@@ -4,6 +4,7 @@ import { AuthForm } from '@/components/AuthForm';
 import { Layout } from '@/components/Layout';
 import { Dashboard } from '@/pages/Dashboard';
 import { MarketingIncentives } from '@/pages/MarketingIncentives';
+import { Offices } from '@/pages/Offices';
 
 const Index = () => {
   const { user, loading } = useAuth();
@@ -29,7 +30,7 @@ const Index = () => {
       case 'dashboard':
         return <Dashboard />;
       case 'offices':
-        return <div>Offices page coming soon...</div>;
+        return <Offices />;
       case 'map':
         return <div>Map view coming soon...</div>;
       case 'marketing':
