@@ -52,6 +52,54 @@ export type Database = {
           },
         ]
       }
+      marketing_visits: {
+        Row: {
+          approach_used: string[] | null
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          office_id: string
+          rating: number | null
+          updated_at: string
+          visit_date: string
+          visit_group: string | null
+          visit_time: string | null
+          visited: boolean | null
+          visited_by: string | null
+        }
+        Insert: {
+          approach_used?: string[] | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          office_id: string
+          rating?: number | null
+          updated_at?: string
+          visit_date?: string
+          visit_group?: string | null
+          visit_time?: string | null
+          visited?: boolean | null
+          visited_by?: string | null
+        }
+        Update: {
+          approach_used?: string[] | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          office_id?: string
+          rating?: number | null
+          updated_at?: string
+          visit_date?: string
+          visit_group?: string | null
+          visit_time?: string | null
+          visited?: boolean | null
+          visited_by?: string | null
+        }
+        Relationships: []
+      }
       office_tags: {
         Row: {
           created_at: string

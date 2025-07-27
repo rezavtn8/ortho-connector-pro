@@ -139,7 +139,7 @@ export function OfficeCard({
             variant="outline" 
             size="sm" 
             className="flex-1"
-            onClick={onViewDetails}
+            onClick={() => window.location.href = `/office/${office.id}`}
           >
             View Details
           </Button>
