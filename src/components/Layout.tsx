@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/hooks/useAuth';
-import { Building2, LogOut, MapPin, Users, BarChart3 } from 'lucide-react';
+import { Building2, LogOut, MapPin, Users, BarChart3, Gift } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -17,6 +17,7 @@ export function Layout({ children, currentPage, onPageChange }: LayoutProps) {
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
     { id: 'offices', label: 'Offices', icon: Building2 },
     { id: 'map', label: 'Map View', icon: MapPin },
+    { id: 'marketing', label: 'Marketing Incentives', icon: Gift },
     { id: 'discovery', label: 'Office Discovery', icon: Users },
   ];
 

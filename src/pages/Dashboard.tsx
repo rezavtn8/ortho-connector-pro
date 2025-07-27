@@ -8,6 +8,7 @@ import { ReferringOffice, OfficeTag, ReferralData, OfficeScore } from '@/lib/dat
 import { supabase } from '@/integrations/supabase/client';
 import { Search, Plus, Filter } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { AddOfficeDialog } from '@/components/AddOfficeDialog';
 
 export function Dashboard() {
   const [offices, setOffices] = useState<ReferringOffice[]>([]);
@@ -127,10 +128,7 @@ export function Dashboard() {
             Manage your referring office relationships
           </p>
         </div>
-        <Button variant="medical" className="gap-2">
-          <Plus className="w-4 h-4" />
-          Add Office
-        </Button>
+        <AddOfficeDialog onOfficeAdded={loadData} />
       </div>
 
       {/* Stats Cards */}
@@ -229,10 +227,7 @@ export function Dashboard() {
             <div className="text-muted-foreground">
               {searchTerm ? 'No offices found matching your search.' : 'No offices found. Add your first office to get started.'}
             </div>
-            <Button variant="medical" className="mt-4 gap-2">
-              <Plus className="w-4 h-4" />
-              Add First Office
-            </Button>
+            <AddOfficeDialog onOfficeAdded={loadData} />
           </CardContent>
         </Card>
       )}
