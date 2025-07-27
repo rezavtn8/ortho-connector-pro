@@ -40,6 +40,8 @@ export default function OfficeProfile() {
   const [loading, setLoading] = useState(true);
   const [editingReferrals, setEditingReferrals] = useState<{ [key: string]: number }>({});
   const [showAddVisit, setShowAddVisit] = useState(false);
+  const [visitFilter, setVisitFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('date-desc');
 
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const teamMembers = ['Dr. Smith', 'Dr. Jones', 'Sarah (Front Desk)', 'Mike (Marketing)'];
@@ -192,6 +194,27 @@ export default function OfficeProfile() {
     const lastReferral = referralData.find(r => r.referral_count > 0);
     return lastReferral ? new Date(lastReferral.month_year).toLocaleDateString() : 'Never';
   };
+
+  const filteredAndSortedVisits = visits
+    .filter(visit => {
+      if (visitFilter === 'visited') return visit.visited;
+      if (visitFilter === 'not-visited') return !visit.visited;
+      return true;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'date-asc':
+          return new Date(a.visit_date).getTime() - new Date(b.visit_date).getTime();
+        case 'date-desc':
+          return new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime();
+        case 'rating-desc':
+          return (b.rating || 0) - (a.rating || 0);
+        case 'rating-asc':
+          return (a.rating || 0) - (b.rating || 0);
+        default:
+          return new Date(b.visit_date).getTime() - new Date(a.visit_date).getTime();
+      }
+    });
 
   if (loading) {
     return <div className="p-6">Loading...</div>;
@@ -393,12 +416,40 @@ export default function OfficeProfile() {
               </div>
             </CardHeader>
             <CardContent>
+              <div className="flex gap-4 mb-4">
+                <Select value={visitFilter} onValueChange={setVisitFilter}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Visits</SelectItem>
+                    <SelectItem value="visited">Visited Only</SelectItem>
+                    <SelectItem value="not-visited">Not Visited</SelectItem>
+                  </SelectContent>
+                </Select>
+                
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="date-desc">Date (Newest First)</SelectItem>
+                    <SelectItem value="date-asc">Date (Oldest First)</SelectItem>
+                    <SelectItem value="rating-desc">Rating (High to Low)</SelectItem>
+                    <SelectItem value="rating-asc">Rating (Low to High)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
               <ScrollArea className="h-[400px]">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Date</TableHead>
                       <TableHead>Time</TableHead>
+                      <TableHead>Group</TableHead>
+                      <TableHead>Address</TableHead>
+                      <TableHead>Phone</TableHead>
                       <TableHead>Visited</TableHead>
                       <TableHead>By</TableHead>
                       <TableHead>Approach</TableHead>
@@ -407,15 +458,18 @@ export default function OfficeProfile() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {visits.map((visit) => (
+                    {filteredAndSortedVisits.map((visit) => (
                       <TableRow key={visit.id}>
                         <TableCell>{new Date(visit.visit_date).toLocaleDateString()}</TableCell>
                         <TableCell>{visit.visit_time || '-'}</TableCell>
+                        <TableCell>{visit.visit_group || '-'}</TableCell>
+                        <TableCell className="max-w-32 truncate">{office?.address}</TableCell>
+                        <TableCell>{office?.phone || '-'}</TableCell>
                         <TableCell>
                           <Checkbox checked={visit.visited} disabled />
                         </TableCell>
                         <TableCell>{visit.visited_by || '-'}</TableCell>
-                        <TableCell>
+                        <TableCell className="max-w-32 truncate">
                           {visit.approach_used?.join(', ') || '-'}
                         </TableCell>
                         <TableCell>
@@ -543,6 +597,33 @@ function AddVisitDialog({ onAdd, onCancel }: { onAdd: (data: any) => void; onCan
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Approach Used</label>
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                {approachOptions.map(approach => (
+                  <div key={approach} className="flex items-center space-x-2">
+                    <Checkbox
+                      checked={formData.approach_used.includes(approach)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setFormData({
+                            ...formData,
+                            approach_used: [...formData.approach_used, approach]
+                          });
+                        } else {
+                          setFormData({
+                            ...formData,
+                            approach_used: formData.approach_used.filter(a => a !== approach)
+                          });
+                        }
+                      }}
+                    />
+                    <label className="text-xs">{approach}</label>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div>
