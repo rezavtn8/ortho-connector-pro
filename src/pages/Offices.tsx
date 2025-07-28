@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { Search, Grid, List, Download, Upload, Filter, MapPin, Phone, Globe, Mail, Star } from 'lucide-react';
 import { ReferringOffice, OfficeTag, OfficeScore } from '@/lib/database.types';
+import { AddOfficeDialog } from '@/components/AddOfficeDialog';
 
 interface OfficeWithData extends ReferringOffice {
   tags: OfficeTag[];
@@ -361,6 +362,8 @@ export const Offices = () => {
               </div>
 
               {/* Actions */}
+              <AddOfficeDialog onOfficeAdded={fetchOffices} />
+              
               <Button variant="outline" size="sm" onClick={exportToCsv}>
                 <Download className="w-4 h-4 mr-2" />
                 Export

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Calendar, Clock, MapPin, Phone, Mail, Globe, Edit, Trash2, Star, Plus, Save, X } from 'lucide-react';
+import { Calendar, Clock, MapPin, Phone, Mail, Globe, Edit, Trash2, Star, Plus, Save, X, ArrowLeft, ExternalLink } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,16 @@ interface MarketingVisit {
   created_at: string;
 }
 
+interface NewVisit {
+  visit_date: string;
+  visit_time: string;
+  visit_group: string;
+  visited_by: string;
+  approach_used: string[];
+  rating: number;
+  notes: string;
+}
+
 export default function OfficeProfile() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -42,6 +52,15 @@ export default function OfficeProfile() {
   const [showAddVisit, setShowAddVisit] = useState(false);
   const [visitFilter, setVisitFilter] = useState('all');
   const [sortBy, setSortBy] = useState('date-desc');
+  const [newVisit, setNewVisit] = useState<NewVisit>({
+    visit_date: new Date().toISOString().split('T')[0],
+    visit_time: '',
+    visit_group: 'New Target',
+    visited_by: '',
+    approach_used: [],
+    rating: 5,
+    notes: ''
+  });
 
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const teamMembers = ['Dr. Smith', 'Dr. Jones', 'Sarah (Front Desk)', 'Mike (Marketing)'];
@@ -225,9 +244,31 @@ export default function OfficeProfile() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* SECTION 1: Office Info Header */}
-      <Card>
+    <div className="min-h-screen bg-gradient-subtle">
+      {/* Header with back button */}
+      <div className="bg-card border-b sticky top-0 z-10">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+            <div className="flex-1">
+              <h1 className="text-2xl font-bold">{office.name}</h1>
+              <p className="text-muted-foreground">Office Profile & Management</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="container mx-auto p-6 space-y-6">
+        {/* SECTION 1: Office Info Header */}
+        <Card>
         <CardHeader className="pb-4">
           <div className="flex justify-between items-start">
             <div className="space-y-2">
@@ -246,64 +287,126 @@ export default function OfficeProfile() {
                 <Edit className="h-4 w-4 mr-2" />
                 Edit
               </Button>
+              <Button variant="outline" size="sm" onClick={() => window.open(`mailto:${office.email}`, '_blank')}>
+                <Mail className="h-4 w-4 mr-2" />
+                Email
+              </Button>
               <Button variant="destructive" size="sm">
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="grid md:grid-cols-2 gap-6">
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-muted-foreground" />
-              <span>{office.address}</span>
-            </div>
-            {office.phone && (
-              <div className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-muted-foreground" />
-                <span>{office.phone}</span>
-              </div>
-            )}
-            {office.email && (
-              <div className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-muted-foreground" />
-                <span>{office.email}</span>
-              </div>
-            )}
-            {office.website && (
-              <div className="flex items-center gap-2">
-                <Globe className="h-4 w-4 text-muted-foreground" />
-                <a href={office.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                  {office.website}
-                </a>
-              </div>
-            )}
-          </div>
-          <div className="space-y-3">
-            {office.distance_from_clinic && (
-              <div>
-                <span className="font-medium">Distance: </span>
-                <span>{office.distance_from_clinic} miles</span>
-              </div>
-            )}
-            {office.office_hours && (
-              <div>
-                <span className="font-medium">Hours: </span>
-                <span>{office.office_hours}</span>
-              </div>
-            )}
-            {tags.length > 0 && (
-              <div>
-                <span className="font-medium">Tags: </span>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {tags.map((tag) => (
-                    <Badge key={tag.id} variant="outline" className="text-xs">
-                      {tag.tag}
-                    </Badge>
-                  ))}
+        <CardContent>
+          <div className="grid md:grid-cols-3 gap-6">
+            {/* Contact Information */}
+            <div className="space-y-4">
+              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Contact Information</h3>
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">Address</p>
+                    <p className="text-sm text-muted-foreground">{office.address}</p>
+                  </div>
                 </div>
+                {office.phone && (
+                  <div className="flex items-center gap-3">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">Phone</p>
+                      <a href={`tel:${office.phone}`} className="text-sm text-primary hover:underline">{office.phone}</a>
+                    </div>
+                  </div>
+                )}
+                {office.email && (
+                  <div className="flex items-center gap-3">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">Email</p>
+                      <a href={`mailto:${office.email}`} className="text-sm text-primary hover:underline">{office.email}</a>
+                    </div>
+                  </div>
+                )}
+                {office.website && (
+                  <div className="flex items-center gap-3">
+                    <Globe className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">Website</p>
+                      <a href={office.website} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
+                        {office.website}
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
+
+            {/* Office Details */}
+            <div className="space-y-4">
+              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Office Details</h3>
+              <div className="space-y-3">
+                {office.distance_from_clinic && (
+                  <div>
+                    <p className="text-sm font-medium">Distance from Clinic</p>
+                    <p className="text-sm text-muted-foreground">{office.distance_from_clinic} miles</p>
+                  </div>
+                )}
+                {office.office_hours && (
+                  <div>
+                    <p className="text-sm font-medium">Office Hours</p>
+                    <p className="text-sm text-muted-foreground">{office.office_hours}</p>
+                  </div>
+                )}
+                {(office.google_rating || office.yelp_rating) && (
+                  <div>
+                    <p className="text-sm font-medium">Ratings</p>
+                    <div className="flex gap-3 text-sm">
+                      {office.google_rating && (
+                        <span className="flex items-center gap-1">
+                          <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                          Google: {office.google_rating}
+                        </span>
+                      )}
+                      {office.yelp_rating && (
+                        <span className="flex items-center gap-1">
+                          <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                          Yelp: {office.yelp_rating}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Partnership Info & Tags */}
+            <div className="space-y-4">
+              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Partnership Status</h3>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm font-medium">Group Classification</p>
+                  <Badge variant={getScoreBadgeVariant(score)} className="mt-1">{score} Partner</Badge>
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Referral Source</p>
+                  <p className="text-sm text-muted-foreground">{office.source}</p>
+                </div>
+                {tags.length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium mb-2">Tags</p>
+                    <div className="flex flex-wrap gap-1">
+                      {tags.map((tag) => (
+                        <Badge key={tag.id} variant="outline" className="text-xs">
+                          {tag.tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -514,8 +617,9 @@ export default function OfficeProfile() {
         </TabsContent>
       </Tabs>
 
-      {/* Add Visit Dialog */}
-      {showAddVisit && <AddVisitDialog onAdd={addNewVisit} onCancel={() => setShowAddVisit(false)} />}
+        {/* Add Visit Dialog */}
+        {showAddVisit && <AddVisitDialog onAdd={addNewVisit} onCancel={() => setShowAddVisit(false)} />}
+      </div>
     </div>
   );
 }
