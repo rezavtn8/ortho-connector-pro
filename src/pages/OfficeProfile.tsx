@@ -81,9 +81,20 @@ export default function OfficeProfile() {
         .from('referring_offices')
         .select('*')
         .eq('id', id)
-        .single();
+        .maybeSingle();
 
       if (officeError) throw officeError;
+      
+      if (!officeData) {
+        toast({
+          title: "Office not found",
+          description: "The requested office could not be found.",
+          variant: "destructive",
+        });
+        navigate('/offices');
+        return;
+      }
+      
       setOffice(officeData);
 
       // Fetch tags
