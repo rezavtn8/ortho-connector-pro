@@ -52,6 +52,63 @@ export type Database = {
           },
         ]
       }
+      marketing_incentives: {
+        Row: {
+          actual_sent_date: string | null
+          assigned_staff: string | null
+          cost_amount: number | null
+          created_at: string
+          created_by: string | null
+          delivery_method: string | null
+          description: string | null
+          id: string
+          incentive_type: string
+          notes: string | null
+          office_id: string
+          personalized_message: string | null
+          scheduled_date: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          actual_sent_date?: string | null
+          assigned_staff?: string | null
+          cost_amount?: number | null
+          created_at?: string
+          created_by?: string | null
+          delivery_method?: string | null
+          description?: string | null
+          id?: string
+          incentive_type: string
+          notes?: string | null
+          office_id: string
+          personalized_message?: string | null
+          scheduled_date?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          actual_sent_date?: string | null
+          assigned_staff?: string | null
+          cost_amount?: number | null
+          created_at?: string
+          created_by?: string | null
+          delivery_method?: string | null
+          description?: string | null
+          id?: string
+          incentive_type?: string
+          notes?: string | null
+          office_id?: string
+          personalized_message?: string | null
+          scheduled_date?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       marketing_visits: {
         Row: {
           approach_used: string[] | null

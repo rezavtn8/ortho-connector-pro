@@ -43,6 +43,25 @@ export interface EngagementLog {
   created_at: string;
 }
 
+export interface MarketingIncentive {
+  id: string;
+  office_id: string;
+  incentive_type: string;
+  title: string;
+  description?: string | null;
+  personalized_message?: string | null;
+  assigned_staff?: string | null;
+  status: 'Planned' | 'Sent' | 'Delivered' | 'Cancelled';
+  delivery_method?: 'In-person' | 'Mail' | 'Email' | 'Other' | null;
+  scheduled_date?: string | null;
+  actual_sent_date?: string | null;
+  cost_amount?: number | null;
+  notes?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface UserProfile {
   id: string;
   user_id?: string | null;
