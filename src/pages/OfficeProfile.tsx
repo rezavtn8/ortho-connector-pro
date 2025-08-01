@@ -75,6 +75,11 @@ export default function OfficeProfile() {
   }, [id]);
 
   const fetchOfficeData = async () => {
+    if (!id) {
+      navigate('/offices');
+      return;
+    }
+
     try {
       setLoading(true);
 
