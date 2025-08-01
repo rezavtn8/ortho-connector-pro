@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { Search, Grid, List, Download, Upload, Filter, MapPin, Phone, Globe, Mail, Star } from 'lucide-react';
+import { Search, Grid, List, Download, Upload, Filter, MapPin, Phone, Globe, Mail, Star, Plus, Minus, Users, ExternalLink } from 'lucide-react';
 import { ReferringOffice, OfficeTag, OfficeScore } from '@/lib/database.types';
 import { AddOfficeDialog } from '@/components/AddOfficeDialog';
 
@@ -22,10 +23,11 @@ export const Offices = () => {
   const [offices, setOffices] = useState<OfficeWithData[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'table'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'table'>('table');
   const [sortBy, setSortBy] = useState('name');
   const [filterBy, setFilterBy] = useState('all');
   const [selectedOffices, setSelectedOffices] = useState<string[]>([]);
+  const [updatingPatients, setUpdatingPatients] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   useEffect(() => {
@@ -177,102 +179,59 @@ export const Offices = () => {
     window.URL.revokeObjectURL(url);
   };
 
-  const renderOfficeCard = (office: OfficeWithData) => (
-    <Card key={office.id} className="relative transition-all hover:shadow-lg">
-      <div className="absolute top-4 left-4">
-        <Checkbox
-          checked={selectedOffices.includes(office.id)}
-          onCheckedChange={() => toggleOfficeSelection(office.id)}
-        />
-      </div>
+  const updatePatientCount = async (officeId: string, newCount: number) => {
+    if (newCount < 0) return;
+    
+    setUpdatingPatients(prev => new Set([...prev, officeId]));
+    try {
+      // For simplicity, we'll update the current month's referral count
+      const currentDate = new Date();
+      const monthYear = `${currentDate.getFullYear()}-${(currentDate.getMonth() + 1).toString().padStart(2, '0')}-01`;
       
-      <CardHeader className="pb-3 pt-12">
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <CardTitle className="text-lg mb-2">{office.name}</CardTitle>
-            <Badge variant={getScoreBadgeVariant(office.score)} className="mb-2">
-              {office.score}
-            </Badge>
-          </div>
-        </div>
-      </CardHeader>
+      const { error } = await supabase
+        .from('referral_data')
+        .upsert({
+          office_id: officeId,
+          month_year: monthYear,
+          referral_count: newCount
+        });
 
-      <CardContent className="space-y-3">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <MapPin className="w-4 h-4" />
-          <span className="line-clamp-2">{office.address}</span>
-        </div>
+      if (error) throw error;
 
-        {office.phone && (
-          <div className="flex items-center gap-2 text-sm">
-            <Phone className="w-4 h-4" />
-            <span>{office.phone}</span>
-          </div>
-        )}
+      // Update local state
+      setOffices(prev => prev.map(office => 
+        office.id === officeId 
+          ? { ...office, totalReferrals: newCount }
+          : office
+      ));
 
-        {office.email && (
-          <div className="flex items-center gap-2 text-sm">
-            <Mail className="w-4 h-4" />
-            <span className="truncate">{office.email}</span>
-          </div>
-        )}
+      toast({
+        title: "Patient count updated",
+        description: `Patient count set to ${newCount}`,
+      });
+    } catch (error) {
+      console.error('Error updating patient count:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update patient count",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingPatients(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(officeId);
+        return newSet;
+      });
+    }
+  };
 
-        {office.website && (
-          <div className="flex items-center gap-2 text-sm">
-            <Globe className="w-4 h-4" />
-            <a href={office.website} target="_blank" rel="noopener noreferrer" 
-               className="text-primary hover:underline truncate">
-              {office.website}
-            </a>
-          </div>
-        )}
+  const incrementPatient = (officeId: string, currentCount: number) => {
+    updatePatientCount(officeId, currentCount + 1);
+  };
 
-        <div className="grid grid-cols-2 gap-4 pt-2 text-sm">
-          <div>
-            <span className="text-muted-foreground">Total Referrals:</span>
-            <p className="font-semibold">{office.totalReferrals}</p>
-          </div>
-          <div>
-            <span className="text-muted-foreground">Last Referral:</span>
-            <p className="font-semibold">
-              {office.lastReferralDate 
-                ? new Date(office.lastReferralDate).toLocaleDateString()
-                : 'Never'
-              }
-            </p>
-          </div>
-        </div>
-
-        {office.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 pt-2">
-            {office.tags.map((tag) => (
-              <Badge key={tag.id} variant="outline" className="text-xs">
-                {tag.tag}
-              </Badge>
-            ))}
-          </div>
-        )}
-
-        <div className="flex gap-2 pt-3">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="flex-1"
-            onClick={() => window.open(`/office/${office.id}`, '_blank')}
-          >
-            View Details
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(office.address)}`, '_blank')}
-          >
-            <MapPin className="w-4 h-4" />
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
+  const decrementPatient = (officeId: string, currentCount: number) => {
+    updatePatientCount(officeId, Math.max(0, currentCount - 1));
+  };
 
   if (loading) {
     return (
@@ -378,13 +337,158 @@ export const Offices = () => {
           </div>
         </div>
 
-        {/* Office Grid */}
-        <div className={`grid gap-6 ${
-          viewMode === 'grid' 
-            ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' 
-            : 'grid-cols-1'
-        }`}>
-          {filteredAndSortedOffices.map(renderOfficeCard)}
+        {/* Offices Table */}
+        <div className="bg-card border rounded-lg overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-12">
+                  <Checkbox
+                    checked={selectedOffices.length === filteredAndSortedOffices.length && filteredAndSortedOffices.length > 0}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setSelectedOffices(filteredAndSortedOffices.map(o => o.id));
+                      } else {
+                        setSelectedOffices([]);
+                      }
+                    }}
+                  />
+                </TableHead>
+                <TableHead>Office Name</TableHead>
+                <TableHead>Contact</TableHead>
+                <TableHead>Score</TableHead>
+                <TableHead>Patient Load</TableHead>
+                <TableHead>Last Referral</TableHead>
+                <TableHead>Tags</TableHead>
+                <TableHead className="w-24">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredAndSortedOffices.map((office) => {
+                const isUpdating = updatingPatients.has(office.id);
+                return (
+                  <TableRow key={office.id} className="hover:bg-muted/50">
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedOffices.includes(office.id)}
+                        onCheckedChange={() => toggleOfficeSelection(office.id)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{office.name}</div>
+                        <div className="text-sm text-muted-foreground flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          {office.address}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1 text-sm">
+                        {office.phone && (
+                          <div className="flex items-center gap-1">
+                            <Phone className="w-3 h-3" />
+                            <span>{office.phone}</span>
+                          </div>
+                        )}
+                        {office.email && (
+                          <div className="flex items-center gap-1">
+                            <Mail className="w-3 h-3" />
+                            <span className="truncate max-w-32">{office.email}</span>
+                          </div>
+                        )}
+                        {office.website && (
+                          <div className="flex items-center gap-1">
+                            <Globe className="w-3 h-3" />
+                            <a href={office.website} target="_blank" rel="noopener noreferrer" 
+                               className="text-primary hover:underline text-xs">
+                              Website
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getScoreBadgeVariant(office.score)}>
+                        {office.score}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
+                          <Users className="w-4 h-4 text-primary" />
+                          <span className={`font-bold text-lg ${isUpdating ? 'animate-pulse' : ''}`}>
+                            {office.totalReferrals}
+                          </span>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => decrementPatient(office.id, office.totalReferrals)}
+                            disabled={isUpdating || office.totalReferrals <= 0}
+                            className="h-7 w-7 p-0 hover:bg-destructive/10 hover:border-destructive hover:text-destructive"
+                          >
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => incrementPatient(office.id, office.totalReferrals)}
+                            disabled={isUpdating}
+                            className="h-7 w-7 p-0 bg-teal-600 hover:bg-teal-700 text-white"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">
+                        {office.lastReferralDate 
+                          ? new Date(office.lastReferralDate).toLocaleDateString()
+                          : 'Never'
+                        }
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {office.tags.slice(0, 2).map((tag) => (
+                          <Badge key={tag.id} variant="outline" className="text-xs">
+                            {tag.tag}
+                          </Badge>
+                        ))}
+                        {office.tags.length > 2 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{office.tags.length - 2}
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          onClick={() => window.open(`/office/${office.id}`, '_blank')}
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(office.address)}`, '_blank')}
+                        >
+                          <MapPin className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
         </div>
 
         {filteredAndSortedOffices.length === 0 && (
