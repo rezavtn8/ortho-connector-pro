@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Calendar, Clock, MapPin, Phone, Mail, Globe, Edit, Trash2, Star, Plus, Save, X, ArrowLeft, ExternalLink } from 'lucide-react';
+import { Calendar, Clock, MapPin, Phone, Mail, Globe, Edit, Trash2, Star, Plus, Save, X, ArrowLeft, ExternalLink, Minus, Users } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -50,6 +50,8 @@ export default function OfficeProfile() {
   const [loading, setLoading] = useState(true);
   const [editingReferrals, setEditingReferrals] = useState<{ [key: string]: number }>({});
   const [showAddVisit, setShowAddVisit] = useState(false);
+  const [patientCount, setPatientCount] = useState(0);
+  const [isUpdatingCount, setIsUpdatingCount] = useState(false);
   const [visitFilter, setVisitFilter] = useState('all');
   const [sortBy, setSortBy] = useState('date-desc');
   const [newVisit, setNewVisit] = useState<NewVisit>({
@@ -125,6 +127,10 @@ export default function OfficeProfile() {
         office_id_param: id
       });
       setScore((scoreData as OfficeScore) || 'Cold');
+
+      // Set initial patient count from total referrals
+      const totalReferrals = (referralDataRes || []).reduce((sum, data) => sum + data.referral_count, 0);
+      setPatientCount(totalReferrals);
 
     } catch (error) {
       console.error('Error fetching office data:', error);
@@ -208,6 +214,50 @@ export default function OfficeProfile() {
       const encodedAddress = encodeURIComponent(office.address);
       window.open(`https://www.google.com/maps/search/?api=1&query=${encodedAddress}`, '_blank');
     }
+  };
+
+  const updatePatientCount = async (newCount: number) => {
+    if (newCount < 0) return;
+    
+    setIsUpdatingCount(true);
+    try {
+      // For simplicity, we'll update the current month's referral count
+      const currentDate = new Date();
+      const monthYear = `${currentDate.getFullYear()}-${(currentDate.getMonth() + 1).toString().padStart(2, '0')}-01`;
+      
+      const { error } = await supabase
+        .from('referral_data')
+        .upsert({
+          office_id: id,
+          month_year: monthYear,
+          referral_count: newCount
+        });
+
+      if (error) throw error;
+
+      setPatientCount(newCount);
+      toast({
+        title: "Patient count updated",
+        description: `Patient count set to ${newCount}`,
+      });
+    } catch (error) {
+      console.error('Error updating patient count:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update patient count",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingCount(false);
+    }
+  };
+
+  const incrementPatient = () => {
+    updatePatientCount(patientCount + 1);
+  };
+
+  const decrementPatient = () => {
+    updatePatientCount(Math.max(0, patientCount - 1));
   };
 
   const getReferralCountForMonth = (year: number, month: number) => {
@@ -417,6 +467,42 @@ export default function OfficeProfile() {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Patient Load Tracker */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Users className="h-5 w-5 text-primary" />
+              <div>
+                <h3 className="font-semibold">Patient Load</h3>
+                <p className="text-sm text-muted-foreground">Referred Patients: <span className={`font-bold text-2xl transition-all duration-300 ${isUpdatingCount ? 'animate-pulse' : ''}`}>{patientCount}</span></p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={decrementPatient}
+                disabled={isUpdatingCount || patientCount <= 0}
+                className="flex items-center gap-1 hover:bg-destructive/10 hover:border-destructive hover:text-destructive transition-colors"
+              >
+                <Minus className="h-4 w-4" />
+                Remove Patient
+              </Button>
+              <Button
+                size="sm"
+                onClick={incrementPatient}
+                disabled={isUpdatingCount}
+                className="flex items-center gap-1 bg-teal-600 hover:bg-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+              >
+                <Plus className="h-4 w-4" />
+                Add Patient
+              </Button>
             </div>
           </div>
         </CardContent>
