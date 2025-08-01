@@ -184,17 +184,24 @@ export const Offices = () => {
     
     setUpdatingPatients(prev => new Set([...prev, officeId]));
     try {
-      // For simplicity, we'll update the current month's referral count
+      // Get current month's referral data
       const currentDate = new Date();
       const monthYear = `${currentDate.getFullYear()}-${(currentDate.getMonth() + 1).toString().padStart(2, '0')}-01`;
       
+      // Use upsert with proper conflict resolution
       const { error } = await supabase
         .from('referral_data')
-        .upsert({
-          office_id: officeId,
-          month_year: monthYear,
-          referral_count: newCount
-        });
+        .upsert(
+          {
+            office_id: officeId,
+            month_year: monthYear,
+            referral_count: newCount
+          },
+          {
+            onConflict: 'office_id,month_year',
+            ignoreDuplicates: false
+          }
+        );
 
       if (error) throw error;
 
