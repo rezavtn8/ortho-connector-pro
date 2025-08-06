@@ -5,6 +5,7 @@ import { Layout } from '@/components/Layout';
 import { Dashboard } from '@/pages/Dashboard';
 import { MarketingIncentives } from '@/pages/MarketingIncentives';
 import { Offices } from '@/pages/Offices';
+import { OfficeDiscovery } from '@/pages/OfficeDiscovery';
 
 const Index = () => {
   const { user, loading } = useAuth();
@@ -36,7 +37,7 @@ const Index = () => {
       case 'marketing':
         return <MarketingIncentives />;
       case 'discovery':
-        return <div>Office discovery coming soon...</div>;
+        return <OfficeDiscovery />;
       default:
         return <Dashboard />;
     }
