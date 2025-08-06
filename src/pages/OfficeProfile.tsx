@@ -80,6 +80,19 @@ export default function OfficeProfile() {
       return;
     }
 
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      console.error('Invalid UUID format:', id);
+      toast({
+        title: "Invalid office ID",
+        description: "The office ID format is invalid.",
+        variant: "destructive",
+      });
+      navigate('/offices');
+      return;
+    }
+
     try {
       setLoading(true);
 
