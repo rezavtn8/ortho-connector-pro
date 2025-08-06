@@ -6,6 +6,7 @@ import { Dashboard } from '@/pages/Dashboard';
 import { MarketingIncentives } from '@/pages/MarketingIncentives';
 import { Offices } from '@/pages/Offices';
 import { OfficeDiscovery } from '@/pages/OfficeDiscovery';
+import { Settings } from '@/pages/Settings';
 
 const Index = () => {
   const { user, loading } = useAuth();
@@ -38,6 +39,8 @@ const Index = () => {
         return <MarketingIncentives />;
       case 'discovery':
         return <OfficeDiscovery />;
+      case 'settings':
+        return <Settings />;
       default:
         return <Dashboard />;
     }

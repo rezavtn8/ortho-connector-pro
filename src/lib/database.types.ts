@@ -68,6 +68,10 @@ export interface UserProfile {
   email: string;
   role: string; // Will be constrained by database but TypeScript sees it as string
   pin_code?: string | null;
+  clinic_name?: string | null;
+  clinic_address?: string | null;
+  clinic_latitude?: number | null;
+  clinic_longitude?: number | null;
   created_at: string;
   updated_at: string;
 }
