@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Calendar, Clock, MapPin, Phone, Mail, Globe, Edit, Trash2, Star, Plus, Save, X, ArrowLeft, ExternalLink, Minus, Users } from 'lucide-react';
+import MapWrapper from '@/components/MapComponent';
+import { OfficeMapModal } from '@/components/OfficeMapModal';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -63,6 +65,7 @@ export default function OfficeProfile() {
     rating: 5,
     notes: ''
   });
+  const [showMapModal, setShowMapModal] = useState(false);
 
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const teamMembers = ['Dr. Smith', 'Dr. Jones', 'Sarah (Front Desk)', 'Mike (Marketing)'];
@@ -358,9 +361,13 @@ export default function OfficeProfile() {
               <p className="text-muted-foreground">Source: {office.source}</p>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={openInGoogleMaps}>
+              <Button variant="outline" size="sm" onClick={() => setShowMapModal(true)}>
                 <MapPin className="h-4 w-4 mr-2" />
-                Maps
+                View Map
+              </Button>
+              <Button variant="outline" size="sm" onClick={openInGoogleMaps}>
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Google Maps
               </Button>
               <Button variant="outline" size="sm">
                 <Edit className="h-4 w-4 mr-2" />
@@ -734,6 +741,13 @@ export default function OfficeProfile() {
 
         {/* Add Visit Dialog */}
         {showAddVisit && <AddVisitDialog onAdd={addNewVisit} onCancel={() => setShowAddVisit(false)} />}
+        
+        {/* Map Modal */}
+        <OfficeMapModal 
+          office={office}
+          isOpen={showMapModal}
+          onClose={() => setShowMapModal(false)}
+        />
       </div>
     </div>
   );

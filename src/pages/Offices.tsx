@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Search, Grid, List, Download, Upload, Filter, MapPin, Phone, Globe, Mail, Star, Plus, Minus, Users, ExternalLink } from 'lucide-react';
 import { ReferringOffice, OfficeTag, OfficeScore } from '@/lib/database.types';
 import { AddOfficeDialog } from '@/components/AddOfficeDialog';
+import { OfficesMapView } from '@/components/OfficesMapView';
 
 interface OfficeWithData extends ReferringOffice {
   tags: OfficeTag[];
@@ -23,7 +24,7 @@ export const Offices = () => {
   const [offices, setOffices] = useState<OfficeWithData[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'table'>('table');
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'table' | 'map'>('table');
   const [sortBy, setSortBy] = useState('name');
   const [filterBy, setFilterBy] = useState('all');
   const [selectedOffices, setSelectedOffices] = useState<string[]>([]);
@@ -323,20 +324,20 @@ export const Offices = () => {
               {/* View Mode */}
               <div className="flex border rounded-md">
                 <Button
-                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                  variant={viewMode === 'table' ? 'default' : 'ghost'}
                   size="sm"
-                  onClick={() => setViewMode('grid')}
+                  onClick={() => setViewMode('table')}
                   className="rounded-r-none"
                 >
-                  <Grid className="w-4 h-4" />
+                  <List className="w-4 h-4" />
                 </Button>
                 <Button
-                  variant={viewMode === 'list' ? 'default' : 'ghost'}
+                  variant={viewMode === 'map' ? 'default' : 'ghost'}
                   size="sm"
-                  onClick={() => setViewMode('list')}
-                  className="rounded-none border-x"
+                  onClick={() => setViewMode('map')}
+                  className="rounded-l-none"
                 >
-                  <List className="w-4 h-4" />
+                  <MapPin className="w-4 h-4" />
                 </Button>
               </div>
 
@@ -357,9 +358,12 @@ export const Offices = () => {
           </div>
         </div>
 
-        {/* Offices Table */}
-        <div className="bg-card border rounded-lg overflow-hidden">
-          <Table>
+        {/* Content based on view mode */}
+        {viewMode === 'map' ? (
+          <OfficesMapView offices={filteredAndSortedOffices} />
+        ) : (
+          <div className="bg-card border rounded-lg overflow-hidden">
+            <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="w-12">
@@ -509,7 +513,8 @@ export const Offices = () => {
               })}
             </TableBody>
           </Table>
-        </div>
+          </div>
+        )}
 
         {filteredAndSortedOffices.length === 0 && (
           <div className="text-center py-12">

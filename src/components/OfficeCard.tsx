@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ReferringOffice, OfficeTag, OfficeScore } from '@/lib/database.types';
 import { MapPin, Phone, Globe, Star, Clock } from 'lucide-react';
+import { OfficeMapModal } from './OfficeMapModal';
 
 interface OfficeCardProps {
   office: ReferringOffice;
@@ -24,6 +25,7 @@ export function OfficeCard({
   onViewDetails,
   onEdit 
 }: OfficeCardProps) {
+  const [showMapModal, setShowMapModal] = useState(false);
   const getScoreBadgeVariant = (score: OfficeScore) => {
     switch (score) {
       case 'Strong': return 'strong';
@@ -144,13 +146,20 @@ export function OfficeCard({
             View Details
           </Button>
           <Button 
-            variant="ghost" 
+            variant="outline" 
             size="sm"
-            onClick={onEdit}
+            onClick={() => setShowMapModal(true)}
           >
-            Edit
+            <MapPin className="w-4 h-4 mr-1" />
+            Map
           </Button>
         </div>
+        
+        <OfficeMapModal 
+          office={office}
+          isOpen={showMapModal}
+          onClose={() => setShowMapModal(false)}
+        />
       </CardContent>
     </Card>
   );
