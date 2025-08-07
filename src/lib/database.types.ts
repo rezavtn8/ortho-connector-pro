@@ -11,10 +11,22 @@ export interface ReferringOffice {
   distance_from_clinic?: number | null;
   latitude?: number | null;
   longitude?: number | null;
+  patient_load?: number | null;
   notes?: string | null;
   source: string; // Will be constrained by database but TypeScript sees it as string
   created_at: string;
   updated_at: string;
+}
+
+export interface PatientLoadHistory {
+  id: string;
+  office_id: string;
+  patient_count: number;
+  previous_count?: number | null;
+  timestamp: string;
+  changed_by_user_id?: string | null;
+  notes?: string | null;
+  created_at: string;
 }
 
 export interface OfficeTag {

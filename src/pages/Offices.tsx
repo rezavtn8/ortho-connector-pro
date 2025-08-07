@@ -12,6 +12,8 @@ import { Search, Grid, List, Download, Upload, Filter, MapPin, Phone, Globe, Mai
 import { ReferringOffice, OfficeTag, OfficeScore } from '@/lib/database.types';
 import { AddOfficeDialog } from '@/components/AddOfficeDialog';
 import { OfficesMapView } from '@/components/OfficesMapView';
+import { PatientLoadDisplay } from '@/components/PatientLoadDisplay';
+import { PatientLoadHistoryModal } from '@/components/PatientLoadHistoryModal';
 
 interface OfficeWithData extends ReferringOffice {
   tags: OfficeTag[];
@@ -28,7 +30,8 @@ export const Offices = () => {
   const [sortBy, setSortBy] = useState('name');
   const [filterBy, setFilterBy] = useState('all');
   const [selectedOffices, setSelectedOffices] = useState<string[]>([]);
-  const [updatingPatients, setUpdatingPatients] = useState<Set<string>>(new Set());
+  const [selectedOfficeForHistory, setSelectedOfficeForHistory] = useState<OfficeWithData | null>(null);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -162,6 +165,7 @@ export const Offices = () => {
       Website: office.website || '',
       Score: office.score,
       'Total Referrals': office.totalReferrals,
+      'Patient Load': office.patient_load || 0,
       'Last Referral': office.lastReferralDate || '',
       Tags: office.tags.map(t => t.tag).join('; ')
     }));
@@ -180,78 +184,14 @@ export const Offices = () => {
     window.URL.revokeObjectURL(url);
   };
 
-  const updatePatientCount = async (officeId: string, newCount: number) => {
-    if (newCount < 0) return;
-    
-    setUpdatingPatients(prev => new Set([...prev, officeId]));
-    try {
-      const currentDate = new Date();
-      const monthYear = `${currentDate.getFullYear()}-${(currentDate.getMonth() + 1).toString().padStart(2, '0')}-01`;
-      
-      // First get current count to see if record exists
-      const { data: existingData } = await supabase
-        .from('referral_data')
-        .select('referral_count')
-        .eq('office_id', officeId)
-        .eq('month_year', monthYear)
-        .maybeSingle();
-
-      let error;
-      if (existingData) {
-        // Update existing record
-        const { error: updateError } = await supabase
-          .from('referral_data')
-          .update({ referral_count: newCount })
-          .eq('office_id', officeId)
-          .eq('month_year', monthYear);
-        error = updateError;
-      } else {
-        // Insert new record
-        const { error: insertError } = await supabase
-          .from('referral_data')
-          .insert({
-            office_id: officeId,
-            month_year: monthYear,
-            referral_count: newCount
-          });
-        error = insertError;
-      }
-
-      if (error) throw error;
-
-      // Update local state
-      setOffices(prev => prev.map(office => 
-        office.id === officeId 
-          ? { ...office, totalReferrals: newCount }
-          : office
-      ));
-
-      toast({
-        title: "Patient count updated",
-        description: `Patient count set to ${newCount}`,
-      });
-    } catch (error) {
-      console.error('Error updating patient count:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update patient count",
-        variant: "destructive",
-      });
-    } finally {
-      setUpdatingPatients(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(officeId);
-        return newSet;
-      });
-    }
+  const openPatientLoadHistory = (office: OfficeWithData) => {
+    setSelectedOfficeForHistory(office);
+    setIsHistoryModalOpen(true);
   };
 
-  const incrementPatient = (officeId: string, currentCount: number) => {
-    updatePatientCount(officeId, currentCount + 1);
-  };
-
-  const decrementPatient = (officeId: string, currentCount: number) => {
-    updatePatientCount(officeId, Math.max(0, currentCount - 1));
+  const closePatientLoadHistory = () => {
+    setIsHistoryModalOpen(false);
+    setSelectedOfficeForHistory(null);
   };
 
   if (loading) {
@@ -389,7 +329,6 @@ export const Offices = () => {
             </TableHeader>
             <TableBody>
               {filteredAndSortedOffices.map((office) => {
-                const isUpdating = updatingPatients.has(office.id);
                 return (
                   <TableRow key={office.id} className="hover:bg-muted/50">
                     <TableCell>
@@ -438,33 +377,11 @@ export const Offices = () => {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1">
-                          <Users className="w-4 h-4 text-primary" />
-                          <span className={`font-bold text-lg ${isUpdating ? 'animate-pulse' : ''}`}>
-                            {office.totalReferrals}
-                          </span>
-                        </div>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => decrementPatient(office.id, office.totalReferrals)}
-                            disabled={isUpdating || office.totalReferrals <= 0}
-                            className="h-7 w-7 p-0 hover:bg-destructive/10 hover:border-destructive hover:text-destructive"
-                          >
-                            <Minus className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => incrementPatient(office.id, office.totalReferrals)}
-                            disabled={isUpdating}
-                            className="h-7 w-7 p-0 bg-teal-600 hover:bg-teal-700 text-white"
-                          >
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
+                      <PatientLoadDisplay
+                        officeId={office.id}
+                        patientLoad={office.patient_load || 0}
+                        onHistoryClick={() => openPatientLoadHistory(office)}
+                      />
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
@@ -526,6 +443,18 @@ export const Offices = () => {
               Try adjusting your search terms or filters
             </p>
           </div>
+        )}
+
+        {/* Patient Load History Modal */}
+        {selectedOfficeForHistory && (
+          <PatientLoadHistoryModal
+            isOpen={isHistoryModalOpen}
+            onClose={closePatientLoadHistory}
+            officeId={selectedOfficeForHistory.id}
+            officeName={selectedOfficeForHistory.name}
+            currentPatientLoad={selectedOfficeForHistory.patient_load || 0}
+            onUpdate={fetchOffices}
+          />
         )}
       </div>
     </div>
