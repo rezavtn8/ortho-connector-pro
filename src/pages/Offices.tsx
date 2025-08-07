@@ -13,7 +13,6 @@ import { ReferringOffice, OfficeTag, OfficeScore } from '@/lib/database.types';
 import { AddOfficeDialog } from '@/components/AddOfficeDialog';
 import { OfficesMapView } from '@/components/OfficesMapView';
 import { PatientLoadDisplay } from '@/components/PatientLoadDisplay';
-import { PatientLoadHistoryModal } from '@/components/PatientLoadHistoryModal';
 
 interface OfficeWithData extends ReferringOffice {
   tags: OfficeTag[];
@@ -30,8 +29,6 @@ export const Offices = () => {
   const [sortBy, setSortBy] = useState('name');
   const [filterBy, setFilterBy] = useState('all');
   const [selectedOffices, setSelectedOffices] = useState<string[]>([]);
-  const [selectedOfficeForHistory, setSelectedOfficeForHistory] = useState<OfficeWithData | null>(null);
-  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -184,15 +181,6 @@ export const Offices = () => {
     window.URL.revokeObjectURL(url);
   };
 
-  const openPatientLoadHistory = (office: OfficeWithData) => {
-    setSelectedOfficeForHistory(office);
-    setIsHistoryModalOpen(true);
-  };
-
-  const closePatientLoadHistory = () => {
-    setIsHistoryModalOpen(false);
-    setSelectedOfficeForHistory(null);
-  };
 
   if (loading) {
     return (
@@ -380,7 +368,7 @@ export const Offices = () => {
                       <PatientLoadDisplay
                         officeId={office.id}
                         patientLoad={office.patient_load || 0}
-                        onHistoryClick={() => openPatientLoadHistory(office)}
+                        onUpdate={fetchOffices}
                       />
                     </TableCell>
                     <TableCell>
@@ -443,18 +431,6 @@ export const Offices = () => {
               Try adjusting your search terms or filters
             </p>
           </div>
-        )}
-
-        {/* Patient Load History Modal */}
-        {selectedOfficeForHistory && (
-          <PatientLoadHistoryModal
-            isOpen={isHistoryModalOpen}
-            onClose={closePatientLoadHistory}
-            officeId={selectedOfficeForHistory.id}
-            officeName={selectedOfficeForHistory.name}
-            currentPatientLoad={selectedOfficeForHistory.patient_load || 0}
-            onUpdate={fetchOffices}
-          />
         )}
       </div>
     </div>
