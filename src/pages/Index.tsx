@@ -7,6 +7,7 @@ import { MarketingIncentives } from '@/pages/MarketingIncentives';
 import { Offices } from '@/pages/Offices';
 import { OfficeDiscovery } from '@/pages/OfficeDiscovery';
 import { Settings } from '@/pages/Settings';
+import { Map } from '@/pages/Map';
 
 const Index = () => {
   const { user, loading } = useAuth();
@@ -34,7 +35,7 @@ const Index = () => {
       case 'offices':
         return <Offices />;
       case 'map':
-        return <div>Map view coming soon...</div>;
+        return <Map />;
       case 'marketing':
         return <MarketingIncentives />;
       case 'discovery':
