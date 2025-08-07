@@ -186,6 +186,47 @@ export type Database = {
           },
         ]
       }
+      patient_load_history: {
+        Row: {
+          changed_by_user_id: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          office_id: string
+          patient_count: number
+          previous_count: number | null
+          timestamp: string
+        }
+        Insert: {
+          changed_by_user_id?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          office_id: string
+          patient_count: number
+          previous_count?: number | null
+          timestamp?: string
+        }
+        Update: {
+          changed_by_user_id?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          office_id?: string
+          patient_count?: number
+          previous_count?: number | null
+          timestamp?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patient_load_history_office_id_fkey"
+            columns: ["office_id"]
+            isOneToOne: false
+            referencedRelation: "referring_offices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       referral_data: {
         Row: {
           created_at: string
@@ -234,6 +275,7 @@ export type Database = {
           name: string
           notes: string | null
           office_hours: string | null
+          patient_load: number | null
           phone: string | null
           source: string | null
           updated_at: string
@@ -252,6 +294,7 @@ export type Database = {
           name: string
           notes?: string | null
           office_hours?: string | null
+          patient_load?: number | null
           phone?: string | null
           source?: string | null
           updated_at?: string
@@ -270,6 +313,7 @@ export type Database = {
           name?: string
           notes?: string | null
           office_hours?: string | null
+          patient_load?: number | null
           phone?: string | null
           source?: string | null
           updated_at?: string
@@ -328,6 +372,15 @@ export type Database = {
       calculate_office_score: {
         Args: { office_id_param: string }
         Returns: string
+      }
+      get_patient_load_trend: {
+        Args: { office_id_param: string; days_back?: number }
+        Returns: {
+          current_count: number
+          previous_count: number
+          trend_direction: string
+          last_updated: string
+        }[]
       }
     }
     Enums: {
