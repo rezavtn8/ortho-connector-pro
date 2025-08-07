@@ -8,6 +8,7 @@ import { Offices } from '@/pages/Offices';
 import { OfficeDiscovery } from '@/pages/OfficeDiscovery';
 import { Settings } from '@/pages/Settings';
 import { Map } from '@/pages/Map';
+import { Analytics } from '@/pages/Analytics';
 
 const Index = () => {
   const { user, loading } = useAuth();
@@ -40,6 +41,8 @@ const Index = () => {
         return <MarketingIncentives />;
       case 'discovery':
         return <OfficeDiscovery />;
+      case 'analytics':
+        return <Analytics />;
       case 'settings':
         return <Settings />;
       default:
