@@ -7,320 +7,183 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.12 (cd3cf9e)"
   }
   public: {
     Tables: {
-      engagement_logs: {
+      monthly_patients: {
         Row: {
-          created_at: string
-          created_by: string | null
+          created_at: string | null
           id: string
-          interaction_date: string
-          interaction_type: string
-          notes: string | null
-          office_id: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          interaction_date?: string
-          interaction_type: string
-          notes?: string | null
-          office_id: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          interaction_date?: string
-          interaction_type?: string
-          notes?: string | null
-          office_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "engagement_logs_office_id_fkey"
-            columns: ["office_id"]
-            isOneToOne: false
-            referencedRelation: "referring_offices"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      marketing_incentives: {
-        Row: {
-          actual_sent_date: string | null
-          assigned_staff: string | null
-          cost_amount: number | null
-          created_at: string
-          created_by: string | null
-          delivery_method: string | null
-          description: string | null
-          id: string
-          incentive_type: string
-          notes: string | null
-          office_id: string
-          personalized_message: string | null
-          scheduled_date: string | null
-          status: string
-          title: string
-          updated_at: string
-        }
-        Insert: {
-          actual_sent_date?: string | null
-          assigned_staff?: string | null
-          cost_amount?: number | null
-          created_at?: string
-          created_by?: string | null
-          delivery_method?: string | null
-          description?: string | null
-          id?: string
-          incentive_type: string
-          notes?: string | null
-          office_id: string
-          personalized_message?: string | null
-          scheduled_date?: string | null
-          status?: string
-          title: string
-          updated_at?: string
-        }
-        Update: {
-          actual_sent_date?: string | null
-          assigned_staff?: string | null
-          cost_amount?: number | null
-          created_at?: string
-          created_by?: string | null
-          delivery_method?: string | null
-          description?: string | null
-          id?: string
-          incentive_type?: string
-          notes?: string | null
-          office_id?: string
-          personalized_message?: string | null
-          scheduled_date?: string | null
-          status?: string
-          title?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      marketing_visits: {
-        Row: {
-          approach_used: string[] | null
-          created_at: string
-          created_by: string | null
-          id: string
-          notes: string | null
-          office_id: string
-          rating: number | null
-          updated_at: string
-          visit_date: string
-          visit_group: string | null
-          visit_time: string | null
-          visited: boolean | null
-          visited_by: string | null
-        }
-        Insert: {
-          approach_used?: string[] | null
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          notes?: string | null
-          office_id: string
-          rating?: number | null
-          updated_at?: string
-          visit_date?: string
-          visit_group?: string | null
-          visit_time?: string | null
-          visited?: boolean | null
-          visited_by?: string | null
-        }
-        Update: {
-          approach_used?: string[] | null
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          notes?: string | null
-          office_id?: string
-          rating?: number | null
-          updated_at?: string
-          visit_date?: string
-          visit_group?: string | null
-          visit_time?: string | null
-          visited?: boolean | null
-          visited_by?: string | null
-        }
-        Relationships: []
-      }
-      office_tags: {
-        Row: {
-          created_at: string
-          id: string
-          office_id: string
-          tag: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          office_id: string
-          tag: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          office_id?: string
-          tag?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "office_tags_office_id_fkey"
-            columns: ["office_id"]
-            isOneToOne: false
-            referencedRelation: "referring_offices"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      patient_load_history: {
-        Row: {
-          changed_by_user_id: string | null
-          created_at: string
-          id: string
-          notes: string | null
-          office_id: string
+          last_modified_by: string | null
           patient_count: number
-          previous_count: number | null
-          timestamp: string
+          source_id: string | null
+          updated_at: string | null
+          year_month: string
         }
         Insert: {
-          changed_by_user_id?: string | null
-          created_at?: string
+          created_at?: string | null
           id?: string
-          notes?: string | null
-          office_id: string
-          patient_count: number
-          previous_count?: number | null
-          timestamp?: string
-        }
-        Update: {
-          changed_by_user_id?: string | null
-          created_at?: string
-          id?: string
-          notes?: string | null
-          office_id?: string
+          last_modified_by?: string | null
           patient_count?: number
-          previous_count?: number | null
-          timestamp?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "patient_load_history_office_id_fkey"
-            columns: ["office_id"]
-            isOneToOne: false
-            referencedRelation: "referring_offices"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      referral_data: {
-        Row: {
-          created_at: string
-          id: string
-          month_year: string
-          office_id: string
-          referral_count: number
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          month_year: string
-          office_id: string
-          referral_count?: number
-          updated_at?: string
+          source_id?: string | null
+          updated_at?: string | null
+          year_month: string
         }
         Update: {
-          created_at?: string
+          created_at?: string | null
           id?: string
-          month_year?: string
-          office_id?: string
-          referral_count?: number
-          updated_at?: string
+          last_modified_by?: string | null
+          patient_count?: number
+          source_id?: string | null
+          updated_at?: string | null
+          year_month?: string
         }
         Relationships: [
           {
-            foreignKeyName: "referral_data_office_id_fkey"
-            columns: ["office_id"]
+            foreignKeyName: "monthly_patients_source_id_fkey"
+            columns: ["source_id"]
             isOneToOne: false
-            referencedRelation: "referring_offices"
+            referencedRelation: "patient_sources"
             referencedColumns: ["id"]
           },
         ]
       }
-      referring_offices: {
+      patient_changes_log: {
         Row: {
-          address: string
-          created_at: string
-          distance_from_clinic: number | null
-          email: string | null
-          google_rating: number | null
+          change_type: string | null
+          changed_at: string | null
+          changed_by: string | null
           id: string
+          new_count: number | null
+          old_count: number | null
+          reason: string | null
+          source_id: string | null
+          year_month: string
+        }
+        Insert: {
+          change_type?: string | null
+          changed_at?: string | null
+          changed_by?: string | null
+          id?: string
+          new_count?: number | null
+          old_count?: number | null
+          reason?: string | null
+          source_id?: string | null
+          year_month: string
+        }
+        Update: {
+          change_type?: string | null
+          changed_at?: string | null
+          changed_by?: string | null
+          id?: string
+          new_count?: number | null
+          old_count?: number | null
+          reason?: string | null
+          source_id?: string | null
+          year_month?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patient_changes_log_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "patient_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      patient_sources: {
+        Row: {
+          address: string | null
+          contact_person: string | null
+          created_at: string | null
+          created_by: string | null
+          email: string | null
+          id: string
+          is_active: boolean | null
           latitude: number | null
           longitude: number | null
           name: string
           notes: string | null
           office_hours: string | null
-          patient_load: number | null
           phone: string | null
-          source: string | null
-          updated_at: string
+          source_type: Database["public"]["Enums"]["source_type"]
+          updated_at: string | null
           website: string | null
-          yelp_rating: number | null
         }
         Insert: {
-          address: string
-          created_at?: string
-          distance_from_clinic?: number | null
+          address?: string | null
+          contact_person?: string | null
+          created_at?: string | null
+          created_by?: string | null
           email?: string | null
-          google_rating?: number | null
           id?: string
+          is_active?: boolean | null
           latitude?: number | null
           longitude?: number | null
           name: string
           notes?: string | null
           office_hours?: string | null
-          patient_load?: number | null
           phone?: string | null
-          source?: string | null
-          updated_at?: string
+          source_type: Database["public"]["Enums"]["source_type"]
+          updated_at?: string | null
           website?: string | null
-          yelp_rating?: number | null
         }
         Update: {
-          address?: string
-          created_at?: string
-          distance_from_clinic?: number | null
+          address?: string | null
+          contact_person?: string | null
+          created_at?: string | null
+          created_by?: string | null
           email?: string | null
-          google_rating?: number | null
           id?: string
+          is_active?: boolean | null
           latitude?: number | null
           longitude?: number | null
           name?: string
           notes?: string | null
           office_hours?: string | null
-          patient_load?: number | null
           phone?: string | null
-          source?: string | null
-          updated_at?: string
+          source_type?: Database["public"]["Enums"]["source_type"]
+          updated_at?: string | null
           website?: string | null
-          yelp_rating?: number | null
         }
         Relationships: []
+      }
+      source_tags: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          source_id: string | null
+          tag_name: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          source_id?: string | null
+          tag_name: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          source_id?: string | null
+          tag_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_tags_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "patient_sources"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_profiles: {
         Row: {
@@ -369,21 +232,94 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_office_referral: {
+        Args: {
+          office_id_param: string
+          referral_count_param?: number
+          referral_date?: string
+        }
+        Returns: undefined
+      }
+      add_patient_with_period: {
+        Args: {
+          p_increment?: number
+          p_office_id: string
+          p_period_type: string
+        }
+        Returns: Json
+      }
+      adjust_patient_count: {
+        Args: { p_delta: number; p_source_id: string; p_year_month: string }
+        Returns: number
+      }
       calculate_office_score: {
         Args: { office_id_param: string }
         Returns: string
       }
+      calculate_source_score: {
+        Args: { source_id_param: string }
+        Returns: string
+      }
+      get_current_month_patients: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          current_month_patients: number
+          is_office: boolean
+          month_year: string
+          source_id: string
+          source_name: string
+          source_type: string
+        }[]
+      }
+      get_office_metrics: {
+        Args: {
+          end_date?: string
+          office_id_param: string
+          start_date?: string
+        }
+        Returns: {
+          metric_date: string
+          patient_count: number
+          referral_count: number
+        }[]
+      }
+      get_office_period_stats: {
+        Args: { p_office_id: string; p_period_type: string }
+        Returns: Json
+      }
       get_patient_load_trend: {
-        Args: { office_id_param: string; days_back?: number }
+        Args: { days_back?: number; office_id_param: string }
         Returns: {
           current_count: number
+          last_updated: string
           previous_count: number
           trend_direction: string
-          last_updated: string
         }[]
+      }
+      set_patient_count: {
+        Args: {
+          p_count: number
+          p_reason?: string
+          p_source_id: string
+          p_year_month: string
+        }
+        Returns: number
+      }
+      update_patient_count: {
+        Args: { p_count: number; p_source_id: string }
+        Returns: Json
       }
     }
     Enums: {
+      source_type:
+        | "Office"
+        | "Google"
+        | "Yelp"
+        | "Website"
+        | "Word of Mouth"
+        | "Insurance"
+        | "Social Media"
+        | "Other"
       user_role: "Owner" | "Front Desk" | "Marketing Rep"
     }
     CompositeTypes: {
@@ -512,6 +448,16 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      source_type: [
+        "Office",
+        "Google",
+        "Yelp",
+        "Website",
+        "Word of Mouth",
+        "Insurance",
+        "Social Media",
+        "Other",
+      ],
       user_role: ["Owner", "Front Desk", "Marketing Rep"],
     },
   },
