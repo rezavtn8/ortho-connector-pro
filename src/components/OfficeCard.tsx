@@ -171,7 +171,7 @@ export const OfficeCard: React.FC<OfficeCardProps> = ({
         {/* Source Type Badge */}
         <div className="pt-2 border-t">
           <Badge variant="outline" className="text-xs">
-            {office.source_type.replace('_', ' ')}
+            {office.source_type}
           </Badge>
         </div>
 
@@ -196,7 +196,7 @@ export const OfficeCard: React.FC<OfficeCardProps> = ({
                 variant="secondary" 
                 className="text-xs"
               >
-                {tag.tag}
+                {tag.tag_name}
               </Badge>
             ))}
             {tags.length > 3 && (

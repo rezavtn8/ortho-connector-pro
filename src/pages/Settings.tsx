@@ -308,27 +308,13 @@ export function Settings() {
               <Label>Location Preview</Label>
               <div className="h-64 rounded-lg overflow-hidden border">
                 {hasLocation ? (
-                  <MapWrapper
-                    center={{
-                      lat: clinicSettings.clinic_latitude!,
-                      lng: clinicSettings.clinic_longitude!,
-                    }}
-                    zoom={15}
-                    markers={[{
-                      position: {
-                        lat: clinicSettings.clinic_latitude!,
-                        lng: clinicSettings.clinic_longitude!,
-                      },
-                      title: clinicSettings.clinic_name || 'Your Clinic',
-                      info: `
-                        <div class="p-3">
-                          <h3 class="font-semibold text-primary">${clinicSettings.clinic_name || 'Your Clinic'}</h3>
-                          <p class="text-sm text-muted-foreground mt-1">${clinicSettings.clinic_address || 'Clinic location'}</p>
-                        </div>
-                      `
-                    }]}
-                    height="100%"
-                  />
+                  <div className="flex items-center justify-center h-full bg-muted text-muted-foreground">
+                    <div className="text-center">
+                      <MapPin className="h-8 w-8 mx-auto mb-2" />
+                      <p className="text-sm">Map view will be available soon</p>
+                      <p className="text-xs mt-1">Lat: {clinicSettings.clinic_latitude}, Lng: {clinicSettings.clinic_longitude}</p>
+                    </div>
+                  </div>
                 ) : (
                   <div className="h-full bg-muted flex items-center justify-center">
                     <div className="text-center text-muted-foreground">

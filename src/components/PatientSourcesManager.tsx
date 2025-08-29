@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Building2, Users, MapPin, Trash2, Edit } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { SourceType } from '@/lib/database.types';
 
 interface PatientSource {
   id: string;
@@ -92,7 +93,7 @@ export const PatientSourceManagement: React.FC<PatientSourceManagementProps> = (
         .from('patient_sources')
         .insert({
           name: formData.name,
-          source_type: 'Other', // Use valid enum value
+          source_type: 'Other' as SourceType,
           notes: formData.notes || null
         });
 

@@ -33,7 +33,7 @@ const Index = () => {
   const renderPage = () => {
     // Handle source detail view
     if (currentPage === 'source-detail' && selectedSourceId) {
-      return <SourceDetail sourceId={selectedSourceId} onBack={() => setCurrentPage('sources')} />;
+      return <SourceDetail />;
     }
 
     switch (currentPage) {

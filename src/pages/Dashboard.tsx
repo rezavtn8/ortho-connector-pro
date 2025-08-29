@@ -209,7 +209,7 @@ export function Dashboard() {
                 <CardContent>
                   <div className="text-center">
                     <div className="text-sm text-muted-foreground mb-2">
-                      Type: {office.source_type.replace('_', ' ')}
+                      Type: {office.source_type}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       Status: {office.is_active ? 'Active' : 'Inactive'}

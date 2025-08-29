@@ -12,6 +12,7 @@ import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { SourceType } from '@/lib/database.types';
 
 interface AddOfficeDialogProps {
   onOfficeAdded: () => void;
@@ -146,7 +147,7 @@ export const AddOfficeDialog: React.FC<AddOfficeDialogProps> = ({ onOfficeAdded 
           email: formData.email.trim() || null,
           website: formData.website.trim() || null,
           notes: formData.notes.trim() || null,
-          source_type: 'Other', // Use valid enum value
+          source_type: 'Other' as SourceType,
           is_active: true
         })
         .select()

@@ -1,42 +1,54 @@
 // src/lib/database.types.ts
 
-// IMPORTANT: Export the source type as a type
+// IMPORTANT: Export the source type as a type to match database enum
 export type SourceType = 
-  | 'dental_office'
-  | 'medical_office'
-  | 'insurance'
-  | 'online'
-  | 'referral_program'
-  | 'other';
+  | 'Office'
+  | 'Google'
+  | 'Yelp'
+  | 'Website'
+  | 'Word of Mouth'
+  | 'Insurance'
+  | 'Social Media'
+  | 'Other';
 
-// IMPORTANT: Export SOURCE_TYPE_CONFIG constant
+// IMPORTANT: Export SOURCE_TYPE_CONFIG constant to match database enum values
 export const SOURCE_TYPE_CONFIG = {
-  dental_office: {
-    label: 'Dental Office',
-    icon: '🦷',
+  Office: {
+    label: 'Office',
+    icon: '🏢',
     color: 'blue'
   },
-  medical_office: {
-    label: 'Medical Office',
-    icon: '⚕️',
+  Google: {
+    label: 'Google',
+    icon: '🔍',
     color: 'green'
   },
-  insurance: {
+  Yelp: {
+    label: 'Yelp',
+    icon: '⭐',
+    color: 'yellow'
+  },
+  Website: {
+    label: 'Website',
+    icon: '🌐',
+    color: 'cyan'
+  },
+  'Word of Mouth': {
+    label: 'Word of Mouth',
+    icon: '💬',
+    color: 'pink'
+  },
+  Insurance: {
     label: 'Insurance',
     icon: '📋',
     color: 'purple'
   },
-  online: {
-    label: 'Online',
-    icon: '🌐',
-    color: 'cyan'
+  'Social Media': {
+    label: 'Social Media',
+    icon: '📱',
+    color: 'indigo'
   },
-  referral_program: {
-    label: 'Referral Program',
-    icon: '🤝',
-    color: 'orange'
-  },
-  other: {
+  Other: {
     label: 'Other',
     icon: '📌',
     color: 'gray'
@@ -71,17 +83,20 @@ export interface PatientChangeLog {
   id: string;
   source_id: string;
   year_month: string;
-  change_amount: number; // Can be positive or negative
+  old_count: number;
+  new_count: number;
+  change_type: string;
   changed_by?: string | null;
-  notes?: string | null;
-  created_at: string;
+  reason?: string | null;
+  changed_at: string;
 }
 
 export interface SourceTag {
   id: string;
   source_id: string;
-  tag: string;
+  tag_name: string;
   created_at: string;
+  created_by?: string;
 }
 
 export interface SourceStatistics {

@@ -28,7 +28,7 @@ export function AddSource({ onSuccess }: AddSourceProps) {
 
   const [formData, setFormData] = useState({
     name: '',
-    source_type: 'dental_office' as SourceType,
+    source_type: 'Other' as SourceType,
     address: '',
     phone: '',
     email: '',
@@ -57,7 +57,7 @@ export function AddSource({ onSuccess }: AddSourceProps) {
         .from('patient_sources')
         .insert({
           name: formData.name,
-          source_type: 'Other' as any, // Cast to work with database enum
+          source_type: 'Other' as SourceType,
           address: formData.address || null,
           phone: formData.phone || null,
           email: formData.email || null,
@@ -76,7 +76,7 @@ export function AddSource({ onSuccess }: AddSourceProps) {
       // Reset form
       setFormData({
         name: '',
-        source_type: 'dental_office',
+        source_type: 'Other',
         address: '',
         phone: '',
         email: '',

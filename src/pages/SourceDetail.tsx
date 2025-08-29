@@ -173,7 +173,7 @@ export function SourceDetail() {
         .from('source_tags')
         .insert([{
           source_id: sourceId,
-          tag: newTag.trim()
+          tag_name: newTag.trim()
         }]);
 
       if (error) throw error;
@@ -528,15 +528,15 @@ export function SourceDetail() {
                   {changeLog.map((log) => (
                     <TableRow key={log.id}>
                       <TableCell>
-                        {new Date(log.created_at).toLocaleDateString()}
+                        {new Date(log.changed_at).toLocaleDateString()}
                       </TableCell>
                       <TableCell>{formatYearMonth(log.year_month)}</TableCell>
                       <TableCell className="text-center">
-                        <Badge variant={log.change_amount > 0 ? "default" : "destructive"}>
-                          {log.change_amount > 0 ? '+' : ''}{log.change_amount}
+                        <Badge variant={(log.new_count - log.old_count) > 0 ? "default" : "destructive"}>
+                          {(log.new_count - log.old_count) > 0 ? '+' : ''}{log.new_count - log.old_count}
                         </Badge>
                       </TableCell>
-                      <TableCell>{log.notes || '-'}</TableCell>
+                      <TableCell>{log.reason || '-'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -579,7 +579,7 @@ export function SourceDetail() {
                     className="py-1 px-3 flex items-center gap-2"
                   >
                     <Tag className="w-3 h-3" />
-                    {tag.tag}
+                    {tag.tag_name}
                     <Button
                       variant="ghost"
                       size="sm"
