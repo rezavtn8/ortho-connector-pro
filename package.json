@@ -70,4 +70,5 @@
     "typescript": "^5.2.2",
     "vite": "^5.1.0"
   }
+  "build:dev": "vite build --mode development"
 }
