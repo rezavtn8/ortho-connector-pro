@@ -1,4 +1,3 @@
-// src/pages/Analytics.tsx
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -20,12 +19,10 @@ import {
   Users,
   Calendar,
   Download,
-  BarChart3,
-  PieChart,
-  LineChart,
-  Building2
+  History
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import {
   ResponsiveContainer,
   BarChart,
@@ -59,22 +56,28 @@ export function Analytics() {
   const [selectedPeriod, setSelectedPeriod] = useState<'3m' | '6m' | '12m' | 'all'>('6m');
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
 
   // Chart colors
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
 
   useEffect(() => {
-    loadAnalytics();
-  }, [selectedPeriod]);
+    if (!authLoading && user) {
+      loadAnalytics();
+    }
+  }, [selectedPeriod, user, authLoading]);
 
   const loadAnalytics = async () => {
+    if (!user) return;
+    
     try {
       setLoading(true);
 
-      // Load sources
+      // Load sources (user's own data)
       const { data: sourcesData, error: sourcesError } = await supabase
         .from('patient_sources')
         .select('*')
+        .eq('created_by', user.id)
         .eq('is_active', true);
 
       if (sourcesError) throw sourcesError;
@@ -99,10 +102,11 @@ export function Analytics() {
 
       const startYearMonth = `${startDate.getFullYear()}-${(startDate.getMonth() + 1).toString().padStart(2, '0')}`;
 
-      // Load monthly data
+      // Load monthly data (user's own data)
       const { data: monthlyDataResult, error: monthlyError } = await supabase
         .from('monthly_patients')
         .select('*')
+        .eq('user_id', user.id)
         .gte('year_month', startYearMonth)
         .order('year_month', { ascending: true });
 
@@ -209,32 +213,7 @@ export function Analytics() {
   const averagePerSource = totalSources > 0 ? Math.round(totalPatients / totalSources) : 0;
   const growingSources = filteredAnalytics.filter(a => a.trend === 'up').length;
 
-  const exportData = () => {
-    const csvData = filteredAnalytics.map(a => ({
-      'Source Name': a.source.name,
-      'Type': SOURCE_TYPE_CONFIG[a.source.source_type].label,
-      'Total Patients': a.totalPatients,
-      'Average Monthly': a.averageMonthly,
-      'Trend': a.trend,
-      'Trend %': a.trendPercentage,
-      'Status': a.source.is_active ? 'Active' : 'Inactive'
-    }));
-
-    const csvString = [
-      Object.keys(csvData[0]).join(','),
-      ...csvData.map(row => Object.values(row).map(value => `"${value}"`).join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvString], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `analytics-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
-  };
-
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
@@ -250,15 +229,12 @@ export function Analytics() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Analytics</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl font-bold text-foreground">History & Analytics</h1>
+          <p className="text-muted-foreground flex items-center gap-2">
+            <History className="w-4 h-4" />
             Track patient source performance and trends
           </p>
         </div>
-        <Button onClick={exportData} variant="outline">
-          <Download className="w-4 h-4 mr-2" />
-          Export Data
-        </Button>
       </div>
 
       {/* Filters */}
@@ -357,8 +333,8 @@ export function Analytics() {
       {/* Charts */}
       <Tabs defaultValue="trends" className="w-full">
         <TabsList>
-          <TabsTrigger value="trends">Trends</TabsTrigger>
-          <TabsTrigger value="distribution">Distribution</TabsTrigger>
+          <TabsTrigger value="trends">Monthly Trends</TabsTrigger>
+          <TabsTrigger value="distribution">Source Distribution</TabsTrigger>
           <TabsTrigger value="performance">Top Performers</TabsTrigger>
         </TabsList>
 

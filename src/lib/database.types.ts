@@ -1,8 +1,7 @@
 // src/lib/database.types.ts
 
-// IMPORTANT: Export the source type as a type to match database enum
+// Clean source types for patient tracking platform
 export type SourceType = 
-  | 'Office'
   | 'Google'
   | 'Yelp'
   | 'Website'
@@ -11,13 +10,8 @@ export type SourceType =
   | 'Social Media'
   | 'Other';
 
-// IMPORTANT: Export SOURCE_TYPE_CONFIG constant to match database enum values
+// Source configuration for UI display
 export const SOURCE_TYPE_CONFIG = {
-  Office: {
-    label: 'Office',
-    icon: '🏢',
-    color: 'blue'
-  },
   Google: {
     label: 'Google',
     icon: '🔍',
@@ -55,7 +49,7 @@ export const SOURCE_TYPE_CONFIG = {
   }
 } as const;
 
-// Main database types
+// Simplified patient source for tracking
 export interface PatientSource {
   id: string;
   name: string;
@@ -68,6 +62,7 @@ export interface PatientSource {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  created_by: string;
 }
 
 export interface MonthlyPatients {
@@ -86,7 +81,7 @@ export interface PatientChangeLog {
   old_count: number;
   new_count: number;
   change_type: string;
-  changed_by?: string | null;
+  user_id: string;
   reason?: string | null;
   changed_at: string;
 }
@@ -99,18 +94,16 @@ export interface SourceTag {
   created_by?: string;
 }
 
-export interface SourceStatistics {
-  id: string;
-  name: string;
+// Simple interface for current month source data
+export interface CurrentMonthSource {
+  source_id: string;
+  source_name: string;
   source_type: SourceType;
-  is_active: boolean;
-  total_patients: number;
   current_month_patients: number;
-  last_month_patients: number;
-  last_updated?: string | null;
+  month_year: string;
 }
 
-// User Profile (keeping existing)
+// User Profile
 export interface UserProfile {
   id: string;
   user_id?: string | null;
@@ -119,16 +112,14 @@ export interface UserProfile {
   pin_code?: string | null;
   clinic_name?: string | null;
   clinic_address?: string | null;
-  clinic_latitude?: number | null;
-  clinic_longitude?: number | null;
   created_at: string;
   updated_at: string;
 }
 
 // Helper types for the UI
-export interface SourceWithStats extends PatientSource {
+export interface SourceWithMonthlyData extends PatientSource {
   tags: SourceTag[];
-  statistics?: SourceStatistics;
+  current_month_patients: number;
   monthlyData?: MonthlyPatients[];
 }
 
