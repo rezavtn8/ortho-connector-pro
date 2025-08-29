@@ -22,7 +22,7 @@ export type Database = {
           patient_count: number
           source_id: string | null
           updated_at: string | null
-          user_id: string | null
+          user_id: string
           year_month: string
         }
         Insert: {
@@ -32,7 +32,7 @@ export type Database = {
           patient_count?: number
           source_id?: string | null
           updated_at?: string | null
-          user_id?: string | null
+          user_id: string
           year_month: string
         }
         Update: {
@@ -42,7 +42,7 @@ export type Database = {
           patient_count?: number
           source_id?: string | null
           updated_at?: string | null
-          user_id?: string | null
+          user_id?: string
           year_month?: string
         }
         Relationships: [
@@ -65,7 +65,7 @@ export type Database = {
           old_count: number | null
           reason: string | null
           source_id: string | null
-          user_id: string | null
+          user_id: string
           year_month: string
         }
         Insert: {
@@ -77,7 +77,7 @@ export type Database = {
           old_count?: number | null
           reason?: string | null
           source_id?: string | null
-          user_id?: string | null
+          user_id: string
           year_month: string
         }
         Update: {
@@ -89,7 +89,7 @@ export type Database = {
           old_count?: number | null
           reason?: string | null
           source_id?: string | null
-          user_id?: string | null
+          user_id?: string
           year_month?: string
         }
         Relationships: [
@@ -107,7 +107,7 @@ export type Database = {
           address: string | null
           contact_person: string | null
           created_at: string | null
-          created_by: string | null
+          created_by: string
           email: string | null
           id: string
           is_active: boolean | null
@@ -125,7 +125,7 @@ export type Database = {
           address?: string | null
           contact_person?: string | null
           created_at?: string | null
-          created_by?: string | null
+          created_by: string
           email?: string | null
           id?: string
           is_active?: boolean | null
@@ -143,7 +143,7 @@ export type Database = {
           address?: string | null
           contact_person?: string | null
           created_at?: string | null
-          created_by?: string | null
+          created_by?: string
           email?: string | null
           id?: string
           is_active?: boolean | null
@@ -166,7 +166,7 @@ export type Database = {
           id: string
           source_id: string | null
           tag_name: string
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           created_at?: string | null
@@ -174,7 +174,7 @@ export type Database = {
           id?: string
           source_id?: string | null
           tag_name: string
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           created_at?: string | null
@@ -182,7 +182,7 @@ export type Database = {
           id?: string
           source_id?: string | null
           tag_name?: string
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: [
           {
