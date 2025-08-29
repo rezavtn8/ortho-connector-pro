@@ -45,35 +45,12 @@ const Index = () => {
         return <AddSource onSuccess={() => setCurrentPage('sources')} />;
       case 'analytics':
         return <Analytics />;
-      case 'data-management':
-        return <DataManagement />;
-      case 'calendar':
-        return <CalendarView />;
       case 'settings':
         return <Settings />;
       default:
         return <Dashboard />;
     }
   };
-
-  // Placeholder components for new pages
-  const DataManagement = () => (
-    <div className="space-y-6">
-      <div className="bg-card rounded-lg p-6 shadow-card">
-        <h2 className="text-2xl font-bold mb-4">Data Management</h2>
-        <p className="text-muted-foreground">Manage patient data, imports, and exports.</p>
-      </div>
-    </div>
-  );
-
-  const CalendarView = () => (
-    <div className="space-y-6">
-      <div className="bg-card rounded-lg p-6 shadow-card">
-        <h2 className="text-2xl font-bold mb-4">Calendar</h2>
-        <p className="text-muted-foreground">Schedule and track source visits and activities.</p>
-      </div>
-    </div>
-  );
 
   return (
     <Layout currentPage={currentPage} onPageChange={setCurrentPage}>
