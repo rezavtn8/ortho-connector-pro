@@ -22,7 +22,6 @@ export type Database = {
           patient_count: number
           source_id: string | null
           updated_at: string | null
-          user_id: string
           year_month: string
         }
         Insert: {
@@ -32,7 +31,6 @@ export type Database = {
           patient_count?: number
           source_id?: string | null
           updated_at?: string | null
-          user_id: string
           year_month: string
         }
         Update: {
@@ -42,7 +40,6 @@ export type Database = {
           patient_count?: number
           source_id?: string | null
           updated_at?: string | null
-          user_id?: string
           year_month?: string
         }
         Relationships: [
@@ -65,7 +62,6 @@ export type Database = {
           old_count: number | null
           reason: string | null
           source_id: string | null
-          user_id: string
           year_month: string
         }
         Insert: {
@@ -77,7 +73,6 @@ export type Database = {
           old_count?: number | null
           reason?: string | null
           source_id?: string | null
-          user_id: string
           year_month: string
         }
         Update: {
@@ -89,7 +84,6 @@ export type Database = {
           old_count?: number | null
           reason?: string | null
           source_id?: string | null
-          user_id?: string
           year_month?: string
         }
         Relationships: [
@@ -105,13 +99,17 @@ export type Database = {
       patient_sources: {
         Row: {
           address: string | null
+          contact_person: string | null
           created_at: string | null
-          created_by: string
+          created_by: string | null
           email: string | null
           id: string
           is_active: boolean | null
+          latitude: number | null
+          longitude: number | null
           name: string
           notes: string | null
+          office_hours: string | null
           phone: string | null
           source_type: Database["public"]["Enums"]["source_type"]
           updated_at: string | null
@@ -119,13 +117,17 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          contact_person?: string | null
           created_at?: string | null
-          created_by: string
+          created_by?: string | null
           email?: string | null
           id?: string
           is_active?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
           name: string
           notes?: string | null
+          office_hours?: string | null
           phone?: string | null
           source_type: Database["public"]["Enums"]["source_type"]
           updated_at?: string | null
@@ -133,13 +135,17 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          contact_person?: string | null
           created_at?: string | null
-          created_by?: string
+          created_by?: string | null
           email?: string | null
           id?: string
           is_active?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
           name?: string
           notes?: string | null
+          office_hours?: string | null
           phone?: string | null
           source_type?: Database["public"]["Enums"]["source_type"]
           updated_at?: string | null
@@ -154,7 +160,6 @@ export type Database = {
           id: string
           source_id: string | null
           tag_name: string
-          user_id: string
         }
         Insert: {
           created_at?: string | null
@@ -162,7 +167,6 @@ export type Database = {
           id?: string
           source_id?: string | null
           tag_name: string
-          user_id: string
         }
         Update: {
           created_at?: string | null
@@ -170,7 +174,6 @@ export type Database = {
           id?: string
           source_id?: string | null
           tag_name?: string
-          user_id?: string
         }
         Relationships: [
           {
@@ -229,9 +232,29 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_office_referral: {
+        Args: {
+          office_id_param: string
+          referral_count_param?: number
+          referral_date?: string
+        }
+        Returns: undefined
+      }
+      add_patient_with_period: {
+        Args: {
+          p_increment?: number
+          p_office_id: string
+          p_period_type: string
+        }
+        Returns: Json
+      }
       adjust_patient_count: {
         Args: { p_delta: number; p_source_id: string; p_year_month: string }
         Returns: number
+      }
+      calculate_office_score: {
+        Args: { office_id_param: string }
+        Returns: string
       }
       calculate_source_score: {
         Args: { source_id_param: string }
@@ -258,6 +281,31 @@ export type Database = {
           source_type: string
         }[]
       }
+      get_office_metrics: {
+        Args: {
+          end_date?: string
+          office_id_param: string
+          start_date?: string
+        }
+        Returns: {
+          metric_date: string
+          patient_count: number
+          referral_count: number
+        }[]
+      }
+      get_office_period_stats: {
+        Args: { p_office_id: string; p_period_type: string }
+        Returns: Json
+      }
+      get_patient_load_trend: {
+        Args: { days_back?: number; office_id_param: string }
+        Returns: {
+          current_count: number
+          last_updated: string
+          previous_count: number
+          trend_direction: string
+        }[]
+      }
       set_patient_count: {
         Args: {
           p_count: number
@@ -278,6 +326,7 @@ export type Database = {
     }
     Enums: {
       source_type:
+        | "Office"
         | "Google"
         | "Yelp"
         | "Website"
@@ -414,6 +463,7 @@ export const Constants = {
   public: {
     Enums: {
       source_type: [
+        "Office",
         "Google",
         "Yelp",
         "Website",

@@ -16,7 +16,6 @@ import { ArrowLeft, Plus, Upload, FileSpreadsheet } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { SOURCE_TYPE_CONFIG, SourceType } from '@/lib/database.types';
-import { useAuth } from '@/hooks/useAuth';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface AddSourceProps {
@@ -26,7 +25,6 @@ interface AddSourceProps {
 export function AddSource({ onSuccess }: AddSourceProps) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const { user } = useAuth();
 
   const [formData, setFormData] = useState({
     name: '',
@@ -43,19 +41,10 @@ export function AddSource({ onSuccess }: AddSourceProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name.trim()) {
+    if (!formData.name) {
       toast({
-        title: "Validation Error",
+        title: "Error",
         description: "Source name is required",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!user) {
-      toast({
-        title: "Authentication Required",
-        description: "You must be logged in to add a source",
         variant: "destructive",
       });
       return;
@@ -67,15 +56,14 @@ export function AddSource({ onSuccess }: AddSourceProps) {
       const { error } = await supabase
         .from('patient_sources')
         .insert({
-          name: formData.name.trim(),
-          source_type: formData.source_type,
-          address: formData.address.trim() || null,
-          phone: formData.phone.trim() || null,
-          email: formData.email.trim() || null,
-          website: formData.website.trim() || null,
-          notes: formData.notes.trim() || null,
+          name: formData.name,
+          source_type: 'Other' as SourceType,
+          address: formData.address || null,
+          phone: formData.phone || null,
+          email: formData.email || null,
+          website: formData.website || null,
+          notes: formData.notes || null,
           is_active: true,
-          created_by: user.id
         });
 
       if (error) throw error;
@@ -119,15 +107,6 @@ export function AddSource({ onSuccess }: AddSourceProps) {
       return;
     }
 
-    if (!user) {
-      toast({
-        title: "Authentication Required", 
-        description: "You must be logged in to import sources",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setLoading(true);
 
     try {
@@ -142,7 +121,7 @@ export function AddSource({ onSuccess }: AddSourceProps) {
         headers.forEach((header, index) => {
           const value = values[index];
           if (header === 'name') source.name = value;
-          else if (header === 'type') source.source_type = value || 'Other';
+          else if (header === 'type') source.source_type = value || 'dental_office';
           else if (header === 'address') source.address = value;
           else if (header === 'phone') source.phone = value;
           else if (header === 'email') source.email = value;
@@ -159,10 +138,7 @@ export function AddSource({ onSuccess }: AddSourceProps) {
 
       const { error } = await supabase
         .from('patient_sources')
-        .insert(sources.map(s => ({
-          ...s,
-          created_by: user.id
-        })));
+        .insert(sources);
 
       if (error) throw error;
 

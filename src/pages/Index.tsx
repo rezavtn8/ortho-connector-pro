@@ -4,9 +4,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { AuthForm } from '@/components/AuthForm';
 import { Layout } from '@/components/Layout';
 import { Dashboard } from '@/pages/Dashboard';
+import { Sources } from '@/pages/Sources';
 import { AddSource } from '@/pages/AddSource';
 import { Settings } from '@/pages/Settings';
 import { Analytics } from '@/pages/Analytics';
+import { SourceDetail } from '@/pages/SourceDetail';
 
 const Index = () => {
   const { user, loading } = useAuth();
@@ -29,11 +31,18 @@ const Index = () => {
   }
 
   const renderPage = () => {
+    // Handle source detail view
+    if (currentPage === 'source-detail' && selectedSourceId) {
+      return <SourceDetail />;
+    }
+
     switch (currentPage) {
       case 'dashboard':
         return <Dashboard />;
+      case 'sources':
+        return <Sources />;
       case 'add-source':
-        return <AddSource onSuccess={() => setCurrentPage('dashboard')} />;
+        return <AddSource onSuccess={() => setCurrentPage('sources')} />;
       case 'analytics':
         return <Analytics />;
       case 'settings':

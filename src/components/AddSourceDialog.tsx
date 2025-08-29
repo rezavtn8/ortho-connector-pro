@@ -13,7 +13,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { SourceType } from '@/lib/database.types';
-import { useAuth } from '@/hooks/useAuth';
 
 interface AddOfficeDialogProps {
   onOfficeAdded: () => void;
@@ -22,7 +21,6 @@ interface AddOfficeDialogProps {
 export const AddOfficeDialog: React.FC<AddOfficeDialogProps> = ({ onOfficeAdded }) => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { user } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     address: '',
@@ -122,18 +120,24 @@ export const AddOfficeDialog: React.FC<AddOfficeDialogProps> = ({ onOfficeAdded 
     
     if (!validateForm()) return;
     
-    if (!user) {
-      toast({
-        title: "Authentication Required",
-        description: "You must be logged in to add an office",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     setLoading(true);
 
     try {
+      const officeData = {
+        name: formData.name.trim(),
+        address: formData.address.trim(),
+        phone: formData.phone.trim() || null,
+        email: formData.email.trim() || null,
+        website: formData.website.trim() || null,
+        office_hours: formData.office_hours.trim() || null,
+        notes: formData.notes.trim() || null,
+        source: formData.source,
+        google_rating: formData.google_rating ? parseFloat(formData.google_rating) : null,
+        yelp_rating: formData.yelp_rating ? parseFloat(formData.yelp_rating) : null,
+        distance_from_clinic: formData.distance_from_clinic ? parseFloat(formData.distance_from_clinic) : null,
+        patient_load: parseInt(formData.patient_load) || 0
+      };
+
       const { data, error } = await supabase
         .from('patient_sources')
         .insert({
@@ -144,8 +148,7 @@ export const AddOfficeDialog: React.FC<AddOfficeDialogProps> = ({ onOfficeAdded 
           website: formData.website.trim() || null,
           notes: formData.notes.trim() || null,
           source_type: 'Other' as SourceType,
-          is_active: true,
-          created_by: user.id
+          is_active: true
         })
         .select()
         .single();
