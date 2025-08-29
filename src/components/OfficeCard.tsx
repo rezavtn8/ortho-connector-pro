@@ -4,10 +4,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MapPin, Phone, Mail, Globe, Star, TrendingUp, TrendingDown, Users, ExternalLink, Edit2, Clock, Building2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { PatientSource, SourceTag } from '@/lib/database.types';
+
+type OfficeScore = 'Strong' | 'Moderate' | 'Sporadic' | 'Cold';
 
 interface OfficeCardProps {
-  office: ReferringOffice;
-  tags?: OfficeTag[];
+  office: PatientSource;
+  tags?: SourceTag[];
   score?: OfficeScore;
   totalReferrals?: number;
   recentReferrals?: number;
@@ -43,7 +46,7 @@ export const OfficeCard: React.FC<OfficeCardProps> = ({
   const ScoreIcon = scoreIcons[score];
 
   const handleCardClick = () => {
-    navigate(`/office/${office.id}`);
+    navigate(`/source/${office.id}`);
   };
 
   const formatPhone = (phone: string) => {
@@ -157,33 +160,20 @@ export const OfficeCard: React.FC<OfficeCardProps> = ({
             </div>
           )}
 
-          {office.office_hours && (
+          {office.notes && (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Clock className="w-4 h-4 flex-shrink-0" />
-              <span>{office.office_hours}</span>
+              <span className="line-clamp-1">{office.notes}</span>
             </div>
           )}
         </div>
 
-        {/* Ratings */}
-        {(office.google_rating || office.yelp_rating) && (
-          <div className="flex gap-3 pt-2 border-t">
-            {office.google_rating && (
-              <div className="flex items-center gap-1">
-                <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                <span className="text-sm font-medium">{office.google_rating}</span>
-                <span className="text-xs text-muted-foreground">Google</span>
-              </div>
-            )}
-            {office.yelp_rating && (
-              <div className="flex items-center gap-1">
-                <Star className="w-4 h-4 text-red-500 fill-red-500" />
-                <span className="text-sm font-medium">{office.yelp_rating}</span>
-                <span className="text-xs text-muted-foreground">Yelp</span>
-              </div>
-            )}
-          </div>
-        )}
+        {/* Source Type Badge */}
+        <div className="pt-2 border-t">
+          <Badge variant="outline" className="text-xs">
+            {office.source_type.replace('_', ' ')}
+          </Badge>
+        </div>
 
         {/* Referral Stats */}
         <div className="grid grid-cols-2 gap-3 pt-3 border-t">
@@ -217,19 +207,10 @@ export const OfficeCard: React.FC<OfficeCardProps> = ({
           </div>
         )}
 
-        {/* Additional Info */}
+        {/* Status */}
         <div className="flex justify-between items-center pt-2 text-xs text-muted-foreground">
-          {office.distance_from_clinic && (
-            <span>{office.distance_from_clinic} miles away</span>
-          )}
-          {office.patient_load && office.patient_load > 0 && (
-            <span>{office.patient_load} patients</span>
-          )}
-          {office.source && (
-            <Badge variant="outline" className="text-xs">
-              Source: {office.source}
-            </Badge>
-          )}
+          <span>Status: {office.is_active ? 'Active' : 'Inactive'}</span>
+          <span>Total: {totalReferrals}</span>
         </div>
       </CardContent>
     </Card>

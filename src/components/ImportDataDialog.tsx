@@ -34,7 +34,7 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<ParsedRow[]>([]);
   const [preview, setPreview] = useState(false);
-  const [defaultSourceType, setDefaultSourceType] = useState<SourceType>('dental_office');
+  const [defaultSourceType, setDefaultSourceType] = useState<string>('Other');
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
   const [importProgress, setImportProgress] = useState<string>('');
   const { toast } = useToast();
@@ -194,7 +194,7 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
               .from('patient_sources')
               .insert({
                 name: row.source,
-                source_type: defaultSourceType,
+                source_type: defaultSourceType as any, // Cast to work with database enum
                 is_active: true
               })
               .select('id')
@@ -399,11 +399,14 @@ Insurance Partners,2,3,4,2,5,4,6,7,5,4,3,2,47`;
                     onChange={(e) => setDefaultSourceType(e.target.value as SourceType)}
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   >
-                    {Object.entries(SOURCE_TYPE_CONFIG).map(([key, config]) => (
-                      <option key={key} value={key}>
-                        {config.icon} {config.label}
-                      </option>
-                    ))}
+                    <option value="Office">Office</option>
+                    <option value="Google">Google</option>
+                    <option value="Yelp">Yelp</option>
+                    <option value="Website">Website</option>
+                    <option value="Word of Mouth">Word of Mouth</option>
+                    <option value="Insurance">Insurance</option>
+                    <option value="Social Media">Social Media</option>
+                    <option value="Other">Other</option>
                   </select>
                   <p className="text-xs text-muted-foreground">
                     Type for new sources created during import
@@ -440,7 +443,7 @@ Insurance Partners,2,3,4,2,5,4,6,7,5,4,3,2,47`;
                 </p>
               </div>
               <Badge variant="secondary">
-                {SOURCE_TYPE_CONFIG[defaultSourceType].icon} {SOURCE_TYPE_CONFIG[defaultSourceType].label}
+                Other
               </Badge>
             </div>
 

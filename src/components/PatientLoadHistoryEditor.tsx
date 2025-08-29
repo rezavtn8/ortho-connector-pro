@@ -40,25 +40,29 @@ export const PatientLoadHistoryEditor: React.FC<PatientLoadHistoryEditorProps> =
     try {
       setLoading(true);
 
-      // Update the office's patient_load
+      // Update monthly patient count instead of patient_load
+      const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
       const { error: updateError } = await supabase
-        .from('patient_sources')
-        .update({ patient_load: editForm.patient_count })
-        .eq('id', officeId);
+        .from('monthly_patients')
+        .upsert({
+          source_id: officeId,
+          year_month: currentMonth,
+          patient_count: editForm.patient_count
+        });
 
       if (updateError) throw updateError;
 
-      // The trigger will automatically create a history entry
-      // But we can also manually add notes if provided
+      // Add to change log if notes provided
       if (editForm.notes) {
         const { error: historyError } = await supabase
-          .from('monthly_patient_data')
+          .from('patient_changes_log')
           .insert({
             source_id: officeId,
-            patient_count: editForm.patient_count,
-            previous_count: currentLoad,
-            notes: editForm.notes,
-            timestamp: editForm.date.toISOString()
+            year_month: currentMonth,
+            old_count: currentLoad,
+            new_count: editForm.patient_count,
+            reason: editForm.notes,
+            change_type: 'manual_edit'
           });
 
         if (historyError) throw historyError;

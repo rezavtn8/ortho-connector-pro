@@ -42,13 +42,12 @@ import {
   Tag
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useParams, useNavigate } from 'react-router-dom';
 
-interface SourceDetailProps {
-  sourceId: string;
-  onBack?: () => void;
-}
-
-export function SourceDetail({ sourceId, onBack }: SourceDetailProps) {
+export function SourceDetail() {
+  const { id: sourceId } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const onBack = () => navigate(-1);
   const [source, setSource] = useState<PatientSource | null>(null);
   const [tags, setTags] = useState<SourceTag[]>([]);
   const [monthlyData, setMonthlyData] = useState<MonthlyPatients[]>([]);
@@ -99,10 +98,10 @@ export function SourceDetail({ sourceId, onBack }: SourceDetailProps) {
 
       // Load change log
       const { data: changeLogData, error: changeLogError } = await supabase
-        .from('patient_change_log')
+        .from('patient_changes_log')
         .select('*')
         .eq('source_id', sourceId)
-        .order('created_at', { ascending: false })
+        .order('changed_at', { ascending: false })
         .limit(50);
 
       if (changeLogError) throw changeLogError;

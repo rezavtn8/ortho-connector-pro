@@ -55,10 +55,16 @@ export function AddSource({ onSuccess }: AddSourceProps) {
     try {
       const { error } = await supabase
         .from('patient_sources')
-        .insert([{
-          ...formData,
+        .insert({
+          name: formData.name,
+          source_type: 'Other' as any, // Cast to work with database enum
+          address: formData.address || null,
+          phone: formData.phone || null,
+          email: formData.email || null,
+          website: formData.website || null,
+          notes: formData.notes || null,
           is_active: true,
-        }]);
+        });
 
       if (error) throw error;
 

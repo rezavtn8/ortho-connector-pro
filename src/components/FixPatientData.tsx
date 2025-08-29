@@ -22,11 +22,12 @@ export const FixPatientData: React.FC = () => {
     setStatus('Resetting all patient loads...');
 
     try {
-      // Reset all patient loads to 0
-      const { error } = await supabase
-        .from('patient_sources')
-        .update({ patient_load: 0 })
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // Update all records
+        // Reset all patient loads - this doesn't exist in current schema
+        // Instead, we'll clear monthly data
+        const { error } = await supabase
+          .from('monthly_patients')
+          .delete()
+          .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
 
       if (error) throw error;
 
@@ -71,10 +72,10 @@ export const FixPatientData: React.FC = () => {
 
       // Get all history entries for Elite Dental
       const { data: eliteHistory } = await supabase
-        .from('monthly_patient_data')
+        .from('monthly_patients')
         .select('*')
         .eq('source_id', eliteOffice.id)
-        .order('timestamp', { ascending: true });
+        .order('created_at', { ascending: true });
 
       if (!eliteHistory || eliteHistory.length === 0) {
         setStatus('No history found for Elite Dental Irvine');
@@ -87,17 +88,12 @@ export const FixPatientData: React.FC = () => {
       const redistributionMap: { [officeName: string]: any[] } = {};
       
       eliteHistory.forEach(entry => {
-        // Try to extract office name from notes
-        // Notes format: "Imported [month] [year]: X patients"
-        if (entry.notes && entry.notes.includes('Imported')) {
-          // This might have the wrong office, need to check original import data
-          // For now, we'll need manual redistribution
-          const month = entry.notes.match(/Imported (\w+)/)?.[1];
-          if (!redistributionMap['Elite Dental Irvine']) {
-            redistributionMap['Elite Dental Irvine'] = [];
-          }
-          redistributionMap['Elite Dental Irvine'].push(entry);
+        // Since we don't have a notes field in monthly_patients, 
+        // we'll just group all entries under Elite Dental
+        if (!redistributionMap['Elite Dental Irvine']) {
+          redistributionMap['Elite Dental Irvine'] = [];
         }
+        redistributionMap['Elite Dental Irvine'].push(entry);
       });
 
       setStatus('Data analysis complete. Please use the import feature with correct office matching.');
@@ -139,17 +135,13 @@ export const FixPatientData: React.FC = () => {
       if (eliteOffice) {
         // Delete all history for Elite Dental
         const { error } = await supabase
-          .from('monthly_patient_data')
+          .from('monthly_patients')
           .delete()
           .eq('source_id', eliteOffice.id);
 
         if (error) throw error;
 
-        // Reset Elite Dental's current load
-        await supabase
-          .from('patient_sources')
-          .update({ patient_load: 0 })
-          .eq('id', eliteOffice.id);
+        // No need to reset patient_load as it doesn't exist in current schema
       }
 
       toast({

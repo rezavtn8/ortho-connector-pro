@@ -3,16 +3,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ReferringOffice, OfficeTag, ReferralData } from '@/lib/database.types';
+import { PatientSource, SourceTag } from '@/lib/database.types';
 import { supabase } from '@/integrations/supabase/client';
 import { Search, Filter, Building2, TrendingUp, Users, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 
 export function Dashboard() {
-  const [offices, setOffices] = useState<ReferringOffice[]>([]);
-  const [tags, setTags] = useState<OfficeTag[]>([]);
-  const [referralData, setReferralData] = useState<ReferralData[]>([]);
+  const [offices, setOffices] = useState<PatientSource[]>([]);
+  const [tags, setTags] = useState<SourceTag[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -26,31 +25,23 @@ export function Dashboard() {
     try {
       setLoading(true);
       
-      // Load offices
-      const { data: officesData, error: officesError } = await supabase
-        .from('referring_offices')
+      // Load patient sources
+      const { data: sourcesData, error: sourcesError } = await supabase
+        .from('patient_sources')
         .select('*')
         .order('name');
 
-      if (officesError) throw officesError;
+      if (sourcesError) throw sourcesError;
 
-      // Load tags
+      // Load source tags
       const { data: tagsData, error: tagsError } = await supabase
-        .from('office_tags')
+        .from('source_tags')
         .select('*');
 
       if (tagsError) throw tagsError;
 
-      // Load referral data
-      const { data: referralDataResult, error: referralError } = await supabase
-        .from('referral_data')
-        .select('*');
-
-      if (referralError) throw referralError;
-
-      setOffices(officesData || []);
+      setOffices(sourcesData || []);
       setTags(tagsData || []);
-      setReferralData(referralDataResult || []);
     } catch (error) {
       console.error('Error loading data:', error);
       toast({
@@ -68,28 +59,9 @@ export function Dashboard() {
     office.address?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const getOfficeReferrals = (officeId: string) => {
-    const officeReferrals = referralData.filter(data => data.office_id === officeId);
-    const total = officeReferrals.reduce((sum, data) => sum + data.referral_count, 0);
-    
-    // Get referrals from last 3 months
-    const threeMonthsAgo = new Date();
-    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-    
-    const recent = officeReferrals
-      .filter(data => new Date(data.month_year) >= threeMonthsAgo)
-      .reduce((sum, data) => sum + data.referral_count, 0);
-    
-    return { total, recent };
-  };
-
-  // Calculate statistics
+  // Calculate statistics - simplified for now
   const totalOffices = offices.length;
-  const totalReferrals = referralData.reduce((sum, data) => sum + data.referral_count, 0);
-  const activeOffices = offices.filter(office => {
-    const { recent } = getOfficeReferrals(office.id);
-    return recent > 0;
-  }).length;
+  const activeOffices = offices.filter(office => office.is_active).length;
 
   if (loading) {
     return (
@@ -168,7 +140,7 @@ export function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
-              <div className="text-2xl font-bold">{totalReferrals}</div>
+              <div className="text-2xl font-bold">0</div>
               <TrendingUp className="w-8 h-8 text-green-500 opacity-20" />
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -222,41 +194,30 @@ export function Dashboard() {
         
         {filteredOffices.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredOffices.map((office) => {
-              const { total, recent } = getOfficeReferrals(office.id);
-              
-              return (
-                <Card 
-                  key={office.id}
-                  className="cursor-pointer hover:shadow-lg transition-shadow"
-                  onClick={() => navigate(`/office/${office.id}`)}
-                >
-                  <CardHeader>
-                    <CardTitle className="text-lg">{office.name}</CardTitle>
-                    {office.address && (
-                      <p className="text-sm text-muted-foreground">{office.address}</p>
-                    )}
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 gap-4 text-center">
-                      <div>
-                        <div className="text-xl font-bold">{total}</div>
-                        <div className="text-xs text-muted-foreground">Total Referrals</div>
-                      </div>
-                      <div>
-                        <div className="text-xl font-bold">{recent}</div>
-                        <div className="text-xs text-muted-foreground">Recent (3mo)</div>
-                      </div>
+            {filteredOffices.map((office) => (
+              <Card 
+                key={office.id}
+                className="cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => navigate(`/source/${office.id}`)}
+              >
+                <CardHeader>
+                  <CardTitle className="text-lg">{office.name}</CardTitle>
+                  {office.address && (
+                    <p className="text-sm text-muted-foreground">{office.address}</p>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center">
+                    <div className="text-sm text-muted-foreground mb-2">
+                      Type: {office.source_type.replace('_', ' ')}
                     </div>
-                    {office.source && (
-                      <Badge variant="outline" className="mt-4">
-                        Source: {office.source}
-                      </Badge>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })}
+                    <div className="text-xs text-muted-foreground">
+                      Status: {office.is_active ? 'Active' : 'Inactive'}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         ) : (
           <Card>

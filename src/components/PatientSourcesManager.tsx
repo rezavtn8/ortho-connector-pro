@@ -92,9 +92,7 @@ export const PatientSourceManagement: React.FC<PatientSourceManagementProps> = (
         .from('patient_sources')
         .insert({
           name: formData.name,
-          type: formData.type,
-          color: formData.color,
-          contact_info: contactInfo,
+          source_type: 'Other', // Use valid enum value
           notes: formData.notes || null
         });
 

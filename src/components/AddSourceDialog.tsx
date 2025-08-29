@@ -138,8 +138,17 @@ export const AddOfficeDialog: React.FC<AddOfficeDialogProps> = ({ onOfficeAdded 
       };
 
       const { data, error } = await supabase
-        .from('referring_offices')
-        .insert([officeData])
+        .from('patient_sources')
+        .insert({
+          name: formData.name.trim(),
+          address: formData.address.trim() || null,
+          phone: formData.phone.trim() || null,
+          email: formData.email.trim() || null,
+          website: formData.website.trim() || null,
+          notes: formData.notes.trim() || null,
+          source_type: 'Other', // Use valid enum value
+          is_active: true
+        })
         .select()
         .single();
 

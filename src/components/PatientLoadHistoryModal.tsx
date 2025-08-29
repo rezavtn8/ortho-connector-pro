@@ -55,31 +55,43 @@ export const PatientLoadHistoryModal: React.FC<PatientLoadHistoryModalProps> = (
       setLoading(true);
       const startDate = subDays(new Date(), timeRange);
 
-      // Fetch historical data
+      // Fetch historical data from monthly_patients
       const { data: historyData, error: historyError } = await supabase
-        .from('monthly_patient_data')
+        .from('monthly_patients')
         .select('*')
         .eq('source_id', officeId)
-        .gte('timestamp', startDate.toISOString())
-        .order('timestamp', { ascending: false });
+        .gte('created_at', startDate.toISOString())
+        .order('created_at', { ascending: false });
 
       if (historyError) throw historyError;
 
-      // Fetch current patient load
-      const { data: officeData, error: officeError } = await supabase
-        .from('patient_sources')
-        .select('patient_load')
-        .eq('id', officeId)
-        .single();
+      // Get current patient count from latest monthly data
+      const { data: latestData, error: latestError } = await supabase
+        .from('monthly_patients')
+        .select('patient_count')
+        .eq('source_id', officeId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-      if (officeError) throw officeError;
+      if (latestError && latestError.code !== 'PGRST116') throw latestError;
 
-      setHistory(historyData || []);
-      setCurrentLoad(officeData?.patient_load || 0);
+      // Transform data to match HistoryEntry interface
+      const transformedHistory: HistoryEntry[] = (historyData || []).map(entry => ({
+        id: entry.id,
+        timestamp: entry.created_at,
+        patient_count: entry.patient_count,
+        previous_count: null, // We don't have this in monthly_patients
+        notes: null, // We don't have this in monthly_patients
+        changed_by_user_id: entry.last_modified_by
+      }));
+
+      setHistory(transformedHistory);
+      setCurrentLoad(latestData?.patient_count || 0);
 
       // Process data for chart
-      if (historyData && historyData.length > 0) {
-        const processedData = historyData
+      if (transformedHistory && transformedHistory.length > 0) {
+        const processedData = transformedHistory
           .slice()
           .reverse()
           .map((entry) => ({
@@ -91,9 +103,9 @@ export const PatientLoadHistoryModal: React.FC<PatientLoadHistoryModalProps> = (
         setChartData(processedData);
 
         // Calculate trend
-        if (historyData.length > 1) {
-          const recent = historyData[0].patient_count;
-          const previous = historyData[Math.min(historyData.length - 1, 7)].patient_count;
+        if (transformedHistory.length > 1) {
+          const recent = transformedHistory[0].patient_count;
+          const previous = transformedHistory[Math.min(transformedHistory.length - 1, 7)].patient_count;
           
           if (recent > previous) setTrend('up');
           else if (recent < previous) setTrend('down');
