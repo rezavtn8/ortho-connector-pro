@@ -7,7 +7,6 @@ import { MapPin, Save, Crosshair, AlertCircle, CheckCircle } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import MapWrapper from '@/components/MapComponent';
 
 interface ClinicSettings {
   clinic_name: string;

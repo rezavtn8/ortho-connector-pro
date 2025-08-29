@@ -1,7 +1,8 @@
+// src/components/PatientLoadDisplay.tsx - SIMPLIFIED VERSION
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { TrendingUp, TrendingDown, Minus, Plus } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Plus, Minus, Users } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -15,15 +16,16 @@ export function PatientLoadDisplay({ officeId, patientLoad, onUpdate }: PatientL
   const [updating, setUpdating] = useState(false);
   const { toast } = useToast();
 
-  const updatePatientLoad = async (change: number) => {
+  const updatePatientCount = async (change: number) => {
     const newCount = Math.max(0, patientLoad + change);
     
     if (newCount === patientLoad) return;
     
     setUpdating(true);
     try {
+      // Update the patient count in the database
       const { error } = await supabase
-        .from('referring_offices')
+        .from('patient_sources')
         .update({ 
           patient_load: newCount,
           updated_at: new Date().toISOString()
@@ -32,18 +34,19 @@ export function PatientLoadDisplay({ officeId, patientLoad, onUpdate }: PatientL
 
       if (error) throw error;
 
+      // The database trigger will automatically log this change to patient_load_history
+
       toast({
-        title: "Patient load updated",
-        description: `Updated to ${newCount}`,
-        variant: "default",
+        title: change > 0 ? "Patient added" : "Patient removed",
+        description: `Total patients from this source: ${newCount}`,
       });
 
       onUpdate();
     } catch (error) {
-      console.error('Error updating patient load:', error);
+      console.error('Error updating patient count:', error);
       toast({
         title: "Error",
-        description: "Failed to update patient load",
+        description: "Failed to update patient count",
         variant: "destructive",
       });
     } finally {
@@ -51,50 +54,34 @@ export function PatientLoadDisplay({ officeId, patientLoad, onUpdate }: PatientL
     }
   };
 
-  const getTrendIcon = () => {
-    // Simple logic: show trend based on recent activity
-    // This could be enhanced with actual trend calculation
-    if (patientLoad > 15) return <TrendingUp className="h-3 w-3 text-green-600" />;
-    if (patientLoad < 5) return <TrendingDown className="h-3 w-3 text-red-600" />;
-    return <Minus className="h-3 w-3 text-muted-foreground" />;
-  };
-
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1">
-              <span className="font-medium text-foreground">{patientLoad}</span>
-              {getTrendIcon()}
-            </div>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-6 w-6 p-0"
-                onClick={() => updatePatientLoad(-1)}
-                disabled={updating || patientLoad <= 0}
-              >
-                <Minus className="h-3 w-3" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-6 w-6 p-0"
-                onClick={() => updatePatientLoad(1)}
-                disabled={updating}
-              >
-                <Plus className="h-3 w-3" />
-              </Button>
-            </div>
-          </div>
-        </TooltipTrigger>
-        <TooltipContent side="top">
-          <p>Patient Load: {patientLoad}</p>
-          <p className="text-xs text-muted-foreground">Use +/- buttons to adjust</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <div className="flex items-center gap-2">
+      <Badge variant="secondary" className="px-3 py-1">
+        <Users className="w-3 h-3 mr-1" />
+        {patientLoad} patients
+      </Badge>
+      
+      <div className="flex items-center gap-1">
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 w-7 p-0"
+          onClick={() => updatePatientCount(-1)}
+          disabled={updating || patientLoad <= 0}
+        >
+          <Minus className="h-3 w-3" />
+        </Button>
+        
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 w-7 p-0"
+          onClick={() => updatePatientCount(1)}
+          disabled={updating}
+        >
+          <Plus className="h-3 w-3" />
+        </Button>
+      </div>
+    </div>
   );
 }

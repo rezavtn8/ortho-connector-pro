@@ -31,7 +31,7 @@ CREATE TABLE public.referral_data (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   office_id UUID NOT NULL REFERENCES public.referring_offices(id) ON DELETE CASCADE,
   month_year DATE NOT NULL, -- First day of the month for the data
-  referral_count INTEGER NOT NULL DEFAULT 0,
+  patient_count INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
   UNIQUE(office_id, month_year)
@@ -204,14 +204,14 @@ DECLARE
   total_referrals INTEGER;
 BEGIN
   -- Get referral count for past 3 months
-  SELECT COALESCE(SUM(referral_count), 0)
+  SELECT COALESCE(SUM(patient_count), 0)
   INTO recent_referrals
   FROM public.referral_data
   WHERE office_id = office_id_param
     AND month_year >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '3 months');
 
   -- Get total referrals
-  SELECT COALESCE(SUM(referral_count), 0)
+  SELECT COALESCE(SUM(patient_count), 0)
   INTO total_referrals
   FROM public.referral_data
   WHERE office_id = office_id_param;
@@ -220,7 +220,7 @@ BEGIN
   SELECT MAX(month_year)
   INTO last_referral_date
   FROM public.referral_data
-  WHERE office_id = office_id_param AND referral_count > 0;
+  WHERE office_id = office_id_param AND patient_count > 0;
 
   -- Calculate days since last referral
   IF last_referral_date IS NOT NULL THEN

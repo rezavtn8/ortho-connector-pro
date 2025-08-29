@@ -1,84 +1,106 @@
-export interface ReferringOffice {
+// src/lib/database.types.ts
+
+// IMPORTANT: Export the source type as a type
+export type SourceType = 
+  | 'dental_office'
+  | 'medical_office'
+  | 'insurance'
+  | 'online'
+  | 'referral_program'
+  | 'other';
+
+// IMPORTANT: Export SOURCE_TYPE_CONFIG constant
+export const SOURCE_TYPE_CONFIG = {
+  dental_office: {
+    label: 'Dental Office',
+    icon: '🦷',
+    color: 'blue'
+  },
+  medical_office: {
+    label: 'Medical Office',
+    icon: '⚕️',
+    color: 'green'
+  },
+  insurance: {
+    label: 'Insurance',
+    icon: '📋',
+    color: 'purple'
+  },
+  online: {
+    label: 'Online',
+    icon: '🌐',
+    color: 'cyan'
+  },
+  referral_program: {
+    label: 'Referral Program',
+    icon: '🤝',
+    color: 'orange'
+  },
+  other: {
+    label: 'Other',
+    icon: '📌',
+    color: 'gray'
+  }
+} as const;
+
+// Main database types
+export interface PatientSource {
   id: string;
   name: string;
-  address: string;
+  source_type: SourceType;
+  address?: string | null;
   phone?: string | null;
   email?: string | null;
   website?: string | null;
-  google_rating?: number | null;
-  yelp_rating?: number | null;
-  office_hours?: string | null;
-  distance_from_clinic?: number | null;
-  latitude?: number | null;
-  longitude?: number | null;
-  patient_load?: number | null;
   notes?: string | null;
-  source: string; // Will be constrained by database but TypeScript sees it as string
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 }
 
-export interface PatientLoadHistory {
+export interface MonthlyPatients {
   id: string;
-  office_id: string;
+  source_id: string;
+  year_month: string; // Format: 'YYYY-MM'
   patient_count: number;
-  previous_count?: number | null;
-  timestamp: string;
-  changed_by_user_id?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PatientChangeLog {
+  id: string;
+  source_id: string;
+  year_month: string;
+  change_amount: number; // Can be positive or negative
+  changed_by?: string | null;
   notes?: string | null;
   created_at: string;
 }
 
-export interface OfficeTag {
+export interface SourceTag {
   id: string;
-  office_id: string;
+  source_id: string;
   tag: string;
   created_at: string;
 }
 
-export interface ReferralData {
+export interface SourceStatistics {
   id: string;
-  office_id: string;
-  month_year: string;
-  referral_count: number;
-  created_at: string;
-  updated_at: string;
+  name: string;
+  source_type: SourceType;
+  is_active: boolean;
+  total_patients: number;
+  current_month_patients: number;
+  last_month_patients: number;
+  last_updated?: string | null;
 }
 
-export interface EngagementLog {
-  id: string;
-  office_id: string;
-  interaction_type: string; // Will be constrained by database but TypeScript sees it as string
-  notes?: string | null;
-  interaction_date: string;
-  created_by?: string | null;
-  created_at: string;
-}
-
-export interface MarketingIncentive {
-  id: string;
-  office_id: string;
-  incentive_type: string;
-  title: string;
-  description?: string | null;
-  personalized_message?: string | null;
-  assigned_staff?: string | null;
-  status: 'Planned' | 'Sent' | 'Delivered' | 'Cancelled';
-  delivery_method?: 'In-person' | 'Mail' | 'Email' | 'Other' | null;
-  scheduled_date?: string | null;
-  actual_sent_date?: string | null;
-  cost_amount?: number | null;
-  notes?: string | null;
-  created_by?: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
+// User Profile (keeping existing)
 export interface UserProfile {
   id: string;
   user_id?: string | null;
   email: string;
-  role: string; // Will be constrained by database but TypeScript sees it as string
+  role: string;
   pin_code?: string | null;
   clinic_name?: string | null;
   clinic_address?: string | null;
@@ -88,4 +110,24 @@ export interface UserProfile {
   updated_at: string;
 }
 
-export type OfficeScore = 'Strong' | 'Moderate' | 'Sporadic' | 'Cold';
+// Helper types for the UI
+export interface SourceWithStats extends PatientSource {
+  tags: SourceTag[];
+  statistics?: SourceStatistics;
+  monthlyData?: MonthlyPatients[];
+}
+
+// Utility function to get current year-month
+export function getCurrentYearMonth(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = (now.getMonth() + 1).toString().padStart(2, '0');
+  return `${year}-${month}`;
+}
+
+// Utility function to format year-month for display
+export function formatYearMonth(yearMonth: string): string {
+  const [year, month] = yearMonth.split('-');
+  const date = new Date(parseInt(year), parseInt(month) - 1);
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+}

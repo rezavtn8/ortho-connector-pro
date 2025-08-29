@@ -1,8 +1,18 @@
+// src/components/Layout.tsx
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/hooks/useAuth';
-import { Building2, LogOut, MapPin, Users, BarChart3, Gift, Settings } from 'lucide-react';
+import { 
+  Building2, 
+  LogOut, 
+  Users, 
+  BarChart3, 
+  Settings,
+  Home,
+  UserPlus,
+  Activity
+} from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -14,11 +24,9 @@ export function Layout({ children, currentPage, onPageChange }: LayoutProps) {
   const { user, signOut } = useAuth();
 
   const navigation = [
-    { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-    { id: 'offices', label: 'Offices', icon: Building2 },
-    { id: 'map', label: 'Map View', icon: MapPin },
-    { id: 'marketing', label: 'Marketing Incentives', icon: Gift },
-    { id: 'discovery', label: 'Office Discovery', icon: Users },
+    { id: 'dashboard', label: 'Dashboard', icon: Home },
+    { id: 'sources', label: 'Patient Sources', icon: Users },
+    { id: 'add-source', label: 'Add Source', icon: UserPlus },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
@@ -35,10 +43,10 @@ export function Layout({ children, currentPage, onPageChange }: LayoutProps) {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
-                <Building2 className="w-5 h-5 text-white" />
+                <Activity className="w-5 h-5 text-white" />
               </div>
               <h1 className="text-xl font-bold text-foreground">
-                Referring Office Intelligence
+                Patient Source Intelligence
               </h1>
             </div>
             

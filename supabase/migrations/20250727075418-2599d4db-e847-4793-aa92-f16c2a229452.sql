@@ -19,14 +19,14 @@ DECLARE
   total_referrals INTEGER;
 BEGIN
   -- Get referral count for past 3 months
-  SELECT COALESCE(SUM(referral_count), 0)
+  SELECT COALESCE(SUM(patient_count), 0)
   INTO recent_referrals
   FROM public.referral_data
   WHERE office_id = office_id_param
     AND month_year >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '3 months');
 
   -- Get total referrals
-  SELECT COALESCE(SUM(referral_count), 0)
+  SELECT COALESCE(SUM(patient_count), 0)
   INTO total_referrals
   FROM public.referral_data
   WHERE office_id = office_id_param;
@@ -35,7 +35,7 @@ BEGIN
   SELECT MAX(month_year)
   INTO last_referral_date
   FROM public.referral_data
-  WHERE office_id = office_id_param AND referral_count > 0;
+  WHERE office_id = office_id_param AND patient_count > 0;
 
   -- Calculate days since last referral
   IF last_referral_date IS NOT NULL THEN

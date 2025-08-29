@@ -1,18 +1,19 @@
+// src/pages/Index.tsx
 import React, { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { AuthForm } from '@/components/AuthForm';
 import { Layout } from '@/components/Layout';
 import { Dashboard } from '@/pages/Dashboard';
-import { MarketingIncentives } from '@/pages/MarketingIncentives';
-import { Offices } from '@/pages/Offices';
-import { OfficeDiscovery } from '@/pages/OfficeDiscovery';
+import { Sources } from '@/pages/Sources';
+import { AddSource } from '@/pages/AddSource';
 import { Settings } from '@/pages/Settings';
-import { Map } from '@/pages/Map';
 import { Analytics } from '@/pages/Analytics';
+import { SourceDetail } from '@/pages/SourceDetail';
 
 const Index = () => {
   const { user, loading } = useAuth();
   const [currentPage, setCurrentPage] = useState('dashboard');
+  const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
 
   if (loading) {
     return (
@@ -30,17 +31,18 @@ const Index = () => {
   }
 
   const renderPage = () => {
+    // Handle source detail view
+    if (currentPage === 'source-detail' && selectedSourceId) {
+      return <SourceDetail sourceId={selectedSourceId} onBack={() => setCurrentPage('sources')} />;
+    }
+
     switch (currentPage) {
       case 'dashboard':
         return <Dashboard />;
-      case 'offices':
-        return <Offices />;
-      case 'map':
-        return <Map />;
-      case 'marketing':
-        return <MarketingIncentives />;
-      case 'discovery':
-        return <OfficeDiscovery />;
+      case 'sources':
+        return <Sources />;
+      case 'add-source':
+        return <AddSource onSuccess={() => setCurrentPage('sources')} />;
       case 'analytics':
         return <Analytics />;
       case 'settings':

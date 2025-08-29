@@ -1,170 +1,154 @@
+// src/pages/Analytics.tsx
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ScatterChart, Scatter } from 'recharts';
-import { TrendingUp, TrendingDown, AlertTriangle, Award, Download, Calendar, Activity } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  PatientSource,
+  MonthlyPatients,
+  SOURCE_TYPE_CONFIG,
+  SourceType,
+  formatYearMonth
+} from '@/lib/database.types';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  Activity,
+  TrendingUp,
+  TrendingDown,
+  Users,
+  Calendar,
+  Download,
+  BarChart3,
+  PieChart,
+  LineChart,
+  Building2
+} from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { format, subDays, startOfDay, endOfDay } from 'date-fns';
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  LineChart as RechartsLineChart,
+  Line,
+  PieChart as RechartsPieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend
+} from 'recharts';
 
-interface PatientLoadTrend {
-  date: string;
-  office_name: string;
-  patient_count: number;
-  office_id: string;
-}
-
-interface OfficePerformance {
-  office_id: string;
-  office_name: string;
-  current_load: number;
-  score: string;
-  total_referrals: number;
-  change_30d: number;
-  trend_direction: 'up' | 'down' | 'stable';
-}
-
-interface InsightCard {
-  title: string;
-  value: string;
-  change: string;
+interface SourceAnalytics {
+  source: PatientSource;
+  totalPatients: number;
+  averageMonthly: number;
   trend: 'up' | 'down' | 'stable';
-  icon: React.ComponentType<any>;
+  trendPercentage: number;
+  monthlyData: MonthlyPatients[];
 }
 
-export const Analytics = () => {
+export function Analytics() {
+  const [sources, setSources] = useState<PatientSource[]>([]);
+  const [monthlyData, setMonthlyData] = useState<MonthlyPatients[]>([]);
+  const [analytics, setAnalytics] = useState<SourceAnalytics[]>([]);
+  const [selectedType, setSelectedType] = useState<SourceType | 'all'>('all');
+  const [selectedPeriod, setSelectedPeriod] = useState<'3m' | '6m' | '12m' | 'all'>('6m');
   const [loading, setLoading] = useState(true);
-  const [dateRange, setDateRange] = useState(30);
-  const [selectedOffice, setSelectedOffice] = useState('all');
-  const [trendData, setTrendData] = useState<PatientLoadTrend[]>([]);
-  const [officePerformance, setOfficePerformance] = useState<OfficePerformance[]>([]);
-  const [insights, setInsights] = useState<InsightCard[]>([]);
-  const [offices, setOffices] = useState<{ id: string; name: string }[]>([]);
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchAnalyticsData();
-  }, [dateRange, selectedOffice]);
+  // Chart colors
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
 
-  const fetchAnalyticsData = async () => {
+  useEffect(() => {
+    loadAnalytics();
+  }, [selectedPeriod]);
+
+  const loadAnalytics = async () => {
     try {
       setLoading(true);
+
+      // Load sources
+      const { data: sourcesData, error: sourcesError } = await supabase
+        .from('patient_sources')
+        .select('*')
+        .eq('is_active', true);
+
+      if (sourcesError) throw sourcesError;
+
+      // Calculate date range based on selected period
+      const now = new Date();
+      let startDate: Date;
       
-      // Fetch offices list
-      const { data: officesData } = await supabase
-        .from('referring_offices')
-        .select('id, name')
-        .order('name');
-      
-      setOffices(officesData || []);
+      switch (selectedPeriod) {
+        case '3m':
+          startDate = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+          break;
+        case '6m':
+          startDate = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+          break;
+        case '12m':
+          startDate = new Date(now.getFullYear(), now.getMonth() - 12, 1);
+          break;
+        default:
+          startDate = new Date(2020, 0, 1); // All time
+      }
 
-      // Fetch patient load trends
-      const startDate = subDays(new Date(), dateRange);
-      const { data: trendsData } = await supabase
-        .from('patient_load_history')
-        .select(`
-          timestamp,
-          patient_count,
-          office_id,
-          referring_offices!inner(name)
-        `)
-        .gte('timestamp', startDate.toISOString())
-        .order('timestamp', { ascending: true });
+      const startYearMonth = `${startDate.getFullYear()}-${(startDate.getMonth() + 1).toString().padStart(2, '0')}`;
 
-      // Transform trends data
-      const transformedTrends = (trendsData || []).map(item => ({
-        date: format(new Date(item.timestamp), 'MMM dd'),
-        office_name: (item.referring_offices as any).name,
-        patient_count: item.patient_count,
-        office_id: item.office_id
-      }));
+      // Load monthly data
+      const { data: monthlyDataResult, error: monthlyError } = await supabase
+        .from('monthly_patients')
+        .select('*')
+        .gte('year_month', startYearMonth)
+        .order('year_month', { ascending: true });
 
-      setTrendData(transformedTrends);
+      if (monthlyError) throw monthlyError;
 
-      // Fetch office performance data
-      const { data: officesPerformance } = await supabase
-        .from('referring_offices')
-        .select(`
-          id,
-          name,
-          patient_load,
-          referral_data(referral_count)
-        `);
+      setSources(sourcesData || []);
+      setMonthlyData(monthlyDataResult || []);
 
-      // Calculate performance metrics
-      const performanceData = await Promise.all(
-        (officesPerformance || []).map(async (office) => {
-          // Get score
-          const { data: scoreData } = await supabase.rpc('calculate_office_score', {
-            office_id_param: office.id
-          });
+      // Calculate analytics for each source
+      const analyticsData: SourceAnalytics[] = (sourcesData || []).map(source => {
+        const sourceMonthlyData = (monthlyDataResult || []).filter(m => m.source_id === source.id);
+        const totalPatients = sourceMonthlyData.reduce((sum, m) => sum + m.patient_count, 0);
+        const averageMonthly = sourceMonthlyData.length > 0 
+          ? Math.round(totalPatients / sourceMonthlyData.length)
+          : 0;
 
-          // Get 30-day trend
-          const { data: trendData } = await supabase.rpc('get_patient_load_trend', {
-            office_id_param: office.id,
-            days_back: 30
-          });
+        // Calculate trend
+        let trend: 'up' | 'down' | 'stable' = 'stable';
+        let trendPercentage = 0;
 
-          const totalReferrals = (office.referral_data as any[])?.reduce((sum, r) => sum + r.referral_count, 0) || 0;
-          const trend = trendData?.[0];
-          const change30d = trend ? trend.current_count - trend.previous_count : 0;
-
-          return {
-            office_id: office.id,
-            office_name: office.name,
-            current_load: office.patient_load || 0,
-            score: scoreData || 'Cold',
-            total_referrals: totalReferrals,
-            change_30d: change30d,
-            trend_direction: change30d > 0 ? 'up' : change30d < 0 ? 'down' : 'stable'
-          } as OfficePerformance;
-        })
-      );
-
-      setOfficePerformance(performanceData);
-
-      // Generate insights
-      const totalLoad = performanceData.reduce((sum, p) => sum + p.current_load, 0);
-      const growingOffices = performanceData.filter(p => p.trend_direction === 'up').length;
-      const decliningOffices = performanceData.filter(p => p.trend_direction === 'down').length;
-      const busiestOffice = performanceData.reduce((max, p) => p.current_load > max.current_load ? p : max, performanceData[0]);
-
-      setInsights([
-        {
-          title: 'Total Patient Load',
-          value: totalLoad.toString(),
-          change: '+12% this month',
-          trend: 'up',
-          icon: Activity
-        },
-        {
-          title: 'Growing Partners',
-          value: growingOffices.toString(),
-          change: `${growingOffices} offices trending up`,
-          trend: 'up',
-          icon: TrendingUp
-        },
-        {
-          title: 'Needs Attention',
-          value: decliningOffices.toString(),
-          change: `${decliningOffices} offices declining`,
-          trend: 'down',
-          icon: AlertTriangle
-        },
-        {
-          title: 'Top Performer',
-          value: busiestOffice?.office_name || 'N/A',
-          change: `${busiestOffice?.current_load || 0} current load`,
-          trend: 'up',
-          icon: Award
+        if (sourceMonthlyData.length >= 2) {
+          const recent = sourceMonthlyData[sourceMonthlyData.length - 1].patient_count;
+          const previous = sourceMonthlyData[sourceMonthlyData.length - 2].patient_count;
+          
+          if (recent > previous) {
+            trend = 'up';
+            trendPercentage = previous > 0 ? Math.round(((recent - previous) / previous) * 100) : 100;
+          } else if (recent < previous) {
+            trend = 'down';
+            trendPercentage = previous > 0 ? Math.round(((previous - recent) / previous) * -100) : -100;
+          }
         }
-      ]);
 
+        return {
+          source,
+          totalPatients,
+          averageMonthly,
+          trend,
+          trendPercentage,
+          monthlyData: sourceMonthlyData
+        };
+      });
+
+      setAnalytics(analyticsData);
     } catch (error) {
-      console.error('Error fetching analytics data:', error);
+      console.error('Error loading analytics:', error);
       toast({
         title: "Error",
         description: "Failed to load analytics data",
@@ -175,40 +159,65 @@ export const Analytics = () => {
     }
   };
 
-  const filteredTrendData = selectedOffice === 'all' 
-    ? trendData 
-    : trendData.filter(d => d.office_id === selectedOffice);
+  // Filter analytics by source type
+  const filteredAnalytics = selectedType === 'all' 
+    ? analytics
+    : analytics.filter(a => a.source.source_type === selectedType);
 
-  const filteredPerformanceData = selectedOffice === 'all'
-    ? officePerformance
-    : officePerformance.filter(p => p.office_id === selectedOffice);
+  // Prepare data for charts
+  const getMonthlyChartData = () => {
+    const monthlyTotals: { [key: string]: number } = {};
+    
+    monthlyData.forEach(data => {
+      if (selectedType === 'all' || sources.find(s => s.id === data.source_id)?.source_type === selectedType) {
+        monthlyTotals[data.year_month] = (monthlyTotals[data.year_month] || 0) + data.patient_count;
+      }
+    });
 
-  // Aggregate data for charts
-  const dailyTotals = filteredTrendData.reduce((acc, item) => {
-    const existing = acc.find(d => d.date === item.date);
-    if (existing) {
-      existing.total += item.patient_count;
-    } else {
-      acc.push({ date: item.date, total: item.patient_count });
-    }
-    return acc;
-  }, [] as { date: string; total: number }[]);
+    return Object.entries(monthlyTotals)
+      .map(([month, count]) => ({
+        month: formatYearMonth(month),
+        count
+      }))
+      .sort((a, b) => a.month.localeCompare(b.month));
+  };
 
-  const scatterData = filteredPerformanceData.map(office => ({
-    x: office.current_load,
-    y: office.total_referrals,
-    name: office.office_name,
-    score: office.score
-  }));
+  const getTypeDistribution = () => {
+    const distribution: { [key: string]: number } = {};
+    
+    analytics.forEach(a => {
+      const type = a.source.source_type;
+      distribution[type] = (distribution[type] || 0) + a.totalPatients;
+    });
+
+    return Object.entries(distribution).map(([type, count]) => ({
+      name: SOURCE_TYPE_CONFIG[type as SourceType].label,
+      value: count,
+      icon: SOURCE_TYPE_CONFIG[type as SourceType].icon
+    }));
+  };
+
+  const getTopPerformers = () => {
+    return [...filteredAnalytics]
+      .sort((a, b) => b.totalPatients - a.totalPatients)
+      .slice(0, 10);
+  };
+
+  // Calculate summary statistics
+  const totalPatients = filteredAnalytics.reduce((sum, a) => sum + a.totalPatients, 0);
+  const totalSources = filteredAnalytics.length;
+  const averagePerSource = totalSources > 0 ? Math.round(totalPatients / totalSources) : 0;
+  const growingSources = filteredAnalytics.filter(a => a.trend === 'up').length;
 
   const exportData = () => {
-    const csvData = filteredPerformanceData.map(office => ({
-      'Office Name': office.office_name,
-      'Current Load': office.current_load,
-      'Score': office.score,
-      'Total Referrals': office.total_referrals,
-      '30-Day Change': office.change_30d,
-      'Trend': office.trend_direction
+    const csvData = filteredAnalytics.map(a => ({
+      'Source Name': a.source.name,
+      'Type': SOURCE_TYPE_CONFIG[a.source.source_type].label,
+      'Total Patients': a.totalPatients,
+      'Average Monthly': a.averageMonthly,
+      'Trend': a.trend,
+      'Trend %': a.trendPercentage,
+      'Status': a.source.is_active ? 'Active' : 'Inactive'
     }));
 
     const csvString = [
@@ -220,14 +229,14 @@ export const Analytics = () => {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `analytics-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    a.download = `analytics-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
+      <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading analytics...</p>
@@ -239,193 +248,216 @@ export const Analytics = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-text bg-clip-text text-transparent">
-            Analytics Dashboard
-          </h1>
+          <h1 className="text-3xl font-bold text-foreground">Analytics</h1>
           <p className="text-muted-foreground">
-            Patient load and referral insights for referring offices
+            Track patient source performance and trends
           </p>
         </div>
-        
-        <div className="flex gap-3">
-          <Select value={dateRange.toString()} onValueChange={(value) => setDateRange(parseInt(value))}>
-            <SelectTrigger className="w-40">
-              <Calendar className="w-4 h-4 mr-2" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="30">Last 30 Days</SelectItem>
-              <SelectItem value="60">Last 60 Days</SelectItem>
-              <SelectItem value="90">Last 90 Days</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={selectedOffice} onValueChange={setSelectedOffice}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="All Offices" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Offices</SelectItem>
-              {offices.map(office => (
-                <SelectItem key={office.id} value={office.id}>
-                  {office.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Button variant="outline" onClick={exportData}>
-            <Download className="w-4 h-4 mr-2" />
-            Export
-          </Button>
-        </div>
+        <Button onClick={exportData} variant="outline">
+          <Download className="w-4 h-4 mr-2" />
+          Export Data
+        </Button>
       </div>
 
-      {/* Insight Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {insights.map((insight, index) => {
-          const Icon = insight.icon;
-          return (
-            <Card key={index}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">
-                      {insight.title}
-                    </p>
-                    <p className="text-2xl font-bold">
-                      {insight.value}
-                    </p>
-                  </div>
-                  <Icon className={`w-8 h-8 ${
-                    insight.trend === 'up' ? 'text-green-600' : 
-                    insight.trend === 'down' ? 'text-red-600' : 
-                    'text-muted-foreground'
-                  }`} />
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  {insight.change}
-                </p>
-              </CardContent>
-            </Card>
-          );
-        })}
+      {/* Filters */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex gap-4">
+            <Select value={selectedType} onValueChange={(v) => setSelectedType(v as SourceType | 'all')}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="All Types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                {Object.entries(SOURCE_TYPE_CONFIG).map(([key, config]) => (
+                  <SelectItem key={key} value={key}>
+                    <span className="flex items-center gap-2">
+                      <span>{config.icon}</span>
+                      {config.label}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={selectedPeriod} onValueChange={(v) => setSelectedPeriod(v as '3m' | '6m' | '12m' | 'all')}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Time Period" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="3m">Last 3 Months</SelectItem>
+                <SelectItem value="6m">Last 6 Months</SelectItem>
+                <SelectItem value="12m">Last 12 Months</SelectItem>
+                <SelectItem value="all">All Time</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Users className="w-5 h-5" />
+              Total Patients
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-primary">{totalPatients}</div>
+            <p className="text-sm text-muted-foreground">From {totalSources} sources</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Activity className="w-5 h-5" />
+              Average/Source
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-primary">{averagePerSource}</div>
+            <p className="text-sm text-muted-foreground">Patients per source</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <TrendingUp className="w-5 h-5" />
+              Growing Sources
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-green-600">{growingSources}</div>
+            <p className="text-sm text-muted-foreground">Trending upward</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <TrendingDown className="w-5 h-5" />
+              Declining Sources
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-red-600">
+              {filteredAnalytics.filter(a => a.trend === 'down').length}
+            </div>
+            <p className="text-sm text-muted-foreground">Need attention</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Patient Load Trends */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5" />
-              Patient Load Trends
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={dailyTotals}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip />
-                <Line 
-                  type="monotone" 
-                  dataKey="total" 
-                  stroke="hsl(var(--primary))" 
-                  strokeWidth={2}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+      <Tabs defaultValue="trends" className="w-full">
+        <TabsList>
+          <TabsTrigger value="trends">Trends</TabsTrigger>
+          <TabsTrigger value="distribution">Distribution</TabsTrigger>
+          <TabsTrigger value="performance">Top Performers</TabsTrigger>
+        </TabsList>
 
-        {/* Patient Load vs Office Score */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Award className="w-5 h-5" />
-              Load vs Performance
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <ScatterChart data={scatterData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="x" name="Patient Load" />
-                <YAxis dataKey="y" name="Total Referrals" />
-                <Tooltip 
-                  formatter={(value, name) => [value, name === 'x' ? 'Patient Load' : 'Total Referrals']}
-                  labelFormatter={(_, payload) => payload?.[0]?.payload?.name || ''}
-                />
-                <Scatter dataKey="y" fill="hsl(var(--primary))" />
-              </ScatterChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
+        <TabsContent value="trends" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Monthly Patient Trends</CardTitle>
+              <CardDescription>
+                Total patients from all sources over time
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <RechartsLineChart data={getMonthlyChartData()}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line 
+                    type="monotone" 
+                    dataKey="count" 
+                    stroke="#8884d8" 
+                    name="Patients"
+                    strokeWidth={2}
+                  />
+                </RechartsLineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      {/* Performance Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="w-5 h-5" />
-            Office Performance Summary
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Office Name</TableHead>
-                <TableHead>Current Load</TableHead>
-                <TableHead>Score</TableHead>
-                <TableHead>Total Referrals</TableHead>
-                <TableHead>30-Day Change</TableHead>
-                <TableHead>Trend</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredPerformanceData
-                .sort((a, b) => b.current_load - a.current_load)
-                .map((office) => (
-                <TableRow key={office.office_id}>
-                  <TableCell className="font-medium">
-                    {office.office_name}
-                  </TableCell>
-                  <TableCell>{office.current_load}</TableCell>
-                  <TableCell>
-                    <Badge variant={
-                      office.score === 'Strong' ? 'success' :
-                      office.score === 'Moderate' ? 'default' :
-                      office.score === 'Sporadic' ? 'warning' : 'destructive'
-                    }>
-                      {office.score}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{office.total_referrals}</TableCell>
-                  <TableCell className={
-                    office.change_30d > 0 ? 'text-green-600' :
-                    office.change_30d < 0 ? 'text-red-600' : 'text-muted-foreground'
-                  }>
-                    {office.change_30d > 0 ? '+' : ''}{office.change_30d}
-                  </TableCell>
-                  <TableCell>
-                    {office.trend_direction === 'up' && 
-                      <TrendingUp className="w-4 h-4 text-green-600" />}
-                    {office.trend_direction === 'down' && 
-                      <TrendingDown className="w-4 h-4 text-red-600" />}
-                    {office.trend_direction === 'stable' && 
-                      <div className="w-4 h-4 bg-muted-foreground rounded-full" />}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+        <TabsContent value="distribution" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Patient Distribution by Source Type</CardTitle>
+              <CardDescription>
+                Breakdown of patients by source category
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <RechartsPieChart>
+                  <Pie
+                    data={getTypeDistribution()}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {getTypeDistribution().map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </RechartsPieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="performance" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Top Performing Sources</CardTitle>
+              <CardDescription>
+                Sources with the highest patient counts
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={400}>
+                <BarChart 
+                  data={getTopPerformers().map(a => ({
+                    name: a.source.name.length > 20 
+                      ? a.source.name.substring(0, 20) + '...' 
+                      : a.source.name,
+                    patients: a.totalPatients
+                  }))}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="name" 
+                    angle={-45}
+                    textAnchor="end"
+                    height={100}
+                  />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="patients" fill="#8884d8" />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
-};
+}
