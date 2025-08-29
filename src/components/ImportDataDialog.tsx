@@ -28,6 +28,20 @@ interface ParsedRow {
   total: number;
 }
 
+interface DuplicateInfo {
+  sourceId: string;
+  sourceName: string;
+  yearMonth: string;
+  existingCount: number;
+  newCount: number;
+  monthName: string;
+}
+
+interface ConflictResolution {
+  duplicateId: string;
+  action: 'skip' | 'merge' | 'add';
+}
+
 export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -35,8 +49,11 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
   const [parsedData, setParsedData] = useState<ParsedRow[]>([]);
   const [preview, setPreview] = useState(false);
   const [defaultSourceType, setDefaultSourceType] = useState<SourceType>('Other');
-  const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
+  const [selectedYear, setSelectedYear] = useState<string>('2025');
   const [importProgress, setImportProgress] = useState<string>('');
+  const [duplicates, setDuplicates] = useState<DuplicateInfo[]>([]);
+  const [conflictResolutions, setConflictResolutions] = useState<ConflictResolution[]>([]);
+  const [showConflicts, setShowConflicts] = useState(false);
   const { toast } = useToast();
 
   // Month name to month number mapping - handles various formats
@@ -158,7 +175,7 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
     }
   };
 
-  const importData = async () => {
+  const performImport = async () => {
     if (!parsedData.length) return;
     
     setLoading(true);
@@ -235,11 +252,29 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
             }
             
             if (existing) {
+              // Find conflict resolution for this duplicate
+              const duplicateId = `${sourceId}-${yearMonth}`;
+              const resolution = conflictResolutions.find(cr => cr.duplicateId === duplicateId);
+              const action = resolution?.action || 'skip';
+              
+              let newCount = Math.round(count);
+              
+              if (action === 'skip') {
+                // Skip this record, don't update
+                continue;
+              } else if (action === 'merge') {
+                // Add to existing count
+                newCount = existing.patient_count + Math.round(count);
+              } else if (action === 'add') {
+                // Replace existing count
+                newCount = Math.round(count);
+              }
+              
               // Update existing record
               const { error: updateError } = await supabase
                 .from('monthly_patients')
                 .update({ 
-                  patient_count: Math.round(count),
+                  patient_count: newCount,
                   updated_at: new Date().toISOString()
                 })
                 .eq('id', existing.id);
@@ -295,6 +330,9 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
       setParsedData([]);
       setFile(null);
       setPreview(false);
+      setDuplicates([]);
+      setConflictResolutions([]);
+      setShowConflicts(false);
       
       onImportComplete?.();
     } catch (error: any) {
@@ -308,6 +346,10 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
       setLoading(false);
       setImportProgress('');
     }
+  };
+
+  const importData = async () => {
+    await checkForDuplicates();
   };
 
   const downloadTemplate = () => {
@@ -326,9 +368,103 @@ Insurance Partners,2,3,4,2,5,4,6,7,5,4,3,2,47`;
     window.URL.revokeObjectURL(url);
   };
 
+
   // Generate year options (current year and 5 years back)
   const currentYear = new Date().getFullYear();
-  const yearOptions = Array.from({ length: 6 }, (_, i) => currentYear - i);
+  const yearOptions = Array.from({ length: 6 }, (_, i) => currentYear + 1 - i);
+
+  const checkForDuplicates = async () => {
+    if (!parsedData.length) return;
+    
+    setLoading(true);
+    setImportProgress('Checking for duplicates...');
+    
+    const foundDuplicates: DuplicateInfo[] = [];
+    
+    try {
+      for (const row of parsedData) {
+        // Check if source exists
+        const { data: existingSource, error: searchError } = await supabase
+          .from('patient_sources')
+          .select('id')
+          .eq('name', row.source)
+          .maybeSingle();
+        
+        if (searchError && searchError.code !== 'PGRST116') {
+          continue;
+        }
+        
+        if (existingSource) {
+          // Check for existing monthly data
+          for (const [monthName, count] of Object.entries(row.monthlyData)) {
+            if (count <= 0) continue;
+            
+            const monthNum = monthMap[monthName.toLowerCase()];
+            if (!monthNum) continue;
+            
+            const yearMonth = `${selectedYear}-${monthNum}`;
+            
+            const { data: existing, error: checkError } = await supabase
+              .from('monthly_patients')
+              .select('id, patient_count')
+              .eq('source_id', existingSource.id)
+              .eq('year_month', yearMonth)
+              .maybeSingle();
+            
+            if (checkError && checkError.code !== 'PGRST116') {
+              continue;
+            }
+            
+            if (existing) {
+              foundDuplicates.push({
+                sourceId: existingSource.id,
+                sourceName: row.source,
+                yearMonth,
+                existingCount: existing.patient_count,
+                newCount: count,
+                monthName
+              });
+            }
+          }
+        }
+      }
+      
+      if (foundDuplicates.length > 0) {
+        setDuplicates(foundDuplicates);
+        setConflictResolutions(foundDuplicates.map(d => ({
+          duplicateId: `${d.sourceId}-${d.yearMonth}`,
+          action: 'skip'
+        })));
+        setShowConflicts(true);
+      } else {
+        // No duplicates, proceed with import
+        await performImport();
+      }
+    } catch (error: any) {
+      console.error('Error checking duplicates:', error);
+      toast({
+        title: "Error",
+        description: "Failed to check for duplicates",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+      setImportProgress('');
+    }
+  };
+
+  const updateConflictResolution = (duplicateId: string, action: 'skip' | 'merge' | 'add') => {
+    setConflictResolutions(prev => 
+      prev.map(cr => 
+        cr.duplicateId === duplicateId ? { ...cr, action } : cr
+      )
+    );
+  };
+
+  const resolveConflictsAndImport = async () => {
+    setShowConflicts(false);
+    await performImport();
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -388,7 +524,7 @@ Insurance Partners,2,3,4,2,5,4,6,7,5,4,3,2,47`;
                     ))}
                   </select>
                   <p className="text-xs text-muted-foreground">
-                    All monthly data will be imported for this year
+                    All monthly data will be imported for this year (default: 2025)
                   </p>
                 </div>
 
@@ -426,6 +562,103 @@ Insurance Partners,2,3,4,2,5,4,6,7,5,4,3,2,47`;
                     Selected: {file.name}
                   </p>
                 )}
+              </div>
+            </div>
+          </div>
+        ) : showConflicts ? (
+          <div className="space-y-4">
+            {/* Conflicts Header */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-destructive">Duplicate Data Detected</h3>
+                <p className="text-sm text-muted-foreground">
+                  {duplicates.length} conflicts found. Choose how to handle each duplicate:
+                </p>
+              </div>
+            </div>
+
+            {/* Conflicts List */}
+            <div className="space-y-3 max-h-[400px] overflow-y-auto">
+              {duplicates.map((duplicate, index) => {
+                const resolution = conflictResolutions.find(cr => cr.duplicateId === `${duplicate.sourceId}-${duplicate.yearMonth}`)?.action || 'skip';
+                return (
+                  <div key={index} className="border rounded-lg p-4 space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-medium">{duplicate.sourceName}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {duplicate.monthName} {selectedYear}
+                        </p>
+                      </div>
+                      <Badge variant="destructive">Duplicate</Badge>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">Existing Count:</p>
+                        <p className="font-medium">{duplicate.existingCount}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">New Count:</p>
+                        <p className="font-medium">{duplicate.newCount}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant={resolution === 'skip' ? 'default' : 'outline'}
+                        onClick={() => updateConflictResolution(`${duplicate.sourceId}-${duplicate.yearMonth}`, 'skip')}
+                      >
+                        Skip
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={resolution === 'merge' ? 'default' : 'outline'}
+                        onClick={() => updateConflictResolution(`${duplicate.sourceId}-${duplicate.yearMonth}`, 'merge')}
+                      >
+                        Merge ({duplicate.existingCount + duplicate.newCount})
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={resolution === 'add' ? 'default' : 'outline'}
+                        onClick={() => updateConflictResolution(`${duplicate.sourceId}-${duplicate.yearMonth}`, 'add')}
+                      >
+                        Replace
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Conflict Actions */}
+            <div className="flex justify-between items-center pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowConflicts(false);
+                  setDuplicates([]);
+                  setConflictResolutions([]);
+                }}
+                disabled={loading}
+              >
+                Back to Preview
+              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setOpen(false)}
+                  disabled={loading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={resolveConflictsAndImport}
+                  disabled={loading}
+                >
+                  {loading ? 'Importing...' : 'Proceed with Import'}
+                </Button>
               </div>
             </div>
           </div>
