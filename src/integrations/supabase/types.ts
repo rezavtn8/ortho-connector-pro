@@ -18,7 +18,6 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
-<<<<<<< HEAD
           last_modified_by: string | null
           patient_count: number
           source_id: string | null
@@ -33,204 +32,10 @@ export type Database = {
           source_id?: string | null
           updated_at?: string | null
           year_month: string
-=======
-          interaction_date: string
-          interaction_type: string
-          notes: string | null
-          source_id: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          interaction_date?: string
-          interaction_type: string
-          notes?: string | null
-          source_id: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          interaction_date?: string
-          interaction_type?: string
-          notes?: string | null
-          source_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "engagement_logs_source_id_fkey"
-            columns: ["source_id"]
-            isOneToOne: false
-            referencedRelation: "patient_sources"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "engagement_logs_source_id_fkey"
-            columns: ["source_id"]
-            isOneToOne: false
-            referencedRelation: "source_current_stats"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      marketing_incentives: {
-        Row: {
-          actual_sent_date: string | null
-          assigned_staff: string | null
-          cost_amount: number | null
-          created_at: string
-          created_by: string | null
-          delivery_method: string | null
-          description: string | null
-          id: string
-          incentive_type: string
-          notes: string | null
-          personalized_message: string | null
-          scheduled_date: string | null
-          source_id: string
-          status: string
-          title: string
-          updated_at: string
-        }
-        Insert: {
-          actual_sent_date?: string | null
-          assigned_staff?: string | null
-          cost_amount?: number | null
-          created_at?: string
-          created_by?: string | null
-          delivery_method?: string | null
-          description?: string | null
-          id?: string
-          incentive_type: string
-          notes?: string | null
-          personalized_message?: string | null
-          scheduled_date?: string | null
-          source_id: string
-          status?: string
-          title: string
-          updated_at?: string
-        }
-        Update: {
-          actual_sent_date?: string | null
-          assigned_staff?: string | null
-          cost_amount?: number | null
-          created_at?: string
-          created_by?: string | null
-          delivery_method?: string | null
-          description?: string | null
-          id?: string
-          incentive_type?: string
-          notes?: string | null
-          personalized_message?: string | null
-          scheduled_date?: string | null
-          source_id?: string
-          status?: string
-          title?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "marketing_incentives_source_id_fkey"
-            columns: ["source_id"]
-            isOneToOne: false
-            referencedRelation: "patient_sources"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "marketing_incentives_source_id_fkey"
-            columns: ["source_id"]
-            isOneToOne: false
-            referencedRelation: "source_current_stats"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      marketing_visits: {
-        Row: {
-          approach_used: string[] | null
-          created_at: string
-          created_by: string | null
-          id: string
-          notes: string | null
-          rating: number | null
-          source_id: string
-          updated_at: string
-          visit_date: string
-          visit_group: string | null
-          visit_time: string | null
-          visited: boolean | null
-          visited_by: string | null
-        }
-        Insert: {
-          approach_used?: string[] | null
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          notes?: string | null
-          rating?: number | null
-          source_id: string
-          updated_at?: string
-          visit_date?: string
-          visit_group?: string | null
-          visit_time?: string | null
-          visited?: boolean | null
-          visited_by?: string | null
-        }
-        Update: {
-          approach_used?: string[] | null
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          notes?: string | null
-          rating?: number | null
-          source_id?: string
-          updated_at?: string
-          visit_date?: string
-          visit_group?: string | null
-          visit_time?: string | null
-          visited?: boolean | null
-          visited_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "marketing_visits_source_id_fkey"
-            columns: ["source_id"]
-            isOneToOne: false
-            referencedRelation: "patient_sources"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "marketing_visits_source_id_fkey"
-            columns: ["source_id"]
-            isOneToOne: false
-            referencedRelation: "source_current_stats"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      monthly_patient_data: {
-        Row: {
-          created_at: string
-          id: string
-          month_year: string
-          patient_count: number
-          source_id: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          month_year: string
-          patient_count?: number
-          source_id: string
-          updated_at?: string
->>>>>>> f210630 (WIP before rebase)
         }
         Update: {
           created_at?: string | null
           id?: string
-<<<<<<< HEAD
           last_modified_by?: string | null
           patient_count?: number
           source_id?: string | null
@@ -243,31 +48,10 @@ export type Database = {
             columns: ["source_id"]
             isOneToOne: false
             referencedRelation: "patient_sources"
-=======
-          month_year?: string
-          patient_count?: number
-          source_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "monthly_patient_data_source_id_fkey"
-            columns: ["source_id"]
-            isOneToOne: false
-            referencedRelation: "patient_sources"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "monthly_patient_data_source_id_fkey"
-            columns: ["source_id"]
-            isOneToOne: false
-            referencedRelation: "source_current_stats"
->>>>>>> f210630 (WIP before rebase)
             referencedColumns: ["id"]
           },
         ]
       }
-<<<<<<< HEAD
       patient_changes_log: {
         Row: {
           change_type: string | null
@@ -321,133 +105,50 @@ export type Database = {
           email: string | null
           id: string
           is_active: boolean | null
-=======
-      office_tags: {
-        Row: {
-          created_at: string
-          id: string
-          source_id: string
-          tag: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          source_id: string
-          tag: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          source_id?: string
-          tag?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "office_tags_source_id_fkey"
-            columns: ["source_id"]
-            isOneToOne: false
-            referencedRelation: "patient_sources"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "office_tags_source_id_fkey"
-            columns: ["source_id"]
-            isOneToOne: false
-            referencedRelation: "source_current_stats"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      patient_sources: {
-        Row: {
-          address: string | null
-          created_at: string
-          distance_from_clinic: number | null
-          email: string | null
-          google_rating: number | null
-          id: string
-          is_office: boolean | null
->>>>>>> f210630 (WIP before rebase)
           latitude: number | null
           longitude: number | null
           name: string
           notes: string | null
           office_hours: string | null
           phone: string | null
-<<<<<<< HEAD
           source_type: Database["public"]["Enums"]["source_type"]
           updated_at: string | null
-=======
-          source: string | null
-          source_type: string | null
-          updated_at: string
->>>>>>> f210630 (WIP before rebase)
           website: string | null
         }
         Insert: {
           address?: string | null
-<<<<<<< HEAD
           contact_person?: string | null
           created_at?: string | null
           created_by?: string | null
-=======
-          created_at?: string
-          distance_from_clinic?: number | null
->>>>>>> f210630 (WIP before rebase)
           email?: string | null
           id?: string
-<<<<<<< HEAD
           is_active?: boolean | null
-=======
-          is_office?: boolean | null
->>>>>>> f210630 (WIP before rebase)
           latitude?: number | null
           longitude?: number | null
           name: string
           notes?: string | null
           office_hours?: string | null
           phone?: string | null
-<<<<<<< HEAD
           source_type: Database["public"]["Enums"]["source_type"]
           updated_at?: string | null
-=======
-          source?: string | null
-          source_type?: string | null
-          updated_at?: string
->>>>>>> f210630 (WIP before rebase)
           website?: string | null
         }
         Update: {
           address?: string | null
-<<<<<<< HEAD
           contact_person?: string | null
           created_at?: string | null
           created_by?: string | null
-=======
-          created_at?: string
-          distance_from_clinic?: number | null
->>>>>>> f210630 (WIP before rebase)
           email?: string | null
           id?: string
-<<<<<<< HEAD
           is_active?: boolean | null
-=======
-          is_office?: boolean | null
->>>>>>> f210630 (WIP before rebase)
           latitude?: number | null
           longitude?: number | null
           name?: string
           notes?: string | null
           office_hours?: string | null
           phone?: string | null
-<<<<<<< HEAD
           source_type?: Database["public"]["Enums"]["source_type"]
           updated_at?: string | null
-=======
-          source?: string | null
-          source_type?: string | null
-          updated_at?: string
->>>>>>> f210630 (WIP before rebase)
           website?: string | null
         }
         Relationships: []
@@ -528,49 +229,13 @@ export type Database = {
       }
     }
     Views: {
-      source_current_stats: {
-        Row: {
-          current_month_patients: number | null
-          id: string | null
-          is_office: boolean | null
-          last_3_months_patients: number | null
-          last_patient_date: string | null
-          name: string | null
-          source_type: string | null
-          total_patients: number | null
-        }
-        Insert: {
-          current_month_patients?: never
-          id?: string | null
-          is_office?: boolean | null
-          last_3_months_patients?: never
-          last_patient_date?: never
-          name?: string | null
-          source_type?: string | null
-          total_patients?: never
-        }
-        Update: {
-          current_month_patients?: never
-          id?: string | null
-          is_office?: boolean | null
-          last_3_months_patients?: never
-          last_patient_date?: never
-          name?: string | null
-          source_type?: string | null
-          total_patients?: never
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       add_office_referral: {
         Args: {
           office_id_param: string
-<<<<<<< HEAD
           referral_count_param?: number
-=======
-          patient_count_param?: number
->>>>>>> f210630 (WIP before rebase)
           referral_date?: string
         }
         Returns: undefined
@@ -578,23 +243,14 @@ export type Database = {
       add_patient_with_period: {
         Args: {
           p_increment?: number
-<<<<<<< HEAD
           p_office_id: string
-=======
-          p_source_id: string
->>>>>>> f210630 (WIP before rebase)
           p_period_type: string
         }
         Returns: Json
       }
       adjust_patient_count: {
-<<<<<<< HEAD
         Args: { p_delta: number; p_source_id: string; p_year_month: string }
         Returns: number
-=======
-        Args: { p_adjustment: number; p_source_id: string }
-        Returns: Json
->>>>>>> f210630 (WIP before rebase)
       }
       calculate_office_score: {
         Args: { office_id_param: string }
@@ -615,6 +271,16 @@ export type Database = {
           source_type: string
         }[]
       }
+      get_current_month_sources: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          current_month_patients: number
+          month_year: string
+          source_id: string
+          source_name: string
+          source_type: string
+        }[]
+      }
       get_office_metrics: {
         Args: {
           end_date?: string
@@ -624,19 +290,11 @@ export type Database = {
         Returns: {
           metric_date: string
           patient_count: number
-<<<<<<< HEAD
           referral_count: number
         }[]
       }
       get_office_period_stats: {
         Args: { p_office_id: string; p_period_type: string }
-=======
-          patient_count: number
-        }[]
-      }
-      get_office_period_stats: {
-        Args: { p_source_id: string; p_period_type: string }
->>>>>>> f210630 (WIP before rebase)
         Returns: Json
       }
       get_patient_load_trend: {
@@ -648,7 +306,6 @@ export type Database = {
           trend_direction: string
         }[]
       }
-<<<<<<< HEAD
       set_patient_count: {
         Args: {
           p_count: number
@@ -658,10 +315,12 @@ export type Database = {
         }
         Returns: number
       }
-=======
->>>>>>> f210630 (WIP before rebase)
       update_patient_count: {
         Args: { p_count: number; p_source_id: string }
+        Returns: Json
+      }
+      update_source_patient_count: {
+        Args: { p_new_count: number; p_source_id: string }
         Returns: Json
       }
     }
