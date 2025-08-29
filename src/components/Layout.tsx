@@ -2,6 +2,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/hooks/useAuth';
 import { 
   Building2, 
@@ -11,7 +12,11 @@ import {
   Settings,
   Home,
   UserPlus,
-  Activity
+  Activity,
+  Database,
+  TrendingUp,
+  Calendar,
+  MapPin
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -23,12 +28,21 @@ interface LayoutProps {
 export function Layout({ children, currentPage, onPageChange }: LayoutProps) {
   const { user, signOut } = useAuth();
 
-  const navigation = [
-    { id: 'dashboard', label: 'Dashboard', icon: Home },
-    { id: 'sources', label: 'Patient Sources', icon: Users },
-    { id: 'add-source', label: 'Add Source', icon: UserPlus },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-    { id: 'settings', label: 'Settings', icon: Settings },
+  // Organize navigation into categories
+  const mainNavigation = [
+    { id: 'dashboard', label: 'Overview', icon: Home, category: 'main' },
+    { id: 'sources', label: 'Sources', icon: Users, category: 'main' },
+    { id: 'analytics', label: 'Analytics', icon: TrendingUp, category: 'main' },
+  ];
+
+  const managementNavigation = [
+    { id: 'add-source', label: 'Add Source', icon: UserPlus, category: 'management' },
+    { id: 'data-management', label: 'Data Management', icon: Database, category: 'management' },
+    { id: 'calendar', label: 'Calendar', icon: Calendar, category: 'management' },
+  ];
+
+  const systemNavigation = [
+    { id: 'settings', label: 'Settings', icon: Settings, category: 'system' },
   ];
 
   const handleSignOut = async () => {
@@ -68,29 +82,79 @@ export function Layout({ children, currentPage, onPageChange }: LayoutProps) {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Main Navigation Tabs */}
+        <div className="mb-6">
+          <Tabs value={currentPage} onValueChange={onPageChange}>
+            <TabsList className="grid w-full grid-cols-3 bg-card shadow-card">
+              {mainNavigation.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <TabsTrigger 
+                    key={item.id} 
+                    value={item.id}
+                    className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                  >
+                    <Icon className="w-4 h-4" />
+                    {item.label}
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+          </Tabs>
+        </div>
+
         <div className="flex gap-6">
-          {/* Sidebar Navigation */}
-          <Card variant="medical" className="w-64 h-fit">
-            <CardContent className="p-4">
-              <nav className="space-y-2">
-                {navigation.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <Button
-                      key={item.id}
-                      variant={currentPage === item.id ? "medical" : "ghost"}
-                      className="w-full justify-start gap-3"
-                      onClick={() => onPageChange?.(item.id)}
-                    >
-                      <Icon className="w-4 h-4" />
-                      {item.label}
-                    </Button>
-                  );
-                })}
-              </nav>
-            </CardContent>
-          </Card>
+          {/* Secondary Navigation Sidebar */}
+          <div className="w-64 space-y-4">
+            {/* Management Tools */}
+            <Card className="bg-gradient-card shadow-card">
+              <CardContent className="p-4">
+                <h3 className="text-sm font-semibold text-muted-foreground mb-3">Management</h3>
+                <nav className="space-y-1">
+                  {managementNavigation.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <Button
+                        key={item.id}
+                        variant={currentPage === item.id ? "default" : "ghost"}
+                        size="sm"
+                        className="w-full justify-start gap-2"
+                        onClick={() => onPageChange?.(item.id)}
+                      >
+                        <Icon className="w-4 h-4" />
+                        {item.label}
+                      </Button>
+                    );
+                  })}
+                </nav>
+              </CardContent>
+            </Card>
+
+            {/* System Settings */}
+            <Card className="bg-gradient-card shadow-card">
+              <CardContent className="p-4">
+                <h3 className="text-sm font-semibold text-muted-foreground mb-3">System</h3>
+                <nav className="space-y-1">
+                  {systemNavigation.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <Button
+                        key={item.id}
+                        variant={currentPage === item.id ? "default" : "ghost"}
+                        size="sm"
+                        className="w-full justify-start gap-2"
+                        onClick={() => onPageChange?.(item.id)}
+                      >
+                        <Icon className="w-4 h-4" />
+                        {item.label}
+                      </Button>
+                    );
+                  })}
+                </nav>
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Main Content */}
           <div className="flex-1">
