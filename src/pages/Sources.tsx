@@ -2,6 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { ImportDataDialog } from '@/components/ImportDataDialog';
 
 export function Sources() {
   const navigate = useNavigate();
@@ -15,10 +16,13 @@ export function Sources() {
             Manage your referral sources and channels
           </p>
         </div>
-        <Button onClick={() => navigate('?page=add-source')}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add Source
-        </Button>
+        <div className="flex gap-2">
+          <ImportDataDialog />
+          <Button onClick={() => navigate('?page=add-source')}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Source
+          </Button>
+        </div>
       </div>
 
       <div className="text-center py-12">
