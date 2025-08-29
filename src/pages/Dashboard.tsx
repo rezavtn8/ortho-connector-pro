@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Search, Filter, Building2, TrendingUp, Users, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 
 export function Dashboard() {
   const [offices, setOffices] = useState<PatientSource[]>([]);
@@ -16,27 +17,37 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (!authLoading) {
+      loadData();
+    }
+  }, [user, authLoading]);
 
   const loadData = async () => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       
-      // Load patient sources
+      // Load patient sources (only user's own data)
       const { data: sourcesData, error: sourcesError } = await supabase
         .from('patient_sources')
         .select('*')
+        .eq('created_by', user.id)
         .order('name');
 
       if (sourcesError) throw sourcesError;
 
-      // Load source tags
+      // Load source tags (only user's own data)
       const { data: tagsData, error: tagsError } = await supabase
         .from('source_tags')
-        .select('*');
+        .select('*')
+        .eq('user_id', user.id);
 
       if (tagsError) throw tagsError;
 
@@ -63,13 +74,13 @@ export function Dashboard() {
   const totalOffices = offices.length;
   const activeOffices = offices.filter(office => office.is_active).length;
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-            <p className="text-muted-foreground">Loading...</p>
+            <p className="text-muted-foreground">Loading your dashboard...</p>
           </div>
         </div>
         

@@ -1,4 +1,3 @@
-// src/pages/SourceDetail.tsx
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -43,6 +42,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 
 export function SourceDetail() {
   const { id: sourceId } = useParams<{ id: string }>();
@@ -57,6 +57,7 @@ export function SourceDetail() {
   const [editValue, setEditValue] = useState<number>(0);
   const [newTag, setNewTag] = useState('');
   const { toast } = useToast();
+  const { user } = useAuth();
   const currentMonth = getCurrentYearMonth();
 
   useEffect(() => {
@@ -168,12 +169,22 @@ export function SourceDetail() {
   const addTag = async () => {
     if (!newTag.trim()) return;
 
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "You must be logged in to add tags",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('source_tags')
         .insert([{
           source_id: sourceId,
-          tag_name: newTag.trim()
+          tag_name: newTag.trim(),
+          user_id: user.id
         }]);
 
       if (error) throw error;

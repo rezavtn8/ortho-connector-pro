@@ -12,6 +12,7 @@ import { Calendar as CalendarIcon, History, Plus, Save, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 
 interface PatientLoadHistoryEditorProps {
   officeId: string;
@@ -35,8 +36,18 @@ export const PatientLoadHistoryEditor: React.FC<PatientLoadHistoryEditorProps> =
     date: new Date()
   });
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const handleSave = async () => {
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "You must be logged in to update patient counts",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -47,7 +58,8 @@ export const PatientLoadHistoryEditor: React.FC<PatientLoadHistoryEditorProps> =
         .upsert({
           source_id: officeId,
           year_month: currentMonth,
-          patient_count: editForm.patient_count
+          patient_count: editForm.patient_count,
+          user_id: user.id
         });
 
       if (updateError) throw updateError;
@@ -62,7 +74,8 @@ export const PatientLoadHistoryEditor: React.FC<PatientLoadHistoryEditorProps> =
             old_count: currentLoad,
             new_count: editForm.patient_count,
             reason: editForm.notes,
-            change_type: 'manual_edit'
+            change_type: 'manual_edit',
+            user_id: user.id
           });
 
         if (historyError) throw historyError;

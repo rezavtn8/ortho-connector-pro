@@ -17,6 +17,7 @@ import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, Download } from 'luc
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { SOURCE_TYPE_CONFIG, SourceType } from '@/lib/database.types';
+import { useAuth } from '@/hooks/useAuth';
 
 interface ImportDataDialogProps {
   onImportComplete?: () => void;
@@ -38,6 +39,7 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
   const [importProgress, setImportProgress] = useState<string>('');
   const { toast } = useToast();
+  const { user } = useAuth();
 
   // Month name to month number mapping - handles various formats
   const monthMap: { [key: string]: string } = {
@@ -161,6 +163,15 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
   const importData = async () => {
     if (!parsedData.length) return;
     
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "You must be logged in to import data",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setLoading(true);
     setImportProgress('Starting import...');
     
@@ -195,7 +206,8 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
               .insert({
                 name: row.source,
                 source_type: defaultSourceType,
-                is_active: true
+                is_active: true,
+                created_by: user.id
               })
               .select('id')
               .single();
@@ -256,7 +268,8 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
                 .insert({
                   source_id: sourceId,
                   year_month: yearMonth,
-                  patient_count: Math.round(count)
+                  patient_count: Math.round(count),
+                  user_id: user.id
                 });
               
               if (insertError) {
