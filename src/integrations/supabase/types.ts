@@ -22,6 +22,7 @@ export type Database = {
           patient_count: number
           source_id: string | null
           updated_at: string | null
+          user_id: string | null
           year_month: string
         }
         Insert: {
@@ -31,6 +32,7 @@ export type Database = {
           patient_count?: number
           source_id?: string | null
           updated_at?: string | null
+          user_id?: string | null
           year_month: string
         }
         Update: {
@@ -40,6 +42,7 @@ export type Database = {
           patient_count?: number
           source_id?: string | null
           updated_at?: string | null
+          user_id?: string | null
           year_month?: string
         }
         Relationships: [
@@ -62,6 +65,7 @@ export type Database = {
           old_count: number | null
           reason: string | null
           source_id: string | null
+          user_id: string | null
           year_month: string
         }
         Insert: {
@@ -73,6 +77,7 @@ export type Database = {
           old_count?: number | null
           reason?: string | null
           source_id?: string | null
+          user_id?: string | null
           year_month: string
         }
         Update: {
@@ -84,6 +89,7 @@ export type Database = {
           old_count?: number | null
           reason?: string | null
           source_id?: string | null
+          user_id?: string | null
           year_month?: string
         }
         Relationships: [
@@ -160,6 +166,7 @@ export type Database = {
           id: string
           source_id: string | null
           tag_name: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -167,6 +174,7 @@ export type Database = {
           id?: string
           source_id?: string | null
           tag_name: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -174,6 +182,7 @@ export type Database = {
           id?: string
           source_id?: string | null
           tag_name?: string
+          user_id?: string | null
         }
         Relationships: [
           {
