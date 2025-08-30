@@ -12,7 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Search, Edit, Eye, Building2, Globe, MessageSquare, Star, Trash2, Check, X, Power, Pencil } from 'lucide-react';
+import { Plus, Search, Edit, Eye, Building2, Globe, MessageSquare, Star, Trash2, Check, X, Power } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ImportDataDialog } from '@/components/ImportDataDialog';
 import { PatientSource, MonthlyPatients, SOURCE_TYPE_CONFIG, getCurrentYearMonth, SourceType } from '@/lib/database.types';
@@ -30,8 +30,6 @@ export function Sources() {
   const [selectedSources, setSelectedSources] = useState<string[]>([]);
   const [editingSource, setEditingSource] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<PatientSource>>({});
-  const [editingPatientCount, setEditingPatientCount] = useState<string | null>(null);
-  const [patientCountValue, setPatientCountValue] = useState<number>(0);
   const currentMonth = getCurrentYearMonth();
 
   useEffect(() => {
@@ -241,74 +239,6 @@ export function Sources() {
     }
   };
 
-  const handleEditPatientCount = (sourceId: string, currentCount: number) => {
-    setEditingPatientCount(sourceId);
-    setPatientCountValue(currentCount);
-  };
-
-  const handleSavePatientCount = async (sourceId: string) => {
-    try {
-      const { data, error } = await supabase.rpc('set_patient_count', {
-        p_source_id: sourceId,
-        p_year_month: currentMonth,
-        p_count: patientCountValue,
-        p_reason: 'Manual update from sources page'
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: `Patient count updated to ${patientCountValue}`,
-      });
-
-      setEditingPatientCount(null);
-      setPatientCountValue(0);
-      loadData(); // Reload to get updated data
-    } catch (error) {
-      console.error('Error updating patient count:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update patient count",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleCancelPatientCount = () => {
-    setEditingPatientCount(null);
-    setPatientCountValue(0);
-  };
-
-  const handleQuickUpdate = async (sourceId: string, newCount: number) => {
-    if (newCount < 0) return;
-
-    try {
-      const { data, error } = await supabase.rpc('set_patient_count', {
-        p_source_id: sourceId,
-        p_year_month: currentMonth,
-        p_count: newCount,
-        p_reason: 'Quick update from sources page'
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: `Patient count updated to ${newCount}`,
-      });
-
-      loadData(); // Reload to get updated data
-    } catch (error) {
-      console.error('Error updating patient count:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update patient count",
-        variant: "destructive",
-      });
-    }
-  };
-
   const onlineSourceTypes = ['Google', 'Yelp', 'Website', 'Social Media'];
   const officeSourceTypes = ['Office'];
   const otherSourceTypes = ['Word of Mouth', 'Insurance', 'Other'];
@@ -408,7 +338,6 @@ export function Sources() {
                 const config = SOURCE_TYPE_CONFIG[source.source_type];
                 const isEditing = editingSource === source.id;
                 const isSelected = selectedSources.includes(source.id);
-                const isEditingCount = editingPatientCount === source.id;
                 
                 return (
                   <TableRow key={source.id} className={isSelected ? "bg-muted/50" : ""}>
@@ -482,89 +411,8 @@ export function Sources() {
                         </Button>
                       </div>
                     </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        {isEditingCount ? (
-                          <div className="flex items-center gap-1">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setPatientCountValue(Math.max(0, patientCountValue - 1))}
-                              title="Decrease count"
-                              className="h-7 w-7 p-0 text-xs"
-                            >
-                              -
-                            </Button>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={patientCountValue}
-                              onChange={(e) => setPatientCountValue(parseInt(e.target.value) || 0)}
-                              className="w-16 h-7 text-center text-sm"
-                              autoFocus
-                            />
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setPatientCountValue(patientCountValue + 1)}
-                              title="Increase count"
-                              className="h-7 w-7 p-0 text-xs"
-                            >
-                              +
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleSavePatientCount(source.id)}
-                              title="Save count"
-                              className="h-7 w-7 p-0"
-                            >
-                              <Check className="w-3 h-3 text-green-600" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={handleCancelPatientCount}
-                              title="Cancel"
-                              className="h-7 w-7 p-0"
-                            >
-                              <X className="w-3 h-3 text-red-600" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleQuickUpdate(source.id, thisMonth - 1)}
-                              disabled={thisMonth === 0}
-                              title="Decrease count"
-                              className="h-6 w-6 p-0 text-xs"
-                            >
-                              -
-                            </Button>
-                            <span className="font-semibold min-w-[2rem] text-center">{thisMonth}</span>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleQuickUpdate(source.id, thisMonth + 1)}
-                              title="Increase count"
-                              className="h-6 w-6 p-0 text-xs"
-                            >
-                              +
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleEditPatientCount(source.id, thisMonth)}
-                              title="Edit this month's count"
-                              className="h-6 w-6 p-0"
-                            >
-                              <Pencil className="w-3 h-3 text-muted-foreground hover:text-primary" />
-                            </Button>
-                          </div>
-                        )}
-                      </div>
+                    <TableCell className="text-center font-semibold">
+                      {thisMonth}
                     </TableCell>
                     <TableCell className="text-center font-semibold">
                       {total}

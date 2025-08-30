@@ -17,7 +17,6 @@ import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, Download } from 'luc
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { SOURCE_TYPE_CONFIG, SourceType } from '@/lib/database.types';
-import { useAuth } from '@/hooks/useAuth';
 
 interface ImportDataDialogProps {
   onImportComplete?: () => void;
@@ -44,7 +43,6 @@ interface ConflictResolution {
 }
 
 export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
-  const { userProfile } = useAuth();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -203,7 +201,7 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
   };
 
   const performImport = async () => {
-    if (!parsedData.length || !userProfile?.clinic_id) return;
+    if (!parsedData.length) return;
     
     setLoading(true);
     setImportProgress('Starting import...');
@@ -241,8 +239,7 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
                 name: row.source,
                 source_type: detectedType,
                 is_active: true,
-                created_by: (await supabase.auth.getUser()).data.user?.id,
-                clinic_id: userProfile.clinic_id
+                created_by: (await supabase.auth.getUser()).data.user?.id
               })
               .select('id')
               .single();
@@ -322,8 +319,7 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
                   source_id: sourceId,
                   year_month: yearMonth,
                   patient_count: Math.round(count),
-                  user_id: (await supabase.auth.getUser()).data.user?.id,
-                  clinic_id: userProfile.clinic_id
+                  user_id: (await supabase.auth.getUser()).data.user?.id
                 });
               
               if (insertError) {

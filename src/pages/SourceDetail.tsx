@@ -4,7 +4,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Table,
@@ -43,14 +42,12 @@ import {
   Tag
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/useAuth';
 import { useParams, useNavigate } from 'react-router-dom';
 
 export function SourceDetail() {
   const { id: sourceId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const onBack = () => navigate(-1);
-  const { userProfile } = useAuth();
   const [source, setSource] = useState<PatientSource | null>(null);
   const [tags, setTags] = useState<SourceTag[]>([]);
   const [monthlyData, setMonthlyData] = useState<MonthlyPatients[]>([]);
@@ -175,7 +172,6 @@ export function SourceDetail() {
       const { error } = await supabase
         .from('source_tags')
         .insert([{
-          clinic_id: userProfile?.clinic_id || '',
           source_id: sourceId,
           tag_name: newTag.trim(),
           user_id: (await supabase.auth.getUser()).data.user?.id
@@ -608,3 +604,6 @@ export function SourceDetail() {
     </div>
   );
 }
+
+// Add missing Label component import
+import { Label } from '@/components/ui/label';

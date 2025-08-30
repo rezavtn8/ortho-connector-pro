@@ -1,19 +1,17 @@
 // src/pages/Index.tsx
 import React, { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { usePermissions } from '@/hooks/usePermissions';
 import { AuthForm } from '@/components/AuthForm';
 import { Layout } from '@/components/Layout';
 import { Dashboard } from '@/pages/Dashboard';
 import { Sources } from '@/pages/Sources';
-import { MarketingVisits } from '@/pages/MarketingVisits';
+import { AddSource } from '@/pages/AddSource';
 import { Settings } from '@/pages/Settings';
 import { Analytics } from '@/pages/Analytics';
 import { SourceDetail } from '@/pages/SourceDetail';
 
 const Index = () => {
   const { user, loading } = useAuth();
-  const { canViewSettings } = usePermissions();
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
 
@@ -43,12 +41,12 @@ const Index = () => {
         return <Dashboard />;
       case 'sources':
         return <Sources />;
-      case 'marketing-visits':
-        return <MarketingVisits />;
+      case 'add-source':
+        return <AddSource onSuccess={() => setCurrentPage('sources')} />;
       case 'analytics':
         return <Analytics />;
       case 'settings':
-        return canViewSettings ? <Settings /> : <Dashboard />;
+        return <Settings />;
       default:
         return <Dashboard />;
     }

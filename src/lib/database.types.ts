@@ -110,33 +110,6 @@ export interface SourceStatistics {
   last_updated?: string | null;
 }
 
-// Marketing Visit Types
-export type VisitType = 'New Target' | 'Routine' | 'Reconnect' | 'Follow-up';
-
-export type MarketingMaterial = 'Referral Slips' | 'Portfolio' | 'Gifts' | 'Booklets' | 'Gift Card';
-
-export const VISIT_TYPE_OPTIONS: VisitType[] = ['New Target', 'Routine', 'Reconnect', 'Follow-up'];
-
-export const MARKETING_MATERIALS: MarketingMaterial[] = ['Referral Slips', 'Portfolio', 'Gifts', 'Booklets', 'Gift Card'];
-
-export interface MarketingVisit {
-  id: string;
-  office_id: string;
-  visit_date: string;
-  visit_type: string; // Will be one of VisitType values
-  group_tag?: string | null;
-  contact_person?: string | null;
-  visited: boolean;
-  rep_name: string;
-  materials_handed_out: string[]; // Will be MarketingMaterial values
-  star_rating?: number | null;
-  follow_up_notes?: string | null;
-  photo_url?: string | null;
-  user_id: string;
-  created_at: string;
-  updated_at: string;
-}
-
 // User Profile (keeping existing)
 export interface UserProfile {
   id: string;
