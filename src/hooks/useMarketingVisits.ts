@@ -67,6 +67,7 @@ export function useMarketingVisits(officeId: string) {
 
         // Ensure all required fields are present for insert
         const insertData = {
+          clinic_id: userProfile?.clinic_id || '',
           office_id: visitData.office_id || officeId,
           visit_date: visitData.visit_date || new Date().toISOString().split('T')[0],
           visit_type: visitData.visit_type || 'New Target',

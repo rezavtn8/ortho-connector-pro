@@ -15,6 +15,7 @@ import {
 import { ArrowLeft, Plus, Upload, FileSpreadsheet } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { SOURCE_TYPE_CONFIG, SourceType } from '@/lib/database.types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -25,6 +26,7 @@ interface AddSourceProps {
 export function AddSource({ onSuccess }: AddSourceProps) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { userProfile } = useAuth();
 
   const [formData, setFormData] = useState({
     name: '',
@@ -56,8 +58,9 @@ export function AddSource({ onSuccess }: AddSourceProps) {
       const { error } = await supabase
         .from('patient_sources')
         .insert({
+          clinic_id: userProfile?.clinic_id || '',
           name: formData.name,
-          source_type: 'Other' as SourceType,
+          source_type: formData.source_type,
           address: formData.address || null,
           phone: formData.phone || null,
           email: formData.email || null,
@@ -119,7 +122,11 @@ export function AddSource({ onSuccess }: AddSourceProps) {
       
       const sources = lines.slice(1).map(line => {
         const values = line.split(',').map(v => v.trim());
-        const source: any = { is_active: true, created_by: userId };
+        const source: any = { 
+          clinic_id: userProfile?.clinic_id || '',
+          is_active: true, 
+          created_by: userId 
+        };
         
         headers.forEach((header, index) => {
           const value = values[index];
