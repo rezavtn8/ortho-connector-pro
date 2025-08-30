@@ -224,8 +224,8 @@ export function MarketingVisits() {
                          visit.contact_person?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          visit.rep_name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRep = !filterRep || visit.rep_name.includes(filterRep);
-    const matchesRating = !filterRating || visit.star_rating?.toString() === filterRating;
-    const matchesVisited = !filterVisited || 
+    const matchesRating = !filterRating || filterRating === 'all' || visit.star_rating?.toString() === filterRating;
+    const matchesVisited = !filterVisited || filterVisited === 'all' ||
                           (filterVisited === 'visited' && visit.visited) ||
                           (filterVisited === 'not_visited' && !visit.visited);
     
@@ -510,7 +510,7 @@ export function MarketingVisits() {
                   <SelectValue placeholder="All ratings" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All ratings</SelectItem>
+                  <SelectItem value="all">All ratings</SelectItem>
                   {[1, 2, 3, 4, 5].map(rating => (
                     <SelectItem key={rating} value={rating.toString()}>
                       {rating} stars
@@ -526,7 +526,7 @@ export function MarketingVisits() {
                   <SelectValue placeholder="All visits" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All visits</SelectItem>
+                  <SelectItem value="all">All visits</SelectItem>
                   <SelectItem value="visited">Visited</SelectItem>
                   <SelectItem value="not_visited">Not visited</SelectItem>
                 </SelectContent>
