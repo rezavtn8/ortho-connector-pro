@@ -203,6 +203,13 @@ export function Analytics() {
       .slice(0, 10);
   };
 
+  const getDecliningSourcesAnalysis = () => {
+    return [...filteredAnalytics]
+      .filter(a => a.trend === 'down')
+      .sort((a, b) => a.trendPercentage - b.trendPercentage) // Sort by worst decline first
+      .slice(0, 10);
+  };
+
   // Calculate summary statistics
   const totalPatients = filteredAnalytics.reduce((sum, a) => sum + a.totalPatients, 0);
   const totalSources = filteredAnalytics.length;
@@ -349,7 +356,21 @@ export function Analytics() {
             <div className="text-3xl font-bold text-red-600">
               {filteredAnalytics.filter(a => a.trend === 'down').length}
             </div>
-            <p className="text-sm text-muted-foreground">Need attention</p>
+            <div className="flex justify-between text-sm text-muted-foreground mt-2">
+              <span>Need attention</span>
+              <span>
+                Avg decline: {
+                  filteredAnalytics.filter(a => a.trend === 'down').length > 0
+                    ? Math.abs(Math.round(
+                        filteredAnalytics
+                          .filter(a => a.trend === 'down')
+                          .reduce((sum, a) => sum + a.trendPercentage, 0) /
+                        filteredAnalytics.filter(a => a.trend === 'down').length
+                      ))
+                    : 0
+                }%
+              </span>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -360,6 +381,7 @@ export function Analytics() {
           <TabsTrigger value="trends">Trends</TabsTrigger>
           <TabsTrigger value="distribution">Distribution</TabsTrigger>
           <TabsTrigger value="performance">Top Performers</TabsTrigger>
+          <TabsTrigger value="declining">Declining Analysis</TabsTrigger>
         </TabsList>
 
         <TabsContent value="trends" className="space-y-4">
@@ -456,6 +478,81 @@ export function Analytics() {
               </ResponsiveContainer>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="declining" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Declining Sources Chart</CardTitle>
+                <CardDescription>
+                  Sources with negative trends - percentage decline
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart 
+                    data={getDecliningSourcesAnalysis().map(a => ({
+                      name: a.source.name.length > 20 
+                        ? a.source.name.substring(0, 20) + '...' 
+                        : a.source.name,
+                      decline: Math.abs(a.trendPercentage)
+                    }))}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="name" 
+                      angle={-45}
+                      textAnchor="end"
+                      height={100}
+                    />
+                    <YAxis />
+                    <Tooltip formatter={(value) => [`${value}%`, 'Decline']} />
+                    <Bar dataKey="decline" fill="#ef4444" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Declining Sources Details</CardTitle>
+                <CardDescription>
+                  Sources that need immediate attention
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {getDecliningSourcesAnalysis().length === 0 ? (
+                  <div className="text-center text-muted-foreground py-8">
+                    No declining sources found
+                  </div>
+                ) : (
+                  getDecliningSourcesAnalysis().map((analytics) => (
+                    <div key={analytics.source.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="text-2xl">
+                          {SOURCE_TYPE_CONFIG[analytics.source.source_type].icon}
+                        </div>
+                        <div>
+                          <div className="font-medium">{analytics.source.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {SOURCE_TYPE_CONFIG[analytics.source.source_type].label}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-red-600 font-bold">{Math.abs(analytics.trendPercentage)}% decline</div>
+                        <div className="text-sm text-muted-foreground">
+                          {analytics.totalPatients} total patients
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
