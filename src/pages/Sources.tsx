@@ -280,6 +280,35 @@ export function Sources() {
     setPatientCountValue(0);
   };
 
+  const handleQuickUpdate = async (sourceId: string, newCount: number) => {
+    if (newCount < 0) return;
+
+    try {
+      const { data, error } = await supabase.rpc('set_patient_count', {
+        p_source_id: sourceId,
+        p_year_month: currentMonth,
+        p_count: newCount,
+        p_reason: 'Quick update from sources page'
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `Patient count updated to ${newCount}`,
+      });
+
+      loadData(); // Reload to get updated data
+    } catch (error) {
+      console.error('Error updating patient count:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update patient count",
+        variant: "destructive",
+      });
+    }
+  };
+
   const onlineSourceTypes = ['Google', 'Yelp', 'Website', 'Social Media'];
   const officeSourceTypes = ['Office'];
   const otherSourceTypes = ['Word of Mouth', 'Insurance', 'Other'];
@@ -503,18 +532,37 @@ export function Sources() {
                             </Button>
                           </div>
                         ) : (
-                          <>
-                            <span className="font-semibold">{thisMonth}</span>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleQuickUpdate(source.id, thisMonth - 1)}
+                              disabled={thisMonth === 0}
+                              title="Decrease count"
+                              className="h-6 w-6 p-0 text-xs"
+                            >
+                              -
+                            </Button>
+                            <span className="font-semibold min-w-[2rem] text-center">{thisMonth}</span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleQuickUpdate(source.id, thisMonth + 1)}
+                              title="Increase count"
+                              className="h-6 w-6 p-0 text-xs"
+                            >
+                              +
+                            </Button>
                             <Button
                               size="sm"
                               variant="ghost"
                               onClick={() => handleEditPatientCount(source.id, thisMonth)}
                               title="Edit this month's count"
-                              className="h-6 w-6 p-0 ml-1"
+                              className="h-6 w-6 p-0"
                             >
                               <Pencil className="w-3 h-3 text-muted-foreground hover:text-primary" />
                             </Button>
-                          </>
+                          </div>
                         )}
                       </div>
                     </TableCell>
