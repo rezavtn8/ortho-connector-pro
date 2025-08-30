@@ -55,7 +55,7 @@ export function Analytics() {
   const [sources, setSources] = useState<PatientSource[]>([]);
   const [monthlyData, setMonthlyData] = useState<MonthlyPatients[]>([]);
   const [analytics, setAnalytics] = useState<SourceAnalytics[]>([]);
-  const [selectedType, setSelectedType] = useState<SourceType | 'all'>('all');
+  const [selectedType, setSelectedType] = useState<SourceType | 'all' | 'online' | 'offices' | 'insurance' | 'word-of-mouth' | 'other'>('all');
   const [selectedPeriod, setSelectedPeriod] = useState<'3m' | '6m' | '12m' | 'all'>('6m');
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -159,9 +159,32 @@ export function Analytics() {
     }
   };
 
-  // Filter analytics by source type
+  // Helper function to determine source category
+  const getSourceCategory = (sourceType: SourceType) => {
+    switch (sourceType) {
+      case 'Yelp':
+      case 'Google':
+      case 'Website':
+      case 'Social Media':
+        return 'online';
+      case 'Office':
+        return 'offices';
+      case 'Insurance':
+        return 'insurance';
+      case 'Word of Mouth':
+        return 'word-of-mouth';
+      case 'Other':
+        return 'other';
+      default:
+        return 'other';
+    }
+  };
+
+  // Filter analytics by source type or category
   const filteredAnalytics = selectedType === 'all' 
     ? analytics
+    : selectedType === 'online' || selectedType === 'offices' || selectedType === 'insurance' || selectedType === 'word-of-mouth' || selectedType === 'other'
+    ? analytics.filter(a => getSourceCategory(a.source.source_type) === selectedType)
     : analytics.filter(a => a.source.source_type === selectedType);
 
   // Prepare data for charts
@@ -169,7 +192,15 @@ export function Analytics() {
     const monthlyTotals: { [key: string]: number } = {};
     
     monthlyData.forEach(data => {
-      if (selectedType === 'all' || sources.find(s => s.id === data.source_id)?.source_type === selectedType) {
+      const source = sources.find(s => s.id === data.source_id);
+      if (!source) return;
+      
+      const matchesFilter = selectedType === 'all' || 
+        (selectedType === 'online' || selectedType === 'offices' || selectedType === 'insurance' || selectedType === 'word-of-mouth' || selectedType === 'other'
+          ? getSourceCategory(source.source_type) === selectedType
+          : source.source_type === selectedType);
+      
+      if (matchesFilter) {
         monthlyTotals[data.year_month] = (monthlyTotals[data.year_month] || 0) + data.patient_count;
       }
     });
@@ -279,20 +310,42 @@ export function Analytics() {
       <Card>
         <CardContent className="p-6">
           <div className="flex gap-4">
-            <Select value={selectedType} onValueChange={(v) => setSelectedType(v as SourceType | 'all')}>
+            <Select value={selectedType} onValueChange={(v) => setSelectedType(v as any)}>
               <SelectTrigger className="w-48">
-                <SelectValue placeholder="All Types" />
+                <SelectValue placeholder="All Categories" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                {Object.entries(SOURCE_TYPE_CONFIG).map(([key, config]) => (
-                  <SelectItem key={key} value={key}>
-                    <span className="flex items-center gap-2">
-                      <span>{config.icon}</span>
-                      {config.label}
-                    </span>
-                  </SelectItem>
-                ))}
+              <SelectContent className="bg-background border z-50">
+                <SelectItem value="all">All Categories</SelectItem>
+                <SelectItem value="online">
+                  <span className="flex items-center gap-2">
+                    <span>🌐</span>
+                    Online Sources
+                  </span>
+                </SelectItem>
+                <SelectItem value="offices">
+                  <span className="flex items-center gap-2">
+                    <span>🏢</span>
+                    Offices
+                  </span>
+                </SelectItem>
+                <SelectItem value="insurance">
+                  <span className="flex items-center gap-2">
+                    <span>📋</span>
+                    Insurance
+                  </span>
+                </SelectItem>
+                <SelectItem value="word-of-mouth">
+                  <span className="flex items-center gap-2">
+                    <span>💬</span>
+                    Word of Mouth
+                  </span>
+                </SelectItem>
+                <SelectItem value="other">
+                  <span className="flex items-center gap-2">
+                    <span>📌</span>
+                    Other
+                  </span>
+                </SelectItem>
               </SelectContent>
             </Select>
 
@@ -300,7 +353,7 @@ export function Analytics() {
               <SelectTrigger className="w-40">
                 <SelectValue placeholder="Time Period" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-background border z-50">
                 <SelectItem value="3m">Last 3 Months</SelectItem>
                 <SelectItem value="6m">Last 6 Months</SelectItem>
                 <SelectItem value="12m">Last 12 Months</SelectItem>
