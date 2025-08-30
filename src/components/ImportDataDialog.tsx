@@ -48,13 +48,38 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<ParsedRow[]>([]);
   const [preview, setPreview] = useState(false);
-  const [defaultSourceType, setDefaultSourceType] = useState<SourceType>('Other');
+  const [defaultSourceType, setDefaultSourceType] = useState<SourceType>('Office');
   const [selectedYear, setSelectedYear] = useState<string>('2025');
   const [importProgress, setImportProgress] = useState<string>('');
   const [duplicates, setDuplicates] = useState<DuplicateInfo[]>([]);
   const [conflictResolutions, setConflictResolutions] = useState<ConflictResolution[]>([]);
   const [showConflicts, setShowConflicts] = useState(false);
   const { toast } = useToast();
+
+  // Auto-detect source type based on name
+  const detectSourceType = (sourceName: string): SourceType => {
+    const name = sourceName.toLowerCase();
+    
+    // Check for specific source types first
+    if (name.includes('google')) return 'Google';
+    if (name.includes('yelp')) return 'Yelp';
+    if (name.includes('website') || name.includes('web')) return 'Website';
+    if (name.includes('social media') || name.includes('facebook') || name.includes('instagram') || name.includes('twitter')) return 'Social Media';
+    if (name.includes('word of mouth') || name.includes('referral')) return 'Word of Mouth';
+    if (name.includes('insurance')) return 'Insurance';
+    
+    // Check for dental office indicators
+    const officeKeywords = [
+      'dental', 'dentistry', 'orthodontics', 'oral', 'smile', 'teeth', 'tooth',
+      'dr.', 'doctor', 'dds', 'dmd', 'office', 'practice', 'clinic', 'center',
+      'family dental', 'pediatric dental', 'cosmetic dental', 'endodontics',
+      'periodontics', 'prosthodontics', 'oral surgery'
+    ];
+    
+    const isOffice = officeKeywords.some(keyword => name.includes(keyword));
+    
+    return isOffice ? 'Office' : defaultSourceType;
+  };
 
   // Month name to month number mapping - handles various formats
   const monthMap: { [key: string]: string } = {
@@ -206,12 +231,13 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
           let sourceId: string;
           
           if (!existingSource) {
-            // Create new source
+            // Create new source with auto-detected type
+            const detectedType = detectSourceType(row.source);
             const { data: newSource, error: createError } = await supabase
               .from('patient_sources')
               .insert({
                 name: row.source,
-                source_type: defaultSourceType,
+                source_type: detectedType,
                 is_active: true,
                 created_by: (await supabase.auth.getUser()).data.user?.id
               })
@@ -497,6 +523,7 @@ Insurance Partners,2,3,4,2,5,4,6,7,5,4,3,2,47`;
                     <li>Month columns: <strong>Jan, Feb, March, April, May, June, July, Aug, Sep, Oct, Nov, Dec</strong></li>
                     <li>Optional: <strong>Total</strong> column (will be calculated if not provided)</li>
                     <li>Values should be numbers (decimals will be rounded)</li>
+                    <li><strong>Auto-detection:</strong> Dental offices will be automatically categorized as "Office" type</li>
                   </ul>
                   <Button
                     variant="link"
@@ -544,7 +571,7 @@ Insurance Partners,2,3,4,2,5,4,6,7,5,4,3,2,47`;
                     ))}
                   </select>
                   <p className="text-xs text-muted-foreground">
-                    Type for new sources created during import
+                    Default type for unrecognized sources (auto-detection will override this for offices)
                   </p>
                 </div>
               </div>
