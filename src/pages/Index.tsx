@@ -1,6 +1,7 @@
 // src/pages/Index.tsx
 import React, { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/hooks/usePermissions';
 import { AuthForm } from '@/components/AuthForm';
 import { Layout } from '@/components/Layout';
 import { Dashboard } from '@/pages/Dashboard';
@@ -12,6 +13,7 @@ import { SourceDetail } from '@/pages/SourceDetail';
 
 const Index = () => {
   const { user, loading } = useAuth();
+  const { canViewSettings } = usePermissions();
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
 
@@ -46,7 +48,7 @@ const Index = () => {
       case 'analytics':
         return <Analytics />;
       case 'settings':
-        return <Settings />;
+        return canViewSettings ? <Settings /> : <Dashboard />;
       default:
         return <Dashboard />;
     }

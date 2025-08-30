@@ -12,6 +12,7 @@ import { Calendar as CalendarIcon, History, Plus, Save, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 
 interface PatientLoadHistoryEditorProps {
   officeId: string;
@@ -26,6 +27,7 @@ export const PatientLoadHistoryEditor: React.FC<PatientLoadHistoryEditorProps> =
   currentLoad,
   onUpdate
 }) => {
+  const { userProfile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -37,6 +39,15 @@ export const PatientLoadHistoryEditor: React.FC<PatientLoadHistoryEditorProps> =
   const { toast } = useToast();
 
   const handleSave = async () => {
+    if (!userProfile?.clinic_id) {
+      toast({
+        title: "Error",
+        description: "User clinic information not available",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -48,7 +59,8 @@ export const PatientLoadHistoryEditor: React.FC<PatientLoadHistoryEditorProps> =
           source_id: officeId,
           year_month: currentMonth,
           patient_count: editForm.patient_count,
-          user_id: (await supabase.auth.getUser()).data.user?.id
+          user_id: (await supabase.auth.getUser()).data.user?.id,
+          clinic_id: userProfile.clinic_id
         });
 
       if (updateError) throw updateError;
@@ -64,7 +76,8 @@ export const PatientLoadHistoryEditor: React.FC<PatientLoadHistoryEditorProps> =
             new_count: editForm.patient_count,
             reason: editForm.notes,
             change_type: 'manual_edit',
-            user_id: (await supabase.auth.getUser()).data.user?.id
+            user_id: (await supabase.auth.getUser()).data.user?.id,
+            clinic_id: userProfile.clinic_id
           });
 
         if (historyError) throw historyError;

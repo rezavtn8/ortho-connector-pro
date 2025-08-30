@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { MarketingVisit } from '@/lib/database.types';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 
 export function useMarketingVisits(officeId: string) {
+  const { userProfile } = useAuth();
   const [visits, setVisits] = useState<MarketingVisit[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);

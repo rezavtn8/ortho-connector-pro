@@ -13,12 +13,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { SourceType } from '@/lib/database.types';
+import { useAuth } from '@/hooks/useAuth';
 
 interface AddOfficeDialogProps {
   onOfficeAdded: () => void;
 }
 
 export const AddOfficeDialog: React.FC<AddOfficeDialogProps> = ({ onOfficeAdded }) => {
+  const { userProfile } = useAuth();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -119,6 +121,14 @@ export const AddOfficeDialog: React.FC<AddOfficeDialogProps> = ({ onOfficeAdded 
     e.preventDefault();
     
     if (!validateForm()) return;
+    if (!userProfile?.clinic_id) {
+      toast({
+        title: "Error",
+        description: "User clinic information not available",
+        variant: "destructive",
+      });
+      return;
+    }
     
     setLoading(true);
 
@@ -149,7 +159,8 @@ export const AddOfficeDialog: React.FC<AddOfficeDialogProps> = ({ onOfficeAdded 
           notes: formData.notes.trim() || null,
           source_type: 'Other' as SourceType,
           is_active: true,
-          created_by: (await supabase.auth.getUser()).data.user?.id
+          created_by: (await supabase.auth.getUser()).data.user?.id,
+          clinic_id: userProfile.clinic_id
         })
         .select()
         .single();

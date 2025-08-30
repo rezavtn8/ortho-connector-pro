@@ -207,7 +207,7 @@ export function Settings() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto p-6 max-w-4xl">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
