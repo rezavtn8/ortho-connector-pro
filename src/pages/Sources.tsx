@@ -456,7 +456,16 @@ export function Sources() {
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-1">
                         {isEditingCount ? (
-                          <>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setPatientCountValue(Math.max(0, patientCountValue - 1))}
+                              title="Decrease count"
+                              className="h-7 w-7 p-0 text-xs"
+                            >
+                              -
+                            </Button>
                             <Input
                               type="number"
                               min="0"
@@ -465,6 +474,15 @@ export function Sources() {
                               className="w-16 h-7 text-center text-sm"
                               autoFocus
                             />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setPatientCountValue(patientCountValue + 1)}
+                              title="Increase count"
+                              className="h-7 w-7 p-0 text-xs"
+                            >
+                              +
+                            </Button>
                             <Button
                               size="sm"
                               variant="ghost"
@@ -483,7 +501,7 @@ export function Sources() {
                             >
                               <X className="w-3 h-3 text-red-600" />
                             </Button>
-                          </>
+                          </div>
                         ) : (
                           <>
                             <span className="font-semibold">{thisMonth}</span>
