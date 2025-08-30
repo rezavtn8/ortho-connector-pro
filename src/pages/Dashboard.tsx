@@ -3,19 +3,29 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { PatientSource, SourceTag } from '@/lib/database.types';
+import { PatientSource, MonthlyPatients, SOURCE_TYPE_CONFIG, getCurrentYearMonth } from '@/lib/database.types';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, Filter, Building2, TrendingUp, Users, Plus } from 'lucide-react';
+import { Search, Plus, TrendingUp, Building2, Star, Users, Globe, MessageSquare, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 
+interface SourceGroupData {
+  name: string;
+  icon: React.ElementType;
+  count: number;
+  totalPatients: number;
+  thisMonth: number;
+  color: string;
+  types: string[];
+}
+
 export function Dashboard() {
-  const [offices, setOffices] = useState<PatientSource[]>([]);
-  const [tags, setTags] = useState<SourceTag[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [sources, setSources] = useState<PatientSource[]>([]);
+  const [monthlyData, setMonthlyData] = useState<MonthlyPatients[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const currentMonth = getCurrentYearMonth();
 
   useEffect(() => {
     loadData();
@@ -33,15 +43,23 @@ export function Dashboard() {
 
       if (sourcesError) throw sourcesError;
 
-      // Load source tags
-      const { data: tagsData, error: tagsError } = await supabase
-        .from('source_tags')
+      // Load monthly data for current month
+      const { data: monthlyDataResult, error: monthlyError } = await supabase
+        .from('monthly_patients')
+        .select('*')
+        .eq('year_month', currentMonth);
+
+      if (monthlyError) throw monthlyError;
+
+      // Load all-time monthly data for totals
+      const { data: allMonthlyData, error: allMonthlyError } = await supabase
+        .from('monthly_patients')
         .select('*');
 
-      if (tagsError) throw tagsError;
+      if (allMonthlyError) throw allMonthlyError;
 
-      setOffices(sourcesData || []);
-      setTags(tagsData || []);
+      setSources(sourcesData || []);
+      setMonthlyData(allMonthlyData || []);
     } catch (error) {
       console.error('Error loading data:', error);
       toast({
@@ -54,14 +72,62 @@ export function Dashboard() {
     }
   };
 
-  const filteredOffices = offices.filter(office =>
-    office.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    office.address?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const getSourceGroupData = (): SourceGroupData[] => {
+    const groups = [
+      {
+        name: 'Google Referrals',
+        icon: Search,
+        color: 'text-green-600',
+        types: ['Google']
+      },
+      {
+        name: 'Yelp Reviews',
+        icon: Star,
+        color: 'text-red-600',
+        types: ['Yelp']
+      },
+      {
+        name: 'Online Sources',
+        icon: Globe,
+        color: 'text-blue-600',
+        types: ['Website', 'Social Media']
+      },
+      {
+        name: 'Dental Offices',
+        icon: Building2,
+        color: 'text-purple-600',
+        types: ['Office']
+      },
+      {
+        name: 'Other Sources',
+        icon: MessageSquare,
+        color: 'text-orange-600',
+        types: ['Word of Mouth', 'Insurance', 'Other']
+      }
+    ];
 
-  // Calculate statistics - simplified for now
-  const totalOffices = offices.length;
-  const activeOffices = offices.filter(office => office.is_active).length;
+    return groups.map(group => {
+      const groupSources = sources.filter(source => group.types.includes(source.source_type));
+      const sourceIds = groupSources.map(s => s.id);
+      
+      const groupMonthlyData = monthlyData.filter(m => sourceIds.includes(m.source_id));
+      const thisMonthData = groupMonthlyData.filter(m => m.year_month === currentMonth);
+      
+      return {
+        ...group,
+        count: groupSources.length,
+        totalPatients: groupMonthlyData.reduce((sum, m) => sum + m.patient_count, 0),
+        thisMonth: thisMonthData.reduce((sum, m) => sum + m.patient_count, 0)
+      };
+    });
+  };
+
+  const totalSources = sources.length;
+  const activeSources = sources.filter(source => source.is_active).length;
+  const totalPatients = monthlyData.reduce((sum, m) => sum + m.patient_count, 0);
+  const thisMonthPatients = monthlyData
+    .filter(m => m.year_month === currentMonth)
+    .reduce((sum, m) => sum + m.patient_count, 0);
 
   if (loading) {
     return (
@@ -101,33 +167,33 @@ export function Dashboard() {
             Dashboard
           </h1>
           <p className="text-muted-foreground">
-            Overview of your referring offices
+            Overview of your patient referral sources
           </p>
         </div>
         <Button 
-          onClick={() => navigate('/offices')}
+          onClick={() => navigate('/sources')}
           className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
         >
           <Plus className="w-4 h-4 mr-2" />
-          Manage Offices
+          Manage Sources
         </Button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Overview Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Offices
+              Total Sources
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
-              <div className="text-2xl font-bold">{totalOffices}</div>
+              <div className="text-2xl font-bold">{totalSources}</div>
               <Building2 className="w-8 h-8 text-blue-500 opacity-20" />
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {activeOffices} active
+              {activeSources} active
             </p>
           </CardContent>
         </Card>
@@ -135,13 +201,13 @@ export function Dashboard() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Referrals
+              Total Patients
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
-              <div className="text-2xl font-bold">0</div>
-              <TrendingUp className="w-8 h-8 text-green-500 opacity-20" />
+              <div className="text-2xl font-bold">{totalPatients}</div>
+              <Users className="w-8 h-8 text-green-500 opacity-20" />
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               All-time referrals
@@ -152,89 +218,74 @@ export function Dashboard() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Active Relationships
+              This Month
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
-              <div className="text-2xl font-bold">{activeOffices}</div>
-              <Users className="w-8 h-8 text-orange-500 opacity-20" />
+              <div className="text-2xl font-bold">{thisMonthPatients}</div>
+              <TrendingUp className="w-8 h-8 text-orange-500 opacity-20" />
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Recent activity
+              Current month
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Active Sources
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="text-2xl font-bold">{activeSources}</div>
+              <FileText className="w-8 h-8 text-purple-500 opacity-20" />
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Currently active
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Search */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search offices by name or address..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Button variant="outline" className="gap-2">
-              <Filter className="w-4 h-4" />
-              Filter
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Offices List */}
+      {/* Source Categories */}
       <div className="space-y-4">
-        <h2 className="text-xl font-semibold">Referring Offices</h2>
+        <h2 className="text-xl font-semibold">Source Categories</h2>
         
-        {filteredOffices.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredOffices.map((office) => (
-              <Card 
-                key={office.id}
-                className="cursor-pointer hover:shadow-lg transition-shadow"
-                onClick={() => navigate(`/source/${office.id}`)}
-              >
-                <CardHeader>
-                  <CardTitle className="text-lg">{office.name}</CardTitle>
-                  {office.address && (
-                    <p className="text-sm text-muted-foreground">{office.address}</p>
-                  )}
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center">
-                    <div className="text-sm text-muted-foreground mb-2">
-                      Type: {office.source_type}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      Status: {office.is_active ? 'Active' : 'Inactive'}
-                    </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {getSourceGroupData().map((group) => (
+            <Card 
+              key={group.name}
+              className="cursor-pointer hover:shadow-lg transition-all duration-200 border-l-4 border-l-transparent hover:border-l-current"
+              onClick={() => navigate('/sources')}
+            >
+              <CardHeader className="pb-3">
+                <CardTitle className={`text-lg flex items-center gap-2 ${group.color}`}>
+                  <group.icon className="w-5 h-5" />
+                  {group.name}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Sources:</span>
+                    <span className="font-semibold">{group.count}</span>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <Card>
-            <CardContent className="p-12 text-center">
-              <Building2 className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <div className="text-muted-foreground">
-                {searchTerm ? 'No offices found matching your search.' : 'No offices found.'}
-              </div>
-              <Button 
-                className="mt-4"
-                onClick={() => navigate('/offices')}
-              >
-                Go to Offices Page
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Total Patients:</span>
+                    <span className="font-semibold">{group.totalPatients}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">This Month:</span>
+                    <span className="font-semibold text-primary">{group.thisMonth}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
     </div>
   );
