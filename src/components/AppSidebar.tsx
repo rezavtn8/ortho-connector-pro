@@ -3,7 +3,7 @@ import {
   Home,
   Users, 
   TrendingUp,
-  UserPlus,
+  Calendar,
   Settings,
   Activity,
   LogOut
@@ -36,7 +36,7 @@ const mainNavItems = [
 ];
 
 const managementItems = [
-  { id: 'add-source', title: 'Add Source', icon: UserPlus },
+  { id: 'marketing-visits', title: 'Marketing Visits', icon: Calendar },
 ];
 
 const systemItems = [

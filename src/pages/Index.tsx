@@ -5,7 +5,7 @@ import { AuthForm } from '@/components/AuthForm';
 import { Layout } from '@/components/Layout';
 import { Dashboard } from '@/pages/Dashboard';
 import { Sources } from '@/pages/Sources';
-import { AddSource } from '@/pages/AddSource';
+import { MarketingVisits } from '@/pages/MarketingVisits';
 import { Settings } from '@/pages/Settings';
 import { Analytics } from '@/pages/Analytics';
 import { SourceDetail } from '@/pages/SourceDetail';
@@ -41,8 +41,8 @@ const Index = () => {
         return <Dashboard />;
       case 'sources':
         return <Sources />;
-      case 'add-source':
-        return <AddSource onSuccess={() => setCurrentPage('sources')} />;
+      case 'marketing-visits':
+        return <MarketingVisits />;
       case 'analytics':
         return <Analytics />;
       case 'settings':
