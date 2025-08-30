@@ -227,7 +227,7 @@ export function SourceDetail() {
   };
 
   const getTotalPatients = () => {
-    return monthlyData.reduce((sum, m) => sum + m.patient_count, 0);
+    return monthlyData.reduce((sum, m) => sum + (m.patient_count || 0), 0);
   };
 
   const getMonthlyTrend = () => {
