@@ -212,7 +212,8 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
               .insert({
                 name: row.source,
                 source_type: defaultSourceType,
-                is_active: true
+                is_active: true,
+                created_by: (await supabase.auth.getUser()).data.user?.id
               })
               .select('id')
               .single();
@@ -291,7 +292,8 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
                 .insert({
                   source_id: sourceId,
                   year_month: yearMonth,
-                  patient_count: Math.round(count)
+                  patient_count: Math.round(count),
+                  user_id: (await supabase.auth.getUser()).data.user?.id
                 });
               
               if (insertError) {

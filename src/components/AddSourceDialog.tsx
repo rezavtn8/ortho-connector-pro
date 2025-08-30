@@ -148,7 +148,8 @@ export const AddOfficeDialog: React.FC<AddOfficeDialogProps> = ({ onOfficeAdded 
           website: formData.website.trim() || null,
           notes: formData.notes.trim() || null,
           source_type: 'Other' as SourceType,
-          is_active: true
+          is_active: true,
+          created_by: (await supabase.auth.getUser()).data.user?.id
         })
         .select()
         .single();

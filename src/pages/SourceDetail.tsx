@@ -173,7 +173,8 @@ export function SourceDetail() {
         .from('source_tags')
         .insert([{
           source_id: sourceId,
-          tag_name: newTag.trim()
+          tag_name: newTag.trim(),
+          user_id: (await supabase.auth.getUser()).data.user?.id
         }]);
 
       if (error) throw error;

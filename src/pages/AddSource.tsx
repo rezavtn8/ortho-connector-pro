@@ -64,6 +64,7 @@ export function AddSource({ onSuccess }: AddSourceProps) {
           website: formData.website || null,
           notes: formData.notes || null,
           is_active: true,
+          created_by: (await supabase.auth.getUser()).data.user?.id
         });
 
       if (error) throw error;
@@ -114,14 +115,16 @@ export function AddSource({ onSuccess }: AddSourceProps) {
       const lines = bulkData.trim().split('\n');
       const headers = lines[0].toLowerCase().split(',').map(h => h.trim());
       
+      const userId = (await supabase.auth.getUser()).data.user?.id;
+      
       const sources = lines.slice(1).map(line => {
         const values = line.split(',').map(v => v.trim());
-        const source: any = { is_active: true };
+        const source: any = { is_active: true, created_by: userId };
         
         headers.forEach((header, index) => {
           const value = values[index];
           if (header === 'name') source.name = value;
-          else if (header === 'type') source.source_type = value || 'dental_office';
+          else if (header === 'type') source.source_type = value || 'Other';
           else if (header === 'address') source.address = value;
           else if (header === 'phone') source.phone = value;
           else if (header === 'email') source.email = value;

@@ -47,7 +47,8 @@ export const PatientLoadHistoryEditor: React.FC<PatientLoadHistoryEditorProps> =
         .upsert({
           source_id: officeId,
           year_month: currentMonth,
-          patient_count: editForm.patient_count
+          patient_count: editForm.patient_count,
+          user_id: (await supabase.auth.getUser()).data.user?.id
         });
 
       if (updateError) throw updateError;
@@ -62,7 +63,8 @@ export const PatientLoadHistoryEditor: React.FC<PatientLoadHistoryEditorProps> =
             old_count: currentLoad,
             new_count: editForm.patient_count,
             reason: editForm.notes,
-            change_type: 'manual_edit'
+            change_type: 'manual_edit',
+            user_id: (await supabase.auth.getUser()).data.user?.id
           });
 
         if (historyError) throw historyError;
