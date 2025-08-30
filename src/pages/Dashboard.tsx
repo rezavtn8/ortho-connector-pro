@@ -29,6 +29,45 @@ export function Dashboard() {
 
   useEffect(() => {
     loadData();
+    
+    // Set up real-time subscriptions
+    const sourcesChannel = supabase
+      .channel('sources-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'patient_sources'
+        },
+        (payload) => {
+          console.log('Sources change:', payload);
+          loadData(); // Reload all data when sources change
+        }
+      )
+      .subscribe();
+
+    const monthlyChannel = supabase
+      .channel('monthly-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'monthly_patients'
+        },
+        (payload) => {
+          console.log('Monthly data change:', payload);
+          loadData(); // Reload all data when monthly data changes
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscriptions on unmount
+    return () => {
+      supabase.removeChannel(sourcesChannel);
+      supabase.removeChannel(monthlyChannel);
+    };
   }, []);
 
   const loadData = async () => {
