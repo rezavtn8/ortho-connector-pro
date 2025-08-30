@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      clinics: {
+        Row: {
+          address: string | null
+          created_at: string
+          id: string
+          latitude: number | null
+          longitude: number | null
+          name: string
+          owner_id: string
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          name: string
+          owner_id: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          name?: string
+          owner_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       marketing_visits: {
         Row: {
           contact_person: string | null
@@ -247,6 +280,7 @@ export type Database = {
       user_profiles: {
         Row: {
           clinic_address: string | null
+          clinic_id: string
           clinic_latitude: number | null
           clinic_longitude: number | null
           clinic_name: string | null
@@ -260,6 +294,7 @@ export type Database = {
         }
         Insert: {
           clinic_address?: string | null
+          clinic_id: string
           clinic_latitude?: number | null
           clinic_longitude?: number | null
           clinic_name?: string | null
@@ -273,6 +308,7 @@ export type Database = {
         }
         Update: {
           clinic_address?: string | null
+          clinic_id?: string
           clinic_latitude?: number | null
           clinic_longitude?: number | null
           clinic_name?: string | null
@@ -284,7 +320,15 @@ export type Database = {
           updated_at?: string
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_user_profiles_clinic"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
