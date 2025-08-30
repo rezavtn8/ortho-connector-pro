@@ -525,46 +525,54 @@ export function Analytics() {
               <CardContent>
                 {getDecliningSourcesAnalysis().length === 0 ? (
                   <div className="text-center text-muted-foreground py-8">
-                    No declining sources found
+                    <TrendingDown className="w-12 h-12 mx-auto mb-2 text-muted-foreground/50" />
+                    <p className="text-sm">No declining sources found</p>
                   </div>
                 ) : (
-                  <div className="rounded-md border">
-                    <table className="w-full">
+                  <div className="rounded-lg border border-border/50 overflow-hidden">
+                    <table className="w-full text-sm">
                       <thead>
-                        <tr className="border-b bg-muted/50">
-                          <th className="text-left p-3 font-medium">Source</th>
-                          <th className="text-left p-3 font-medium">Type</th>
-                          <th className="text-right p-3 font-medium">Total Patients</th>
-                          <th className="text-right p-3 font-medium">Decline %</th>
-                          <th className="text-right p-3 font-medium">Avg Monthly</th>
+                        <tr className="border-b bg-muted/30">
+                          <th className="text-left p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Source</th>
+                          <th className="text-left p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Type</th>
+                          <th className="text-right p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Patients</th>
+                          <th className="text-right p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Decline</th>
+                          <th className="text-right p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Avg/Month</th>
                         </tr>
                       </thead>
-                      <tbody>
+                      <tbody className="divide-y divide-border/30">
                         {getDecliningSourcesAnalysis().map((analytics, index) => (
-                          <tr key={analytics.source.id} className={index % 2 === 0 ? "bg-background" : "bg-muted/25"}>
+                          <tr key={analytics.source.id} className="hover:bg-muted/20 transition-colors">
                             <td className="p-3">
-                              <div className="font-medium">{analytics.source.name}</div>
+                              <div className="font-medium text-sm text-foreground">{analytics.source.name}</div>
                             </td>
                             <td className="p-3">
                               <div className="flex items-center gap-2">
-                                <span className="text-lg">
+                                <span className="text-base">
                                   {SOURCE_TYPE_CONFIG[analytics.source.source_type].icon}
                                 </span>
-                                <span className="text-sm">
+                                <span className="text-xs text-muted-foreground">
                                   {SOURCE_TYPE_CONFIG[analytics.source.source_type].label}
                                 </span>
                               </div>
                             </td>
-                            <td className="p-3 text-right font-medium">
-                              {analytics.totalPatients}
-                            </td>
                             <td className="p-3 text-right">
-                              <span className="text-red-600 font-bold">
-                                -{Math.abs(analytics.trendPercentage)}%
+                              <span className="font-medium text-sm text-foreground">
+                                {analytics.totalPatients.toLocaleString()}
                               </span>
                             </td>
-                            <td className="p-3 text-right text-muted-foreground">
-                              {analytics.averageMonthly}
+                            <td className="p-3 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <TrendingDown className="w-3 h-3 text-red-500" />
+                                <span className="text-red-600 font-semibold text-sm">
+                                  {Math.abs(analytics.trendPercentage)}%
+                                </span>
+                              </div>
+                            </td>
+                            <td className="p-3 text-right">
+                              <span className="text-muted-foreground text-sm">
+                                {analytics.averageMonthly}
+                              </span>
                             </td>
                           </tr>
                         ))}
