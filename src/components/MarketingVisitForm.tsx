@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
-import { X, CalendarIcon, Star, Upload, Camera } from 'lucide-react';
+import { X, CalendarIcon, Star } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { MarketingVisit, VisitType, MarketingMaterial, VISIT_TYPE_OPTIONS, MARKETING_MATERIALS } from '@/lib/database.types';
@@ -42,7 +42,6 @@ export function MarketingVisitForm({
     materials_handed_out: visit?.materials_handed_out || [],
     star_rating: visit?.star_rating || undefined,
     follow_up_notes: visit?.follow_up_notes || '',
-    photo_url: visit?.photo_url || null,
   });
 
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(
@@ -237,21 +236,6 @@ export function MarketingVisitForm({
               value={formData.follow_up_notes || ''}
               onChange={(e) => setFormData({ ...formData, follow_up_notes: e.target.value })}
             />
-          </div>
-
-          {/* Photo Upload Placeholder */}
-          <div className="space-y-2">
-            <Label>Photo (Optional)</Label>
-            <div className="border-2 border-dashed border-muted rounded-lg p-6 text-center">
-              <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                <div className="flex gap-2">
-                  <Camera className="w-8 h-8" />
-                  <Upload className="w-8 h-8" />
-                </div>
-                <p className="text-sm">Photo upload functionality will be implemented</p>
-                <p className="text-xs">Phone capture or file upload</p>
-              </div>
-            </div>
           </div>
 
           {/* Form Actions */}
