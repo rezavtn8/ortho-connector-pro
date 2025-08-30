@@ -14,6 +14,68 @@ export type Database = {
   }
   public: {
     Tables: {
+      marketing_visits: {
+        Row: {
+          contact_person: string | null
+          created_at: string
+          follow_up_notes: string | null
+          group_tag: string | null
+          id: string
+          materials_handed_out: string[] | null
+          office_id: string
+          photo_url: string | null
+          rep_name: string
+          star_rating: number | null
+          updated_at: string
+          user_id: string
+          visit_date: string
+          visit_type: string
+          visited: boolean
+        }
+        Insert: {
+          contact_person?: string | null
+          created_at?: string
+          follow_up_notes?: string | null
+          group_tag?: string | null
+          id?: string
+          materials_handed_out?: string[] | null
+          office_id: string
+          photo_url?: string | null
+          rep_name: string
+          star_rating?: number | null
+          updated_at?: string
+          user_id: string
+          visit_date: string
+          visit_type: string
+          visited?: boolean
+        }
+        Update: {
+          contact_person?: string | null
+          created_at?: string
+          follow_up_notes?: string | null
+          group_tag?: string | null
+          id?: string
+          materials_handed_out?: string[] | null
+          office_id?: string
+          photo_url?: string | null
+          rep_name?: string
+          star_rating?: number | null
+          updated_at?: string
+          user_id?: string
+          visit_date?: string
+          visit_type?: string
+          visited?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_marketing_visits_office"
+            columns: ["office_id"]
+            isOneToOne: false
+            referencedRelation: "patient_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       monthly_patients: {
         Row: {
           created_at: string | null
