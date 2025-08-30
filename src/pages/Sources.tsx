@@ -114,18 +114,20 @@ export function Sources() {
     if (!editingSource || !editForm.name) return;
 
     try {
+      // Only update the fields that are being edited
+      const updateData: Partial<PatientSource> = {
+        name: editForm.name,
+        source_type: editForm.source_type,
+      };
+
+      // Only include address if it's being edited (not undefined)
+      if (editForm.address !== undefined) {
+        updateData.address = editForm.address || null;
+      }
+
       const { error } = await supabase
         .from('patient_sources')
-        .update({
-          name: editForm.name,
-          address: editForm.address || null,
-          phone: editForm.phone || null,
-          email: editForm.email || null,
-          website: editForm.website || null,
-          notes: editForm.notes || null,
-          source_type: editForm.source_type,
-          is_active: editForm.is_active
-        })
+        .update(updateData)
         .eq('id', editingSource);
 
       if (error) throw error;
