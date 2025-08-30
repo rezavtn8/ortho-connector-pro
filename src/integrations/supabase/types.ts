@@ -348,7 +348,7 @@ export type Database = {
         | "Social Media"
         | "Other"
         | "Office"
-      user_role: "Owner" | "Front Desk" | "Marketing Rep"
+      user_role: "Owner" | "Front Desk" | "Marketing Rep" | "Manager"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -486,7 +486,7 @@ export const Constants = {
         "Other",
         "Office",
       ],
-      user_role: ["Owner", "Front Desk", "Marketing Rep"],
+      user_role: ["Owner", "Front Desk", "Marketing Rep", "Manager"],
     },
   },
 } as const
