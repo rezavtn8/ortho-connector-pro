@@ -12,12 +12,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Search, Edit, Eye, Building2, Globe, MessageSquare, Star } from 'lucide-react';
+import { Plus, Search, Edit, Eye, Building2, Globe, MessageSquare, Star, Trash2, Check, X, Power } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ImportDataDialog } from '@/components/ImportDataDialog';
-import { PatientSource, MonthlyPatients, SOURCE_TYPE_CONFIG, getCurrentYearMonth } from '@/lib/database.types';
+import { PatientSource, MonthlyPatients, SOURCE_TYPE_CONFIG, getCurrentYearMonth, SourceType } from '@/lib/database.types';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export function Sources() {
   const navigate = useNavigate();
@@ -26,6 +27,9 @@ export function Sources() {
   const [monthlyData, setMonthlyData] = useState<MonthlyPatients[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [selectedSources, setSelectedSources] = useState<string[]>([]);
+  const [editingSource, setEditingSource] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<Partial<PatientSource>>({});
   const currentMonth = getCurrentYearMonth();
 
   useEffect(() => {
@@ -84,12 +88,163 @@ export function Sources() {
       );
   };
 
+  const handleSelectAll = (sources: PatientSource[], checked: boolean) => {
+    const sourceIds = sources.map(s => s.id);
+    if (checked) {
+      setSelectedSources(prev => [...new Set([...prev, ...sourceIds])]);
+    } else {
+      setSelectedSources(prev => prev.filter(id => !sourceIds.includes(id)));
+    }
+  };
+
+  const handleSelectSource = (sourceId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedSources(prev => [...prev, sourceId]);
+    } else {
+      setSelectedSources(prev => prev.filter(id => id !== sourceId));
+    }
+  };
+
+  const handleEditSource = (source: PatientSource) => {
+    setEditingSource(source.id);
+    setEditForm(source);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingSource || !editForm.name) return;
+
+    try {
+      const { error } = await supabase
+        .from('patient_sources')
+        .update({
+          name: editForm.name,
+          address: editForm.address || null,
+          phone: editForm.phone || null,
+          email: editForm.email || null,
+          website: editForm.website || null,
+          notes: editForm.notes || null,
+          source_type: editForm.source_type,
+          is_active: editForm.is_active
+        })
+        .eq('id', editingSource);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Source updated successfully",
+      });
+
+      setEditingSource(null);
+      setEditForm({});
+      loadData();
+    } catch (error) {
+      console.error('Error updating source:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update source",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingSource(null);
+    setEditForm({});
+  };
+
+  const handleDeleteSources = async (sourceIds: string[]) => {
+    if (sourceIds.length === 0) return;
+
+    const confirmMessage = sourceIds.length === 1 
+      ? "Are you sure you want to delete this source?"
+      : `Are you sure you want to delete ${sourceIds.length} sources?`;
+
+    if (!confirm(confirmMessage)) return;
+
+    try {
+      // Delete monthly data first
+      const { error: monthlyError } = await supabase
+        .from('monthly_patients')
+        .delete()
+        .in('source_id', sourceIds);
+
+      if (monthlyError) throw monthlyError;
+
+      // Delete source tags
+      const { error: tagsError } = await supabase
+        .from('source_tags')
+        .delete()
+        .in('source_id', sourceIds);
+
+      if (tagsError) throw tagsError;
+
+      // Delete change logs
+      const { error: logsError } = await supabase
+        .from('patient_changes_log')
+        .delete()
+        .in('source_id', sourceIds);
+
+      if (logsError) throw logsError;
+
+      // Finally delete sources
+      const { error: sourcesError } = await supabase
+        .from('patient_sources')
+        .delete()
+        .in('id', sourceIds);
+
+      if (sourcesError) throw sourcesError;
+
+      toast({
+        title: "Success",
+        description: `${sourceIds.length} source(s) deleted successfully`,
+      });
+
+      setSelectedSources([]);
+      loadData();
+    } catch (error) {
+      console.error('Error deleting sources:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete sources",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleToggleActive = async (sourceId: string, isActive: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('patient_sources')
+        .update({ is_active: isActive })
+        .eq('id', sourceId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `Source ${isActive ? 'activated' : 'deactivated'} successfully`,
+      });
+
+      loadData();
+    } catch (error) {
+      console.error('Error updating source status:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update source status",
+        variant: "destructive",
+      });
+    }
+  };
+
   const onlineSourceTypes = ['Google', 'Yelp', 'Website', 'Social Media'];
   const officeSourceTypes = ['Office'];
   const otherSourceTypes = ['Word of Mouth', 'Insurance', 'Other'];
 
   const renderSourceTable = (sources: PatientSource[], title: string, icon: React.ElementType) => {
     const Icon = icon;
+    const isAllSelected = sources.length > 0 && sources.every(s => selectedSources.includes(s.id));
+    const isSomeSelected = sources.some(s => selectedSources.includes(s.id));
     
     if (loading) {
       return (
@@ -129,18 +284,44 @@ export function Sources() {
       );
     }
 
+    const selectedInTable = sources.filter(s => selectedSources.includes(s.id));
+
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Icon className="w-5 h-5" />
-            {title} ({sources.length})
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Icon className="w-5 h-5" />
+              {title} ({sources.length})
+            </CardTitle>
+            {selectedInTable.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                  {selectedInTable.length} selected
+                </span>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => handleDeleteSources(selectedInTable.map(s => s.id))}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Selected
+                </Button>
+              </div>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-12">
+                  <Checkbox
+                    checked={isAllSelected}
+                    onCheckedChange={(checked) => handleSelectAll(sources, checked as boolean)}
+                    aria-label="Select all"
+                  />
+                </TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Status</TableHead>
@@ -153,29 +334,80 @@ export function Sources() {
               {sources.map((source) => {
                 const { thisMonth, total } = getPatientCounts(source.id);
                 const config = SOURCE_TYPE_CONFIG[source.source_type];
+                const isEditing = editingSource === source.id;
+                const isSelected = selectedSources.includes(source.id);
                 
                 return (
-                  <TableRow key={source.id}>
+                  <TableRow key={source.id} className={isSelected ? "bg-muted/50" : ""}>
                     <TableCell>
-                      <div>
-                        <div className="font-medium">{source.name}</div>
-                        {source.address && (
-                          <div className="text-sm text-muted-foreground truncate max-w-xs">
-                            {source.address}
-                          </div>
-                        )}
-                      </div>
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={(checked) => handleSelectSource(source.id, checked as boolean)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {isEditing ? (
+                        <div className="space-y-2">
+                          <Input
+                            value={editForm.name || ''}
+                            onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                            placeholder="Source name"
+                            className="text-sm"
+                          />
+                          {editForm.address !== undefined && (
+                            <Input
+                              value={editForm.address || ''}
+                              onChange={(e) => setEditForm(prev => ({ ...prev, address: e.target.value }))}
+                              placeholder="Address"
+                              className="text-sm"
+                            />
+                          )}
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="font-medium">{source.name}</div>
+                          {source.address && (
+                            <div className="text-sm text-muted-foreground truncate max-w-xs">
+                              {source.address}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {isEditing ? (
+                        <select
+                          value={editForm.source_type || source.source_type}
+                          onChange={(e) => setEditForm(prev => ({ ...prev, source_type: e.target.value as SourceType }))}
+                          className="text-sm border rounded px-2 py-1"
+                        >
+                          {Object.entries(SOURCE_TYPE_CONFIG).map(([key, config]) => (
+                            <option key={key} value={key}>
+                              {config.label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span>{config.icon}</span>
+                          <span className="text-sm">{config.label}</span>
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <span>{config.icon}</span>
-                        <span className="text-sm">{config.label}</span>
+                        <Badge variant={source.is_active ? "default" : "secondary"}>
+                          {source.is_active ? 'Active' : 'Inactive'}
+                        </Badge>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleToggleActive(source.id, !source.is_active)}
+                          title={source.is_active ? 'Deactivate' : 'Activate'}
+                        >
+                          <Power className={`w-3 h-3 ${source.is_active ? 'text-green-600' : 'text-gray-400'}`} />
+                        </Button>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={source.is_active ? "default" : "secondary"}>
-                        {source.is_active ? 'Active' : 'Inactive'}
-                      </Badge>
                     </TableCell>
                     <TableCell className="text-center font-semibold">
                       {thisMonth}
@@ -184,21 +416,54 @@ export function Sources() {
                       {total}
                     </TableCell>
                     <TableCell>
-                      <div className="flex justify-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => navigate(`/source/${source.id}`)}
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => navigate(`/source/${source.id}`)}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
+                      <div className="flex justify-center gap-1">
+                        {isEditing ? (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={handleSaveEdit}
+                              title="Save changes"
+                            >
+                              <Check className="w-4 h-4 text-green-600" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={handleCancelEdit}
+                              title="Cancel"
+                            >
+                              <X className="w-4 h-4 text-red-600" />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => navigate(`/source/${source.id}`)}
+                              title="View details"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleEditSource(source)}
+                              title="Edit"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDeleteSources([source.id])}
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4 text-red-600" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
