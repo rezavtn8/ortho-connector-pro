@@ -364,6 +364,14 @@ export type Database = {
           source_type: string
         }[]
       }
+      get_user_clinic_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      get_user_role: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       set_patient_count: {
         Args: {
           p_count: number
@@ -380,6 +388,10 @@ export type Database = {
       update_source_patient_count: {
         Args: { p_new_count: number; p_source_id: string }
         Returns: Json
+      }
+      user_has_clinic_admin_access: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
       }
     }
     Enums: {
