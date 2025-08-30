@@ -206,6 +206,19 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
     setLoading(true);
     setImportProgress('Starting import...');
     
+    // Get user ID upfront and validate
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user?.id) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to import data",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+
+    const userId = user.id;
     let sourcesCreated = 0;
     let sourcesUpdated = 0;
     let dataPointsCreated = 0;
@@ -239,7 +252,7 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
                 name: row.source,
                 source_type: detectedType,
                 is_active: true,
-                created_by: (await supabase.auth.getUser()).data.user?.id
+                created_by: userId
               })
               .select('id')
               .single();
@@ -319,7 +332,7 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
                   source_id: sourceId,
                   year_month: yearMonth,
                   patient_count: Math.round(count),
-                  user_id: (await supabase.auth.getUser()).data.user?.id
+                  user_id: userId
                 });
               
               if (insertError) {
