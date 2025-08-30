@@ -210,6 +210,13 @@ export function Analytics() {
       .slice(0, 10);
   };
 
+  const getGrowingSourcesAnalysis = () => {
+    return [...filteredAnalytics]
+      .filter(a => a.trend === 'up')
+      .sort((a, b) => b.trendPercentage - a.trendPercentage) // Sort by best growth first
+      .slice(0, 10);
+  };
+
   // Calculate summary statistics
   const totalPatients = filteredAnalytics.reduce((sum, a) => sum + a.totalPatients, 0);
   const totalSources = filteredAnalytics.length;
@@ -381,6 +388,7 @@ export function Analytics() {
           <TabsTrigger value="trends">Trends</TabsTrigger>
           <TabsTrigger value="distribution">Distribution</TabsTrigger>
           <TabsTrigger value="performance">Top Performers</TabsTrigger>
+          <TabsTrigger value="growing">Growing Analysis</TabsTrigger>
           <TabsTrigger value="declining">Declining Analysis</TabsTrigger>
         </TabsList>
 
@@ -480,6 +488,111 @@ export function Analytics() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="growing" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Growing Sources Chart</CardTitle>
+                <CardDescription>
+                  Sources with positive trends - percentage growth
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart 
+                    data={getGrowingSourcesAnalysis().map(a => ({
+                      name: a.source.name.length > 20 
+                        ? a.source.name.substring(0, 20) + '...' 
+                        : a.source.name,
+                      growth: a.trendPercentage
+                    }))}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="name" 
+                      angle={-45}
+                      textAnchor="end"
+                      height={100}
+                    />
+                    <YAxis />
+                    <Tooltip formatter={(value) => [`${value}%`, 'Growth']} />
+                    <Bar dataKey="growth" fill="#22c55e" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Growing Sources Performance</CardTitle>
+                <CardDescription>
+                  Sources showing positive momentum
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {getGrowingSourcesAnalysis().length === 0 ? (
+                  <div className="text-center text-muted-foreground py-8">
+                    <TrendingUp className="w-12 h-12 mx-auto mb-2 text-muted-foreground/50" />
+                    <p className="text-sm">No growing sources found</p>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-border/50 overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-muted/30">
+                          <th className="text-left p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Source Name</th>
+                          <th className="text-left p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Category</th>
+                          <th className="text-right p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Total Count</th>
+                          <th className="text-right p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Growth Rate</th>
+                          <th className="text-right p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Monthly Avg</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/30">
+                        {getGrowingSourcesAnalysis().map((analytics, index) => (
+                          <tr key={analytics.source.id} className="hover:bg-muted/20 transition-colors">
+                            <td className="p-3">
+                              <div className="font-medium text-sm text-foreground">{analytics.source.name}</div>
+                            </td>
+                            <td className="p-3">
+                              <div className="flex items-center gap-2">
+                                <span className="text-base">
+                                  {SOURCE_TYPE_CONFIG[analytics.source.source_type].icon}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  {SOURCE_TYPE_CONFIG[analytics.source.source_type].label}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="p-3 text-right">
+                              <span className="font-medium text-sm text-foreground">
+                                {analytics.totalPatients.toLocaleString()}
+                              </span>
+                            </td>
+                            <td className="p-3 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <TrendingUp className="w-3 h-3 text-green-500" />
+                                <span className="text-green-600 font-semibold text-sm">
+                                  +{analytics.trendPercentage}%
+                                </span>
+                              </div>
+                            </td>
+                            <td className="p-3 text-right">
+                              <span className="text-muted-foreground text-sm">
+                                {analytics.averageMonthly}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
         <TabsContent value="declining" className="space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
@@ -533,11 +646,11 @@ export function Analytics() {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b bg-muted/30">
-                          <th className="text-left p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Source</th>
-                          <th className="text-left p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Type</th>
-                          <th className="text-right p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Patients</th>
-                          <th className="text-right p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Decline</th>
-                          <th className="text-right p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Avg/Month</th>
+                          <th className="text-left p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Source Name</th>
+                          <th className="text-left p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Category</th>
+                          <th className="text-right p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Total Count</th>
+                          <th className="text-right p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Decline Rate</th>
+                          <th className="text-right p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Monthly Avg</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border/30">
