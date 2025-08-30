@@ -522,33 +522,55 @@ export function Analytics() {
                   Sources that need immediate attention
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent>
                 {getDecliningSourcesAnalysis().length === 0 ? (
                   <div className="text-center text-muted-foreground py-8">
                     No declining sources found
                   </div>
                 ) : (
-                  getDecliningSourcesAnalysis().map((analytics) => (
-                    <div key={analytics.source.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className="text-2xl">
-                          {SOURCE_TYPE_CONFIG[analytics.source.source_type].icon}
-                        </div>
-                        <div>
-                          <div className="font-medium">{analytics.source.name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {SOURCE_TYPE_CONFIG[analytics.source.source_type].label}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-red-600 font-bold">{Math.abs(analytics.trendPercentage)}% decline</div>
-                        <div className="text-sm text-muted-foreground">
-                          {analytics.totalPatients} total patients
-                        </div>
-                      </div>
-                    </div>
-                  ))
+                  <div className="rounded-md border">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b bg-muted/50">
+                          <th className="text-left p-3 font-medium">Source</th>
+                          <th className="text-left p-3 font-medium">Type</th>
+                          <th className="text-right p-3 font-medium">Total Patients</th>
+                          <th className="text-right p-3 font-medium">Decline %</th>
+                          <th className="text-right p-3 font-medium">Avg Monthly</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {getDecliningSourcesAnalysis().map((analytics, index) => (
+                          <tr key={analytics.source.id} className={index % 2 === 0 ? "bg-background" : "bg-muted/25"}>
+                            <td className="p-3">
+                              <div className="font-medium">{analytics.source.name}</div>
+                            </td>
+                            <td className="p-3">
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">
+                                  {SOURCE_TYPE_CONFIG[analytics.source.source_type].icon}
+                                </span>
+                                <span className="text-sm">
+                                  {SOURCE_TYPE_CONFIG[analytics.source.source_type].label}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="p-3 text-right font-medium">
+                              {analytics.totalPatients}
+                            </td>
+                            <td className="p-3 text-right">
+                              <span className="text-red-600 font-bold">
+                                -{Math.abs(analytics.trendPercentage)}%
+                              </span>
+                            </td>
+                            <td className="p-3 text-right text-muted-foreground">
+                              {analytics.averageMonthly}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </CardContent>
             </Card>
