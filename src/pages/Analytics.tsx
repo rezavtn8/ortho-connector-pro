@@ -443,6 +443,7 @@ export function Analytics() {
           <TabsTrigger value="performance">Top Performers</TabsTrigger>
           <TabsTrigger value="growing">Growing Analysis</TabsTrigger>
           <TabsTrigger value="declining">Declining Analysis</TabsTrigger>
+          <TabsTrigger value="marketing">Marketing Outreach</TabsTrigger>
         </TabsList>
 
         <TabsContent value="trends" className="space-y-4">
@@ -749,6 +750,76 @@ export function Analytics() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* Marketing Outreach Tab */}
+        <TabsContent value="marketing" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Calendar className="w-5 h-5" />
+                  Total Visits
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-primary">
+                  {/* This would need to be populated with actual visit data */}
+                  -
+                </div>
+                <p className="text-sm text-muted-foreground">All marketing visits</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Building2 className="w-5 h-5" />
+                  Offices Visited
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-primary">
+                  -
+                </div>
+                <p className="text-sm text-muted-foreground">Unique offices</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5" />
+                  Conversion Rate
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-primary">
+                  -
+                </div>
+                <p className="text-sm text-muted-foreground">Visits to referrals</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Marketing Outreach Analytics</CardTitle>
+              <CardDescription>
+                Track the effectiveness of your marketing visits and materials
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-12">
+                <Calendar className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Marketing Analytics Coming Soon</h3>
+                <p className="text-muted-foreground max-w-md mx-auto">
+                  Detailed analytics showing visit trends, referral conversion rates by materials, 
+                  and before/after visit comparisons will be available here.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

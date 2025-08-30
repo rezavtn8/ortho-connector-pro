@@ -39,10 +39,12 @@ import {
   TrendingDown,
   Activity,
   History,
-  Tag
+  Tag,
+  Star
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useParams, useNavigate } from 'react-router-dom';
+import { format, subMonths } from 'date-fns';
 
 export function SourceDetail() {
   const { id: sourceId } = useParams<{ id: string }>();
@@ -52,6 +54,7 @@ export function SourceDetail() {
   const [tags, setTags] = useState<SourceTag[]>([]);
   const [monthlyData, setMonthlyData] = useState<MonthlyPatients[]>([]);
   const [changeLog, setChangeLog] = useState<PatientChangeLog[]>([]);
+  const [marketingVisits, setMarketingVisits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingMonth, setEditingMonth] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<number>(0);
@@ -106,10 +109,27 @@ export function SourceDetail() {
 
       if (changeLogError) throw changeLogError;
 
+      // Load marketing visits if source is Office type
+      let visitsData = [];
+      if (sourceData?.source_type === 'Office') {
+        const { data: visits, error: visitsError } = await supabase
+          .from('marketing_visits')
+          .select('*')
+          .eq('office_id', sourceId)
+          .order('visit_date', { ascending: false });
+
+        if (visitsError) {
+          console.warn('Error loading marketing visits:', visitsError);
+        } else {
+          visitsData = visits || [];
+        }
+      }
+
       setSource(sourceData);
       setTags(tagsData || []);
       setMonthlyData(monthlyDataResult || []);
       setChangeLog(changeLogData || []);
+      setMarketingVisits(visitsData);
     } catch (error) {
       console.error('Error loading source data:', error);
       toast({
@@ -251,6 +271,34 @@ export function SourceDetail() {
     return months;
   };
 
+  const getLastVisitDate = () => {
+    if (marketingVisits.length === 0) return null;
+    const lastVisit = marketingVisits.find(visit => visit.visited);
+    return lastVisit ? new Date(lastVisit.visit_date) : null;
+  };
+
+  const isOfficeNotVisitedRecently = () => {
+    if (source?.source_type !== 'Office') return false;
+    const lastVisitDate = getLastVisitDate();
+    if (!lastVisitDate) return true;
+    const threeMonthsAgo = subMonths(new Date(), 3);
+    return lastVisitDate < threeMonthsAgo;
+  };
+
+  const renderStars = (rating?: number) => {
+    if (!rating) return <span className="text-muted-foreground">-</span>;
+    return (
+      <div className="flex">
+        {[1, 2, 3, 4, 5].map(star => (
+          <Star
+            key={star}
+            className={`w-4 h-4 ${star <= rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
+          />
+        ))}
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -284,10 +332,17 @@ export function SourceDetail() {
             Back
           </Button>
           <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <span>{config.icon}</span>
-              {source.name}
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold flex items-center gap-2">
+                <span>{config.icon}</span>
+                {source.name}
+              </h1>
+              {isOfficeNotVisitedRecently() && (
+                <Badge variant="destructive" className="text-sm">
+                  ⚠️ Not visited 3+ months
+                </Badge>
+              )}
+            </div>
             <p className="text-muted-foreground">{config.label}</p>
           </div>
         </div>
@@ -364,11 +419,14 @@ export function SourceDetail() {
 
       {/* Details */}
       <Tabs defaultValue="details" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className={cn("grid w-full", source.source_type === 'Office' ? "grid-cols-5" : "grid-cols-4")}>
           <TabsTrigger value="details">Details</TabsTrigger>
           <TabsTrigger value="monthly">Monthly History</TabsTrigger>
           <TabsTrigger value="changelog">Change Log</TabsTrigger>
           <TabsTrigger value="tags">Tags</TabsTrigger>
+          {source.source_type === 'Office' && (
+            <TabsTrigger value="visits">Marketing Visits</TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="details" className="space-y-4">
@@ -600,6 +658,98 @@ export function SourceDetail() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Marketing Visits Tab */}
+        {source.source_type === 'Office' && (
+          <TabsContent value="visits" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="w-5 h-5" />
+                  Marketing Visits ({marketingVisits.length})
+                </CardTitle>
+                <CardDescription>
+                  Track visits and outreach activities for this office
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {marketingVisits.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No visits recorded</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Start tracking your marketing visits to this office
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Contact</TableHead>
+                          <TableHead>Rep</TableHead>
+                          <TableHead>Visited</TableHead>
+                          <TableHead>Rating</TableHead>
+                          <TableHead>Materials</TableHead>
+                          <TableHead>Notes</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {marketingVisits.map((visit) => (
+                          <TableRow key={visit.id}>
+                            <TableCell>
+                              {format(new Date(visit.visit_date), 'MMM dd, yyyy')}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{visit.visit_type}</Badge>
+                              {visit.group_tag && (
+                                <Badge variant="secondary" className="ml-2 text-xs">
+                                  {visit.group_tag}
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>{visit.contact_person || '-'}</TableCell>
+                            <TableCell>{visit.rep_name}</TableCell>
+                            <TableCell>
+                              <Badge variant={visit.visited ? "default" : "secondary"}>
+                                {visit.visited ? 'Yes' : 'No'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{renderStars(visit.star_rating)}</TableCell>
+                            <TableCell>
+                              {visit.materials_handed_out && visit.materials_handed_out.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {visit.materials_handed_out.map((material: string) => (
+                                    <Badge key={material} variant="outline" className="text-xs">
+                                      {material}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {visit.follow_up_notes ? (
+                                <div className="max-w-40 truncate" title={visit.follow_up_notes}>
+                                  {visit.follow_up_notes}
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
@@ -607,3 +757,4 @@ export function SourceDetail() {
 
 // Add missing Label component import
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';

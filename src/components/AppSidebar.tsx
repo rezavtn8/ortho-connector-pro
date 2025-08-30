@@ -36,7 +36,7 @@ const mainNavItems = [
 ];
 
 const managementItems = [
-  { id: 'add-source', title: 'Add Source', icon: UserPlus },
+  { id: 'marketing-visits', title: 'Marketing Visits', icon: UserPlus },
 ];
 
 const systemItems = [
