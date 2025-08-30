@@ -430,6 +430,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_invitation: {
+        Args: { p_token: string }
+        Returns: Json
+      }
       adjust_patient_count: {
         Args: { p_delta: number; p_source_id: string; p_year_month: string }
         Returns: number
