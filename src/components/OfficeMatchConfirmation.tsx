@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, Check, X, MapPin, Phone, Globe, Building2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { Loader } from '@googlemaps/js-api-loader';
 
 interface ImportedOffice {
   id: string;
@@ -41,11 +42,56 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
   const [confirmedOffices, setConfirmedOffices] = useState<Set<string>>(new Set());
   const [skippedOffices, setSkippedOffices] = useState<Set<string>>(new Set());
   const [searchingOfficeId, setSearchingOfficeId] = useState<string | null>(null);
+  const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
+  const [googleMapsError, setGoogleMapsError] = useState<string | null>(null);
   const { toast } = useToast();
 
+  // Load Google Maps first
   useEffect(() => {
-    searchForMatches();
-  }, [importedOffices]);
+    const initGoogleMaps = async () => {
+      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        const errorMsg = 'Google Maps API key not found. Please add VITE_GOOGLE_MAPS_API_KEY to your environment variables.';
+        console.warn(errorMsg);
+        setGoogleMapsError(errorMsg);
+        toast({
+          title: "Google Maps API Key Missing",
+          description: errorMsg,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      try {
+        const loader = new Loader({
+          apiKey,
+          version: 'weekly',
+          libraries: ['places']
+        });
+
+        await loader.load();
+        setGoogleMapsLoaded(true);
+      } catch (error) {
+        console.error('Error loading Google Maps:', error);
+        const errorMsg = 'Failed to load Google Maps. Please check your API key and internet connection.';
+        setGoogleMapsError(errorMsg);
+        toast({
+          title: "Google Maps Loading Error",
+          description: errorMsg,
+          variant: "destructive",
+        });
+      }
+    };
+
+    initGoogleMaps();
+  }, []);
+
+  // Search for matches once Google Maps is loaded
+  useEffect(() => {
+    if (googleMapsLoaded && importedOffices.length > 0) {
+      searchForMatches();
+    }
+  }, [googleMapsLoaded, importedOffices]);
 
   const searchForMatches = async () => {
     if (!window.google) {
@@ -185,7 +231,42 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
         </p>
       </div>
 
-      {loading && searchingOfficeId && (
+      {/* Google Maps Loading State */}
+      {!googleMapsLoaded && !googleMapsError && (
+        <div className="flex items-center justify-center p-8 bg-muted/50 rounded-lg">
+          <Loader2 className="w-5 h-5 animate-spin mr-2" />
+          <span className="text-muted-foreground">Loading Google Maps...</span>
+        </div>
+      )}
+
+      {/* Google Maps Error State */}
+      {googleMapsError && (
+        <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+          <div className="flex items-center gap-2 text-destructive mb-2">
+            <X className="w-4 h-4" />
+            <span className="font-medium">Google Maps Error</span>
+          </div>
+          <p className="text-sm text-muted-foreground mb-4">{googleMapsError}</p>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => window.location.reload()}
+            className="mr-2"
+          >
+            Refresh Page
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => handleComplete()}
+          >
+            Skip Google Places & Continue
+          </Button>
+        </div>
+      )}
+
+      {/* Search Progress */}
+      {googleMapsLoaded && loading && searchingOfficeId && (
         <div className="flex items-center justify-center p-4 bg-muted/50 rounded-lg">
           <Loader2 className="w-4 h-4 animate-spin mr-2" />
           <span className="text-sm text-muted-foreground">
@@ -194,151 +275,156 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
         </div>
       )}
 
-      {/* Pending Confirmations */}
-      <div className="space-y-4">
-        {pendingOffices.map(office => {
-          const match = matches.get(office.id);
-          
-          return (
-            <Card key={office.id} className="border-l-4 border-l-warning">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="w-5 h-5" />
-                  Original: {office.name}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {match ? (
-                  <div className="space-y-4">
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div>
-                        <h4 className="font-semibold text-foreground mb-2">Suggested Match:</h4>
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <Building2 className="w-4 h-4 text-muted-foreground" />
-                            <span className="font-medium">{match.name}</span>
-                            {match.rating && (
-                              <Badge variant="secondary">
-                                ⭐ {match.rating} ({match.user_ratings_total})
-                              </Badge>
-                            )}
+      {/* Only show office matches if Google Maps loaded successfully */}
+      {googleMapsLoaded && !googleMapsError && (
+        <>
+          {/* Pending Confirmations */}
+          <div className="space-y-4">
+            {pendingOffices.map(office => {
+              const match = matches.get(office.id);
+              
+              return (
+                <Card key={office.id} className="border-l-4 border-l-warning">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Building2 className="w-5 h-5" />
+                      Original: {office.name}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {match ? (
+                      <div className="space-y-4">
+                        <div className="grid md:grid-cols-2 gap-4">
+                          <div>
+                            <h4 className="font-semibold text-foreground mb-2">Suggested Match:</h4>
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <Building2 className="w-4 h-4 text-muted-foreground" />
+                                <span className="font-medium">{match.name}</span>
+                                {match.rating && (
+                                  <Badge variant="secondary">
+                                    ⭐ {match.rating} ({match.user_ratings_total})
+                                  </Badge>
+                                )}
+                              </div>
+                              
+                              {match.formatted_address && (
+                                <div className="flex items-start gap-2">
+                                  <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
+                                  <span className="text-sm">{match.formatted_address}</span>
+                                </div>
+                              )}
+                              
+                              {match.formatted_phone_number && (
+                                <div className="flex items-center gap-2">
+                                  <Phone className="w-4 h-4 text-muted-foreground" />
+                                  <span className="text-sm">{match.formatted_phone_number}</span>
+                                </div>
+                              )}
+                              
+                              {match.website && (
+                                <div className="flex items-center gap-2">
+                                  <Globe className="w-4 h-4 text-muted-foreground" />
+                                  <a 
+                                    href={match.website} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="text-sm text-primary hover:underline"
+                                  >
+                                    {match.website}
+                                  </a>
+                                </div>
+                              )}
+                            </div>
                           </div>
                           
-                          {match.formatted_address && (
-                            <div className="flex items-start gap-2">
-                              <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
-                              <span className="text-sm">{match.formatted_address}</span>
+                          <div>
+                            <h4 className="font-semibold text-foreground mb-2">Original Data:</h4>
+                            <div className="space-y-2 text-sm text-muted-foreground">
+                              <div>Name: {office.name}</div>
+                              {office.address && <div>Address: {office.address}</div>}
+                              {office.phone && <div>Phone: {office.phone}</div>}
+                              {office.website && <div>Website: {office.website}</div>}
                             </div>
-                          )}
-                          
-                          {match.formatted_phone_number && (
-                            <div className="flex items-center gap-2">
-                              <Phone className="w-4 h-4 text-muted-foreground" />
-                              <span className="text-sm">{match.formatted_phone_number}</span>
-                            </div>
-                          )}
-                          
-                          {match.website && (
-                            <div className="flex items-center gap-2">
-                              <Globe className="w-4 h-4 text-muted-foreground" />
-                              <a 
-                                href={match.website} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-sm text-primary hover:underline"
-                              >
-                                {match.website}
-                              </a>
-                            </div>
-                          )}
+                          </div>
+                        </div>
+                        
+                        <div className="flex gap-2 pt-4 border-t">
+                          <Button 
+                            onClick={() => handleConfirm(office.id)}
+                            className="flex items-center gap-2"
+                            disabled={loading}
+                          >
+                            <Check className="w-4 h-4" />
+                            Confirm Match
+                          </Button>
+                          <Button 
+                            variant="outline"
+                            onClick={() => handleSkip(office.id)}
+                            className="flex items-center gap-2"
+                          >
+                            <X className="w-4 h-4" />
+                            Skip
+                          </Button>
                         </div>
                       </div>
-                      
-                      <div>
-                        <h4 className="font-semibold text-foreground mb-2">Original Data:</h4>
-                        <div className="space-y-2 text-sm text-muted-foreground">
-                          <div>Name: {office.name}</div>
-                          {office.address && <div>Address: {office.address}</div>}
-                          {office.phone && <div>Phone: {office.phone}</div>}
-                          {office.website && <div>Website: {office.website}</div>}
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="text-center py-6 text-muted-foreground">
+                          <Building2 className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                          <p>No Google Places match found</p>
+                          <p className="text-sm">The original data will be preserved</p>
+                        </div>
+                        
+                        <div className="flex gap-2 pt-4 border-t">
+                          <Button 
+                            variant="outline"
+                            onClick={() => handleSkip(office.id)}
+                            className="flex items-center gap-2 mx-auto"
+                          >
+                            <Check className="w-4 h-4" />
+                            Keep Original
+                          </Button>
                         </div>
                       </div>
-                    </div>
-                    
-                    <div className="flex gap-2 pt-4 border-t">
-                      <Button 
-                        onClick={() => handleConfirm(office.id)}
-                        className="flex items-center gap-2"
-                        disabled={loading}
-                      >
-                        <Check className="w-4 h-4" />
-                        Confirm Match
-                      </Button>
-                      <Button 
-                        variant="outline"
-                        onClick={() => handleSkip(office.id)}
-                        className="flex items-center gap-2"
-                      >
-                        <X className="w-4 h-4" />
-                        Skip
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="text-center py-6 text-muted-foreground">
-                      <Building2 className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                      <p>No Google Places match found</p>
-                      <p className="text-sm">The original data will be preserved</p>
-                    </div>
-                    
-                    <div className="flex gap-2 pt-4 border-t">
-                      <Button 
-                        variant="outline"
-                        onClick={() => handleSkip(office.id)}
-                        className="flex items-center gap-2 mx-auto"
-                      >
-                        <Check className="w-4 h-4" />
-                        Keep Original
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Review Later Section */}
-      {reviewLaterOffices.length > 0 && (
-        <div className="mt-8">
-          <h3 className="text-lg font-semibold text-foreground mb-4">Review Later</h3>
-          <div className="space-y-2">
-            {reviewLaterOffices.map(office => (
-              <Card key={office.id} className="bg-muted/50">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-medium">{office.name}</h4>
-                      <p className="text-sm text-muted-foreground">Will use original imported data</p>
-                    </div>
-                    <Badge variant="secondary">Skipped</Badge>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
-        </div>
-      )}
 
-      {/* Complete Button */}
-      {pendingOffices.length === 0 && importedOffices.length > 0 && (
-        <div className="flex justify-center pt-6">
-          <Button onClick={handleComplete} size="lg">
-            Complete Import ({confirmedOffices.size} confirmed, {skippedOffices.size} skipped)
-          </Button>
-        </div>
+          {/* Review Later Section */}
+          {reviewLaterOffices.length > 0 && (
+            <div className="mt-8">
+              <h3 className="text-lg font-semibold text-foreground mb-4">Review Later</h3>
+              <div className="space-y-2">
+                {reviewLaterOffices.map(office => (
+                  <Card key={office.id} className="bg-muted/50">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-medium">{office.name}</h4>
+                          <p className="text-sm text-muted-foreground">Will use original imported data</p>
+                        </div>
+                        <Badge variant="secondary">Skipped</Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Complete Button */}
+          {pendingOffices.length === 0 && importedOffices.length > 0 && (
+            <div className="flex justify-center pt-6">
+              <Button onClick={handleComplete} size="lg">
+                Complete Import ({confirmedOffices.size} confirmed, {skippedOffices.size} skipped)
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
