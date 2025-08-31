@@ -93,17 +93,14 @@ export function AddressSearch({ value, onSelect, placeholder = "Search offices..
     setIsLoadingGoogle(true);
     
     const searchPlaces = async () => {
-      try {
-        // Use the newer Places API (New) with AutocompleteSuggestion
-        const { AutocompleteSuggestion } = await google.maps.importLibrary("places") as google.maps.PlacesLibrary;
-        
-        const request = {
-          input: searchValue,
-          types: ['establishment'],
-          componentRestrictions: { country: 'us' }
-        };
+      const request = {
+        input: searchValue,
+        types: ['establishment'],
+        componentRestrictions: { country: 'us' }
+      };
 
-        // Use the new AutocompleteSuggestion API
+      try {
+        // Use AutocompleteService (works despite deprecation warning)
         const autocompleteService = new google.maps.places.AutocompleteService();
         autocompleteService.getPlacePredictions(request, (results, status) => {
           setIsLoadingGoogle(false);
