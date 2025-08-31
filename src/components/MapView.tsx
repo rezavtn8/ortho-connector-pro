@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader } from '@googlemaps/js-api-loader';
+import mapboxgl from 'mapbox-gl';
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MapPin, Users, Calendar, Filter, X, Gift, UserPlus, Star, Phone, Mail, Globe, MessageSquare, TrendingUp, Building2 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import 'mapbox-gl/dist/mapbox-gl.css';
 
 interface Office {
   id: string;
@@ -59,8 +60,8 @@ export function MapView({
   showVisitData = false 
 }: MapViewProps) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<google.maps.Marker[]>([]);
+  const mapInstanceRef = useRef<mapboxgl.Map | null>(null);
+  const markersRef = useRef<mapboxgl.Marker[]>([]);
   const [offices, setOffices] = useState<Office[]>([]);
   const [clinic, setClinic] = useState<Clinic | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -68,7 +69,6 @@ export function MapView({
   const [showFilters, setShowFilters] = useState(false);
   const [hoveredOffice, setHoveredOffice] = useState<Office | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-  const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [filters, setFilters] = useState<FilterState>({
     strength: ['Strong', 'Moderate', 'Sporadic', 'Cold'],
     treatmentTypes: [],
@@ -85,7 +85,8 @@ export function MapView({
         const { data: profile } = await supabase
           .from('user_profiles')
           .select('clinic_id, clinic_name, clinic_address, clinic_latitude, clinic_longitude')
-          .single();
+          .eq('user_id', (await supabase.auth.getUser()).data?.user?.id)
+          .maybeSingle();
 
         if (profile && profile.clinic_latitude && profile.clinic_longitude) {
           setClinic({
@@ -173,133 +174,106 @@ export function MapView({
     loadData();
   }, []);
 
-  // Initialize Google Maps
+  // Initialize Mapbox map
   useEffect(() => {
     if (!mapRef.current || isLoading) return;
 
     const initMap = async () => {
       try {
-        const loader = new Loader({
-          apiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
-          version: 'weekly',
-          libraries: ['places']
-        });
+        // Get Mapbox token from Supabase secrets
+        const { data, error } = await supabase.functions.invoke('get-mapbox-token');
+        
+        if (error || !data?.token) {
+          console.error('Error getting Mapbox token:', error);
+          // Fallback to a default token or show error
+          return;
+        }
 
-        await loader.load();
+        mapboxgl.accessToken = data.token;
 
-        const map = new google.maps.Map(mapRef.current!, {
-          center: clinic ? { lat: clinic.latitude, lng: clinic.longitude } : { lat: 40.7128, lng: -74.0060 },
+        const map = new mapboxgl.Map({
+          container: mapRef.current!,
+          style: 'mapbox://styles/mapbox/light-v11',
+          center: clinic ? [clinic.longitude, clinic.latitude] : [-74.0060, 40.7128],
           zoom: clinic ? 12 : 9,
-          mapTypeId: google.maps.MapTypeId.ROADMAP,
-          styles: [
-            {
-              featureType: "all",
-              elementType: "geometry.fill",
-              stylers: [{ weight: "2.00" }]
-            },
-            {
-              featureType: "all",
-              elementType: "geometry.stroke",
-              stylers: [{ color: "#9c9c9c" }]
-            }
-          ]
+          pitch: 0,
+          bearing: 0
         });
 
         mapInstanceRef.current = map;
-        setIsMapLoaded(true);
 
-        // Add clinic marker if available
-        if (clinic) {
-          const clinicMarker = new google.maps.Marker({
-            position: { lat: clinic.latitude, lng: clinic.longitude },
-            map: map,
-            title: clinic.name,
-            icon: {
-              url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="20" cy="20" r="18" fill="#3b82f6" stroke="white" stroke-width="3"/>
-                  <text x="20" y="26" text-anchor="middle" font-size="18" fill="white">🏥</text>
-                </svg>
-              `),
-              scaledSize: new google.maps.Size(40, 40),
-              anchor: new google.maps.Point(20, 20)
-            }
-          });
-
-          const clinicInfoWindow = new google.maps.InfoWindow({
-            content: `
-              <div class="p-3">
-                <div class="font-semibold text-primary">${clinic.name}</div>
-                <div class="text-sm text-muted-foreground">${clinic.address}</div>
-                <div class="text-xs text-blue-600 mt-1">Your Clinic</div>
+        map.on('load', () => {
+          // Add clinic marker if available
+          if (clinic) {
+            const clinicEl = document.createElement('div');
+            clinicEl.className = 'clinic-marker';
+            clinicEl.innerHTML = `
+              <div class="clinic-pin">
+                <div class="clinic-icon">🏥</div>
+                <div class="clinic-pulse"></div>
               </div>
-            `
-          });
+            `;
+            
+            new mapboxgl.Marker(clinicEl)
+              .setLngLat([clinic.longitude, clinic.latitude])
+              .setPopup(new mapboxgl.Popup({ offset: 25 })
+                .setHTML(`
+                  <div class="p-3">
+                    <div class="font-semibold text-primary">${clinic.name}</div>
+                    <div class="text-sm text-muted-foreground">${clinic.address}</div>
+                    <div class="text-xs text-blue-600 mt-1">Your Clinic</div>
+                  </div>
+                `))
+              .addTo(map);
+          }
 
-          clinicMarker.addListener('click', () => {
-            clinicInfoWindow.open(map, clinicMarker);
-          });
-        }
-
-        // Add office markers
-        addOfficeMarkers(map);
+          // Add office markers
+          addOfficeMarkers(map);
+        });
 
         // Handle mouse move for tooltip positioning
-        map.addListener('mousemove', (e: google.maps.MapMouseEvent) => {
-          if (mapRef.current) {
-            const rect = mapRef.current.getBoundingClientRect();
-            const overlay = new google.maps.OverlayView();
-            overlay.setMap(map);
-            overlay.onAdd = function() {};
-            overlay.draw = function() {};
-            const projection = overlay.getProjection();
-            if (projection && e.latLng) {
-              const point = projection.fromLatLngToContainerPixel(e.latLng);
-              if (point) {
-                setMousePosition({ x: point.x + rect.left, y: point.y + rect.top });
-              }
-            }
-          }
+        map.on('mousemove', (e) => {
+          const rect = mapRef.current!.getBoundingClientRect();
+          setMousePosition({ x: e.point.x + rect.left, y: e.point.y + rect.top });
         });
 
       } catch (error) {
-        console.error('Error loading Google Maps:', error);
+        console.error('Error initializing Mapbox:', error);
       }
     };
 
     initMap();
 
     return () => {
-      // Google Maps cleanup is handled automatically
-      mapInstanceRef.current = null;
-      setIsMapLoaded(false);
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
     };
   }, [clinic, isLoading]);
 
   // Add office markers to map
-  const addOfficeMarkers = (map: google.maps.Map) => {
+  const addOfficeMarkers = (map: mapboxgl.Map) => {
     // Clear existing markers
-    markersRef.current.forEach(marker => marker.setMap(null));
+    markersRef.current.forEach(marker => marker.remove());
     markersRef.current = [];
 
     const filteredOffices = getFilteredOffices();
 
     filteredOffices.forEach((office) => {
       if (office.latitude && office.longitude) {
-        const markerIcon = createMarkerIcon(office);
+        const markerEl = createMarkerElement(office);
         
-        const marker = new google.maps.Marker({
-          position: { lat: office.latitude, lng: office.longitude },
-          map: map,
-          title: office.name,
-          icon: markerIcon
-        });
+        const marker = new mapboxgl.Marker(markerEl)
+          .setLngLat([office.longitude, office.latitude])
+          .addTo(map);
 
-        // Add hover and click events
-        marker.addListener('mouseover', () => setHoveredOffice(office));
-        marker.addListener('mouseout', () => setHoveredOffice(null));
+        // Add hover events
+        markerEl.addEventListener('mouseenter', () => setHoveredOffice(office));
+        markerEl.addEventListener('mouseleave', () => setHoveredOffice(null));
         
-        marker.addListener('click', () => {
+        // Add click event
+        markerEl.addEventListener('click', () => {
           setSelectedOffice(office);
           if (onOfficeSelect) onOfficeSelect(office.id);
         });
@@ -309,8 +283,10 @@ export function MapView({
     });
   };
 
-  // Create marker icon with dynamic styling
-  const createMarkerIcon = (office: Office) => {
+  // Create marker element with dynamic styling
+  const createMarkerElement = (office: Office) => {
+    const el = document.createElement('div');
+    
     // Pin size based on referrals - make it more prominent for high patient load
     const baseSize = 24;
     const maxSize = 48;
@@ -331,24 +307,52 @@ export function MapView({
     // Show patient count instead of treatment icon for better visibility
     const displayText = office.currentMonthReferrals > 0 ? office.currentMonthReferrals.toString() : '0';
 
-    const svgIcon = `
-      <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="${size/2}" cy="${size/2}" r="${size/2 - 3}" fill="white" stroke="${strengthColors[office.strength]}" stroke-width="3"/>
+    el.className = 'office-marker';
+    el.innerHTML = `
+      <div class="office-pin ${hasRecentReferral ? 'pulse' : ''}" style="
+        width: ${size}px; 
+        height: ${size}px; 
+        border-color: ${strengthColors[office.strength]};
+        background: white;
+        border: 3px solid ${strengthColors[office.strength]};
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        position: relative;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        transition: all 0.2s ease;
+        font-weight: bold;
+        font-size: ${Math.min(size * 0.35, 14)}px;
+        color: ${strengthColors[office.strength]};
+      ">
+        ${displayText}
         ${hasRecentReferral ? `
-          <circle cx="${size/2}" cy="${size/2}" r="${size/2 - 1}" fill="none" stroke="${strengthColors[office.strength]}" stroke-width="2" opacity="0.5">
-            <animate attributeName="r" values="${size/2 - 1};${size/2 + 8};${size/2 - 1}" dur="2s" repeatCount="indefinite"/>
-            <animate attributeName="opacity" values="0.5;0;0.5" dur="2s" repeatCount="indefinite"/>
-          </circle>
+          <div class="ping-animation" style="
+            position: absolute;
+            top: -3px;
+            left: -3px;
+            right: -3px;
+            bottom: -3px;
+            border: 2px solid ${strengthColors[office.strength]};
+            border-radius: 50%;
+            animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+          "></div>
         ` : ''}
-        <text x="${size/2}" y="${size/2 + 4}" text-anchor="middle" font-size="${Math.min(size * 0.35, 14)}" font-weight="bold" fill="${strengthColors[office.strength]}">${displayText}</text>
-      </svg>
+      </div>
     `;
 
-    return {
-      url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svgIcon),
-      scaledSize: new google.maps.Size(size, size),
-      anchor: new google.maps.Point(size/2, size/2)
-    };
+    // Add hover effects
+    el.addEventListener('mouseenter', () => {
+      el.style.transform = 'scale(1.1)';
+    });
+    
+    el.addEventListener('mouseleave', () => {
+      el.style.transform = 'scale(1)';
+    });
+
+    return el;
   };
 
   // Filter offices based on current filter state
@@ -380,10 +384,10 @@ export function MapView({
 
   // Update markers when filters change
   useEffect(() => {
-    if (mapInstanceRef.current && isMapLoaded) {
+    if (mapInstanceRef.current) {
       addOfficeMarkers(mapInstanceRef.current);
     }
-  }, [filters, offices, isMapLoaded]);
+  }, [filters, offices]);
 
   const formatLastReferralDate = (dateStr?: string | null) => {
     if (!dateStr) return 'Never';
