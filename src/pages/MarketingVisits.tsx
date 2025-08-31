@@ -71,7 +71,6 @@ export function MarketingVisits() {
   const [filterRating, setFilterRating] = useState('');
   const [filterVisited, setFilterVisited] = useState('');
   const [selectedOffice, setSelectedOffice] = useState<Office | null>(null);
-  const [showMap, setShowMap] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -511,23 +510,6 @@ export function MarketingVisits() {
           </CardContent>
         </Card>
       )}
-
-      {/* Map View Toggle */}
-      <div className="mb-4">
-        <Button 
-          variant="outline" 
-          onClick={() => setShowMap(!showMap)}
-          className="mb-4"
-        >
-          {showMap ? 'Hide Map' : 'Show Map'}
-        </Button>
-        {showMap && (
-          <MapView 
-            showVisitData={true}
-            height="300px"
-          />
-        )}
-      </div>
 
       {/* Filters */}
       <Card>

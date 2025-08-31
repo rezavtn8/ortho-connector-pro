@@ -6,7 +6,11 @@ import {
   UserPlus,
   Settings,
   Activity,
-  LogOut
+  LogOut,
+  Building,
+  Calendar,
+  MapPin,
+  BarChart3
 } from 'lucide-react';
 import {
   Sidebar,
@@ -37,6 +41,7 @@ const mainNavItems = [
 
 const managementItems = [
   { id: 'marketing-visits', title: 'Marketing Visits', icon: UserPlus },
+  { id: 'map-view', title: 'Map View', icon: MapPin },
 ];
 
 const systemItems = [

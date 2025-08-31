@@ -12,14 +12,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Search, Edit, Eye, Building2, Globe, MessageSquare, Star, Trash2, Check, X, Power, MapPin } from 'lucide-react';
+import { Plus, Search, Edit, Eye, Building2, Globe, MessageSquare, Star, Trash2, Check, X, Power } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ImportDataDialog } from '@/components/ImportDataDialog';
 import { PatientSource, MonthlyPatients, SOURCE_TYPE_CONFIG, getCurrentYearMonth, SourceType } from '@/lib/database.types';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
-import { MapView } from '@/components/MapView';
 import { AddressSearch } from '@/components/AddressSearch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -498,22 +497,6 @@ export function Sources() {
           <AddSourceDialog onSourceAdded={loadData} />
         </div>
       </div>
-
-      {/* Map Overview */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MapPin className="w-5 h-5" />
-            Source Locations
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <MapView 
-            showVisitData={false}
-            height="300px"
-          />
-        </CardContent>
-      </Card>
 
       {/* Search */}
       <Card>

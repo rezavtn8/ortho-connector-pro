@@ -5,10 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PatientSource, MonthlyPatients, SOURCE_TYPE_CONFIG, getCurrentYearMonth } from '@/lib/database.types';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, Plus, TrendingUp, Building2, Star, Users, Globe, MessageSquare, FileText, MapPin } from 'lucide-react';
+import { Search, Plus, TrendingUp, Building2, Star, Users, Globe, MessageSquare, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
-import { MapView } from '@/components/MapView';
 
 interface SourceGroupData {
   name: string;
@@ -326,34 +325,6 @@ export function Dashboard() {
             </Card>
           ))}
         </div>
-      </div>
-
-      {/* Geographic Overview */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold flex items-center gap-2">
-            <MapPin className="w-5 h-5" />
-            Office Locations
-          </h2>
-          <Button variant="outline" onClick={() => navigate('/marketing-visits')}>
-            View Marketing Activities
-          </Button>
-        </div>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Geographic Distribution</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Overview of your office network and referral sources
-            </p>
-          </CardHeader>
-          <CardContent>
-            <MapView 
-              showVisitData={true}
-              height="350px"
-            />
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

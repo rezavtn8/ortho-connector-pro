@@ -24,7 +24,6 @@ import {
   formatYearMonth
 } from '@/lib/database.types';
 import { supabase } from '@/integrations/supabase/client';
-import { MapView } from '@/components/MapView';
 import {
   ArrowLeft,
   Phone,
@@ -46,6 +45,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useParams, useNavigate } from 'react-router-dom';
 import { format, subMonths } from 'date-fns';
+import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 
 export function SourceDetail() {
   const { id: sourceId } = useParams<{ id: string }>();
@@ -473,22 +474,6 @@ export function SourceDetail() {
               )}
             </CardContent>
           </Card>
-          
-          {/* Map View for offices with coordinates */}
-          {source.latitude && source.longitude && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Location</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <MapView 
-                  selectedOfficeId={source.id}
-                  showVisitData={source.source_type === 'Office'}
-                  height="300px"
-                />
-              </CardContent>
-            </Card>
-          )}
         </TabsContent>
 
         <TabsContent value="monthly" className="space-y-4">
@@ -771,7 +756,3 @@ export function SourceDetail() {
     </div>
   );
 }
-
-// Add missing Label component import
-import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/utils';
