@@ -205,26 +205,52 @@ export function Settings() {
     setIsSaving(true);
     
     try {
-      const { error } = await supabase
+      // Check if user profile exists first
+      const { data: existingProfile } = await supabase
         .from('user_profiles')
-        .update({
-          clinic_name: clinicSettings.clinic_name,
-          clinic_address: clinicSettings.clinic_address,
-          clinic_latitude: clinicSettings.clinic_latitude,
-          clinic_longitude: clinicSettings.clinic_longitude,
-        })
-        .eq('user_id', user?.id);
+        .select('id')
+        .eq('user_id', user?.id)
+        .single();
 
-      if (error) throw error;
+      if (!existingProfile) {
+        // Create profile first
+        const { error: insertError } = await supabase
+          .from('user_profiles')
+          .insert({
+            user_id: user?.id,
+            email: user?.email || '',
+            clinic_name: clinicSettings.clinic_name,
+            clinic_address: clinicSettings.clinic_address,
+            clinic_latitude: clinicSettings.clinic_latitude,
+            clinic_longitude: clinicSettings.clinic_longitude,
+            clinic_id: user?.id // Use user ID as clinic ID for now
+          });
+
+        if (insertError) throw insertError;
+      } else {
+        // Update existing profile
+        const { error } = await supabase
+          .from('user_profiles')
+          .update({
+            clinic_name: clinicSettings.clinic_name,
+            clinic_address: clinicSettings.clinic_address,
+            clinic_latitude: clinicSettings.clinic_latitude,
+            clinic_longitude: clinicSettings.clinic_longitude,
+          })
+          .eq('user_id', user?.id);
+
+        if (error) throw error;
+      }
 
       toast({
         title: "Clinic settings saved",
         description: "Your clinic information has been updated successfully.",
       });
     } catch (error) {
+      console.error('Error saving clinic settings:', error);
       toast({
         title: "Error saving settings",
-        description: "Could not save your clinic settings.",
+        description: "Could not save your clinic settings. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -483,23 +509,18 @@ export function Settings() {
                     <div className="space-y-2">
                       <Label htmlFor="clinic_address">Clinic Address *</Label>
                       <AddressSearch
-                        value={hasLocation ? 'current-location' : ''}
+                        value={clinicSettings.clinic_address}
                         onSelect={(office) => {
                           if (office) {
                             setClinicSettings(prev => ({
                               ...prev,
-                              clinic_address: office.address || '',
+                              clinic_address: office.address || office.name || '',
                               clinic_latitude: office.latitude,
                               clinic_longitude: office.longitude
                             }));
                           }
                         }}
                         placeholder="Search for your clinic address..."
-                      />
-                      <Input
-                        value={clinicSettings.clinic_address}
-                        onChange={(e) => setClinicSettings(prev => ({ ...prev, clinic_address: e.target.value }))}
-                        placeholder="Or enter address manually..."
                       />
                     </div>
 

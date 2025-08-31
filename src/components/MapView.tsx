@@ -189,7 +189,7 @@ export function MapView({
 
         const map = new google.maps.Map(mapRef.current!, {
           center: clinic ? { lat: clinic.latitude, lng: clinic.longitude } : { lat: 40.7128, lng: -74.0060 },
-          zoom: clinic ? 10 : 9,
+          zoom: clinic ? 12 : 9,
           mapTypeId: google.maps.MapTypeId.ROADMAP,
           styles: [
             {
@@ -311,35 +311,36 @@ export function MapView({
 
   // Create marker icon with dynamic styling
   const createMarkerIcon = (office: Office) => {
-    // Pin size based on referrals (min 20px, max 40px)
-    const size = Math.max(20, Math.min(40, 20 + (office.currentMonthReferrals * 4)));
+    // Pin size based on referrals - make it more prominent for high patient load
+    const baseSize = 24;
+    const maxSize = 48;
+    const size = Math.max(baseSize, Math.min(maxSize, baseSize + (office.currentMonthReferrals * 3)));
     
     // Border color based on strength
     const strengthColors = {
       Strong: '#10b981', // green
       Moderate: '#f59e0b', // yellow
       Sporadic: '#6b7280', // grey
-      Cold: '#6b7280' // grey
+      Cold: '#94a3b8' // light grey
     };
     
     // Check if there was a referral in past 30 days
     const hasRecentReferral = office.lastReferralDate && 
       new Date(office.lastReferralDate + '-01') > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     
-    // Treatment type icon (placeholder logic)
-    const treatmentIcon = office.treatmentTypes.includes('Root Canal') ? '🦷' : 
-                         office.treatmentTypes.includes('Surgery') ? '🔧' : '🧊';
+    // Show patient count instead of treatment icon for better visibility
+    const displayText = office.currentMonthReferrals > 0 ? office.currentMonthReferrals.toString() : '0';
 
     const svgIcon = `
       <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
         <circle cx="${size/2}" cy="${size/2}" r="${size/2 - 3}" fill="white" stroke="${strengthColors[office.strength]}" stroke-width="3"/>
         ${hasRecentReferral ? `
           <circle cx="${size/2}" cy="${size/2}" r="${size/2 - 1}" fill="none" stroke="${strengthColors[office.strength]}" stroke-width="2" opacity="0.5">
-            <animate attributeName="r" values="${size/2 - 1};${size/2 + 5};${size/2 - 1}" dur="2s" repeatCount="indefinite"/>
+            <animate attributeName="r" values="${size/2 - 1};${size/2 + 8};${size/2 - 1}" dur="2s" repeatCount="indefinite"/>
             <animate attributeName="opacity" values="0.5;0;0.5" dur="2s" repeatCount="indefinite"/>
           </circle>
         ` : ''}
-        <text x="${size/2}" y="${size/2 + size/8}" text-anchor="middle" font-size="${size * 0.4}" fill="black">${treatmentIcon}</text>
+        <text x="${size/2}" y="${size/2 + 4}" text-anchor="middle" font-size="${Math.min(size * 0.35, 14)}" font-weight="bold" fill="${strengthColors[office.strength]}">${displayText}</text>
       </svg>
     `;
 
