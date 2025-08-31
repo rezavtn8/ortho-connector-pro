@@ -206,11 +206,11 @@ export function Analytics() {
     });
 
     return Object.entries(monthlyTotals)
+      .sort(([a], [b]) => a.localeCompare(b)) // Sort by year-month string first
       .map(([month, count]) => ({
         month: formatYearMonth(month),
         count
-      }))
-      .sort((a, b) => a.month.localeCompare(b.month));
+      }));
   };
 
   const getTypeDistribution = () => {
