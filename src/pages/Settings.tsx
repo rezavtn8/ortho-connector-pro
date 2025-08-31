@@ -121,7 +121,7 @@ export function Settings() {
       .from('user_profiles')
       .select('clinic_name, clinic_address, clinic_latitude, clinic_longitude')
       .eq('user_id', user?.id)
-      .single();
+      .maybeSingle();
 
     if (error && error.code !== 'PGRST116') {
       throw error;
@@ -142,7 +142,7 @@ export function Settings() {
       .from('user_profiles')
       .select('email, role, pin_code')
       .eq('user_id', user?.id)
-      .single();
+      .maybeSingle();
 
     if (data) {
       setUserProfile({
