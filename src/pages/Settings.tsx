@@ -230,7 +230,7 @@ export function Settings() {
     setIsSaving(true);
     
     try {
-      // First ensure user profile exists
+      // Check if user profile exists first
       const { data: existingProfile, error: profileError } = await supabase
         .from('user_profiles')
         .select('id, clinic_id')
@@ -239,27 +239,9 @@ export function Settings() {
 
       console.log('Existing profile:', existingProfile, 'Profile error:', profileError);
 
-      // Create user profile if it doesn't exist (with clinic_id as null initially)
-      if (!existingProfile) {
-        console.log('Creating user profile first');
-        const { error: createProfileError } = await supabase
-          .from('user_profiles')
-          .insert({
-            user_id: authUser.id,
-            email: authUser.email || '',
-            role: 'Owner',
-            clinic_id: null  // We'll update this after creating the clinic
-          });
-        
-        if (createProfileError) {
-          console.error('Profile creation error:', createProfileError);
-          throw createProfileError;
-        }
-      }
-
       let clinicId = existingProfile?.clinic_id;
 
-      // If no clinic exists, create one
+      // If no clinic exists, create one FIRST
       if (!clinicId) {
         console.log('Creating new clinic with owner_id:', authUser.id);
         const { data: newClinic, error: clinicError } = await supabase
@@ -281,6 +263,28 @@ export function Settings() {
           throw clinicError;
         }
         clinicId = newClinic.id;
+
+        // NOW create user profile with the clinic_id (only if profile doesn't exist)
+        if (!existingProfile) {
+          console.log('Creating user profile with clinic_id:', clinicId);
+          const { error: createProfileError } = await supabase
+            .from('user_profiles')
+            .insert({
+              user_id: authUser.id,
+              email: authUser.email || '',
+              role: 'Owner',
+              clinic_id: clinicId,
+              clinic_name: clinicSettings.clinic_name,
+              clinic_address: clinicSettings.clinic_address,
+              clinic_latitude: clinicSettings.clinic_latitude,
+              clinic_longitude: clinicSettings.clinic_longitude,
+            });
+          
+          if (createProfileError) {
+            console.error('Profile creation error:', createProfileError);
+            throw createProfileError;
+          }
+        }
       } else {
         // Update existing clinic
         const { error: clinicUpdateError } = await supabase
@@ -296,21 +300,23 @@ export function Settings() {
         if (clinicUpdateError) throw clinicUpdateError;
       }
 
-      // Now update user profile with clinic info (whether it existed or was just created)
-      const { error: updateProfileError } = await supabase
-        .from('user_profiles')
-        .update({
-          clinic_id: clinicId,
-          clinic_name: clinicSettings.clinic_name,
-          clinic_address: clinicSettings.clinic_address,
-          clinic_latitude: clinicSettings.clinic_latitude,
-          clinic_longitude: clinicSettings.clinic_longitude,
-        })
-        .eq('user_id', authUser.id);
-        
-      if (updateProfileError) {
-        console.error('Profile update error:', updateProfileError);
-        throw updateProfileError;
+      // Update user profile with clinic info (if profile already existed)
+      if (existingProfile) {
+        const { error: updateProfileError } = await supabase
+          .from('user_profiles')
+          .update({
+            clinic_id: clinicId,
+            clinic_name: clinicSettings.clinic_name,
+            clinic_address: clinicSettings.clinic_address,
+            clinic_latitude: clinicSettings.clinic_latitude,
+            clinic_longitude: clinicSettings.clinic_longitude,
+          })
+          .eq('user_id', authUser.id);
+          
+        if (updateProfileError) {
+          console.error('Profile update error:', updateProfileError);
+          throw updateProfileError;
+        }
       }
 
       toast({
