@@ -24,6 +24,7 @@ import {
   formatYearMonth
 } from '@/lib/database.types';
 import { supabase } from '@/integrations/supabase/client';
+import { MapView } from '@/components/MapView';
 import {
   ArrowLeft,
   Phone,
@@ -472,6 +473,22 @@ export function SourceDetail() {
               )}
             </CardContent>
           </Card>
+          
+          {/* Map View for offices with coordinates */}
+          {source.latitude && source.longitude && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Location</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <MapView 
+                  selectedOfficeId={source.id}
+                  showVisitData={source.source_type === 'Office'}
+                  height="300px"
+                />
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="monthly" className="space-y-4">

@@ -65,6 +65,8 @@ export interface PatientSource {
   email?: string | null;
   website?: string | null;
   notes?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

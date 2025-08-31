@@ -9,6 +9,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AddressSearch } from '@/components/AddressSearch';
+import { MapView } from '@/components/MapView';
 import {
   Table,
   TableBody,
@@ -49,7 +51,9 @@ interface MarketingVisit {
 interface Office {
   id: string;
   name: string;
-  address?: string;
+  address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 const VISIT_TYPES = ['New Target', 'Routine', 'Reconnect', 'Follow-up'];
@@ -66,6 +70,8 @@ export function MarketingVisits() {
   const [filterRep, setFilterRep] = useState('');
   const [filterRating, setFilterRating] = useState('');
   const [filterVisited, setFilterVisited] = useState('');
+  const [selectedOffice, setSelectedOffice] = useState<Office | null>(null);
+  const [showMap, setShowMap] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -92,7 +98,7 @@ export function MarketingVisits() {
       // Load offices (patient sources with type 'Office')
       const { data: officesData, error: officesError } = await supabase
         .from('patient_sources')
-        .select('id, name, address')
+        .select('id, name, address, latitude, longitude')
         .eq('source_type', 'Office')
         .eq('is_active', true)
         .order('name');
@@ -155,11 +161,41 @@ export function MarketingVisits() {
       return;
     }
 
+    if (!selectedOffice || !formData.visit_type) {
+      toast({
+        title: "Validation Error",
+        description: "Please select an office and visit type",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setLoading(true);
 
+      // If it's a new office from Google Places, create it first
+      let officeId = selectedOffice.id;
+      if (selectedOffice.id.startsWith('new-')) {
+        const { data: newOffice, error: officeError } = await supabase
+          .from('patient_sources')
+          .insert({
+            name: selectedOffice.name,
+            address: selectedOffice.address,
+            latitude: selectedOffice.latitude,
+            longitude: selectedOffice.longitude,
+            source_type: 'Office',
+            created_by: user.id,
+            is_active: true
+          })
+          .select('id')
+          .single();
+
+        if (officeError) throw officeError;
+        officeId = newOffice.id;
+      }
+
       const visitData = {
-        office_id: formData.office_id,
+        office_id: officeId,
         visit_date: format(formData.visit_date, 'yyyy-MM-dd'),
         visit_type: formData.visit_type,
         group_tag: formData.group_tag || null,
@@ -197,6 +233,7 @@ export function MarketingVisits() {
         follow_up_notes: '',
         photo_file: null,
       });
+      setSelectedOffice(null);
       setShowForm(false);
       loadData();
     } catch (error: any) {
@@ -315,20 +352,22 @@ export function MarketingVisits() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="office">Office *</Label>
-                  <Select value={formData.office_id} onValueChange={(value) => 
-                    setFormData(prev => ({ ...prev, office_id: value }))
-                  }>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select office" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {offices.map(office => (
-                        <SelectItem key={office.id} value={office.id}>
-                          {office.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <AddressSearch
+                    value={selectedOffice?.id}
+                    onSelect={(office) => {
+                      setSelectedOffice(office);
+                      setFormData(prev => ({ ...prev, office_id: office?.id || '' }));
+                    }}
+                    placeholder="Search for an office or address..."
+                  />
+                  {selectedOffice && (
+                    <div className="mt-2 p-2 bg-muted rounded-md">
+                      <div className="text-sm font-medium">{selectedOffice.name}</div>
+                      {selectedOffice.address && (
+                        <div className="text-xs text-muted-foreground">{selectedOffice.address}</div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -472,6 +511,23 @@ export function MarketingVisits() {
           </CardContent>
         </Card>
       )}
+
+      {/* Map View Toggle */}
+      <div className="mb-4">
+        <Button 
+          variant="outline" 
+          onClick={() => setShowMap(!showMap)}
+          className="mb-4"
+        >
+          {showMap ? 'Hide Map' : 'Show Map'}
+        </Button>
+        {showMap && (
+          <MapView 
+            showVisitData={true}
+            height="300px"
+          />
+        )}
+      </div>
 
       {/* Filters */}
       <Card>
