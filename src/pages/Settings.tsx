@@ -407,65 +407,57 @@ export function Settings() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Sidebar Navigation */}
-        <div className="lg:col-span-1">
-          <Card className="p-2">
-            <nav className="space-y-1">
-              <Button
-                variant={activeTab === 'clinic' ? 'default' : 'ghost'}
-                className="w-full justify-start gap-3"
-                onClick={() => setActiveTab('clinic')}
-              >
-                <MapPin className="h-4 w-4" />
-                Clinic Settings
-              </Button>
-              <Button
-                variant={activeTab === 'profile' ? 'default' : 'ghost'}
-                className="w-full justify-start gap-3"
-                onClick={() => setActiveTab('profile')}
-              >
-                <User className="h-4 w-4" />
-                User Profile
-              </Button>
-              <Button
-                variant={activeTab === 'notifications' ? 'default' : 'ghost'}
-                className="w-full justify-start gap-3"
-                onClick={() => setActiveTab('notifications')}
-              >
-                <Bell className="h-4 w-4" />
-                Notifications
-              </Button>
-              <Button
-                variant={activeTab === 'team' ? 'default' : 'ghost'}
-                className="w-full justify-start gap-3"
-                onClick={() => setActiveTab('team')}
-              >
-                <Users className="h-4 w-4" />
-                Team Management
-              </Button>
-              <Button
-                variant={activeTab === 'data' ? 'default' : 'ghost'}
-                className="w-full justify-start gap-3"
-                onClick={() => setActiveTab('data')}
-              >
-                <Database className="h-4 w-4" />
-                Data Management
-              </Button>
-              <Button
-                variant={activeTab === 'security' ? 'default' : 'ghost'}
-                className="w-full justify-start gap-3"
-                onClick={() => setActiveTab('security')}
-              >
-                <Shield className="h-4 w-4" />
-                Security
-              </Button>
-            </nav>
-          </Card>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        {/* Modern Horizontal Tabs */}
+        <div className="border-b border-border mb-8">
+          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 h-auto p-1 bg-muted/50">
+            <TabsTrigger 
+              value="clinic" 
+              className="flex flex-col items-center gap-2 py-3 px-2 text-xs data-[state=active]:bg-background data-[state=active]:text-foreground"
+            >
+              <MapPin className="h-5 w-5" />
+              <span className="hidden sm:block">Clinic</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="profile" 
+              className="flex flex-col items-center gap-2 py-3 px-2 text-xs data-[state=active]:bg-background data-[state=active]:text-foreground"
+            >
+              <User className="h-5 w-5" />
+              <span className="hidden sm:block">Profile</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="notifications" 
+              className="flex flex-col items-center gap-2 py-3 px-2 text-xs data-[state=active]:bg-background data-[state=active]:text-foreground"
+            >
+              <Bell className="h-5 w-5" />
+              <span className="hidden sm:block">Notifications</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="team" 
+              className="flex flex-col items-center gap-2 py-3 px-2 text-xs data-[state=active]:bg-background data-[state=active]:text-foreground"
+            >
+              <Users className="h-5 w-5" />
+              <span className="hidden sm:block">Team</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="data" 
+              className="flex flex-col items-center gap-2 py-3 px-2 text-xs data-[state=active]:bg-background data-[state=active]:text-foreground"
+            >
+              <Database className="h-5 w-5" />
+              <span className="hidden sm:block">Data</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="security" 
+              className="flex flex-col items-center gap-2 py-3 px-2 text-xs data-[state=active]:bg-background data-[state=active]:text-foreground"
+            >
+              <Shield className="h-5 w-5" />
+              <span className="hidden sm:block">Security</span>
+            </TabsTrigger>
+          </TabsList>
         </div>
 
-        {/* Main Content Area */}
-        <div className="lg:col-span-3">
+        {/* Tab Contents */}
+        <div className="space-y-6">
           {/* Clinic Settings */}
           {activeTab === 'clinic' && (
             <Card>
@@ -934,7 +926,7 @@ export function Settings() {
             </Card>
           )}
         </div>
-      </div>
+      </Tabs>
     </div>
   );
 }
