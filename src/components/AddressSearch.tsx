@@ -36,22 +36,28 @@ export function AddressSearch({ value, onSelect, placeholder = "Search offices..
   const [offices, setOffices] = useState<Office[]>([]);
   const [googlePlaces, setGooglePlaces] = useState<GooglePlaceResult[]>([]);
   const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
-  const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
+  const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
   const geocoder = useRef<google.maps.Geocoder | null>(null);
 
   // Initialize Google Maps services
   useEffect(() => {
     const initGoogleMaps = async () => {
+      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        console.warn('Google Maps API key not found. Please add VITE_GOOGLE_MAPS_API_KEY to your environment variables.');
+        return;
+      }
+
       try {
         const loader = new Loader({
-          apiKey: process.env.GOOGLE_MAPS_API_KEY || '',
+          apiKey,
           version: 'weekly',
           libraries: ['places']
         });
 
         await loader.load();
-        autocompleteService.current = new google.maps.places.AutocompleteService();
         geocoder.current = new google.maps.Geocoder();
+        setGoogleMapsLoaded(true);
       } catch (error) {
         console.error('Error loading Google Maps:', error);
       }
@@ -79,28 +85,43 @@ export function AddressSearch({ value, onSelect, placeholder = "Search offices..
 
   // Search Google Places when user types
   useEffect(() => {
-    if (!searchValue || searchValue.length < 3 || !autocompleteService.current) {
+    if (!searchValue || searchValue.length < 3 || !googleMapsLoaded) {
       setGooglePlaces([]);
       return;
     }
 
     setIsLoadingGoogle(true);
     
-    const request = {
-      input: searchValue,
-      types: ['establishment'],
-      componentRestrictions: { country: 'us' } // Adjust country as needed
-    };
+    const searchPlaces = async () => {
+      try {
+        // Use the newer Places API (New) with AutocompleteSuggestion
+        const { AutocompleteSuggestion } = await google.maps.importLibrary("places") as google.maps.PlacesLibrary;
+        
+        const request = {
+          input: searchValue,
+          types: ['establishment'],
+          componentRestrictions: { country: 'us' }
+        };
 
-    autocompleteService.current.getPlacePredictions(request, (results, status) => {
-      setIsLoadingGoogle(false);
-      if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-        setGooglePlaces(results.slice(0, 5)); // Limit to 5 results
-      } else {
+        // Use the new AutocompleteSuggestion API
+        const autocompleteService = new google.maps.places.AutocompleteService();
+        autocompleteService.getPlacePredictions(request, (results, status) => {
+          setIsLoadingGoogle(false);
+          if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+            setGooglePlaces(results.slice(0, 5));
+          } else {
+            setGooglePlaces([]);
+          }
+        });
+      } catch (error) {
+        console.error('Error searching places:', error);
+        setIsLoadingGoogle(false);
         setGooglePlaces([]);
       }
-    });
-  }, [searchValue]);
+    };
+
+    searchPlaces();
+  }, [searchValue, googleMapsLoaded]);
 
   // Filter existing offices based on search
   const filteredOffices = offices.filter(office => 
