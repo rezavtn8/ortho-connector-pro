@@ -418,99 +418,130 @@ export function SourceDetail() {
   const trend = getMonthlyTrend();
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={onBack}>
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
-          </Button>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold flex items-center gap-2">
-                <span>{config.icon}</span>
-                {source.name}
-              </h1>
-              {isOfficeNotVisitedRecently() && (
-                <Badge variant="destructive" className="text-sm">
-                  ⚠️ Not visited 3+ months
-                </Badge>
-              )}
+    <div className="min-h-screen bg-gradient-to-br from-background to-muted/20">
+      <div className="container mx-auto p-6 space-y-8">
+        {/* Header Section */}
+        <div className="relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-primary/10 rounded-2xl -z-10"></div>
+          <div className="p-8 rounded-2xl border bg-card/50 backdrop-blur-sm">
+            <div className="flex items-center justify-between mb-4">
+              <Button variant="ghost" size="sm" onClick={onBack} className="hover:bg-primary/10">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Sources
+              </Button>
+              <Badge 
+                variant={source.is_active ? "default" : "secondary"}
+                className="text-sm font-medium"
+              >
+                {source.is_active ? '🟢 Active' : '⭕ Inactive'}
+              </Badge>
             </div>
-            <p className="text-muted-foreground">{config.label}</p>
+            
+            <div className="flex items-start gap-6">
+              <div className="p-4 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 border">
+                <span className="text-3xl">{config.icon}</span>
+              </div>
+              
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <h1 className="text-3xl font-bold text-foreground">{source.name}</h1>
+                  {isOfficeNotVisitedRecently() && (
+                    <Badge variant="destructive" className="text-sm animate-pulse">
+                      ⚠️ Visit Overdue
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-lg text-muted-foreground font-medium">{config.label}</p>
+                {source.address && (
+                  <div className="flex items-center gap-2 mt-3 text-muted-foreground">
+                    <MapPin className="w-4 h-4" />
+                    <span className="text-sm">{source.address}</span>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
-        <Badge variant={source.is_active ? "default" : "secondary"}>
-          {source.is_active ? 'Active' : 'Inactive'}
-        </Badge>
-      </div>
 
-      {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Activity className="w-5 h-5" />
-              Total Patients
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-primary">{getTotalPatients()}</div>
-            <p className="text-sm text-muted-foreground">All-time referrals</p>
-          </CardContent>
-        </Card>
+        {/* Overview Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card className="relative overflow-hidden border-2 hover:shadow-lg transition-all duration-300">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-blue-600/5"></div>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-blue-500/10">
+                  <Users className="w-5 h-5 text-blue-600" />
+                </div>
+                Total Patients
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold text-blue-600 mb-2">{getTotalPatients()}</div>
+              <p className="text-sm text-muted-foreground">All-time referrals</p>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Calendar className="w-5 h-5" />
-              Current Month
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-primary">
-              {getMonthlyCount(currentMonth)}
-            </div>
-            <div className="flex items-center gap-2 mt-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => adjustPatientCount(currentMonth, -1)}
-                disabled={getMonthlyCount(currentMonth) <= 0}
-              >
-                <Minus className="w-4 h-4" />
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => adjustPatientCount(currentMonth, 1)}
-              >
-                <Plus className="w-4 h-4" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+          <Card className="relative overflow-hidden border-2 hover:shadow-lg transition-all duration-300">
+            <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-green-600/5"></div>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-green-500/10">
+                  <Calendar className="w-5 h-5 text-green-600" />
+                </div>
+                Current Month
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold text-green-600 mb-3">{getMonthlyCount(currentMonth)}</div>
+              <div className="flex items-center gap-3">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => adjustPatientCount(currentMonth, -1)}
+                  disabled={getMonthlyCount(currentMonth) <= 0}
+                  className="hover:bg-red-50 hover:border-red-300"
+                >
+                  <Minus className="w-4 h-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => adjustPatientCount(currentMonth, 1)}
+                  className="hover:bg-green-50 hover:border-green-300"
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              {trend === 'up' ? <TrendingUp className="w-5 h-5 text-green-600" /> :
-               trend === 'down' ? <TrendingDown className="w-5 h-5 text-red-600" /> :
-               <Minus className="w-5 h-5 text-gray-400" />}
-              Trend
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-semibold">
-              {trend === 'up' ? 'Increasing' :
-               trend === 'down' ? 'Decreasing' :
-               'Stable'}
-            </div>
-            <p className="text-sm text-muted-foreground">vs. last month</p>
-          </CardContent>
-        </Card>
-      </div>
+          <Card className="relative overflow-hidden border-2 hover:shadow-lg transition-all duration-300">
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-purple-600/5"></div>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-purple-500/10">
+                  {trend === 'up' ? (
+                    <TrendingUp className="w-5 h-5 text-green-600" />
+                  ) : trend === 'down' ? (
+                    <TrendingDown className="w-5 h-5 text-red-600" />
+                  ) : (
+                    <Activity className="w-5 h-5 text-purple-600" />
+                  )}
+                </div>
+                Monthly Trend
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className={cn(
+                "text-2xl font-bold mb-2",
+                trend === 'up' ? "text-green-600" : trend === 'down' ? "text-red-600" : "text-purple-600"
+              )}>
+                {trend === 'up' ? '📈 Growing' : trend === 'down' ? '📉 Declining' : '📊 Stable'}
+              </div>
+              <p className="text-sm text-muted-foreground">vs. previous month</p>
+            </CardContent>
+          </Card>
+        </div>
 
       {/* Details */}
       <Tabs defaultValue="details" className="w-full">
@@ -1029,6 +1060,7 @@ export function SourceDetail() {
           </TabsContent>
         )}
       </Tabs>
+      </div>
     </div>
   );
 }
