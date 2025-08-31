@@ -208,22 +208,55 @@ export function Settings() {
       // Check if user profile exists first
       const { data: existingProfile } = await supabase
         .from('user_profiles')
-        .select('id')
+        .select('id, clinic_id')
         .eq('user_id', user?.id)
-        .single();
+        .maybeSingle();
+
+      let clinicId = existingProfile?.clinic_id;
+
+      // If no clinic exists, create one
+      if (!clinicId) {
+        const { data: newClinic, error: clinicError } = await supabase
+          .from('clinics')
+          .insert({
+            name: clinicSettings.clinic_name,
+            address: clinicSettings.clinic_address,
+            latitude: clinicSettings.clinic_latitude,
+            longitude: clinicSettings.clinic_longitude,
+            owner_id: user?.id
+          })
+          .select('id')
+          .single();
+
+        if (clinicError) throw clinicError;
+        clinicId = newClinic.id;
+      } else {
+        // Update existing clinic
+        const { error: clinicUpdateError } = await supabase
+          .from('clinics')
+          .update({
+            name: clinicSettings.clinic_name,
+            address: clinicSettings.clinic_address,
+            latitude: clinicSettings.clinic_latitude,
+            longitude: clinicSettings.clinic_longitude,
+          })
+          .eq('id', clinicId);
+
+        if (clinicUpdateError) throw clinicUpdateError;
+      }
 
       if (!existingProfile) {
-        // Create profile first
+        // Create user profile
         const { error: insertError } = await supabase
           .from('user_profiles')
           .insert({
             user_id: user?.id,
             email: user?.email || '',
+            clinic_id: clinicId,
             clinic_name: clinicSettings.clinic_name,
             clinic_address: clinicSettings.clinic_address,
             clinic_latitude: clinicSettings.clinic_latitude,
             clinic_longitude: clinicSettings.clinic_longitude,
-            clinic_id: user?.id // Use user ID as clinic ID for now
           });
 
         if (insertError) throw insertError;
@@ -232,6 +265,7 @@ export function Settings() {
         const { error } = await supabase
           .from('user_profiles')
           .update({
+            clinic_id: clinicId,
             clinic_name: clinicSettings.clinic_name,
             clinic_address: clinicSettings.clinic_address,
             clinic_latitude: clinicSettings.clinic_latitude,
