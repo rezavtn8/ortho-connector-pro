@@ -12,13 +12,19 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Search, Edit, Eye, Building2, Globe, MessageSquare, Star, Trash2, Check, X, Power } from 'lucide-react';
+import { Plus, Search, Edit, Eye, Building2, Globe, MessageSquare, Star, Trash2, Check, X, Power, MapPin } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ImportDataDialog } from '@/components/ImportDataDialog';
 import { PatientSource, MonthlyPatients, SOURCE_TYPE_CONFIG, getCurrentYearMonth, SourceType } from '@/lib/database.types';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
+import { MapView } from '@/components/MapView';
+import { AddressSearch } from '@/components/AddressSearch';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export function Sources() {
   const navigate = useNavigate();
@@ -487,20 +493,33 @@ export function Sources() {
             Manage your referral sources and channels
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-3">
           <ImportDataDialog onImportComplete={loadData} />
-          <Button onClick={() => navigate('?page=add-source')}>
-            <Plus className="w-4 h-4 mr-2" />
-            Add Source
-          </Button>
+          <AddSourceDialog onSourceAdded={loadData} />
         </div>
       </div>
 
+      {/* Map Overview */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MapPin className="w-5 h-5" />
+            Source Locations
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <MapView 
+            showVisitData={false}
+            height="300px"
+          />
+        </CardContent>
+      </Card>
+
       {/* Search */}
       <Card>
-        <CardContent className="p-4">
+        <CardContent className="p-6">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search sources by name or address..."
               value={searchTerm}
@@ -511,28 +530,238 @@ export function Sources() {
         </CardContent>
       </Card>
 
-      {/* Source Tables */}
+      {/* Sources organized by type */}
       <Tabs defaultValue="online" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="online">Online Sources</TabsTrigger>
-          <TabsTrigger value="offices">Dental Offices</TabsTrigger>
-          <TabsTrigger value="others">Other Sources</TabsTrigger>
+          <TabsTrigger value="offices">Offices</TabsTrigger>
+          <TabsTrigger value="other">Other Sources</TabsTrigger>
         </TabsList>
 
         <TabsContent value="online" className="space-y-4">
-          {renderSourceTable(filterSources(onlineSourceTypes), 'Online Sources', Globe)}
+          {renderSourceTable(filterSources(onlineSourceTypes), "Online Sources", Globe)}
         </TabsContent>
 
         <TabsContent value="offices" className="space-y-4">
-          {renderSourceTable(filterSources(officeSourceTypes), 'Dental Offices', Building2)}
+          {renderSourceTable(filterSources(officeSourceTypes), "Offices", Building2)}
         </TabsContent>
 
-        <TabsContent value="others" className="space-y-4">
-          {renderSourceTable(filterSources(otherSourceTypes), 'Other Sources', MessageSquare)}
+        <TabsContent value="other" className="space-y-4">
+          {renderSourceTable(filterSources(otherSourceTypes), "Other Sources", MessageSquare)}
         </TabsContent>
       </Tabs>
     </div>
   );
 }
 
-export default Sources;
+// Add Source Dialog Component
+interface AddSourceDialogProps {
+  onSourceAdded: () => void;
+}
+
+function AddSourceDialog({ onSourceAdded }: AddSourceDialogProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [selectedOffice, setSelectedOffice] = useState<any>(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    source_type: 'Other' as SourceType,
+    phone: '',
+    email: '',
+    website: '',
+    notes: ''
+  });
+  const { toast } = useToast();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.name.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Source name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const sourceData: any = {
+        name: formData.name.trim(),
+        source_type: formData.source_type,
+        phone: formData.phone.trim() || null,
+        email: formData.email.trim() || null,
+        website: formData.website.trim() || null,
+        notes: formData.notes.trim() || null,
+        is_active: true,
+        created_by: (await supabase.auth.getUser()).data.user?.id
+      };
+
+      // Add address and coordinates if office was selected
+      if (selectedOffice) {
+        sourceData.address = selectedOffice.address;
+        sourceData.latitude = selectedOffice.latitude;
+        sourceData.longitude = selectedOffice.longitude;
+      }
+
+      const { error } = await supabase
+        .from('patient_sources')
+        .insert([sourceData]);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Source added successfully",
+      });
+
+      // Reset form
+      setFormData({
+        name: '',
+        source_type: 'Other',
+        phone: '',
+        email: '',
+        website: '',
+        notes: ''
+      });
+      setSelectedOffice(null);
+      setIsOpen(false);
+      onSourceAdded();
+    } catch (error: any) {
+      console.error('Error adding source:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add source",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white">
+          <Plus className="w-4 h-4 mr-2" />
+          Add Source
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Add New Source</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="address-search">Search Address (Optional)</Label>
+            <AddressSearch
+              onSelect={(office) => {
+                setSelectedOffice(office);
+                if (office) {
+                  setFormData(prev => ({ ...prev, name: office.name }));
+                }
+              }}
+              placeholder="Search for address or office..."
+            />
+            {selectedOffice && (
+              <div className="p-2 bg-muted rounded-md text-sm">
+                <div className="font-medium">{selectedOffice.name}</div>
+                {selectedOffice.address && (
+                  <div className="text-muted-foreground">{selectedOffice.address}</div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Name *</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Source name"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="source_type">Type</Label>
+              <Select value={formData.source_type} onValueChange={(value: SourceType) => 
+                setFormData(prev => ({ ...prev, source_type: value }))
+              }>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(SOURCE_TYPE_CONFIG).map(([key, config]) => (
+                    <SelectItem key={key} value={key}>
+                      <span className="flex items-center gap-2">
+                        <span>{config.icon}</span>
+                        <span>{config.label}</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone</Label>
+              <Input
+                id="phone"
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                placeholder="(555) 123-4567"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                placeholder="contact@example.com"
+              />
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="website">Website</Label>
+              <Input
+                id="website"
+                type="url"
+                value={formData.website}
+                onChange={(e) => setFormData(prev => ({ ...prev, website: e.target.value }))}
+                placeholder="https://www.example.com"
+              />
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea
+                id="notes"
+                value={formData.notes}
+                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                placeholder="Additional notes..."
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Adding...' : 'Add Source'}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}

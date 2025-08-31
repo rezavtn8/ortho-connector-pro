@@ -13,6 +13,7 @@ import {
   formatYearMonth
 } from '@/lib/database.types';
 import { supabase } from '@/integrations/supabase/client';
+import { MapView } from '@/components/MapView';
 import {
   Activity,
   TrendingUp,
@@ -440,6 +441,7 @@ export function Analytics() {
         <TabsList>
           <TabsTrigger value="trends">Trends</TabsTrigger>
           <TabsTrigger value="distribution">Distribution</TabsTrigger>
+          <TabsTrigger value="geographic">Geographic</TabsTrigger>
           <TabsTrigger value="performance">Top Performers</TabsTrigger>
           <TabsTrigger value="growing">Growing Analysis</TabsTrigger>
           <TabsTrigger value="declining">Declining Analysis</TabsTrigger>
@@ -503,6 +505,23 @@ export function Analytics() {
                   <Tooltip />
                 </RechartsPieChart>
               </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="geographic" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Geographic Distribution</CardTitle>
+              <CardDescription>
+                Office locations and patient source distribution across your service area
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <MapView 
+                showVisitData={false}
+                height="500px"
+              />
             </CardContent>
           </Card>
         </TabsContent>

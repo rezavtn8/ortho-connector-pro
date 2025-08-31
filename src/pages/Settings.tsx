@@ -7,6 +7,8 @@ import { MapPin, Save, Crosshair, AlertCircle, CheckCircle } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { AddressSearch } from '@/components/AddressSearch';
+import { MapView } from '@/components/MapView';
 
 interface ClinicSettings {
   clinic_name: string;
@@ -231,12 +233,28 @@ export function Settings() {
 
               <div className="space-y-2">
                 <Label htmlFor="clinic_address">Clinic Address</Label>
-                <Input
-                  id="clinic_address"
-                  value={clinicSettings.clinic_address}
-                  onChange={(e) => setClinicSettings(prev => ({ ...prev, clinic_address: e.target.value }))}
-                  placeholder="Enter your clinic address..."
+                <AddressSearch
+                  value={hasLocation ? 'current-location' : ''}
+                  onSelect={(office) => {
+                    if (office) {
+                      setClinicSettings(prev => ({
+                        ...prev,
+                        clinic_address: office.address || '',
+                        clinic_latitude: office.latitude,
+                        clinic_longitude: office.longitude
+                      }));
+                    }
+                  }}
+                  placeholder="Search for your clinic address..."
                 />
+                {clinicSettings.clinic_address && (
+                  <Input
+                    id="clinic_address"
+                    value={clinicSettings.clinic_address}
+                    onChange={(e) => setClinicSettings(prev => ({ ...prev, clinic_address: e.target.value }))}
+                    placeholder="Or enter address manually..."
+                  />
+                )}
                 <Button 
                   variant="outline" 
                   size="sm" 
@@ -308,13 +326,10 @@ export function Settings() {
               <Label>Location Preview</Label>
               <div className="h-64 rounded-lg overflow-hidden border">
                 {hasLocation ? (
-                  <div className="flex items-center justify-center h-full bg-muted text-muted-foreground">
-                    <div className="text-center">
-                      <MapPin className="h-8 w-8 mx-auto mb-2" />
-                      <p className="text-sm">Map view will be available soon</p>
-                      <p className="text-xs mt-1">Lat: {clinicSettings.clinic_latitude}, Lng: {clinicSettings.clinic_longitude}</p>
-                    </div>
-                  </div>
+                  <MapView 
+                    selectedOfficeId="clinic-location"
+                    height="256px"
+                  />
                 ) : (
                   <div className="h-full bg-muted flex items-center justify-center">
                     <div className="text-center text-muted-foreground">

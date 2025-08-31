@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { SourceType } from '@/lib/database.types';
+import { AddressSearch } from '@/components/AddressSearch';
 
 interface AddOfficeDialogProps {
   onOfficeAdded: () => void;
@@ -35,6 +36,7 @@ export const AddOfficeDialog: React.FC<AddOfficeDialogProps> = ({ onOfficeAdded 
     distance_from_clinic: '',
     patient_load: '0'
   });
+  const [selectedOffice, setSelectedOffice] = useState<any>(null);
 
   const sourceOptions = [
     { value: 'Manual', label: 'Manual Entry', icon: '✏️' },
@@ -74,14 +76,8 @@ export const AddOfficeDialog: React.FC<AddOfficeDialogProps> = ({ onOfficeAdded 
       });
       return false;
     }
-    if (!formData.address.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Office address is required",
-        variant: "destructive",
-      });
-      return false;
-    }
+    
+    // Address is no longer required since we have AddressSearch
     
     // Validate ratings if provided
     if (formData.google_rating && (parseFloat(formData.google_rating) < 0 || parseFloat(formData.google_rating) > 5)) {
@@ -123,34 +119,30 @@ export const AddOfficeDialog: React.FC<AddOfficeDialogProps> = ({ onOfficeAdded 
     setLoading(true);
 
     try {
-      const officeData = {
+      // If selected from AddressSearch, use that data
+      let sourceData: any = {
         name: formData.name.trim(),
-        address: formData.address.trim(),
+        source_type: 'Office' as SourceType,
         phone: formData.phone.trim() || null,
         email: formData.email.trim() || null,
         website: formData.website.trim() || null,
-        office_hours: formData.office_hours.trim() || null,
         notes: formData.notes.trim() || null,
-        source: formData.source,
-        google_rating: formData.google_rating ? parseFloat(formData.google_rating) : null,
-        yelp_rating: formData.yelp_rating ? parseFloat(formData.yelp_rating) : null,
-        distance_from_clinic: formData.distance_from_clinic ? parseFloat(formData.distance_from_clinic) : null,
-        patient_load: parseInt(formData.patient_load) || 0
+        is_active: true,
+        created_by: (await supabase.auth.getUser()).data.user?.id
       };
+
+      // Add address and coordinates if available
+      if (selectedOffice) {
+        sourceData.address = selectedOffice.address;
+        sourceData.latitude = selectedOffice.latitude;
+        sourceData.longitude = selectedOffice.longitude;
+      } else {
+        sourceData.address = formData.address.trim() || null;
+      }
 
       const { data, error } = await supabase
         .from('patient_sources')
-        .insert({
-          name: formData.name.trim(),
-          address: formData.address.trim() || null,
-          phone: formData.phone.trim() || null,
-          email: formData.email.trim() || null,
-          website: formData.website.trim() || null,
-          notes: formData.notes.trim() || null,
-          source_type: 'Other' as SourceType,
-          is_active: true,
-          created_by: (await supabase.auth.getUser()).data.user?.id
-        })
+        .insert([sourceData])
         .select()
         .single();
 
@@ -163,6 +155,7 @@ export const AddOfficeDialog: React.FC<AddOfficeDialogProps> = ({ onOfficeAdded 
       });
 
       resetForm();
+      setSelectedOffice(null);
       setOpen(false);
       onOfficeAdded();
     } catch (error: any) {
@@ -282,16 +275,40 @@ export const AddOfficeDialog: React.FC<AddOfficeDialogProps> = ({ onOfficeAdded 
                 </div>
 
                 <div className="space-y-2">
+                  <Label htmlFor="address-search">Search Address</Label>
+                  <AddressSearch
+                    onSelect={(office) => {
+                      setSelectedOffice(office);
+                      if (office) {
+                        setFormData(prev => ({ 
+                          ...prev, 
+                          name: office.name,
+                          address: office.address || ''
+                        }));
+                      }
+                    }}
+                    placeholder="Search for office address..."
+                  />
+                  {selectedOffice && (
+                    <div className="p-2 bg-muted rounded-md text-sm">
+                      <div className="font-medium">{selectedOffice.name}</div>
+                      {selectedOffice.address && (
+                        <div className="text-muted-foreground">{selectedOffice.address}</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="address" className="flex items-center gap-1">
                     <MapPin className="w-4 h-4" />
-                    Address <span className="text-red-500">*</span>
+                    Manual Address Entry
                   </Label>
                   <Textarea
                     id="address"
                     value={formData.address}
                     onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                    placeholder="123 Main Street, Suite 100&#10;City, State 12345"
-                    required
+                    placeholder="Or enter address manually..."
                     rows={3}
                     className="border-gray-300 focus:border-blue-500"
                   />
