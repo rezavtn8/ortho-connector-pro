@@ -202,6 +202,15 @@ export function Settings() {
   };
 
   const saveClinicSettings = async () => {
+    if (!user?.id) {
+      toast({
+        title: "Authentication error",
+        description: "Please log in to save your settings.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSaving(true);
     
     try {
@@ -209,7 +218,7 @@ export function Settings() {
       const { data: existingProfile } = await supabase
         .from('user_profiles')
         .select('id, clinic_id')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .maybeSingle();
 
       let clinicId = existingProfile?.clinic_id;
@@ -219,16 +228,19 @@ export function Settings() {
         const { data: newClinic, error: clinicError } = await supabase
           .from('clinics')
           .insert({
-            name: clinicSettings.clinic_name,
-            address: clinicSettings.clinic_address,
+            name: clinicSettings.clinic_name || 'My Clinic',
+            address: clinicSettings.clinic_address || '',
             latitude: clinicSettings.clinic_latitude,
             longitude: clinicSettings.clinic_longitude,
-            owner_id: user?.id
+            owner_id: user.id
           })
           .select('id')
           .single();
 
-        if (clinicError) throw clinicError;
+        if (clinicError) {
+          console.error('Clinic creation error:', clinicError);
+          throw clinicError;
+        }
         clinicId = newClinic.id;
       } else {
         // Update existing clinic
