@@ -17,6 +17,7 @@ import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, Download } from 'luc
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { SOURCE_TYPE_CONFIG, SourceType } from '@/lib/database.types';
+import { OfficeMatchConfirmation } from '@/components/OfficeMatchConfirmation';
 
 interface ImportDataDialogProps {
   onImportComplete?: () => void;
@@ -54,6 +55,9 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
   const [duplicates, setDuplicates] = useState<DuplicateInfo[]>([]);
   const [conflictResolutions, setConflictResolutions] = useState<ConflictResolution[]>([]);
   const [showConflicts, setShowConflicts] = useState(false);
+  const [showOfficeMatching, setShowOfficeMatching] = useState(false);
+  const [importedOffices, setImportedOffices] = useState<any[]>([]);
+  const [confirmedOfficeData, setConfirmedOfficeData] = useState<Map<string, any>>(new Map());
   const { toast } = useToast();
 
   // Auto-detect source type based on name
@@ -246,14 +250,33 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
           if (!existingSource) {
             // Create new source with auto-detected type
             const detectedType = detectSourceType(row.source);
+            
+            // Check if we have confirmed office data for this source
+            const confirmedOffice = confirmedOfficeData.get(row.source);
+            
+            let sourceData: any = {
+              name: row.source,
+              source_type: detectedType,
+              is_active: true,
+              created_by: userId
+            };
+
+            // If this is a confirmed office with Google Places data, use enhanced data
+            if (confirmedOffice && detectedType === 'Office') {
+              sourceData = {
+                ...sourceData,
+                name: confirmedOffice.name || row.source,
+                address: confirmedOffice.formatted_address,
+                phone: confirmedOffice.formatted_phone_number,
+                website: confirmedOffice.website,
+                latitude: confirmedOffice.geometry?.location.lat,
+                longitude: confirmedOffice.geometry?.location.lng,
+              };
+            }
+
             const { data: newSource, error: createError } = await supabase
               .from('patient_sources')
-              .insert({
-                name: row.source,
-                source_type: detectedType,
-                is_active: true,
-                created_by: userId
-              })
+              .insert(sourceData)
               .select('id')
               .single();
             
@@ -374,6 +397,9 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
       setDuplicates([]);
       setConflictResolutions([]);
       setShowConflicts(false);
+      setShowOfficeMatching(false);
+      setImportedOffices([]);
+      setConfirmedOfficeData(new Map());
       
       onImportComplete?.();
     } catch (error: any) {
@@ -390,6 +416,50 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
   };
 
   const importData = async () => {
+    // Check for office sources that need Google Places matching
+    const officeSourcesNeedingMatch = parsedData.filter(row => {
+      const detectedType = detectSourceType(row.source);
+      return detectedType === 'Office';
+    });
+
+    if (officeSourcesNeedingMatch.length > 0) {
+      // Prepare offices for matching
+      const officesForMatching = officeSourcesNeedingMatch.map(row => ({
+        id: `import-${row.source}`,
+        name: row.source,
+        // No existing address/phone/website from CSV import
+      }));
+
+      setImportedOffices(officesForMatching);
+      setShowOfficeMatching(true);
+    } else {
+      // No office sources, proceed directly to duplicate checking
+      await checkForDuplicates();
+    }
+  };
+
+  const handleOfficeMatchingComplete = async (confirmedOffices: any[]) => {
+    // Store confirmed office data for use during import
+    const officeDataMap = new Map();
+    
+    // Handle all imported offices - both confirmed and skipped
+    importedOffices.forEach(importedOffice => {
+      const originalName = importedOffice.id.replace('import-', '');
+      
+      // Find if this office was confirmed with enhanced data
+      const confirmedOffice = confirmedOffices.find(office => office.id === importedOffice.id);
+      
+      if (confirmedOffice) {
+        // This office was confirmed with Google Places data
+        officeDataMap.set(originalName, confirmedOffice);
+      }
+      // If not confirmed, we'll just use the original data (no entry in map = use original)
+    });
+    
+    setConfirmedOfficeData(officeDataMap);
+    setShowOfficeMatching(false);
+    
+    // Now proceed to duplicate checking
     await checkForDuplicates();
   };
 
@@ -607,6 +677,11 @@ Insurance Partners,2,3,4,2,5,4,6,7,5,4,3,2,47`;
               </div>
             </div>
           </div>
+        ) : showOfficeMatching ? (
+          <OfficeMatchConfirmation
+            importedOffices={importedOffices}
+            onComplete={handleOfficeMatchingComplete}
+          />
         ) : showConflicts ? (
           <div className="space-y-4">
             {/* Conflicts Header */}
