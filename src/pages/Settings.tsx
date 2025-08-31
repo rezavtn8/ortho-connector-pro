@@ -202,10 +202,26 @@ export function Settings() {
   };
 
   const saveClinicSettings = async () => {
+    console.log('Save clinic settings called, user:', user);
+    
     if (!user?.id) {
+      console.log('No user ID available');
       toast({
         title: "Authentication error",
         description: "Please log in to save your settings.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if user is properly authenticated by testing auth
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    console.log('Auth user check:', authUser);
+    
+    if (!authUser?.id) {
+      toast({
+        title: "Authentication error", 
+        description: "Session expired. Please log in again.",
         variant: "destructive",
       });
       return;
@@ -215,16 +231,19 @@ export function Settings() {
     
     try {
       // Check if user profile exists first
-      const { data: existingProfile } = await supabase
+      const { data: existingProfile, error: profileError } = await supabase
         .from('user_profiles')
         .select('id, clinic_id')
-        .eq('user_id', user.id)
+        .eq('user_id', authUser.id)
         .maybeSingle();
+
+      console.log('Existing profile:', existingProfile, 'Profile error:', profileError);
 
       let clinicId = existingProfile?.clinic_id;
 
       // If no clinic exists, create one
       if (!clinicId) {
+        console.log('Creating new clinic with owner_id:', authUser.id);
         const { data: newClinic, error: clinicError } = await supabase
           .from('clinics')
           .insert({
@@ -232,11 +251,13 @@ export function Settings() {
             address: clinicSettings.clinic_address || '',
             latitude: clinicSettings.clinic_latitude,
             longitude: clinicSettings.clinic_longitude,
-            owner_id: user.id
+            owner_id: authUser.id
           })
           .select('id')
           .single();
 
+        console.log('New clinic result:', newClinic, 'Clinic error:', clinicError);
+        
         if (clinicError) {
           console.error('Clinic creation error:', clinicError);
           throw clinicError;
