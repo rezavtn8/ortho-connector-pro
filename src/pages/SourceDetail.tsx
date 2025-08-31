@@ -40,13 +40,17 @@ import {
   Activity,
   History,
   Tag,
-  Star
+  Star,
+  MapPin,
+  Users,
+  Building
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useParams, useNavigate } from 'react-router-dom';
 import { format, subMonths } from 'date-fns';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { AddressSearch } from '@/components/AddressSearch';
 
 export function SourceDetail() {
   const { id: sourceId } = useParams<{ id: string }>();
@@ -61,6 +65,17 @@ export function SourceDetail() {
   const [editingMonth, setEditingMonth] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<number>(0);
   const [newTag, setNewTag] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    address: '',
+    phone: '',
+    email: '',
+    website: '',
+    notes: '',
+    latitude: null as number | null,
+    longitude: null as number | null
+  });
   const { toast } = useToast();
   const currentMonth = getCurrentYearMonth();
 
@@ -132,6 +147,20 @@ export function SourceDetail() {
       setMonthlyData(monthlyDataResult || []);
       setChangeLog(changeLogData || []);
       setMarketingVisits(visitsData);
+      
+      // Initialize edit form with source data
+      if (sourceData) {
+        setEditForm({
+          name: sourceData.name || '',
+          address: sourceData.address || '',
+          phone: sourceData.phone || '',
+          email: sourceData.email || '',
+          website: sourceData.website || '',
+          notes: sourceData.notes || '',
+          latitude: sourceData.latitude,
+          longitude: sourceData.longitude
+        });
+      }
     } catch (error) {
       console.error('Error loading source data:', error);
       toast({
@@ -301,6 +330,70 @@ export function SourceDetail() {
     );
   };
 
+  const handleEditSource = async () => {
+    try {
+      const { error } = await supabase
+        .from('patient_sources')
+        .update({
+          name: editForm.name,
+          address: editForm.address,
+          phone: editForm.phone,
+          email: editForm.email,
+          website: editForm.website,
+          notes: editForm.notes,
+          latitude: editForm.latitude,
+          longitude: editForm.longitude
+        })
+        .eq('id', sourceId);
+
+      if (error) throw error;
+
+      setIsEditing(false);
+      await loadSourceData();
+
+      toast({
+        title: "Source Updated",
+        description: "Source details have been updated successfully",
+      });
+    } catch (error) {
+      console.error('Error updating source:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update source details",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCancelEdit = () => {
+    // Reset form to original source data
+    if (source) {
+      setEditForm({
+        name: source.name || '',
+        address: source.address || '',
+        phone: source.phone || '',
+        email: source.email || '',
+        website: source.website || '',
+        notes: source.notes || '',
+        latitude: source.latitude,
+        longitude: source.longitude
+      });
+    }
+    setIsEditing(false);
+  };
+
+  const handleAddressSelect = (office: any) => {
+    if (office) {
+      setEditForm(prev => ({
+        ...prev,
+        name: office.name,
+        address: office.address || '',
+        latitude: office.latitude,
+        longitude: office.longitude
+      }));
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -431,49 +524,232 @@ export function SourceDetail() {
           )}
         </TabsList>
 
-        <TabsContent value="details" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Contact Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {source.address && (
-                <div>
-                  <Label className="text-sm text-muted-foreground">Address</Label>
-                  <p>{source.address}</p>
-                </div>
+        <TabsContent value="details" className="space-y-6">
+          {/* Source Information Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-lg bg-primary/10">
+                <Building className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold">Source Information</h3>
+                <p className="text-muted-foreground">Manage and update source details</p>
+              </div>
+            </div>
+            <Button
+              variant={isEditing ? "outline" : "default"}
+              onClick={() => isEditing ? handleCancelEdit() : setIsEditing(true)}
+              className="gap-2"
+            >
+              {isEditing ? (
+                <>
+                  <X className="w-4 h-4" />
+                  Cancel
+                </>
+              ) : (
+                <>
+                  <Edit className="w-4 h-4" />
+                  Edit Details
+                </>
               )}
-              {source.phone && (
-                <div className="flex items-center gap-2">
-                  <Phone className="w-4 h-4 text-muted-foreground" />
-                  <span>{source.phone}</span>
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Basic Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  Basic Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Source Name</Label>
+                  {isEditing ? (
+                    <Input
+                      id="name"
+                      value={editForm.name}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="Enter source name"
+                    />
+                  ) : (
+                    <p className="text-lg font-medium">{source.name || 'No name provided'}</p>
+                  )}
                 </div>
-              )}
-              {source.email && (
-                <div className="flex items-center gap-2">
-                  <Mail className="w-4 h-4 text-muted-foreground" />
-                  <a href={`mailto:${source.email}`} className="text-primary hover:underline">
-                    {source.email}
-                  </a>
+
+                <div className="space-y-2">
+                  <Label htmlFor="address">Address</Label>
+                  {isEditing ? (
+                    <div className="space-y-2">
+                      <AddressSearch
+                        value={editForm.address}
+                        onSelect={handleAddressSelect}
+                        placeholder="Search for address..."
+                      />
+                      <Textarea
+                        id="address"
+                        value={editForm.address}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, address: e.target.value }))}
+                        placeholder="Or enter address manually"
+                        className="min-h-[60px]"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-2">
+                      <MapPin className="w-4 h-4 text-muted-foreground mt-1 flex-shrink-0" />
+                      <p>{source.address || 'No address provided'}</p>
+                    </div>
+                  )}
                 </div>
-              )}
-              {source.website && (
-                <div className="flex items-center gap-2">
-                  <Globe className="w-4 h-4 text-muted-foreground" />
-                  <a href={source.website} target="_blank" rel="noopener noreferrer" 
-                     className="text-primary hover:underline">
-                    {source.website}
-                  </a>
+
+                <div className="space-y-2">
+                  <Label htmlFor="notes">Notes</Label>
+                  {isEditing ? (
+                    <Textarea
+                      id="notes"
+                      value={editForm.notes}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, notes: e.target.value }))}
+                      placeholder="Add any additional notes about this source"
+                      className="min-h-[80px]"
+                    />
+                  ) : (
+                    <p className="whitespace-pre-wrap text-muted-foreground">
+                      {source.notes || 'No notes provided'}
+                    </p>
+                  )}
                 </div>
-              )}
-              {source.notes && (
-                <div>
-                  <Label className="text-sm text-muted-foreground">Notes</Label>
-                  <p className="whitespace-pre-wrap">{source.notes}</p>
+              </CardContent>
+            </Card>
+
+            {/* Contact Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Phone className="w-5 h-5" />
+                  Contact Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number</Label>
+                  {isEditing ? (
+                    <Input
+                      id="phone"
+                      type="tel"
+                      value={editForm.phone}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, phone: e.target.value }))}
+                      placeholder="Enter phone number"
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-4 h-4 text-muted-foreground" />
+                      <p>{source.phone || 'No phone provided'}</p>
+                    </div>
+                  )}
                 </div>
-              )}
-            </CardContent>
-          </Card>
+
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  {isEditing ? (
+                    <Input
+                      id="email"
+                      type="email"
+                      value={editForm.email}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, email: e.target.value }))}
+                      placeholder="Enter email address"
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-muted-foreground" />
+                      {source.email ? (
+                        <a href={`mailto:${source.email}`} className="text-primary hover:underline">
+                          {source.email}
+                        </a>
+                      ) : (
+                        <p>No email provided</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="website">Website</Label>
+                  {isEditing ? (
+                    <Input
+                      id="website"
+                      type="url"
+                      value={editForm.website}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, website: e.target.value }))}
+                      placeholder="Enter website URL"
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Globe className="w-4 h-4 text-muted-foreground" />
+                      {source.website ? (
+                        <a 
+                          href={source.website} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="text-primary hover:underline"
+                        >
+                          {source.website}
+                        </a>
+                      ) : (
+                        <p>No website provided</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Location Information */}
+          {(source.latitude && source.longitude) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MapPin className="w-5 h-5" />
+                  Location Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm text-muted-foreground">Latitude</Label>
+                    <p className="font-mono text-sm">{source.latitude}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm text-muted-foreground">Longitude</Label>
+                    <p className="font-mono text-sm">{source.longitude}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Save Changes Button */}
+          {isEditing && (
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={handleCancelEdit}
+                className="gap-2"
+              >
+                <X className="w-4 h-4" />
+                Cancel
+              </Button>
+              <Button
+                onClick={handleEditSource}
+                className="gap-2"
+              >
+                <Save className="w-4 h-4" />
+                Save Changes
+              </Button>
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="monthly" className="space-y-4">
