@@ -230,7 +230,7 @@ export function Settings() {
     setIsSaving(true);
     
     try {
-      // Check if user profile exists first
+      // First ensure user profile exists
       const { data: existingProfile, error: profileError } = await supabase
         .from('user_profiles')
         .select('id, clinic_id')
@@ -238,6 +238,24 @@ export function Settings() {
         .maybeSingle();
 
       console.log('Existing profile:', existingProfile, 'Profile error:', profileError);
+
+      // Create user profile if it doesn't exist (with clinic_id as null initially)
+      if (!existingProfile) {
+        console.log('Creating user profile first');
+        const { error: createProfileError } = await supabase
+          .from('user_profiles')
+          .insert({
+            user_id: authUser.id,
+            email: authUser.email || '',
+            role: 'Owner',
+            clinic_id: null  // We'll update this after creating the clinic
+          });
+        
+        if (createProfileError) {
+          console.error('Profile creation error:', createProfileError);
+          throw createProfileError;
+        }
+      }
 
       let clinicId = existingProfile?.clinic_id;
 
@@ -278,35 +296,21 @@ export function Settings() {
         if (clinicUpdateError) throw clinicUpdateError;
       }
 
-      if (!existingProfile) {
-        // Create user profile
-        const { error: insertError } = await supabase
-          .from('user_profiles')
-          .insert({
-            user_id: user?.id,
-            email: user?.email || '',
-            clinic_id: clinicId,
-            clinic_name: clinicSettings.clinic_name,
-            clinic_address: clinicSettings.clinic_address,
-            clinic_latitude: clinicSettings.clinic_latitude,
-            clinic_longitude: clinicSettings.clinic_longitude,
-          });
-
-        if (insertError) throw insertError;
-      } else {
-        // Update existing profile
-        const { error } = await supabase
-          .from('user_profiles')
-          .update({
-            clinic_id: clinicId,
-            clinic_name: clinicSettings.clinic_name,
-            clinic_address: clinicSettings.clinic_address,
-            clinic_latitude: clinicSettings.clinic_latitude,
-            clinic_longitude: clinicSettings.clinic_longitude,
-          })
-          .eq('user_id', user?.id);
-
-        if (error) throw error;
+      // Now update user profile with clinic info (whether it existed or was just created)
+      const { error: updateProfileError } = await supabase
+        .from('user_profiles')
+        .update({
+          clinic_id: clinicId,
+          clinic_name: clinicSettings.clinic_name,
+          clinic_address: clinicSettings.clinic_address,
+          clinic_latitude: clinicSettings.clinic_latitude,
+          clinic_longitude: clinicSettings.clinic_longitude,
+        })
+        .eq('user_id', authUser.id);
+        
+      if (updateProfileError) {
+        console.error('Profile update error:', updateProfileError);
+        throw updateProfileError;
       }
 
       toast({
