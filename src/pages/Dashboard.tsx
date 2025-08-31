@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -343,9 +343,9 @@ export function Dashboard() {
         <Card>
           <CardHeader>
             <CardTitle>Geographic Distribution</CardTitle>
-            <CardDescription>
+            <p className="text-sm text-muted-foreground">
               Overview of your office network and referral sources
-            </CardDescription>
+            </p>
           </CardHeader>
           <CardContent>
             <MapView 
