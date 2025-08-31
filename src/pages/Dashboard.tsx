@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { PatientSource, MonthlyPatients, SOURCE_TYPE_CONFIG, getCurrentYearMonth } from '@/lib/database.types';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, Plus, TrendingUp, Building2, Star, Users, Globe, MessageSquare, FileText } from 'lucide-react';
+import { Search, TrendingUp, Building2, Star, Users, Globe, MessageSquare, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 
@@ -209,13 +206,6 @@ export function Dashboard() {
             Overview of your patient referral sources
           </p>
         </div>
-        <Button 
-          onClick={() => navigate('/sources')}
-          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Manage Sources
-        </Button>
       </div>
 
       {/* Overview Stats */}
