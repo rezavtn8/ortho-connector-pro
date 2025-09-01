@@ -1,8 +1,11 @@
 import React from 'react';
-import { ArrowRight, Play, CheckCircle, Users, TrendingUp, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { PatientSourceGraph } from '@/components/PatientSourceGraph';
+import { NetworkBackground } from './NetworkBackground';
+import { ConnectionDot } from './ConnectionDot';
+import { AuthForm } from './AuthForm';
+import { PatientSourceGraph } from './PatientSourceGraph';
+import { Activity, TrendingUp, Users, Search, ArrowRight, CheckCircle, Globe, MessageSquare, MapPin } from 'lucide-react';
 
 interface LandingPageProps {
   onGetStarted: () => void;
@@ -10,207 +13,259 @@ interface LandingPageProps {
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth = false }) => {
-  if (showAuth) {
-    // Return simplified auth version
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-background to-muted/30">
-        <div className="flex min-h-screen">
-          <div className="w-1/2 flex items-center justify-center p-6">
-            <div className="w-full max-w-md">
-              <div className="text-center mb-8">
-                <div className="text-2xl font-bold text-primary mb-2">DentalFlow</div>
-                <p className="text-muted-foreground">Connect to your patient flow dashboard</p>
-              </div>
-              {/* AuthForm would go here */}
-            </div>
-          </div>
-          <div className="w-1/2 bg-primary/5 flex items-center justify-center p-12">
-            <PatientSourceGraph className="w-full max-w-lg" />
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const features = [
+    {
+      icon: <Activity className="w-8 h-8" />,
+      title: "Patient Source Tracking",
+      description: "Google, Yelp, Word-of-mouth, Referring offices — track every patient's journey to your practice."
+    },
+    {
+      icon: <TrendingUp className="w-8 h-8" />,
+      title: "Monthly Trends", 
+      description: "Understand what's working and what's not with clear analytics and trend visualization."
+    },
+    {
+      icon: <Users className="w-8 h-8" />,
+      title: "Outreach Tools",
+      description: "Stay in touch with key sources and nurture your most valuable professional relationships."
+    },
+    {
+      icon: <Search className="w-8 h-8" />,
+      title: "Visual Dashboard",
+      description: "See the full network in one view with interactive maps and connection insights."
+    }
+  ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-muted/30">
+    <div className="min-h-screen bg-gradient-connection relative overflow-hidden">
+      {/* Network background for non-auth view */}
+      {!showAuth && (
+        <NetworkBackground variant="subtle" className="opacity-30" />
+      )}
+      
       {/* Header */}
-      <header className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-8">
-              <div className="text-2xl font-bold text-primary">DentalFlow</div>
-              <nav className="hidden md:flex items-center space-x-6">
-                <a href="#services" className="text-muted-foreground hover:text-primary transition-colors">Services</a>
-                <a href="#software" className="text-muted-foreground hover:text-primary transition-colors">Software</a>
-                <a href="#reviews" className="text-muted-foreground hover:text-primary transition-colors">Reviews</a>
-                <a href="#blog" className="text-muted-foreground hover:text-primary transition-colors">Blog</a>
-                <a href="#company" className="text-muted-foreground hover:text-primary transition-colors">Company</a>
-                <a href="#faqs" className="text-muted-foreground hover:text-primary transition-colors">FAQs</a>
-                <a href="#careers" className="text-muted-foreground hover:text-primary transition-colors">Careers</a>
-              </nav>
+      <header className="relative z-20 px-6 pt-8">
+        <nav className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="relative">
+              <Activity size={32} className="text-connection-primary" />
+              <ConnectionDot 
+                position={{ x: 80, y: 20 }} 
+                size="sm" 
+                className="absolute"
+                animated={false}
+              />
             </div>
-            <Button onClick={onGetStarted} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-              Book Free Demo
-            </Button>
+            <span className="text-2xl font-bold text-connection-text">PatientFlow</span>
           </div>
-        </div>
+          {!showAuth && (
+            <Button 
+              variant="outline" 
+              onClick={onGetStarted}
+              className="border-connection-primary/30 text-connection-text hover:bg-connection-primary/10 backdrop-blur-sm"
+            >
+              Sign In
+            </Button>
+          )}
+        </nav>
       </header>
 
-      {/* Hero Section */}
-      <section className="container mx-auto px-6 py-16 lg:py-24">
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-          {/* Left Content */}
-          <div className="space-y-8">
-            <div className="space-y-4">
-              <p className="text-primary font-medium text-sm uppercase tracking-wide">
-                End-To-End Dental Patient Management
-              </p>
-              <h1 className="text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground leading-tight">
-                Revolutionizing Dental 
-                <span className="text-primary"> Patient Flow</span> with Cutting-
-                Edge Technology
+      <div className={`flex ${showAuth ? 'min-h-[calc(100vh-100px)] items-center' : ''}`}>
+        {/* Main Content */}
+        <div className={`${showAuth ? 'w-1/2 px-6' : 'w-full'} relative z-20`}>
+          {/* Hero Section */}
+          <section className={`${showAuth ? 'px-0' : 'px-6'} pt-20 pb-24`}>
+            <div className="max-w-4xl mx-auto text-center relative">
+              {/* Network background for hero */}
+              {!showAuth && <NetworkBackground variant="hero" className="opacity-40" />}
+              
+              <h1 className="relative z-10 text-5xl md:text-6xl font-bold text-connection-text mb-6 leading-tight">
+                Track the Source.
+                <span className="block text-connection-primary font-light">Understand the Growth.</span>
               </h1>
-              <p className="text-lg text-muted-foreground leading-relaxed max-w-xl">
-                Our comprehensive patient flow management services are designed for dental practices to optimize patient acquisition, streamline operations, and maximize practice growth all while driving efficiency and profitability.
+              
+              <p className="relative z-10 text-lg md:text-xl text-connection-muted mb-12 max-w-3xl mx-auto leading-relaxed">
+                Every patient has a path — visualize where they came from and optimize what brings them to your practice.
               </p>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Button size="lg" onClick={onGetStarted} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                Talk To Our Expert
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-              <Button size="lg" variant="outline" className="border-primary text-primary hover:bg-primary hover:text-primary-foreground">
-                <Play className="mr-2 h-4 w-4" />
-                Watch Overview
-              </Button>
-            </div>
-          </div>
-
-          {/* Right Content - Patient Source Graph */}
-          <div className="lg:pl-8">
-            <PatientSourceGraph className="w-full" />
-          </div>
-        </div>
-      </section>
-
-      {/* Benefits Section */}
-      <section className="container mx-auto px-6 py-16">
-        <div className="grid md:grid-cols-3 gap-8">
-          <Card className="border-border/50 hover:border-primary/30 transition-colors duration-300">
-            <CardContent className="p-8">
-              <div className="space-y-4">
-                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
-                  <Users className="h-6 w-6 text-primary" />
+              
+              {!showAuth && (
+                <div className="relative z-10 flex flex-col sm:flex-row gap-4 justify-center items-center">
+                  <Button 
+                    size="lg"
+                    onClick={onGetStarted}
+                    className="bg-connection-primary hover:bg-connection-primary/90 text-white px-8 py-4 text-lg rounded-xl shadow-elegant hover:shadow-glow transition-all group"
+                  >
+                    Explore Patient Flow
+                    <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  </Button>
                 </div>
-                <h3 className="text-xl font-semibold text-foreground">
-                  Manage Your Complete Patient Flow
-                </h3>
-                <p className="text-muted-foreground leading-relaxed">
-                  Track and optimize every touchpoint in your patient journey from initial contact through treatment completion and follow-up care.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border/50 hover:border-primary/30 transition-colors duration-300">
-            <CardContent className="p-8">
-              <div className="space-y-4">
-                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
-                  <TrendingUp className="h-6 w-6 text-primary" />
+              )}
+            </div>
+          </section>
+          
+          {!showAuth && (
+            <>
+              {/* Patient Source Graph Section */}
+              <section className="relative z-20 px-6 py-16">
+                <div className="max-w-5xl mx-auto">
+                  <div className="text-center mb-12">
+                    <h2 className="text-3xl md:text-4xl font-bold text-connection-text mb-4">
+                      Visualize Your Patient Network
+                    </h2>
+                    <p className="text-lg text-connection-muted max-w-2xl mx-auto">
+                      See how patients flow to your practice from every source — from Google searches to professional referrals. Click or hover any source to highlight its connection.
+                    </p>
+                  </div>
+                  
+                  <PatientSourceGraph className="mx-auto" />
+                  
+                  {/* Interactive callout */}
+                  <div className="mt-8 text-center">
+                    <p className="text-sm text-connection-muted/80 italic">
+                      💡 Try hovering over any source above to see its connection light up
+                    </p>
+                  </div>
                 </div>
-                <h3 className="text-xl font-semibold text-foreground">
-                  Free Yourself from Repetitive and Time-Consuming Tasks
-                </h3>
-                <p className="text-muted-foreground leading-relaxed">
-                  Automate appointment scheduling, follow-ups, and administrative tasks to focus more on patient care and practice growth.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+              </section>
 
-          <Card className="border-border/50 hover:border-primary/30 transition-colors duration-300">
-            <CardContent className="p-8">
-              <div className="space-y-4">
-                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
-                  <BarChart3 className="h-6 w-6 text-primary" />
+              {/* Features Section */}
+              <section className="relative z-20 px-6 py-24 bg-white/60 backdrop-blur-sm">
+                <div className="max-w-6xl mx-auto relative">
+                  {/* Network connections between features */}
+                  <NetworkBackground variant="features" className="opacity-20" />
+                  
+                  <div className="text-center mb-16">
+                    <h2 className="text-4xl md:text-5xl font-bold text-connection-text mb-6">
+                      Connected Intelligence
+                    </h2>
+                    <p className="text-lg text-connection-muted max-w-2xl mx-auto">
+                      Transform scattered patient data into a clear network of sources and connections 
+                      that drive your practice growth.
+                    </p>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 relative z-10">
+                    {features.map((feature, index) => (
+                      <Card key={index} className="group hover:shadow-elegant transition-all duration-300 border-connection-primary/20 hover:border-connection-primary/40 bg-gradient-card relative">
+                        <CardContent className="p-8 text-center relative">
+                          {/* Connection dot overlay */}
+                          <div className="absolute -top-2 -right-2">
+                            <ConnectionDot size="sm" position={{ x: 0, y: 0 }} />
+                          </div>
+                          
+                          <div className="w-16 h-16 mx-auto mb-6 rounded-xl bg-connection-bg flex items-center justify-center text-connection-primary group-hover:bg-connection-primary group-hover:text-white transition-all duration-300 shadow-sm">
+                            {feature.icon}
+                          </div>
+                          <h3 className="text-xl font-semibold text-connection-text mb-4">
+                            {feature.title}
+                          </h3>
+                          <p className="text-connection-muted leading-relaxed">
+                            {feature.description}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
                 </div>
-                <h3 className="text-xl font-semibold text-foreground">
-                  Provide the Best Dental Experience For Your Patients
-                </h3>
-                <p className="text-muted-foreground leading-relaxed">
-                  Deliver personalized care with data-driven insights, streamlined communication, and seamless appointment management.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
+              </section>
 
-      {/* CTA Section */}
-      <section className="bg-primary/5 border-y">
-        <div className="container mx-auto px-6 py-16">
-          <div className="text-center space-y-6">
-            <h2 className="text-3xl lg:text-4xl font-bold text-foreground">
-              Ready to Transform Your Practice?
-            </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Join hundreds of dental practices that have streamlined their patient flow and increased their revenue with our comprehensive management system.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" onClick={onGetStarted} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                Start Free Trial
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-              <Button size="lg" variant="outline" className="border-primary text-primary hover:bg-primary hover:text-primary-foreground">
-                Schedule Demo
-              </Button>
-            </div>
-          </div>
-        </div>
-      </section>
+              {/* Benefits Section */}
+              <section className="relative z-20 px-6 py-24">
+                <div className="max-w-4xl mx-auto">
+                  <div className="text-center mb-16">
+                    <h2 className="text-4xl md:text-5xl font-bold text-connection-text mb-6">
+                      See the Full Picture
+                    </h2>
+                    <p className="text-lg text-connection-muted">
+                      Transform scattered patient data into meaningful connections and actionable growth insights.
+                    </p>
+                  </div>
 
-      {/* Footer */}
-      <footer className="bg-background border-t">
-        <div className="container mx-auto px-6 py-12">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div className="space-y-4">
-              <div className="text-2xl font-bold text-primary">DentalFlow</div>
-              <p className="text-muted-foreground">
-                Revolutionizing dental practice management with cutting-edge technology.
-              </p>
-            </div>
-            <div className="space-y-4">
-              <h4 className="font-semibold text-foreground">Services</h4>
-              <div className="space-y-2">
-                <a href="#" className="block text-muted-foreground hover:text-primary transition-colors">Patient Management</a>
-                <a href="#" className="block text-muted-foreground hover:text-primary transition-colors">Analytics</a>
-                <a href="#" className="block text-muted-foreground hover:text-primary transition-colors">Automation</a>
-              </div>
-            </div>
-            <div className="space-y-4">
-              <h4 className="font-semibold text-foreground">Company</h4>
-              <div className="space-y-2">
-                <a href="#" className="block text-muted-foreground hover:text-primary transition-colors">About</a>
-                <a href="#" className="block text-muted-foreground hover:text-primary transition-colors">Careers</a>
-                <a href="#" className="block text-muted-foreground hover:text-primary transition-colors">Contact</a>
-              </div>
-            </div>
-            <div className="space-y-4">
-              <h4 className="font-semibold text-foreground">Support</h4>
-              <div className="space-y-2">
-                <a href="#" className="block text-muted-foreground hover:text-primary transition-colors">Help Center</a>
-                <a href="#" className="block text-muted-foreground hover:text-primary transition-colors">Documentation</a>
-                <a href="#" className="block text-muted-foreground hover:text-primary transition-colors">Privacy Policy</a>
-              </div>
-            </div>
-          </div>
-          <div className="border-t mt-12 pt-8 text-center text-muted-foreground">
-            <p>&copy; 2024 DentalFlow. All rights reserved.</p>
-          </div>
+                  <div className="grid md:grid-cols-2 gap-12 items-center">
+                    <div>
+                      <ul className="space-y-6">
+                        <li className="flex items-start space-x-4">
+                          <CheckCircle className="w-6 h-6 text-connection-primary flex-shrink-0 mt-1" />
+                          <div>
+                            <h4 className="font-semibold text-connection-text mb-2">Source Intelligence</h4>
+                            <p className="text-connection-muted">Automatically track and categorize every patient source from Google searches to professional referrals.</p>
+                          </div>
+                        </li>
+                        <li className="flex items-start space-x-4">
+                          <CheckCircle className="w-6 h-6 text-connection-primary flex-shrink-0 mt-1" />
+                          <div>
+                            <h4 className="font-semibold text-connection-text mb-2">Connection Mapping</h4>
+                            <p className="text-connection-muted">Visualize your referral network and discover the most valuable relationships driving your growth.</p>
+                          </div>
+                        </li>
+                        <li className="flex items-start space-x-4">
+                          <CheckCircle className="w-6 h-6 text-connection-primary flex-shrink-0 mt-1" />
+                          <div>
+                            <h4 className="font-semibold text-connection-text mb-2">Smart Outreach</h4>
+                            <p className="text-connection-muted">Get prompted to follow up with key sources and maintain the relationships that matter most.</p>
+                          </div>
+                        </li>
+                      </ul>
+                    </div>
+                    <div className="relative">
+                      <div className="w-full h-64 bg-gradient-glow rounded-2xl flex items-center justify-center relative overflow-hidden border border-connection-primary/20">
+                        <div className="relative w-32 h-32">
+                          <Activity className="w-16 h-16 text-connection-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                          <ConnectionDot position={{ x: 20, y: 20 }} label="Google" size="sm" />
+                          <ConnectionDot position={{ x: 80, y: 30 }} label="Yelp" size="sm" />
+                          <ConnectionDot position={{ x: 15, y: 70 }} label="Referrals" size="sm" />
+                          <ConnectionDot position={{ x: 85, y: 80 }} label="Word of Mouth" size="sm" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* CTA Section */}
+              <section className="relative z-20 px-6 py-24 bg-connection-bg/30">
+                <div className="max-w-4xl mx-auto text-center relative">
+                  <NetworkBackground variant="subtle" className="opacity-30" />
+                  
+                  <h2 className="text-4xl md:text-5xl font-bold text-connection-text mb-6">
+                    Ready to Connect?
+                  </h2>
+                  <p className="text-lg text-connection-muted mb-12 max-w-2xl mx-auto">
+                    Join practices that are already mapping their patient sources and building 
+                    stronger referral networks with data-driven insights.
+                  </p>
+                  
+                  <Button 
+                    size="lg"
+                    onClick={onGetStarted}
+                    className="bg-connection-primary hover:bg-connection-primary/90 text-white px-12 py-6 text-xl shadow-elegant hover:shadow-glow transition-all group rounded-xl"
+                  >
+                    Map Your Network
+                    <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-1 transition-transform" />
+                  </Button>
+                </div>
+              </section>
+            </>
+          )}
         </div>
-      </footer>
+
+        {/* Auth Form Side Panel */}
+        {showAuth && (
+          <div className="w-1/2 flex items-center justify-center p-6 relative">
+            <NetworkBackground variant="subtle" className="opacity-20" />
+            <div className="w-full max-w-md bg-white/90 backdrop-blur-lg rounded-2xl p-8 shadow-xl border border-connection-primary/20 relative z-10">
+              <div className="text-center mb-8">
+                <div className="flex items-center justify-center space-x-3 mb-4">
+                  <Activity size={24} className="text-connection-primary" />
+                  <span className="text-xl font-semibold text-connection-text">Welcome Back</span>
+                </div>
+                <p className="text-connection-muted">Connect to your patient flow dashboard</p>
+              </div>
+              <AuthForm />
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
