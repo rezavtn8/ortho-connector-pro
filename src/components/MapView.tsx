@@ -190,13 +190,20 @@ export function MapView({
             mapRef.current.innerHTML = `
               <div class="flex items-center justify-center h-full bg-muted rounded-lg border">
                 <div class="text-center p-6">
-                  <MapPin class="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <h3 class="text-lg font-medium mb-2">Map Unavailable</h3>
-                  <p class="text-sm text-muted-foreground mb-4">Unable to load map. Please check Mapbox configuration.</p>
+                  <div class="h-12 w-12 mx-auto mb-4 text-muted-foreground">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                    </svg>
+                  </div>
+                  <h3 class="text-lg font-medium mb-2">Map Loading...</h3>
+                  <p class="text-sm text-muted-foreground mb-4">
+                    Setting up interactive map with your clinic and referring offices.
+                  </p>
                   ${clinic ? `
-                    <div class="text-xs text-muted-foreground">
-                      <div class="font-medium">${clinic.name}</div>
+                    <div class="text-xs text-muted-foreground space-y-1">
+                      <div class="font-medium text-primary">${clinic.name}</div>
                       <div>${clinic.address}</div>
+                      <div class="mt-2 text-blue-600">📍 ${offices.length} referring offices with locations</div>
                     </div>
                   ` : ''}
                 </div>
