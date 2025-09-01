@@ -381,7 +381,7 @@ export type Database = {
       user_profiles: {
         Row: {
           clinic_address: string | null
-          clinic_id: string
+          clinic_id: string | null
           clinic_latitude: number | null
           clinic_longitude: number | null
           clinic_name: string | null
@@ -395,7 +395,7 @@ export type Database = {
         }
         Insert: {
           clinic_address?: string | null
-          clinic_id: string
+          clinic_id?: string | null
           clinic_latitude?: number | null
           clinic_longitude?: number | null
           clinic_name?: string | null
@@ -409,7 +409,7 @@ export type Database = {
         }
         Update: {
           clinic_address?: string | null
-          clinic_id?: string
+          clinic_id?: string | null
           clinic_latitude?: number | null
           clinic_longitude?: number | null
           clinic_name?: string | null
