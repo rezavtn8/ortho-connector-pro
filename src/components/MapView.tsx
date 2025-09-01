@@ -185,7 +185,24 @@ export function MapView({
         
         if (error || !data?.token) {
           console.error('Error getting Mapbox token:', error);
-          // Fallback to a default token or show error
+          // Show error message instead of failing silently
+          if (mapRef.current) {
+            mapRef.current.innerHTML = `
+              <div class="flex items-center justify-center h-full bg-muted rounded-lg border">
+                <div class="text-center p-6">
+                  <MapPin class="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <h3 class="text-lg font-medium mb-2">Map Unavailable</h3>
+                  <p class="text-sm text-muted-foreground mb-4">Unable to load map. Please check Mapbox configuration.</p>
+                  ${clinic ? `
+                    <div class="text-xs text-muted-foreground">
+                      <div class="font-medium">${clinic.name}</div>
+                      <div>${clinic.address}</div>
+                    </div>
+                  ` : ''}
+                </div>
+              </div>
+            `;
+          }
           return;
         }
 
