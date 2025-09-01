@@ -2,7 +2,6 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { AuthForm } from './AuthForm';
-import { PatientSourceGraph } from './PatientSourceGraph';
 import { Activity, TrendingUp, Users, Search, ArrowRight, CheckCircle, Globe, MessageSquare, MapPin } from 'lucide-react';
 
 interface LandingPageProps {
@@ -87,29 +86,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
           
           {!showAuth && (
             <>
-              {/* Patient Source Graph Section */}
-              <section className="px-6 py-16">
-                <div className="max-w-5xl mx-auto">
-                  <div className="text-center mb-12">
-                    <h2 className="text-3xl md:text-4xl font-bold text-connection-text mb-4">
-                      Visualize Your Patient Network
-                    </h2>
-                    <p className="text-lg text-connection-muted max-w-2xl mx-auto">
-                      See the real-time flow of patients to your practice. Each connection represents a source bringing patients to your door.
-                    </p>
-                  </div>
-                  
-                  <PatientSourceGraph className="mx-auto" />
-                  
-                  {/* Interactive callout */}
-                  <div className="mt-8 text-center">
-                    <p className="text-sm text-connection-muted/80 italic">
-                      💡 Hover over any source to see its connection
-                    </p>
-                  </div>
-                </div>
-              </section>
-
               {/* Features Section */}
               <section className="px-6 py-24 bg-white/60 backdrop-blur-sm">
                 <div className="max-w-6xl mx-auto">
