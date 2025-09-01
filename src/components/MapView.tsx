@@ -174,38 +174,62 @@ export function MapView({
     loadData();
   }, []);
 
-  // Initialize Mapbox map
+  // Filter offices based on current filter state
+  const getFilteredOffices = () => {
+    return offices.filter(office => {
+      // Filter by strength
+      if (!filters.strength.includes(office.strength)) return false;
+      
+      // Filter by last referral date
+      if (office.lastReferralDate) {
+        const lastReferral = new Date(office.lastReferralDate + '-01');
+        const daysSince = (Date.now() - lastReferral.getTime()) / (1000 * 60 * 60 * 24);
+        if (daysSince > filters.lastReferralDays) return false;
+      } else if (filters.lastReferralDays < 365) {
+        return false; // No referrals ever, but filter requires recent referrals
+      }
+      
+      // Filter by treatment types (if any selected)
+      if (filters.treatmentTypes.length > 0) {
+        const hasMatchingTreatment = filters.treatmentTypes.some(type => 
+          office.treatmentTypes.includes(type)
+        );
+        if (!hasMatchingTreatment) return false;
+      }
+      
+      return true;
+    });
+  };
+
+  // Initialize map with fallback to Google Maps
   useEffect(() => {
     if (!mapRef.current || isLoading) return;
 
     const initMap = async () => {
       try {
-        // Get Mapbox token from Supabase secrets
+        // Try Mapbox first, but fallback to Google Maps if it fails
         const { data, error } = await supabase.functions.invoke('get-mapbox-token');
         
         if (error || !data?.token) {
-          console.error('Error getting Mapbox token:', error);
-          // Show error message instead of failing silently
-          if (mapRef.current) {
+          console.log('Mapbox unavailable, using Google Maps fallback');
+          // Fallback to Google Maps iframe
+          if (mapRef.current && clinic) {
+            const filteredOffices = getFilteredOffices();
             mapRef.current.innerHTML = `
-              <div class="flex items-center justify-center h-full bg-muted rounded-lg border">
-                <div class="text-center p-6">
-                  <div class="h-12 w-12 mx-auto mb-4 text-muted-foreground">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                    </svg>
+              <div class="h-full flex flex-col">
+                <div class="flex-1 relative">
+                  <iframe
+                    class="w-full h-full rounded-lg"
+                    loading="lazy"
+                    allowFullScreen
+                    referrerPolicy="no-referrer-when-downgrade"
+                    src="https://www.google.com/maps/embed/v1/place?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}&q=${clinic.latitude},${clinic.longitude}&zoom=12&maptype=roadmap"
+                    title="Clinic and Referring Offices Map"
+                  ></iframe>
+                  <div class="absolute top-4 right-4 bg-white/90 backdrop-blur p-3 rounded-lg shadow-lg">
+                    <div class="text-sm font-medium text-primary">${clinic.name}</div>
+                    <div class="text-xs text-muted-foreground">${filteredOffices.length} referring offices</div>
                   </div>
-                  <h3 class="text-lg font-medium mb-2">Map Loading...</h3>
-                  <p class="text-sm text-muted-foreground mb-4">
-                    Setting up interactive map with your clinic and referring offices.
-                  </p>
-                  ${clinic ? `
-                    <div class="text-xs text-muted-foreground space-y-1">
-                      <div class="font-medium text-primary">${clinic.name}</div>
-                      <div>${clinic.address}</div>
-                      <div class="mt-2 text-blue-600">📍 ${offices.length} referring offices with locations</div>
-                    </div>
-                  ` : ''}
                 </div>
               </div>
             `;
@@ -377,33 +401,6 @@ export function MapView({
     });
 
     return el;
-  };
-
-  // Filter offices based on current filter state
-  const getFilteredOffices = () => {
-    return offices.filter(office => {
-      // Filter by strength
-      if (!filters.strength.includes(office.strength)) return false;
-      
-      // Filter by last referral date
-      if (office.lastReferralDate) {
-        const lastReferral = new Date(office.lastReferralDate + '-01');
-        const daysSince = (Date.now() - lastReferral.getTime()) / (1000 * 60 * 60 * 24);
-        if (daysSince > filters.lastReferralDays) return false;
-      } else if (filters.lastReferralDays < 365) {
-        return false; // No referrals ever, but filter requires recent referrals
-      }
-      
-      // Filter by treatment types (if any selected)
-      if (filters.treatmentTypes.length > 0) {
-        const hasMatchingTreatment = filters.treatmentTypes.some(type => 
-          office.treatmentTypes.includes(type)
-        );
-        if (!hasMatchingTreatment) return false;
-      }
-      
-      return true;
-    });
   };
 
   // Update markers when filters change
