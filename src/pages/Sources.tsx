@@ -331,6 +331,7 @@ export function Sources() {
                 </TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Type</TableHead>
+                <TableHead className="text-center">Google Rating</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-center">This Month</TableHead>
                 <TableHead className="text-center">Total</TableHead>
@@ -399,6 +400,16 @@ export function Sources() {
                           <span>{config.icon}</span>
                           <span className="text-sm">{config.label}</span>
                         </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {source.google_rating ? (
+                        <div className="flex items-center justify-center gap-1">
+                          <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                          <span className="font-medium">{source.google_rating}</span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">—</span>
                       )}
                     </TableCell>
                     <TableCell>

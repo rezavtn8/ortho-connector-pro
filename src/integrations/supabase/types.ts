@@ -233,51 +233,69 @@ export type Database = {
           clinic_id: string | null
           created_at: string | null
           created_by: string
+          distance_miles: number | null
           email: string | null
+          google_place_id: string | null
+          google_rating: number | null
           id: string
           is_active: boolean | null
+          last_updated_from_google: string | null
           latitude: number | null
           longitude: number | null
           name: string
           notes: string | null
+          opening_hours: string | null
           phone: string | null
           source_type: Database["public"]["Enums"]["source_type"]
           updated_at: string | null
           website: string | null
+          yelp_rating: number | null
         }
         Insert: {
           address?: string | null
           clinic_id?: string | null
           created_at?: string | null
           created_by: string
+          distance_miles?: number | null
           email?: string | null
+          google_place_id?: string | null
+          google_rating?: number | null
           id?: string
           is_active?: boolean | null
+          last_updated_from_google?: string | null
           latitude?: number | null
           longitude?: number | null
           name: string
           notes?: string | null
+          opening_hours?: string | null
           phone?: string | null
           source_type: Database["public"]["Enums"]["source_type"]
           updated_at?: string | null
           website?: string | null
+          yelp_rating?: number | null
         }
         Update: {
           address?: string | null
           clinic_id?: string | null
           created_at?: string | null
           created_by?: string
+          distance_miles?: number | null
           email?: string | null
+          google_place_id?: string | null
+          google_rating?: number | null
           id?: string
           is_active?: boolean | null
+          last_updated_from_google?: string | null
           latitude?: number | null
           longitude?: number | null
           name?: string
           notes?: string | null
+          opening_hours?: string | null
           phone?: string | null
           source_type?: Database["public"]["Enums"]["source_type"]
           updated_at?: string | null
           website?: string | null
+          yelp_rating?: number | null
         }
         Relationships: [
           {

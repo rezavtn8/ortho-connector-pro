@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { Check, ChevronsUpDown, MapPin } from "lucide-react";
+import { Check, ChevronsUpDown, MapPin, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader } from '@googlemaps/js-api-loader';
@@ -318,13 +318,17 @@ export function AddressSearch({ value, onSelect, placeholder = "Search offices..
                     value={place.description}
                     onSelect={() => handleGooglePlaceSelect(place)}
                   >
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-blue-500" />
-                      <div>
-                        <div className="font-medium">{place.structured_formatting.main_text}</div>
-                        <div className="text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2 w-full">
+                      <MapPin className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{place.structured_formatting.main_text}</div>
+                        <div className="text-sm text-muted-foreground truncate">
                           {place.structured_formatting.secondary_text}
                         </div>
+                      </div>
+                      <div className="flex items-center gap-1 text-blue-500 text-xs">
+                        <Star className="w-3 h-3" />
+                        <span>Google</span>
                       </div>
                     </div>
                   </CommandItem>

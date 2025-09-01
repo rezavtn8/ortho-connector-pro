@@ -136,8 +136,50 @@ export const AddOfficeDialog: React.FC<AddOfficeDialogProps> = ({ onOfficeAdded 
         sourceData.address = selectedOffice.address;
         sourceData.latitude = selectedOffice.latitude;
         sourceData.longitude = selectedOffice.longitude;
+        
+        // Add Google-specific data if available
+        if (selectedOffice.google_rating) {
+          sourceData.google_rating = selectedOffice.google_rating;
+        }
+        if (selectedOffice.google_place_id) {
+          sourceData.google_place_id = selectedOffice.google_place_id;
+          sourceData.last_updated_from_google = new Date().toISOString();
+        }
+        if (selectedOffice.opening_hours) {
+          sourceData.opening_hours = selectedOffice.opening_hours;
+        }
+        // Override phone and website with Google data if available and not manually entered
+        if (selectedOffice.phone && !formData.phone.trim()) {
+          sourceData.phone = selectedOffice.phone;
+        }
+        if (selectedOffice.website && !formData.website.trim()) {
+          sourceData.website = selectedOffice.website;
+        }
       } else {
         sourceData.address = formData.address.trim() || null;
+      }
+
+      // Check for existing office with same Google Place ID to prevent duplicates
+      if (selectedOffice?.google_place_id) {
+        const { data: existingOffice, error: checkError } = await supabase
+          .from('patient_sources')
+          .select('id, name')
+          .eq('google_place_id', selectedOffice.google_place_id)
+          .eq('created_by', (await supabase.auth.getUser()).data.user?.id)
+          .maybeSingle();
+
+        if (checkError && checkError.code !== 'PGRST116') {
+          throw checkError;
+        }
+
+        if (existingOffice) {
+          toast({
+            title: "Duplicate Office",
+            description: `${existingOffice.name} already exists in your sources.`,
+            variant: "destructive",
+          });
+          return;
+        }
       }
 
       const { data, error } = await supabase
@@ -283,18 +325,56 @@ export const AddOfficeDialog: React.FC<AddOfficeDialogProps> = ({ onOfficeAdded 
                         setFormData(prev => ({ 
                           ...prev, 
                           name: office.name,
-                          address: office.address || ''
+                          address: office.address || '',
+                          // Populate phone and website from Google data if available and not already filled
+                          phone: office.phone && !prev.phone ? office.phone : prev.phone,
+                          website: office.website && !prev.website ? office.website : prev.website,
                         }));
                       }
                     }}
                     placeholder="Search for office address..."
                   />
                   {selectedOffice && (
-                    <div className="p-2 bg-muted rounded-md text-sm">
-                      <div className="font-medium">{selectedOffice.name}</div>
-                      {selectedOffice.address && (
-                        <div className="text-muted-foreground">{selectedOffice.address}</div>
-                      )}
+                    <div className="p-3 bg-muted/50 rounded-md border">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="font-medium flex items-center gap-2">
+                            {selectedOffice.name}
+                            {selectedOffice.google_rating && (
+                              <div className="flex items-center gap-1 text-amber-600">
+                                <Star className="w-4 h-4 fill-current" />
+                                <span className="text-sm font-medium">{selectedOffice.google_rating}</span>
+                              </div>
+                            )}
+                          </div>
+                          {selectedOffice.address && (
+                            <div className="text-muted-foreground text-sm mt-1">{selectedOffice.address}</div>
+                          )}
+                          {selectedOffice.phone && (
+                            <div className="text-muted-foreground text-sm flex items-center gap-1 mt-1">
+                              <Phone className="w-3 h-3" />
+                              {selectedOffice.phone}
+                            </div>
+                          )}
+                          {selectedOffice.website && (
+                            <div className="text-muted-foreground text-sm flex items-center gap-1 mt-1">
+                              <Globe className="w-3 h-3" />
+                              <span className="truncate">{selectedOffice.website}</span>
+                            </div>
+                          )}
+                          {selectedOffice.opening_hours && (
+                            <div className="text-muted-foreground text-xs mt-2 max-w-full">
+                              <Clock className="w-3 h-3 inline mr-1" />
+                              <span className="truncate">{selectedOffice.opening_hours.split(';').slice(0, 2).join(', ')}...</span>
+                            </div>
+                          )}
+                        </div>
+                        {selectedOffice.google_place_id && (
+                          <Badge variant="secondary" className="text-xs">
+                            Google
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

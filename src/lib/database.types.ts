@@ -67,6 +67,12 @@ export interface PatientSource {
   notes?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  google_rating?: number | null;
+  google_place_id?: string | null;
+  opening_hours?: string | null;
+  yelp_rating?: number | null;
+  distance_miles?: number | null;
+  last_updated_from_google?: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
