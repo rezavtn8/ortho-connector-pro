@@ -113,11 +113,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                       Visualize Your Patient Network
                     </h2>
                     <p className="text-lg text-connection-muted max-w-2xl mx-auto">
-                      See how patients flow to your practice from every source — from Google searches to professional referrals.
+                      See how patients flow to your practice from every source — from Google searches to professional referrals. Click or hover any source to highlight its connection.
                     </p>
                   </div>
                   
                   <PatientSourceGraph className="mx-auto" />
+                  
+                  {/* Interactive callout */}
+                  <div className="mt-8 text-center">
+                    <p className="text-sm text-connection-muted/80 italic">
+                      💡 Try hovering over any source above to see its connection light up
+                    </p>
+                  </div>
                 </div>
               </section>
 

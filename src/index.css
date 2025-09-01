@@ -249,6 +249,41 @@ All colors MUST be HSL.
     50% { transform: translateY(-10px); }
   }
 
+  @keyframes pulse-intense {
+    0%, 100% {
+      opacity: 0.8;
+      stroke-width: 2;
+    }
+    50% {
+      opacity: 1;
+      stroke-width: 3;
+    }
+  }
+
+  @keyframes ping-intense {
+    75%, 100% {
+      transform: scale(2.5);
+      opacity: 0;
+    }
+  }
+
+  @keyframes travel-line {
+    0% {
+      transform: translateX(0%) translateY(0%);
+      opacity: 0;
+    }
+    10% {
+      opacity: 1;
+    }
+    90% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(calc(var(--travel-x, 50px))) translateY(calc(var(--travel-y, 50px)));
+      opacity: 0;
+    }
+  }
+
   .animate-flow {
     animation: flow 2s ease-in-out infinite;
   }
@@ -289,7 +324,39 @@ All colors MUST be HSL.
     animation: float 4s ease-in-out infinite;
   }
 
+  /* Enhanced animations for interactivity */
+  .animate-pulse-intense {
+    animation: pulse-intense 1.5s ease-in-out infinite;
+  }
+
+  .animate-ping-intense {
+    animation: ping-intense 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+
+  .animate-travel-line {
+    animation: travel-line 3s ease-in-out infinite;
+  }
+
   .hover-glow:hover {
     animation: glow 0.3s ease-in-out;
+  }
+
+  /* Performance & Accessibility - Respect user preferences */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-pulse-line,
+    .animate-pulse-intense,
+    .animate-ping-intense,
+    .animate-travel-line,
+    .animate-float,
+    .animate-pulse-glow,
+    .animate-pulse-dot {
+      animation: none;
+    }
+    
+    .group:hover .group-hover\\:scale-110,
+    .hover\\:scale-110,
+    .hover\\:scale-125 {
+      transform: none;
+    }
   }
 }

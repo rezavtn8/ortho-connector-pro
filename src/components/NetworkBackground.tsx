@@ -14,10 +14,26 @@ export const NetworkBackground: React.FC<NetworkBackgroundProps> = ({
   if (variant === 'hero') {
     return (
       <div className={`absolute inset-0 overflow-hidden pointer-events-none ${className}`}>
-        {/* Gradient backgrounds for tech interface feel */}
-        <div className="absolute top-0 left-0 w-32 h-32 bg-gradient-to-br from-connection-primary/5 to-transparent rounded-full blur-3xl" />
-        <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-bl from-connection-primary/3 to-transparent rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-36 h-36 bg-gradient-to-tr from-connection-primary/4 to-transparent rounded-full blur-3xl" />
+        {/* Enhanced gradient backgrounds with subtle movement */}
+        <div className="absolute top-0 left-0 w-32 h-32 bg-gradient-to-br from-connection-primary/5 to-transparent rounded-full blur-3xl animate-float" style={{ animationDelay: '0s', animationDuration: '8s' }} />
+        <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-bl from-connection-primary/3 to-transparent rounded-full blur-3xl animate-float" style={{ animationDelay: '2s', animationDuration: '10s' }} />
+        <div className="absolute bottom-0 left-0 w-36 h-36 bg-gradient-to-tr from-connection-primary/4 to-transparent rounded-full blur-3xl animate-float" style={{ animationDelay: '4s', animationDuration: '12s' }} />
+        
+        {/* Subtle data flow particles along circuit lines */}
+        <div className="absolute inset-0">
+          {[...Array(8)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute w-0.5 h-0.5 bg-connection-primary/40 rounded-full animate-travel-line"
+              style={{
+                left: `${10 + (i * 10)}%`,
+                top: `${15 + (i * 8)}%`,
+                animationDelay: `${i * 1.5}s`,
+                animationDuration: '6s'
+              }}
+            />
+          ))}
+        </div>
         
         {/* Circuit-style corner connections with glow */}
         
