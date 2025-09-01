@@ -24,6 +24,13 @@ export default {
 				ring: 'hsl(var(--ring))',
 				background: 'hsl(var(--background))',
 				foreground: 'hsl(var(--foreground))',
+				sage: {
+					light: 'hsl(var(--sage-light))',
+					medium: 'hsl(var(--sage-medium))',
+					dark: 'hsl(var(--sage-dark))'
+				},
+				leaf: 'hsl(var(--leaf-green))',
+				vine: 'hsl(var(--vine-brown))',
 				primary: {
 					DEFAULT: 'hsl(var(--primary))',
 					foreground: 'hsl(var(--primary-foreground))',
@@ -90,7 +97,8 @@ export default {
 			backgroundImage: {
 				'gradient-primary': 'var(--gradient-primary)',
 				'gradient-card': 'var(--gradient-card)',
-				'gradient-subtle': 'var(--gradient-subtle)'
+				'gradient-subtle': 'var(--gradient-subtle)',
+				'gradient-vine': 'var(--gradient-vine)'
 			},
 			boxShadow: {
 				'elegant': 'var(--shadow-elegant)',
@@ -117,11 +125,38 @@ export default {
 					to: {
 						height: '0'
 					}
+				},
+				'vine-grow': {
+					'0%': {
+						strokeDasharray: '0 1000'
+					},
+					'100%': {
+						strokeDasharray: '1000 0'
+					}
+				},
+				'leaf-sway': {
+					'0%, 100%': {
+						transform: 'rotate(0deg)'
+					},
+					'50%': {
+						transform: 'rotate(5deg)'
+					}
+				},
+				'float': {
+					'0%, 100%': {
+						transform: 'translateY(0px)'
+					},
+					'50%': {
+						transform: 'translateY(-10px)'
+					}
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'vine-grow': 'vine-grow 3s ease-in-out infinite',
+				'leaf-sway': 'leaf-sway 4s ease-in-out infinite',
+				'float': 'float 6s ease-in-out infinite'
 			}
 		}
 	},

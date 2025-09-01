@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { AuthForm } from '@/components/AuthForm';
 import { Layout } from '@/components/Layout';
+import { LandingPage } from '@/components/LandingPage';
 import { Dashboard } from '@/pages/Dashboard';
 import { Sources } from '@/pages/Sources';
 import { MarketingVisits } from '@/pages/MarketingVisits';
@@ -15,6 +16,7 @@ const Index = () => {
   const { user, loading } = useAuth();
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
+  const [showAuth, setShowAuth] = useState(false);
 
   if (loading) {
     return (
@@ -28,7 +30,10 @@ const Index = () => {
   }
 
   if (!user) {
-    return <AuthForm />;
+    if (showAuth) {
+      return <AuthForm />;
+    }
+    return <LandingPage onGetStarted={() => setShowAuth(true)} />;
   }
 
   const renderPage = () => {
