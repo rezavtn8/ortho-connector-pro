@@ -13,6 +13,11 @@ interface Office {
   address?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  google_rating?: number | null;
+  google_place_id?: string | null;
+  phone?: string | null;
+  website?: string | null;
+  opening_hours?: string | null;
 }
 
 interface GooglePlaceResult {
@@ -21,6 +26,24 @@ interface GooglePlaceResult {
   structured_formatting: {
     main_text: string;
     secondary_text: string;
+  };
+}
+
+interface GooglePlaceDetails {
+  place_id: string;
+  name: string;
+  formatted_address: string;
+  geometry: {
+    location: {
+      lat: () => number;
+      lng: () => number;
+    };
+  };
+  rating?: number;
+  formatted_phone_number?: string;
+  website?: string;
+  opening_hours?: {
+    weekday_text: string[];
   };
 }
 
@@ -38,6 +61,7 @@ export function AddressSearch({ value, onSelect, placeholder = "Search offices..
   const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
   const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
   const geocoder = useRef<google.maps.Geocoder | null>(null);
+  const placesService = useRef<google.maps.places.PlacesService | null>(null);
 
   // Initialize Google Maps services
   useEffect(() => {
@@ -57,6 +81,12 @@ export function AddressSearch({ value, onSelect, placeholder = "Search offices..
 
         await loader.load();
         geocoder.current = new google.maps.Geocoder();
+        
+        // Create a dummy map element for PlacesService
+        const mapDiv = document.createElement('div');
+        const map = new google.maps.Map(mapDiv);
+        placesService.current = new google.maps.places.PlacesService(map);
+        
         setGoogleMapsLoaded(true);
       } catch (error) {
         console.error('Error loading Google Maps:', error);
@@ -127,35 +157,88 @@ export function AddressSearch({ value, onSelect, placeholder = "Search offices..
   );
 
   const handleGooglePlaceSelect = async (place: GooglePlaceResult) => {
-    if (!geocoder.current) return;
+    if (!placesService.current) return;
 
     try {
-      const results = await new Promise<google.maps.GeocoderResult[]>((resolve, reject) => {
-        geocoder.current!.geocode({ placeId: place.place_id }, (results, status) => {
-          if (status === 'OK' && results) {
-            resolve(results);
+      setIsLoadingGoogle(true);
+      
+      // First get place details to fetch rating and other information
+      const placeDetails = await new Promise<GooglePlaceDetails>((resolve, reject) => {
+        const request = {
+          placeId: place.place_id,
+          fields: [
+            'name', 
+            'formatted_address', 
+            'geometry', 
+            'rating', 
+            'formatted_phone_number', 
+            'website', 
+            'opening_hours'
+          ]
+        };
+
+        placesService.current!.getDetails(request, (result, status) => {
+          if (status === google.maps.places.PlacesServiceStatus.OK && result) {
+            resolve(result as GooglePlaceDetails);
           } else {
-            reject(new Error('Geocoding failed'));
+            reject(new Error('Place details fetch failed'));
           }
         });
       });
 
-      const result = results[0];
-      const location = result.geometry.location;
+      const location = placeDetails.geometry.location;
       
       const newOffice: Office = {
-        id: 'new-' + Date.now(), // Temporary ID for new places
-        name: place.structured_formatting.main_text,
-        address: result.formatted_address,
+        id: `google-${place.place_id}`, // Use Google place ID to avoid duplicates
+        name: placeDetails.name,
+        address: placeDetails.formatted_address,
         latitude: location.lat(),
-        longitude: location.lng()
+        longitude: location.lng(),
+        google_rating: placeDetails.rating || null,
+        google_place_id: place.place_id,
+        phone: placeDetails.formatted_phone_number || null,
+        website: placeDetails.website || null,
+        opening_hours: placeDetails.opening_hours?.weekday_text.join('; ') || null
       };
 
+      console.log('Selected Google Place:', newOffice);
       onSelect(newOffice);
       setSearchValue(newOffice.name);
       setOpen(false);
     } catch (error) {
-      console.error('Error geocoding place:', error);
+      console.error('Error fetching Google place details:', error);
+      // Fallback to basic geocoding if place details fail
+      try {
+        const results = await new Promise<google.maps.GeocoderResult[]>((resolve, reject) => {
+          geocoder.current!.geocode({ placeId: place.place_id }, (results, status) => {
+            if (status === 'OK' && results) {
+              resolve(results);
+            } else {
+              reject(new Error('Geocoding failed'));
+            }
+          });
+        });
+
+        const result = results[0];
+        const location = result.geometry.location;
+        
+        const newOffice: Office = {
+          id: `google-${place.place_id}`,
+          name: place.structured_formatting.main_text,
+          address: result.formatted_address,
+          latitude: location.lat(),
+          longitude: location.lng(),
+          google_place_id: place.place_id
+        };
+
+        onSelect(newOffice);
+        setSearchValue(newOffice.name);
+        setOpen(false);
+      } catch (fallbackError) {
+        console.error('Error with fallback geocoding:', fallbackError);
+      }
+    } finally {
+      setIsLoadingGoogle(false);
     }
   };
 
