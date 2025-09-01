@@ -34,14 +34,27 @@ export const ConnectionLine: React.FC<ConnectionLineProps> = ({
       <path
         d={pathData}
         stroke="hsl(var(--connection-primary))"
-        strokeWidth="0.5"
+        strokeWidth="0.8"
         fill="none"
-        className={`opacity-60 ${animated ? 'animate-draw-line hover-glow' : ''}`}
+        className={`opacity-70 ${animated ? 'animate-draw-line' : ''}`}
         style={{ 
           animationDelay: `${delay}s`,
           strokeDasharray: animated ? '100' : 'none'
         }}
       />
+      {/* Traveling pulse effect */}
+      {animated && (
+        <circle
+          r="1.5"
+          fill="hsl(var(--connection-primary))"
+          className="opacity-80 animate-travel-pulse"
+          style={{ animationDelay: `${delay + 2}s` }}
+        >
+          <animateMotion dur="6s" repeatCount="indefinite" begin={`${delay + 2}s`}>
+            <mpath href={`#path-${Math.random()}`} />
+          </animateMotion>
+        </circle>
+      )}
     </svg>
   );
 };

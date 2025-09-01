@@ -33,8 +33,8 @@ export const ConnectionDot: React.FC<ConnectionDotProps> = ({
     >
       <div 
         className={`w-full h-full bg-connection-primary rounded-full ${
-          animated ? 'animate-pulse-dot hover:animate-glow' : ''
-        } cursor-pointer transition-all duration-300 hover:scale-125 hover:bg-connection-secondary`}
+          animated ? 'animate-pulse-dot animate-pulse-glow' : ''
+        } cursor-pointer transition-all duration-300 hover:scale-125 hover:animate-glow hover:bg-connection-secondary`}
         style={{ animationDelay: `${delay}s` }}
       />
       {label && (
