@@ -1,11 +1,10 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { VineDecoration } from './VineDecoration';
-import { LeafIcon } from './LeafIcon';
-import { HeroVineFrame } from './HeroVineFrame';
+import { NetworkBackground } from './NetworkBackground';
+import { ConnectionDot } from './ConnectionDot';
 import { AuthForm } from './AuthForm';
-import { Network, TrendingUp, Users, Target, ArrowRight, CheckCircle } from 'lucide-react';
+import { Activity, TrendingUp, Users, Search, ArrowRight, CheckCircle, Globe, MessageSquare, MapPin } from 'lucide-react';
 
 interface LandingPageProps {
   onGetStarted: () => void;
@@ -15,49 +14,54 @@ interface LandingPageProps {
 export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth = false }) => {
   const features = [
     {
-      icon: <Target className="w-8 h-8" />,
-      title: "Track Referrals",
-      description: "Monitor monthly office referrals with precision and identify your strongest professional connections."
+      icon: <Activity className="w-8 h-8" />,
+      title: "Patient Source Tracking",
+      description: "Google, Yelp, Word-of-mouth, Referring offices — track every patient's journey to your practice."
     },
     {
       icon: <TrendingUp className="w-8 h-8" />,
-      title: "Measure Patient Sources", 
-      description: "See what drives Google, Yelp, and walk-ins to understand your marketing effectiveness."
-    },
-    {
-      icon: <Network className="w-8 h-8" />,
-      title: "Visualize Growth",
-      description: "Map your network and see it flourish over time with beautiful, intuitive analytics."
+      title: "Monthly Trends", 
+      description: "Understand what's working and what's not with clear analytics and trend visualization."
     },
     {
       icon: <Users className="w-8 h-8" />,
-      title: "Strengthen Connections",
-      description: "Follow up and grow your most valuable relationships with automated insights and reminders."
+      title: "Outreach Tools",
+      description: "Stay in touch with key sources and nurture your most valuable professional relationships."
+    },
+    {
+      icon: <Search className="w-8 h-8" />,
+      title: "Visual Dashboard",
+      description: "See the full network in one view with interactive maps and connection insights."
     }
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white via-sage-light/20 to-sage-light/40 relative overflow-hidden">
-      {/* Minimal decorative elements for non-auth view */}
+    <div className="min-h-screen bg-gradient-connection relative overflow-hidden">
+      {/* Network background for non-auth view */}
       {!showAuth && (
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-0 left-0 w-32 h-32 bg-leaf/5 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-0 right-0 w-48 h-48 bg-sage-medium/10 rounded-full blur-3xl"></div>
-        </div>
+        <NetworkBackground variant="subtle" className="opacity-30" />
       )}
       
       {/* Header */}
       <header className="relative z-20 px-6 pt-8">
         <nav className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <LeafIcon size={32} className="text-leaf" />
-            <span className="text-2xl font-bold text-sage-dark">GrowthVine</span>
+          <div className="flex items-center space-x-3">
+            <div className="relative">
+              <Activity size={32} className="text-connection-primary" />
+              <ConnectionDot 
+                position={{ x: 80, y: 20 }} 
+                size="sm" 
+                className="absolute"
+                animated={false}
+              />
+            </div>
+            <span className="text-2xl font-bold text-connection-text">PatientFlow</span>
           </div>
           {!showAuth && (
             <Button 
               variant="outline" 
               onClick={onGetStarted}
-              className="border-sage-medium/50 text-sage-dark hover:bg-sage-light/50 backdrop-blur-sm"
+              className="border-connection-primary/30 text-connection-text hover:bg-connection-primary/10 backdrop-blur-sm"
             >
               Sign In
             </Button>
@@ -71,16 +75,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
           {/* Hero Section */}
           <section className={`${showAuth ? 'px-0' : 'px-6'} pt-20 pb-24`}>
             <div className="max-w-4xl mx-auto text-center relative">
-              {/* Subtle vine frame only for non-auth */}
-              {!showAuth && <HeroVineFrame />}
+              {/* Network background for hero */}
+              {!showAuth && <NetworkBackground variant="hero" className="opacity-40" />}
               
-              <h1 className="relative z-10 text-5xl md:text-6xl font-bold text-sage-dark mb-6 leading-tight">
-                Grow with
-                <span className="block text-leaf font-light italic">Intention.</span>
+              <h1 className="relative z-10 text-5xl md:text-6xl font-bold text-connection-text mb-6 leading-tight">
+                Track the Source.
+                <span className="block text-connection-primary font-light">Understand the Growth.</span>
               </h1>
               
-              <p className="relative z-10 text-lg md:text-xl text-sage-dark/70 mb-12 max-w-2xl mx-auto leading-relaxed">
-                Track the sources behind every patient. Nurture the network that grows your practice.
+              <p className="relative z-10 text-lg md:text-xl text-connection-muted mb-12 max-w-3xl mx-auto leading-relaxed">
+                Every patient has a path — visualize where they came from and optimize what brings them to your practice.
               </p>
               
               {!showAuth && (
@@ -88,9 +92,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                   <Button 
                     size="lg"
                     onClick={onGetStarted}
-                    className="bg-leaf hover:bg-leaf/90 text-white px-8 py-4 text-lg rounded-full shadow-lg hover:shadow-xl transition-all group"
+                    className="bg-connection-primary hover:bg-connection-primary/90 text-white px-8 py-4 text-lg rounded-xl shadow-elegant hover:shadow-glow transition-all group"
                   >
-                    Explore the Network
+                    Explore Patient Flow
                     <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </div>
@@ -101,29 +105,37 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
           {!showAuth && (
             <>
               {/* Features Section */}
-              <section className="relative z-20 px-6 py-24 bg-white/50 backdrop-blur-sm">
-                <div className="max-w-6xl mx-auto">
+              <section className="relative z-20 px-6 py-24 bg-white/60 backdrop-blur-sm">
+                <div className="max-w-6xl mx-auto relative">
+                  {/* Network connections between features */}
+                  <NetworkBackground variant="features" className="opacity-20" />
+                  
                   <div className="text-center mb-16">
-                    <h2 className="text-4xl md:text-5xl font-bold text-sage-dark mb-6">
-                      Your Practice, Naturally Growing
+                    <h2 className="text-4xl md:text-5xl font-bold text-connection-text mb-6">
+                      Connected Intelligence
                     </h2>
-                    <p className="text-lg text-sage-dark/70 max-w-2xl mx-auto">
-                      Like vines that find the best path to sunlight, discover the connections 
-                      that help your practice flourish.
+                    <p className="text-lg text-connection-muted max-w-2xl mx-auto">
+                      Transform scattered patient data into a clear network of sources and connections 
+                      that drive your practice growth.
                     </p>
                   </div>
 
-                  <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+                  <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 relative z-10">
                     {features.map((feature, index) => (
-                      <Card key={index} className="group hover:shadow-elegant transition-all duration-300 border-sage-light/50 hover:border-leaf/30 bg-gradient-card">
-                        <CardContent className="p-8 text-center">
-                          <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-sage-light flex items-center justify-center text-leaf group-hover:bg-leaf group-hover:text-white transition-all duration-300">
+                      <Card key={index} className="group hover:shadow-elegant transition-all duration-300 border-connection-primary/20 hover:border-connection-primary/40 bg-gradient-card relative">
+                        <CardContent className="p-8 text-center relative">
+                          {/* Connection dot overlay */}
+                          <div className="absolute -top-2 -right-2">
+                            <ConnectionDot size="sm" position={{ x: 0, y: 0 }} />
+                          </div>
+                          
+                          <div className="w-16 h-16 mx-auto mb-6 rounded-xl bg-connection-bg flex items-center justify-center text-connection-primary group-hover:bg-connection-primary group-hover:text-white transition-all duration-300 shadow-sm">
                             {feature.icon}
                           </div>
-                          <h3 className="text-xl font-semibold text-sage-dark mb-4">
+                          <h3 className="text-xl font-semibold text-connection-text mb-4">
                             {feature.title}
                           </h3>
-                          <p className="text-sage-dark/70 leading-relaxed">
+                          <p className="text-connection-muted leading-relaxed">
                             {feature.description}
                           </p>
                         </CardContent>
@@ -137,11 +149,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
               <section className="relative z-20 px-6 py-24">
                 <div className="max-w-4xl mx-auto">
                   <div className="text-center mb-16">
-                    <h2 className="text-4xl md:text-5xl font-bold text-sage-dark mb-6">
-                      Cultivate Success
+                    <h2 className="text-4xl md:text-5xl font-bold text-connection-text mb-6">
+                      See the Full Picture
                     </h2>
-                    <p className="text-lg text-sage-dark/70">
-                      Transform scattered data into meaningful insights that drive sustainable practice growth.
+                    <p className="text-lg text-connection-muted">
+                      Transform scattered patient data into meaningful connections and actionable growth insights.
                     </p>
                   </div>
 
@@ -149,32 +161,37 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                     <div>
                       <ul className="space-y-6">
                         <li className="flex items-start space-x-4">
-                          <CheckCircle className="w-6 h-6 text-leaf flex-shrink-0 mt-1" />
+                          <CheckCircle className="w-6 h-6 text-connection-primary flex-shrink-0 mt-1" />
                           <div>
-                            <h4 className="font-semibold text-sage-dark mb-2">Organic Growth Tracking</h4>
-                            <p className="text-sage-dark/70">Watch your referral network expand naturally with clear visualization of connection strength.</p>
+                            <h4 className="font-semibold text-connection-text mb-2">Source Intelligence</h4>
+                            <p className="text-connection-muted">Automatically track and categorize every patient source from Google searches to professional referrals.</p>
                           </div>
                         </li>
                         <li className="flex items-start space-x-4">
-                          <CheckCircle className="w-6 h-6 text-leaf flex-shrink-0 mt-1" />
+                          <CheckCircle className="w-6 h-6 text-connection-primary flex-shrink-0 mt-1" />
                           <div>
-                            <h4 className="font-semibold text-sage-dark mb-2">Intelligent Insights</h4>
-                            <p className="text-sage-dark/70">Discover patterns in patient sources and referral behaviors you never noticed before.</p>
+                            <h4 className="font-semibold text-connection-text mb-2">Connection Mapping</h4>
+                            <p className="text-connection-muted">Visualize your referral network and discover the most valuable relationships driving your growth.</p>
                           </div>
                         </li>
                         <li className="flex items-start space-x-4">
-                          <CheckCircle className="w-6 h-6 text-leaf flex-shrink-0 mt-1" />
+                          <CheckCircle className="w-6 h-6 text-connection-primary flex-shrink-0 mt-1" />
                           <div>
-                            <h4 className="font-semibold text-sage-dark mb-2">Relationship Nurturing</h4>
-                            <p className="text-sage-dark/70">Automated reminders help you maintain and strengthen your most valuable professional connections.</p>
+                            <h4 className="font-semibold text-connection-text mb-2">Smart Outreach</h4>
+                            <p className="text-connection-muted">Get prompted to follow up with key sources and maintain the relationships that matter most.</p>
                           </div>
                         </li>
                       </ul>
                     </div>
                     <div className="relative">
-                      <div className="w-full h-64 bg-sage-light/30 rounded-2xl flex items-center justify-center relative overflow-hidden">
-                        <Network className="w-24 h-24 text-leaf opacity-60" />
-                        <VineDecoration position="right" className="opacity-20 scale-75" />
+                      <div className="w-full h-64 bg-gradient-glow rounded-2xl flex items-center justify-center relative overflow-hidden border border-connection-primary/20">
+                        <div className="relative w-32 h-32">
+                          <Activity className="w-16 h-16 text-connection-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                          <ConnectionDot position={{ x: 20, y: 20 }} label="Google" size="sm" />
+                          <ConnectionDot position={{ x: 80, y: 30 }} label="Yelp" size="sm" />
+                          <ConnectionDot position={{ x: 15, y: 70 }} label="Referrals" size="sm" />
+                          <ConnectionDot position={{ x: 85, y: 80 }} label="Word of Mouth" size="sm" />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -182,43 +199,43 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
               </section>
 
               {/* CTA Section */}
-              <section className="relative z-20 px-6 py-24 bg-sage-light/30">
-                <div className="max-w-4xl mx-auto text-center">
-                  <h2 className="text-4xl md:text-5xl font-bold text-sage-dark mb-6">
-                    Ready to Grow?
+              <section className="relative z-20 px-6 py-24 bg-connection-bg/30">
+                <div className="max-w-4xl mx-auto text-center relative">
+                  <NetworkBackground variant="subtle" className="opacity-30" />
+                  
+                  <h2 className="text-4xl md:text-5xl font-bold text-connection-text mb-6">
+                    Ready to Connect?
                   </h2>
-                  <p className="text-lg text-sage-dark/70 mb-12 max-w-2xl mx-auto">
-                    Join practices that are already seeing organic growth through intelligent 
-                    referral tracking and relationship management.
+                  <p className="text-lg text-connection-muted mb-12 max-w-2xl mx-auto">
+                    Join practices that are already mapping their patient sources and building 
+                    stronger referral networks with data-driven insights.
                   </p>
                   
                   <Button 
                     size="lg"
                     onClick={onGetStarted}
-                    className="bg-leaf hover:bg-leaf/90 text-white px-12 py-6 text-xl shadow-elegant group"
+                    className="bg-connection-primary hover:bg-connection-primary/90 text-white px-12 py-6 text-xl shadow-elegant hover:shadow-glow transition-all group rounded-xl"
                   >
-                    Start Growing Today
+                    Map Your Network
                     <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </div>
               </section>
-
-              {/* Bottom vine decoration */}
-              <VineDecoration position="bottom" className="opacity-20" />
             </>
           )}
         </div>
 
         {/* Auth Form Side Panel */}
         {showAuth && (
-          <div className="w-1/2 flex items-center justify-center p-6">
-            <div className="w-full max-w-md bg-white/80 backdrop-blur-lg rounded-2xl p-8 shadow-xl border border-sage-light/50">
+          <div className="w-1/2 flex items-center justify-center p-6 relative">
+            <NetworkBackground variant="subtle" className="opacity-20" />
+            <div className="w-full max-w-md bg-white/90 backdrop-blur-lg rounded-2xl p-8 shadow-xl border border-connection-primary/20 relative z-10">
               <div className="text-center mb-8">
-                <div className="flex items-center justify-center space-x-2 mb-4">
-                  <LeafIcon size={24} className="text-leaf" />
-                  <span className="text-xl font-semibold text-sage-dark">Welcome Back</span>
+                <div className="flex items-center justify-center space-x-3 mb-4">
+                  <Activity size={24} className="text-connection-primary" />
+                  <span className="text-xl font-semibold text-connection-text">Welcome Back</span>
                 </div>
-                <p className="text-sage-dark/60">Sign in to grow your practice</p>
+                <p className="text-connection-muted">Connect to your patient flow dashboard</p>
               </div>
               <AuthForm />
             </div>

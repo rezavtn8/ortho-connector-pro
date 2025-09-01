@@ -24,17 +24,14 @@ export default {
 				ring: 'hsl(var(--ring))',
 				background: 'hsl(var(--background))',
 				foreground: 'hsl(var(--foreground))',
-				sage: {
-					light: 'hsl(var(--sage-light))',
-					medium: 'hsl(var(--sage-medium))',
-					dark: 'hsl(var(--sage-dark))'
-				},
-				leaf: 'hsl(var(--leaf-green))',
-				vine: 'hsl(var(--vine-brown))',
+				'connection-primary': 'hsl(var(--connection-primary))',
+				'connection-secondary': 'hsl(var(--connection-secondary))', 
+				'connection-bg': 'hsl(var(--connection-bg))',
+				'connection-text': 'hsl(var(--connection-text))',
+				'connection-muted': 'hsl(var(--connection-muted))',
 				primary: {
 					DEFAULT: 'hsl(var(--primary))',
-					foreground: 'hsl(var(--primary-foreground))',
-					glow: 'hsl(var(--primary-glow))'
+					foreground: 'hsl(var(--primary-foreground))'
 				},
 				secondary: {
 					DEFAULT: 'hsl(var(--secondary))',
@@ -95,10 +92,11 @@ export default {
 				sm: 'calc(var(--radius) - 4px)'
 			},
 			backgroundImage: {
-				'gradient-primary': 'var(--gradient-primary)',
+				'gradient-connection': 'var(--gradient-connection)',
 				'gradient-card': 'var(--gradient-card)',
-				'gradient-subtle': 'var(--gradient-subtle)',
-				'gradient-vine': 'var(--gradient-vine)'
+				'gradient-glow': 'var(--gradient-glow)',
+				'gradient-primary': 'var(--gradient-primary)',
+				'gradient-subtle': 'var(--gradient-subtle)'
 			},
 			boxShadow: {
 				'elegant': 'var(--shadow-elegant)',
@@ -126,37 +124,44 @@ export default {
 						height: '0'
 					}
 				},
-				'vine-grow': {
+				'draw-line': {
 					'0%': {
-						strokeDasharray: '0 1000'
+						strokeDashoffset: '1000',
+						opacity: '0'
+					},
+					'50%': {
+						opacity: '0.8'
 					},
 					'100%': {
-						strokeDasharray: '1000 0'
+						strokeDashoffset: '0',
+						opacity: '1'
 					}
 				},
-				'leaf-sway': {
+				'pulse-dot': {
 					'0%, 100%': {
-						transform: 'rotate(0deg)'
+						opacity: '0.6',
+						transform: 'scale(1)'
 					},
 					'50%': {
-						transform: 'rotate(5deg)'
+						opacity: '1',
+						transform: 'scale(1.1)'
 					}
 				},
-				'float': {
+				'glow': {
 					'0%, 100%': {
-						transform: 'translateY(0px)'
+						filter: 'brightness(1) drop-shadow(0 0 5px currentColor)'
 					},
 					'50%': {
-						transform: 'translateY(-10px)'
+						filter: 'brightness(1.2) drop-shadow(0 0 10px currentColor)'
 					}
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out',
-				'vine-grow': 'vine-grow 3s ease-in-out infinite',
-				'leaf-sway': 'leaf-sway 4s ease-in-out infinite',
-				'float': 'float 6s ease-in-out infinite'
+				'draw-line': 'draw-line 2s ease-out forwards',
+				'pulse-dot': 'pulse-dot 3s ease-in-out infinite',
+				'glow': 'glow 2s ease-in-out infinite'
 			}
 		}
 	},
