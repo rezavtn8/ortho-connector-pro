@@ -214,6 +214,24 @@ export function Settings() {
       return;
     }
 
+    if (!clinicSettings.clinic_name.trim()) {
+      toast({
+        title: "Missing clinic name",
+        description: "Please enter your clinic name before saving.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!clinicSettings.clinic_address.trim()) {
+      toast({
+        title: "Missing address",
+        description: "Please enter your clinic address before saving.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Check if user is properly authenticated by testing auth
     const { data: { user: authUser } } = await supabase.auth.getUser();
     console.log('Auth user check:', authUser);
@@ -260,6 +278,9 @@ export function Settings() {
         
         if (clinicError) {
           console.error('Clinic creation error:', clinicError);
+          if (clinicError.code === '23505') {
+            throw new Error('A clinic already exists for this user.');
+          }
           throw clinicError;
         }
         clinicId = newClinic.id;
@@ -282,6 +303,9 @@ export function Settings() {
           
           if (createProfileError) {
             console.error('Profile creation error:', createProfileError);
+            if (createProfileError.code === '23505') {
+              throw new Error('User profile already exists.');
+            }
             throw createProfileError;
           }
         }
@@ -297,7 +321,10 @@ export function Settings() {
           })
           .eq('id', clinicId);
 
-        if (clinicUpdateError) throw clinicUpdateError;
+        if (clinicUpdateError) {
+          console.error('Clinic update error:', clinicUpdateError);
+          throw clinicUpdateError;
+        }
       }
 
       // Update user profile with clinic info (if profile already existed)
@@ -323,11 +350,11 @@ export function Settings() {
         title: "Clinic settings saved",
         description: "Your clinic information has been updated successfully.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving clinic settings:', error);
       toast({
         title: "Error saving settings",
-        description: "Could not save your clinic settings. Please try again.",
+        description: error.message || "Could not save your clinic settings. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -585,20 +612,34 @@ export function Settings() {
 
                     <div className="space-y-2">
                       <Label htmlFor="clinic_address">Clinic Address *</Label>
-                      <AddressSearch
-                        value={clinicSettings.clinic_address}
-                        onSelect={(office) => {
-                          if (office) {
-                            setClinicSettings(prev => ({
-                              ...prev,
-                              clinic_address: office.address || office.name || '',
-                              clinic_latitude: office.latitude,
-                              clinic_longitude: office.longitude
-                            }));
-                          }
-                        }}
-                        placeholder="Search for your clinic address..."
-                      />
+                      <div className="space-y-2">
+                        <AddressSearch
+                          value={clinicSettings.clinic_address}
+                          onSelect={(office) => {
+                            if (office) {
+                              setClinicSettings(prev => ({
+                                ...prev,
+                                clinic_address: office.address || office.name || '',
+                                clinic_latitude: office.latitude,
+                                clinic_longitude: office.longitude
+                              }));
+                            }
+                          }}
+                          placeholder="Search for your clinic address..."
+                        />
+                        <div className="text-xs text-muted-foreground">
+                          Or manually enter your address below:
+                        </div>
+                        <Input
+                          id="manual_address"
+                          value={clinicSettings.clinic_address}
+                          onChange={(e) => setClinicSettings(prev => ({ 
+                            ...prev, 
+                            clinic_address: e.target.value 
+                          }))}
+                          placeholder="Enter your clinic address manually..."
+                        />
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
