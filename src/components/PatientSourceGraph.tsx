@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Building2, Globe, Star, Facebook, Users, MessageSquare } from 'lucide-react';
+import { Building2, Globe, Star, Facebook, Users, MessageSquare, User } from 'lucide-react';
 
 interface PatientSourceGraphProps {
   className?: string;
@@ -33,17 +33,17 @@ export const PatientSourceGraph: React.FC<PatientSourceGraphProps> = ({ classNam
       <div className="absolute inset-0 bg-gradient-to-br from-connection-bg/30 via-white to-connection-bg/20"></div>
 
       {/* Connection lines */}
-      <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
+      <svg className="absolute inset-0 w-full h-full pointer-events-none z-10" viewBox="0 0 100 100" preserveAspectRatio="none">
         <defs>
           <linearGradient id="connectionLine" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="hsl(var(--connection-primary))" stopOpacity="0.4" />
-            <stop offset="50%" stopColor="hsl(var(--connection-primary))" stopOpacity="0.8" />
-            <stop offset="100%" stopColor="hsl(var(--connection-primary))" stopOpacity="0.4" />
-          </linearGradient>
-          <linearGradient id="connectionLineActive" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" stopColor="hsl(var(--connection-primary))" stopOpacity="0.6" />
             <stop offset="50%" stopColor="hsl(var(--connection-primary))" stopOpacity="1" />
             <stop offset="100%" stopColor="hsl(var(--connection-primary))" stopOpacity="0.6" />
+          </linearGradient>
+          <linearGradient id="connectionLineActive" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="hsl(var(--connection-primary))" stopOpacity="0.8" />
+            <stop offset="50%" stopColor="hsl(var(--connection-primary))" stopOpacity="1" />
+            <stop offset="100%" stopColor="hsl(var(--connection-primary))" stopOpacity="0.8" />
           </linearGradient>
         </defs>
         
@@ -52,51 +52,53 @@ export const PatientSourceGraph: React.FC<PatientSourceGraphProps> = ({ classNam
           const isActive = hoveredSource === source.id;
           
           return (
-            <g key={source.id}>
-              <line
-                x1={position.x}
-                y1={position.y}
-                x2="50"
-                y2="50"
-                stroke={isActive ? "url(#connectionLineActive)" : "url(#connectionLine)"}
-                strokeWidth={isActive ? "2" : "1"}
-                className={`transition-all duration-300 ${isActive ? '' : 'animate-pulse'}`}
-                style={{
-                  animationDuration: '3s',
-                  filter: isActive ? 'drop-shadow(0 0 4px hsl(var(--connection-primary) / 0.5))' : 'none'
-                }}
-              />
-              
-              {/* Animated signal dot */}
-              <circle
-                className={`animate-signal ${isActive ? 'opacity-100' : 'opacity-60'}`}
-                r="1"
-                fill="hsl(var(--connection-primary))"
-                style={{
-                  animationDuration: '2s',
-                  animationDelay: `${source.angle / 60}s`
-                }}
-              >
-                <animateMotion
-                  dur="2s"
-                  repeatCount="indefinite"
-                  begin={`${source.angle / 60}s`}
-                >
-                  <mpath href={`#signal-path-${source.id}`} />
-                </animateMotion>
-              </circle>
-              
-              {/* Signal path (hidden) */}
-              <path
-                id={`signal-path-${source.id}`}
-                d={`M ${position.x} ${position.y} L 50 50`}
-                stroke="none"
-                fill="none"
-              />
-            </g>
+            <line
+              key={source.id}
+              x1={position.x}
+              y1={position.y}
+              x2="50"
+              y2="50"
+              stroke={isActive ? "url(#connectionLineActive)" : "url(#connectionLine)"}
+              strokeWidth={isActive ? "3" : "2"}
+              className={`transition-all duration-300 ${isActive ? '' : 'animate-pulse'}`}
+              style={{
+                animationDuration: '3s',
+                filter: isActive ? 'drop-shadow(0 0 4px hsl(var(--connection-primary) / 0.5))' : 'none'
+              }}
+            />
           );
         })}
       </svg>
+
+      {/* Moving patient icons */}
+      <div className="absolute inset-0 pointer-events-none z-15">
+        {sources.map((source, index) => {
+          const position = getPosition(source.angle);
+          const isActive = hoveredSource === source.id;
+          
+          return (
+            <div
+              key={`patient-${source.id}`}
+              className={`absolute w-6 h-6 rounded-full bg-white shadow-md border-2 border-connection-primary flex items-center justify-center transition-all duration-300 ${
+                isActive ? 'scale-125' : ''
+              }`}
+              style={{
+                left: `${position.x}%`,
+                top: `${position.y}%`,
+                animationName: 'patientFlow',
+                animationDuration: '3s',
+                animationDelay: `${index * 0.5}s`,
+                animationIterationCount: 'infinite',
+                animationTimingFunction: 'ease-in-out',
+                '--start-x': `${position.x - 50}%`,
+                '--start-y': `${position.y - 50}%`,
+              } as any}
+            >
+              <User className="w-3 h-3 text-connection-primary" />
+            </div>
+          );
+        })}
+      </div>
 
       {/* Central dental office node */}
       <div 
@@ -128,7 +130,7 @@ export const PatientSourceGraph: React.FC<PatientSourceGraphProps> = ({ classNam
         return (
           <div
             key={source.id}
-            className="absolute w-12 h-12 -translate-x-1/2 -translate-y-1/2 z-10 cursor-pointer"
+            className="absolute w-12 h-12 -translate-x-1/2 -translate-y-1/2 z-20 cursor-pointer"
             style={{
               left: `${position.x}%`,
               top: `${position.y}%`,

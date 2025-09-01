@@ -164,6 +164,21 @@ All colors MUST be HSL.
   }
 
   /* Animation keyframes */
+  @keyframes patientFlow {
+    0% {
+      transform: translate(var(--start-x), var(--start-y)) scale(0.8);
+      opacity: 0.5;
+    }
+    50% {
+      opacity: 1;
+      transform: translate(calc(var(--start-x) * 0.3), calc(var(--start-y) * 0.3)) scale(1);
+    }
+    100% {
+      transform: translate(0, 0) scale(0.8);
+      opacity: 0.5;
+    }
+  }
+
   .animate-signal {
     animation: signal 2s ease-in-out infinite;
   }
