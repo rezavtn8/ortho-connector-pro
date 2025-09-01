@@ -12,32 +12,32 @@ All colors MUST be HSL.
     --foreground: 174 20% 20%;
     
     /* Teal Connection Theme - Modern, Digital, Network-focused */
-    --primary: 174 72% 56%;           /* Bright teal for primary actions */
+    --primary: 185 75% 35%;           /* Darker teal for primary actions */
     --primary-foreground: 0 0% 100%;  /* White text on primary */
-    --secondary: 174 20% 95%;         /* Very light teal-gray */
-    --secondary-foreground: 174 72% 20%; /* Dark teal text */
-    --muted: 174 15% 96%;            /* Lightest gray-teal background */
-    --muted-foreground: 174 10% 45%; /* Muted teal text */
-    --accent: 174 45% 85%;           /* Light teal accent */
-    --accent-foreground: 174 72% 20%; /* Dark text on accent */
+    --secondary: 185 20% 95%;         /* Very light teal-gray */
+    --secondary-foreground: 185 75% 20%; /* Dark teal text */
+    --muted: 185 15% 96%;            /* Lightest gray-teal background */
+    --muted-foreground: 185 10% 45%; /* Muted teal text */
+    --accent: 185 45% 85%;           /* Light teal accent */
+    --accent-foreground: 185 75% 20%; /* Dark text on accent */
     --destructive: 0 84% 60%;        /* Red for errors */
     --destructive-foreground: 0 0% 98%; /* Light text on destructive */
-    --border: 174 15% 85%;           /* Light teal borders */
-    --input: 174 15% 90%;            /* Input background */
-    --ring: 174 72% 56%;             /* Focus ring color */
+    --border: 185 15% 85%;           /* Light teal borders */
+    --input: 185 15% 90%;            /* Input background */
+    --ring: 185 75% 35%;             /* Focus ring color */
 
-    --card: 174 10% 99%;
-    --card-foreground: 174 20% 20%;
+    --card: 185 10% 99%;
+    --card-foreground: 185 20% 20%;
 
-    --popover: 174 10% 99%;
-    --popover-foreground: 174 20% 20%;
+    --popover: 185 10% 99%;
+    --popover-foreground: 185 20% 20%;
 
     /* Custom theme colors */
-    --connection-primary: 174 72% 56%;    /* Main teal for lines and dots */
-    --connection-secondary: 174 45% 70%;  /* Lighter teal for secondary elements */
-    --connection-bg: 174 15% 98%;         /* Background teal */
-    --connection-text: 174 20% 20%;       /* Dark text */
-    --connection-muted: 174 10% 50%;      /* Muted text */
+    --connection-primary: 185 75% 35%;    /* Main darker teal for lines and dots */
+    --connection-secondary: 185 45% 70%;  /* Lighter teal for secondary elements */
+    --connection-bg: 185 15% 98%;         /* Background teal */
+    --connection-text: 185 20% 20%;       /* Dark text */
+    --connection-muted: 185 10% 50%;      /* Muted text */
 
     /* Medical/CRM specific colors */
     --success: 150 75% 35%;
@@ -54,16 +54,16 @@ All colors MUST be HSL.
     --status-cold: 210 15% 60%;
 
     /* Gradients */
-    --gradient-connection: linear-gradient(135deg, hsl(174 15% 99%), hsl(174 15% 95%));
-    --gradient-card: linear-gradient(145deg, hsl(174 10% 99%), hsl(174 15% 96%));
-    --gradient-glow: radial-gradient(circle, hsl(174 72% 56% / 0.1), transparent);
-    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(174 72% 66%));
-    --gradient-subtle: linear-gradient(180deg, hsl(var(--background)), hsl(174 15% 95%));
+    --gradient-connection: linear-gradient(135deg, hsl(185 15% 99%), hsl(185 15% 95%));
+    --gradient-card: linear-gradient(145deg, hsl(185 10% 99%), hsl(185 15% 96%));
+    --gradient-glow: radial-gradient(circle, hsl(185 75% 35% / 0.1), transparent);
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(185 75% 45%));
+    --gradient-subtle: linear-gradient(180deg, hsl(var(--background)), hsl(185 15% 95%));
 
     /* Shadows */
-    --shadow-elegant: 0 10px 30px -10px hsl(174 72% 56% / 0.2);
-    --shadow-glow: 0 0 20px hsl(174 72% 56% / 0.3);
-    --shadow-card: 0 4px 20px -4px hsl(174 20% 20% / 0.08);
+    --shadow-elegant: 0 10px 30px -10px hsl(185 75% 35% / 0.2);
+    --shadow-glow: 0 0 20px hsl(185 75% 35% / 0.3);
+    --shadow-card: 0 4px 20px -4px hsl(185 20% 20% / 0.08);
 
     /* Animations */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -71,51 +71,51 @@ All colors MUST be HSL.
 
     --radius: 0.5rem;
 
-    --sidebar-background: 174 15% 98%;
-    --sidebar-foreground: 174 20% 26%;
-    --sidebar-primary: 174 72% 56%;
+    --sidebar-background: 185 15% 98%;
+    --sidebar-foreground: 185 20% 26%;
+    --sidebar-primary: 185 75% 35%;
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 174 15% 95%;
-    --sidebar-accent-foreground: 174 72% 20%;
-    --sidebar-border: 174 15% 91%;
-    --sidebar-ring: 174 72% 56%;
+    --sidebar-accent: 185 15% 95%;
+    --sidebar-accent-foreground: 185 75% 20%;
+    --sidebar-border: 185 15% 91%;
+    --sidebar-ring: 185 75% 35%;
   }
 
   .dark {
-    --background: 174 20% 8%;
-    --foreground: 174 15% 95%;
+    --background: 185 20% 8%;
+    --foreground: 185 15% 95%;
 
-    --card: 174 20% 12%;
-    --card-foreground: 174 15% 95%;
+    --card: 185 20% 12%;
+    --card-foreground: 185 15% 95%;
 
-    --popover: 174 20% 12%;
-    --popover-foreground: 174 15% 95%;
+    --popover: 185 20% 12%;
+    --popover-foreground: 185 15% 95%;
 
-    --primary: 174 72% 56%;
-    --primary-foreground: 174 20% 8%;
+    --primary: 185 75% 35%;
+    --primary-foreground: 185 20% 8%;
 
-    --secondary: 174 20% 18%;
-    --secondary-foreground: 174 15% 95%;
+    --secondary: 185 20% 18%;
+    --secondary-foreground: 185 15% 95%;
 
-    --muted: 174 20% 18%;
-    --muted-foreground: 174 10% 65%;
+    --muted: 185 20% 18%;
+    --muted-foreground: 185 10% 65%;
 
-    --accent: 174 45% 20%;
-    --accent-foreground: 174 45% 85%;
+    --accent: 185 45% 20%;
+    --accent-foreground: 185 45% 85%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 174 20% 20%;
-    --input: 174 20% 20%;
-    --ring: 174 72% 56%;
+    --border: 185 20% 20%;
+    --input: 185 20% 20%;
+    --ring: 185 75% 35%;
 
     /* Custom theme colors - dark mode */
-    --connection-primary: 174 72% 56%;
-    --connection-secondary: 174 45% 70%;
-    --connection-bg: 174 20% 10%;
-    --connection-text: 174 15% 90%;
-    --connection-muted: 174 10% 70%;
+    --connection-primary: 185 75% 35%;
+    --connection-secondary: 185 45% 70%;
+    --connection-bg: 185 20% 10%;
+    --connection-text: 185 15% 90%;
+    --connection-muted: 185 10% 70%;
 
     /* Medical/CRM specific colors - dark mode */
     --success: 150 75% 45%;
@@ -129,28 +129,28 @@ All colors MUST be HSL.
     --status-strong: 150 75% 45%;
     --status-moderate: 45 85% 65%;
     --status-sporadic: 25 85% 65%;
-    --status-cold: 174 10% 50%;
+    --status-cold: 185 10% 50%;
 
     /* Gradients - dark mode */
-    --gradient-connection: linear-gradient(135deg, hsl(174 20% 12%), hsl(174 20% 8%));
-    --gradient-card: linear-gradient(145deg, hsl(174 20% 12%), hsl(174 20% 15%));
-    --gradient-glow: radial-gradient(circle, hsl(174 72% 56% / 0.1), transparent);
-    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(174 72% 66%));
-    --gradient-subtle: linear-gradient(180deg, hsl(var(--background)), hsl(174 20% 10%));
+    --gradient-connection: linear-gradient(135deg, hsl(185 20% 12%), hsl(185 20% 8%));
+    --gradient-card: linear-gradient(145deg, hsl(185 20% 12%), hsl(185 20% 15%));
+    --gradient-glow: radial-gradient(circle, hsl(185 75% 35% / 0.1), transparent);
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(185 75% 45%));
+    --gradient-subtle: linear-gradient(180deg, hsl(var(--background)), hsl(185 20% 10%));
 
     /* Shadows - dark mode */
     --shadow-elegant: 0 10px 30px -10px hsl(0 0% 0% / 0.3);
     --shadow-card: 0 4px 20px -4px hsl(0 0% 0% / 0.25);
-    --shadow-glow: 0 0 20px hsl(174 72% 56% / 0.2);
+    --shadow-glow: 0 0 20px hsl(185 75% 35% / 0.2);
 
-    --sidebar-background: 174 20% 10%;
-    --sidebar-foreground: 174 15% 95%;
-    --sidebar-primary: 174 72% 56%;
+    --sidebar-background: 185 20% 10%;
+    --sidebar-foreground: 185 15% 95%;
+    --sidebar-primary: 185 75% 35%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 174 20% 15%;
-    --sidebar-accent-foreground: 174 15% 95%;
-    --sidebar-border: 174 20% 15%;
-    --sidebar-ring: 174 72% 56%;
+    --sidebar-accent: 185 20% 15%;
+    --sidebar-accent-foreground: 185 15% 95%;
+    --sidebar-border: 185 20% 15%;
+    --sidebar-ring: 185 75% 35%;
   }
 }
 
