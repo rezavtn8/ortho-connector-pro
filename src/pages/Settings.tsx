@@ -380,6 +380,9 @@ export function Settings() {
         title: "Clinic settings saved",
         description: "Your clinic information has been updated successfully.",
       });
+
+      // Reload all settings to reflect the saved changes
+      await loadAllSettings();
     } catch (error: any) {
       console.error('Error saving clinic settings:', error);
       toast({
