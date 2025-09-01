@@ -37,14 +37,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-vine relative overflow-hidden">
-      {/* Decorative Vines */}
+    <div className="min-h-screen bg-gradient-to-br from-white via-sage-light/20 to-sage-light/40 relative overflow-hidden">
+      {/* Minimal decorative elements for non-auth view */}
       {!showAuth && (
-        <>
-          <VineDecoration position="left" className="opacity-40" />
-          <VineDecoration position="right" className="opacity-40" />
-          <VineDecoration position="top" className="opacity-30" />
-        </>
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-0 left-0 w-32 h-32 bg-leaf/5 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-0 right-0 w-48 h-48 bg-sage-medium/10 rounded-full blur-3xl"></div>
+        </div>
       )}
       
       {/* Header */}
@@ -58,7 +57,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
             <Button 
               variant="outline" 
               onClick={onGetStarted}
-              className="border-sage-medium text-sage-dark hover:bg-sage-light"
+              className="border-sage-medium/50 text-sage-dark hover:bg-sage-light/50 backdrop-blur-sm"
             >
               Sign In
             </Button>
@@ -66,34 +65,36 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
         </nav>
       </header>
 
-      <div className={`flex ${showAuth ? 'min-h-[calc(100vh-100px)]' : ''}`}>
+      <div className={`flex ${showAuth ? 'min-h-[calc(100vh-100px)] items-center' : ''}`}>
         {/* Main Content */}
-        <div className={`${showAuth ? 'w-1/2 pr-8' : 'w-full'} relative z-20`}>
+        <div className={`${showAuth ? 'w-1/2 px-6' : 'w-full'} relative z-20`}>
           {/* Hero Section */}
-          <section className="px-6 pt-20 pb-24">
+          <section className={`${showAuth ? 'px-0' : 'px-6'} pt-20 pb-24`}>
             <div className="max-w-4xl mx-auto text-center relative">
-              {/* Vine frame around the hero text */}
-              <HeroVineFrame />
+              {/* Subtle vine frame only for non-auth */}
+              {!showAuth && <HeroVineFrame />}
               
-              <h1 className="relative z-10 text-6xl md:text-7xl font-bold text-sage-dark mb-6 leading-tight">
+              <h1 className="relative z-10 text-5xl md:text-6xl font-bold text-sage-dark mb-6 leading-tight">
                 Grow with
-                <span className="block text-leaf">Intention.</span>
+                <span className="block text-leaf font-light italic">Intention.</span>
               </h1>
               
-              <p className="relative z-10 text-xl md:text-2xl text-sage-dark/80 mb-12 max-w-3xl mx-auto leading-relaxed">
+              <p className="relative z-10 text-lg md:text-xl text-sage-dark/70 mb-12 max-w-2xl mx-auto leading-relaxed">
                 Track the sources behind every patient. Nurture the network that grows your practice.
               </p>
               
-              <div className="relative z-10 flex flex-col sm:flex-row gap-4 justify-center items-center">
-                <Button 
-                  size="lg"
-                  onClick={onGetStarted}
-                  className="bg-leaf hover:bg-leaf/90 text-white px-8 py-4 text-lg shadow-elegant group"
-                >
-                  Explore the Network
-                  <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </Button>
-              </div>
+              {!showAuth && (
+                <div className="relative z-10 flex flex-col sm:flex-row gap-4 justify-center items-center">
+                  <Button 
+                    size="lg"
+                    onClick={onGetStarted}
+                    className="bg-leaf hover:bg-leaf/90 text-white px-8 py-4 text-lg rounded-full shadow-lg hover:shadow-xl transition-all group"
+                  >
+                    Explore the Network
+                    <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  </Button>
+                </div>
+              )}
             </div>
           </section>
           
@@ -210,8 +211,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
 
         {/* Auth Form Side Panel */}
         {showAuth && (
-          <div className="w-1/2 pl-8 flex items-center justify-center">
-            <div className="w-full max-w-md">
+          <div className="w-1/2 flex items-center justify-center p-6">
+            <div className="w-full max-w-md bg-white/80 backdrop-blur-lg rounded-2xl p-8 shadow-xl border border-sage-light/50">
+              <div className="text-center mb-8">
+                <div className="flex items-center justify-center space-x-2 mb-4">
+                  <LeafIcon size={24} className="text-leaf" />
+                  <span className="text-xl font-semibold text-sage-dark">Welcome Back</span>
+                </div>
+                <p className="text-sage-dark/60">Sign in to grow your practice</p>
+              </div>
               <AuthForm />
             </div>
           </div>
