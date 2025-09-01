@@ -144,7 +144,16 @@ export function MapView({ height = "600px" }: { height?: string }) {
     }
   }, [clinic, offices]);
 
-  // Convert lat/lng to screen coordinates
+  // Helper functions
+  const getStrengthColor = (strength: string) => {
+    switch (strength) {
+      case 'Strong': return 'bg-green-500 border-green-600';
+      case 'Moderate': return 'bg-yellow-500 border-yellow-600';  
+      case 'Sporadic': return 'bg-orange-500 border-orange-600';
+      default: return 'bg-gray-400 border-gray-500';
+    }
+  };
+
   const coordsToScreen = (lat: number, lng: number) => {
     if (!mapBounds.minLat || !mapBounds.maxLat) return { x: 50, y: 50 };
     
@@ -155,15 +164,6 @@ export function MapView({ height = "600px" }: { height?: string }) {
       x: Math.max(2, Math.min(98, x + panOffset.x)), 
       y: Math.max(2, Math.min(98, y + panOffset.y)) 
     };
-  };
-
-  const getStrengthColor = (strength: string) => {
-    switch (strength) {
-      case 'Strong': return 'bg-green-500 border-green-600';
-      case 'Moderate': return 'bg-yellow-500 border-yellow-600';  
-      case 'Sporadic': return 'bg-orange-500 border-orange-600';
-      default: return 'bg-gray-400 border-gray-500';
-    }
   };
 
   const handleZoomIn = () => setZoom(prev => Math.min(prev * 1.3, 4));
