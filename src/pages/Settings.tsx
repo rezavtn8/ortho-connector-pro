@@ -257,32 +257,10 @@ export function Settings() {
 
       console.log('Existing profile:', existingProfile, 'Profile error:', profileError);
 
-      // CRITICAL: Create user profile FIRST if it doesn't exist (required for RLS)  
-      if (!existingProfile) {
-        console.log('Creating user profile first (required for RLS policies)');
-        const { error: createProfileError } = await supabase
-          .from('user_profiles')
-          .insert({
-            user_id: authUser.id,
-            email: authUser.email || '',
-            role: 'Owner',
-            clinic_id: '00000000-0000-0000-0000-000000000000', // temporary UUID
-            clinic_name: clinicSettings.clinic_name,
-            clinic_address: clinicSettings.clinic_address,
-            clinic_latitude: clinicSettings.clinic_latitude,
-            clinic_longitude: clinicSettings.clinic_longitude,
-          });
-        
-        if (createProfileError && createProfileError.code !== '23505') {
-          console.error('Profile creation error:', createProfileError);
-          throw new Error('Could not create user profile: ' + createProfileError.message);
-        }
-      }
-
       let clinicId = existingProfile?.clinic_id;
 
-      // If no clinic exists, create one
-      if (!clinicId || clinicId === '00000000-0000-0000-0000-000000000000') {
+      // If no clinic exists, create one first
+      if (!clinicId) {
         console.log('Creating new clinic with owner_id:', authUser.id);
         const { data: newClinic, error: clinicError } = await supabase
           .from('clinics')
@@ -307,21 +285,43 @@ export function Settings() {
         }
         clinicId = newClinic.id;
 
-        // Update user profile with the real clinic_id
-        const { error: updateProfileError } = await supabase
-          .from('user_profiles')
-          .update({ 
-            clinic_id: clinicId,
-            clinic_name: clinicSettings.clinic_name,
-            clinic_address: clinicSettings.clinic_address,
-            clinic_latitude: clinicSettings.clinic_latitude,
-            clinic_longitude: clinicSettings.clinic_longitude,
-          })
-          .eq('user_id', authUser.id);
-        
-        if (updateProfileError) {
-          console.error('Profile update with clinic_id error:', updateProfileError);
-          throw new Error('Could not link clinic to profile: ' + updateProfileError.message);
+        // Now create user profile with the real clinic_id (only if profile doesn't exist)
+        if (!existingProfile) {
+          console.log('Creating user profile with clinic_id:', clinicId);
+          const { error: createProfileError } = await supabase
+            .from('user_profiles')
+            .insert({
+              user_id: authUser.id,
+              email: authUser.email || '',
+              role: 'Owner',
+              clinic_id: clinicId,
+              clinic_name: clinicSettings.clinic_name,
+              clinic_address: clinicSettings.clinic_address,
+              clinic_latitude: clinicSettings.clinic_latitude,
+              clinic_longitude: clinicSettings.clinic_longitude,
+            });
+          
+          if (createProfileError && createProfileError.code !== '23505') {
+            console.error('Profile creation error:', createProfileError);
+            throw new Error('Could not create user profile: ' + createProfileError.message);
+          }
+        } else {
+          // Update existing profile with new clinic_id
+          const { error: updateProfileError } = await supabase
+            .from('user_profiles')
+            .update({ 
+              clinic_id: clinicId,
+              clinic_name: clinicSettings.clinic_name,
+              clinic_address: clinicSettings.clinic_address,
+              clinic_latitude: clinicSettings.clinic_latitude,
+              clinic_longitude: clinicSettings.clinic_longitude,
+            })
+            .eq('user_id', authUser.id);
+          
+          if (updateProfileError) {
+            console.error('Profile update with clinic_id error:', updateProfileError);
+            throw new Error('Could not link clinic to profile: ' + updateProfileError.message);
+          }
         }
       } else {
         // Update existing clinic
