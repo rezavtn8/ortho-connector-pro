@@ -24,48 +24,86 @@ export const VineDecoration: React.FC<VineDecorationProps> = ({ position, classN
       case 'left':
         return (
           <svg className="w-full h-full" viewBox="0 0 120 800" fill="none" xmlns="http://www.w3.org/2000/svg">
+            {/* Main vine path */}
             <path
-              d="M20 0 Q40 100 20 200 Q60 250 40 350 Q20 400 40 500 Q60 550 20 650 Q40 700 20 800"
+              d="M20 0 Q40 80 30 160 Q50 240 25 320 Q45 400 30 480 Q50 560 25 640 Q40 720 20 800"
+              stroke="currentColor"
+              strokeWidth="3"
+              fill="none"
+              className="text-vine opacity-80"
+            />
+            {/* Secondary branch */}
+            <path
+              d="M30 160 Q60 180 70 220 Q55 240 45 260"
               stroke="currentColor"
               strokeWidth="2"
               fill="none"
-              className="text-leaf animate-vine-grow"
-              style={{ strokeDasharray: 1000, strokeDashoffset: 0 }}
+              className="text-vine opacity-60"
             />
-            {/* Leaves */}
-            <g className="text-leaf animate-leaf-sway" style={{ transformOrigin: '40px 150px' }}>
-              <ellipse cx="50" cy="140" rx="8" ry="15" fill="currentColor" opacity="0.8" />
-              <ellipse cx="45" cy="155" rx="6" ry="12" fill="currentColor" opacity="0.6" />
-            </g>
-            <g className="text-leaf animate-leaf-sway" style={{ transformOrigin: '30px 350px', animationDelay: '1s' }}>
-              <ellipse cx="25" cy="340" rx="7" ry="14" fill="currentColor" opacity="0.8" />
-              <ellipse cx="35" cy="355" rx="5" ry="10" fill="currentColor" opacity="0.6" />
-            </g>
-            <g className="text-leaf animate-leaf-sway" style={{ transformOrigin: '50px 550px', animationDelay: '2s' }}>
-              <ellipse cx="55" cy="540" rx="6" ry="13" fill="currentColor" opacity="0.8" />
-              <ellipse cx="50" cy="558" rx="4" ry="9" fill="currentColor" opacity="0.6" />
+            {/* Leaves along the vine */}
+            <g className="text-leaf">
+              {/* Leaf cluster 1 */}
+              <path d="M35 140 Q45 130 55 135 Q50 145 45 150 Q40 145 35 140 Z" fill="currentColor" opacity="0.9" />
+              <path d="M40 152 Q48 148 52 155 Q48 162 42 160 Q38 155 40 152 Z" fill="currentColor" opacity="0.7" />
+              
+              {/* Leaf cluster 2 */}
+              <path d="M50 220 Q62 210 70 218 Q65 230 58 232 Q52 228 50 220 Z" fill="currentColor" opacity="0.8" />
+              <path d="M45 235 Q52 230 58 238 Q52 245 47 242 Q43 238 45 235 Z" fill="currentColor" opacity="0.6" />
+              
+              {/* Leaf cluster 3 */}
+              <path d="M28 300 Q38 292 45 298 Q42 308 35 310 Q30 306 28 300 Z" fill="currentColor" opacity="0.9" />
+              <path d="M32 315 Q40 312 45 318 Q40 325 35 322 Q30 318 32 315 Z" fill="currentColor" opacity="0.7" />
+              
+              {/* Leaf cluster 4 */}
+              <path d="M48 460 Q58 452 65 458 Q62 468 55 470 Q50 466 48 460 Z" fill="currentColor" opacity="0.8" />
+              <path d="M42 475 Q50 470 55 478 Q50 485 45 482 Q40 478 42 475 Z" fill="currentColor" opacity="0.6" />
+              
+              {/* Leaf cluster 5 */}
+              <path d="M28 620 Q38 612 45 618 Q42 628 35 630 Q30 626 28 620 Z" fill="currentColor" opacity="0.9" />
+              <path d="M32 635 Q40 632 45 638 Q40 645 35 642 Q30 638 32 635 Z" fill="currentColor" opacity="0.7" />
             </g>
           </svg>
         );
       case 'right':
         return (
           <svg className="w-full h-full" viewBox="0 0 120 800" fill="none" xmlns="http://www.w3.org/2000/svg">
+            {/* Main vine path */}
             <path
-              d="M100 0 Q80 100 100 200 Q60 250 80 350 Q100 400 80 500 Q60 550 100 650 Q80 700 100 800"
+              d="M100 0 Q80 80 90 160 Q70 240 95 320 Q75 400 90 480 Q70 560 95 640 Q80 720 100 800"
+              stroke="currentColor"
+              strokeWidth="3"
+              fill="none"
+              className="text-vine opacity-80"
+            />
+            {/* Secondary branch */}
+            <path
+              d="M90 160 Q60 180 50 220 Q65 240 75 260"
               stroke="currentColor"
               strokeWidth="2"
               fill="none"
-              className="text-leaf animate-vine-grow"
-              style={{ strokeDasharray: 1000, strokeDashoffset: 0, animationDelay: '1s' }}
+              className="text-vine opacity-60"
             />
-            {/* Leaves */}
-            <g className="text-leaf animate-leaf-sway" style={{ transformOrigin: '80px 180px', animationDelay: '0.5s' }}>
-              <ellipse cx="70" cy="170" rx="8" ry="15" fill="currentColor" opacity="0.8" />
-              <ellipse cx="75" cy="185" rx="6" ry="12" fill="currentColor" opacity="0.6" />
-            </g>
-            <g className="text-leaf animate-leaf-sway" style={{ transformOrigin: '90px 380px', animationDelay: '1.5s' }}>
-              <ellipse cx="95" cy="370" rx="7" ry="14" fill="currentColor" opacity="0.8" />
-              <ellipse cx="85" cy="385" rx="5" ry="10" fill="currentColor" opacity="0.6" />
+            {/* Leaves along the vine */}
+            <g className="text-leaf">
+              {/* Leaf cluster 1 */}
+              <path d="M85 140 Q75 130 65 135 Q70 145 75 150 Q80 145 85 140 Z" fill="currentColor" opacity="0.9" />
+              <path d="M80 152 Q72 148 68 155 Q72 162 78 160 Q82 155 80 152 Z" fill="currentColor" opacity="0.7" />
+              
+              {/* Leaf cluster 2 */}
+              <path d="M70 220 Q58 210 50 218 Q55 230 62 232 Q68 228 70 220 Z" fill="currentColor" opacity="0.8" />
+              <path d="M75 235 Q68 230 62 238 Q68 245 73 242 Q77 238 75 235 Z" fill="currentColor" opacity="0.6" />
+              
+              {/* Leaf cluster 3 */}
+              <path d="M92 300 Q82 292 75 298 Q78 308 85 310 Q90 306 92 300 Z" fill="currentColor" opacity="0.9" />
+              <path d="M88 315 Q80 312 75 318 Q80 325 85 322 Q90 318 88 315 Z" fill="currentColor" opacity="0.7" />
+              
+              {/* Leaf cluster 4 */}
+              <path d="M72 460 Q62 452 55 458 Q58 468 65 470 Q70 466 72 460 Z" fill="currentColor" opacity="0.8" />
+              <path d="M78 475 Q70 470 65 478 Q70 485 75 482 Q80 478 78 475 Z" fill="currentColor" opacity="0.6" />
+              
+              {/* Leaf cluster 5 */}
+              <path d="M92 620 Q82 612 75 618 Q78 628 85 630 Q90 626 92 620 Z" fill="currentColor" opacity="0.9" />
+              <path d="M88 635 Q80 632 75 638 Q80 645 85 642 Q90 638 88 635 Z" fill="currentColor" opacity="0.7" />
             </g>
           </svg>
         );

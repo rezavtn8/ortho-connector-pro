@@ -30,10 +30,7 @@ const Index = () => {
   }
 
   if (!user) {
-    if (showAuth) {
-      return <AuthForm />;
-    }
-    return <LandingPage onGetStarted={() => setShowAuth(true)} />;
+    return <LandingPage onGetStarted={() => setShowAuth(true)} showAuth={showAuth} />;
   }
 
   const renderPage = () => {
