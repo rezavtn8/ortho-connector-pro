@@ -14,30 +14,98 @@ export const NetworkBackground: React.FC<NetworkBackgroundProps> = ({
   if (variant === 'hero') {
     return (
       <div className={`absolute inset-0 overflow-hidden pointer-events-none ${className}`}>
-        {/* Clean framing lines - positioned to avoid text overlap */}
+        {/* Tech interface corner connections - avoiding text areas */}
         
-        {/* Top elegant curve - above headline */}
+        {/* Top left corner connection */}
         <ConnectionLine
-          startX={20} startY={15}
-          endX={80} endY={15}
+          startX={5} startY={5}
+          endX={25} endY={5}
           curved={false}
           animated={false}
-          className="opacity-30"
+          className="opacity-40"
         />
-        
-        {/* Subtle side accent - left side */}
         <ConnectionLine
-          startX={5} startY={30}
-          endX={15} endY={70}
+          startX={25} startY={5}
+          endX={25} endY={20}
           curved={false}
           animated={false}
-          className="opacity-20"
+          className="opacity-40"
         />
         
-        {/* Bottom framing line - below CTA */}
+        {/* Top right corner connection */}
         <ConnectionLine
-          startX={30} startY={85}
-          endX={70} endY={85}
+          startX={75} startY={5}
+          endX={95} endY={5}
+          curved={false}
+          animated={false}
+          className="opacity-40"
+        />
+        <ConnectionLine
+          startX={95} startY={5}
+          endX={95} endY={20}
+          curved={false}
+          animated={false}
+          className="opacity-40"
+        />
+        
+        {/* Bottom left corner connection */}
+        <ConnectionLine
+          startX={5} startY={80}
+          endX={5} endY={95}
+          curved={false}
+          animated={false}
+          className="opacity-40"
+        />
+        <ConnectionLine
+          startX={5} startY={95}
+          endX={20} endY={95}
+          curved={false}
+          animated={false}
+          className="opacity-40"
+        />
+        
+        {/* Bottom right corner connection */}
+        <ConnectionLine
+          startX={80} startY={95}
+          endX={95} endY={95}
+          curved={false}
+          animated={false}
+          className="opacity-40"
+        />
+        <ConnectionLine
+          startX={95} startY={80}
+          endX={95} endY={95}
+          curved={false}
+          animated={false}
+          className="opacity-40"
+        />
+        
+        {/* Side tech accents - in free areas */}
+        <ConnectionLine
+          startX={8} startY={35}
+          endX={18} endY={35}
+          curved={false}
+          animated={false}
+          className="opacity-25"
+        />
+        <ConnectionLine
+          startX={18} startY={35}
+          endX={18} endY={45}
+          curved={false}
+          animated={false}
+          className="opacity-25"
+        />
+        
+        <ConnectionLine
+          startX={82} startY={55}
+          endX={92} endY={55}
+          curved={false}
+          animated={false}
+          className="opacity-25"
+        />
+        <ConnectionLine
+          startX={82} startY={55}
+          endX={82} endY={65}
           curved={false}
           animated={false}
           className="opacity-25"
