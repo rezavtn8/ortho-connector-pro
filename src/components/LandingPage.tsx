@@ -1,8 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { NetworkBackground } from './NetworkBackground';
-import { ConnectionDot } from './ConnectionDot';
 import { AuthForm } from './AuthForm';
 import { PatientSourceGraph } from './PatientSourceGraph';
 import { Activity, TrendingUp, Users, Search, ArrowRight, CheckCircle, Globe, MessageSquare, MapPin } from 'lucide-react';
@@ -37,32 +35,19 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-connection relative overflow-hidden">
-      {/* Network background for non-auth view */}
-      {!showAuth && (
-        <NetworkBackground variant="subtle" className="opacity-30" />
-      )}
-      
+    <div className="min-h-screen bg-gradient-connection relative">
       {/* Header */}
-      <header className="relative z-20 px-6 pt-8">
+      <header className="relative px-6 pt-8">
         <nav className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="relative">
-              <Activity size={32} className="text-connection-primary" />
-              <ConnectionDot 
-                position={{ x: 80, y: 20 }} 
-                size="sm" 
-                className="absolute"
-                animated={false}
-              />
-            </div>
+            <Activity size={32} className="text-connection-primary" />
             <span className="text-2xl font-bold text-connection-text">PatientFlow</span>
           </div>
           {!showAuth && (
             <Button 
               variant="outline" 
               onClick={onGetStarted}
-              className="border-connection-primary/30 text-connection-text hover:bg-connection-primary/10 backdrop-blur-sm"
+              className="border-connection-primary/30 text-connection-text hover:bg-connection-primary/10"
             >
               Sign In
             </Button>
@@ -75,21 +60,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
         <div className={`${showAuth ? 'w-1/2 px-6' : 'w-full'} relative z-20`}>
           {/* Hero Section */}
           <section className={`${showAuth ? 'px-0' : 'px-6'} pt-20 pb-24`}>
-            <div className="max-w-4xl mx-auto text-center relative">
-              {/* Network background for hero */}
-              {!showAuth && <NetworkBackground variant="hero" className="opacity-40" />}
-              
-              <h1 className="relative z-10 text-5xl md:text-6xl font-bold text-connection-text mb-6 leading-tight">
+            <div className="max-w-4xl mx-auto text-center">
+              <h1 className="text-5xl md:text-6xl font-bold text-connection-text mb-6 leading-tight">
                 Track the Source.
                 <span className="block text-connection-primary font-light">Understand the Growth.</span>
               </h1>
               
-              <p className="relative z-10 text-lg md:text-xl text-connection-muted mb-12 max-w-3xl mx-auto leading-relaxed">
+              <p className="text-lg md:text-xl text-connection-muted mb-12 max-w-3xl mx-auto leading-relaxed">
                 Every patient has a path — visualize where they came from and optimize what brings them to your practice.
               </p>
               
               {!showAuth && (
-                <div className="relative z-10 flex flex-col sm:flex-row gap-4 justify-center items-center">
+                <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
                   <Button 
                     size="lg"
                     onClick={onGetStarted}
@@ -129,11 +111,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
               </section>
 
               {/* Features Section */}
-              <section className="relative z-20 px-6 py-24 bg-white/60 backdrop-blur-sm">
-                <div className="max-w-6xl mx-auto relative">
-                  {/* Network connections between features */}
-                  <NetworkBackground variant="features" className="opacity-20" />
-                  
+              <section className="px-6 py-24 bg-white/60 backdrop-blur-sm">
+                <div className="max-w-6xl mx-auto">
                   <div className="text-center mb-16">
                     <h2 className="text-4xl md:text-5xl font-bold text-connection-text mb-6">
                       Connected Intelligence
@@ -144,15 +123,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                     </p>
                   </div>
 
-                  <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 relative z-10">
+                  <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
                     {features.map((feature, index) => (
-                      <Card key={index} className="group hover:shadow-elegant transition-all duration-300 border-connection-primary/20 hover:border-connection-primary/40 bg-gradient-card relative">
-                        <CardContent className="p-8 text-center relative">
-                          {/* Connection dot overlay */}
-                          <div className="absolute -top-2 -right-2">
-                            <ConnectionDot size="sm" position={{ x: 0, y: 0 }} />
-                          </div>
-                          
+                      <Card key={index} className="group hover:shadow-elegant transition-all duration-300 border-connection-primary/20 hover:border-connection-primary/40 bg-gradient-card">
+                        <CardContent className="p-8 text-center">
                           <div className="w-16 h-16 mx-auto mb-6 rounded-xl bg-connection-bg flex items-center justify-center text-connection-primary group-hover:bg-connection-primary group-hover:text-white transition-all duration-300 shadow-sm">
                             {feature.icon}
                           </div>
@@ -209,13 +183,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                     </div>
                     <div className="relative">
                       <div className="w-full h-64 bg-gradient-glow rounded-2xl flex items-center justify-center relative overflow-hidden border border-connection-primary/20">
-                        <div className="relative w-32 h-32">
-                          <Activity className="w-16 h-16 text-connection-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-                          <ConnectionDot position={{ x: 20, y: 20 }} label="Google" size="sm" />
-                          <ConnectionDot position={{ x: 80, y: 30 }} label="Yelp" size="sm" />
-                          <ConnectionDot position={{ x: 15, y: 70 }} label="Referrals" size="sm" />
-                          <ConnectionDot position={{ x: 85, y: 80 }} label="Word of Mouth" size="sm" />
-                        </div>
+                        <Activity className="w-16 h-16 text-connection-primary" />
                       </div>
                     </div>
                   </div>
@@ -223,10 +191,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
               </section>
 
               {/* CTA Section */}
-              <section className="relative z-20 px-6 py-24 bg-connection-bg/30">
-                <div className="max-w-4xl mx-auto text-center relative">
-                  <NetworkBackground variant="subtle" className="opacity-30" />
-                  
+              <section className="px-6 py-24 bg-connection-bg/30">
+                <div className="max-w-4xl mx-auto text-center">
                   <h2 className="text-4xl md:text-5xl font-bold text-connection-text mb-6">
                     Ready to Connect?
                   </h2>
@@ -252,7 +218,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
         {/* Auth Form Side Panel */}
         {showAuth && (
           <div className="w-1/2 flex items-center justify-center p-6 relative">
-            <NetworkBackground variant="subtle" className="opacity-20" />
             <div className="w-full max-w-md bg-white/90 backdrop-blur-lg rounded-2xl p-8 shadow-xl border border-connection-primary/20 relative z-10">
               <div className="text-center mb-8">
                 <div className="flex items-center justify-center space-x-3 mb-4">
