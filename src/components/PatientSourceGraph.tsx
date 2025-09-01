@@ -36,14 +36,14 @@ export const PatientSourceGraph: React.FC<PatientSourceGraphProps> = ({ classNam
       <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
         <defs>
           <linearGradient id="connectionLine" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="hsl(var(--connection-primary))" stopOpacity="0.2" />
-            <stop offset="50%" stopColor="hsl(var(--connection-primary))" stopOpacity="0.6" />
-            <stop offset="100%" stopColor="hsl(var(--connection-primary))" stopOpacity="0.2" />
+            <stop offset="0%" stopColor="hsl(var(--connection-primary))" stopOpacity="0.4" />
+            <stop offset="50%" stopColor="hsl(var(--connection-primary))" stopOpacity="0.8" />
+            <stop offset="100%" stopColor="hsl(var(--connection-primary))" stopOpacity="0.4" />
           </linearGradient>
           <linearGradient id="connectionLineActive" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="hsl(var(--connection-primary))" stopOpacity="0.4" />
+            <stop offset="0%" stopColor="hsl(var(--connection-primary))" stopOpacity="0.6" />
             <stop offset="50%" stopColor="hsl(var(--connection-primary))" stopOpacity="1" />
-            <stop offset="100%" stopColor="hsl(var(--connection-primary))" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="hsl(var(--connection-primary))" stopOpacity="0.6" />
           </linearGradient>
         </defs>
         
