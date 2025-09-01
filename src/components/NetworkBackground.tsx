@@ -14,74 +14,34 @@ export const NetworkBackground: React.FC<NetworkBackgroundProps> = ({
   if (variant === 'hero') {
     return (
       <div className={`absolute inset-0 overflow-hidden pointer-events-none ${className}`}>
-        {/* Smart grid lines flowing toward center */}
+        {/* Clean framing lines - positioned to avoid text overlap */}
         
-        {/* Left side convergence */}
+        {/* Top elegant curve - above headline */}
         <ConnectionLine
-          startX={0} startY={25}
-          endX={35} endY={45}
-          animated
-          delay={0.3}
-        />
-        <ConnectionLine
-          startX={0} startY={75}
-          endX={35} endY={55}
-          animated
-          delay={0.6}
+          startX={20} startY={15}
+          endX={80} endY={15}
+          curved={false}
+          animated={false}
+          className="opacity-30"
         />
         
-        {/* Right side convergence */}
+        {/* Subtle side accent - left side */}
         <ConnectionLine
-          startX={100} startY={20}
-          endX={65} endY={40}
-          animated
-          delay={0.9}
-        />
-        <ConnectionLine
-          startX={100} startY={80}
-          endX={65} endY={60}
-          animated
-          delay={1.2}
+          startX={5} startY={30}
+          endX={15} endY={70}
+          curved={false}
+          animated={false}
+          className="opacity-20"
         />
         
-        {/* Top convergence */}
+        {/* Bottom framing line - below CTA */}
         <ConnectionLine
-          startX={30} startY={0}
-          endX={45} endY={35}
-          animated
-          delay={1.5}
+          startX={30} startY={85}
+          endX={70} endY={85}
+          curved={false}
+          animated={false}
+          className="opacity-25"
         />
-        <ConnectionLine
-          startX={70} startY={0}
-          endX={55} endY={35}
-          animated
-          delay={1.8}
-        />
-        
-        {/* Central connection hub */}
-        <ConnectionLine
-          startX={35} startY={50}
-          endX={65} endY={50}
-          animated
-          delay={2.1}
-          className="opacity-40"
-        />
-        
-        {/* Network nodes - no labels */}
-        <ConnectionDot position={{ x: 10, y: 25 }} size="sm" delay={2.4} />
-        <ConnectionDot position={{ x: 10, y: 75 }} size="sm" delay={2.5} />
-        <ConnectionDot position={{ x: 90, y: 20 }} size="sm" delay={2.6} />
-        <ConnectionDot position={{ x: 90, y: 80 }} size="sm" delay={2.7} />
-        <ConnectionDot position={{ x: 30, y: 10 }} size="sm" delay={2.8} />
-        <ConnectionDot position={{ x: 70, y: 10 }} size="sm" delay={2.9} />
-        
-        {/* Central hub dots */}
-        <ConnectionDot position={{ x: 50, y: 50 }} size="md" delay={3.0} />
-        
-        {/* Unconnected depth dots */}
-        <ConnectionDot position={{ x: 20, y: 60 }} size="sm" delay={3.2} className="opacity-30" />
-        <ConnectionDot position={{ x: 80, y: 40 }} size="sm" delay={3.4} className="opacity-30" />
-        <ConnectionDot position={{ x: 60, y: 20 }} size="sm" delay={3.6} className="opacity-30" />
       </div>
     );
   }
