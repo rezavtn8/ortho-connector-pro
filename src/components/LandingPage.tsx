@@ -88,14 +88,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
           {!showAuth && (
             <>
               {/* Patient Source Graph Section */}
-              <section className="relative z-20 px-6 py-16">
+              <section className="px-6 py-16">
                 <div className="max-w-5xl mx-auto">
                   <div className="text-center mb-12">
                     <h2 className="text-3xl md:text-4xl font-bold text-connection-text mb-4">
                       Visualize Your Patient Network
                     </h2>
                     <p className="text-lg text-connection-muted max-w-2xl mx-auto">
-                      See how patients flow to your practice from every source — from Google searches to professional referrals. Click or hover any source to highlight its connection.
+                      See the real-time flow of patients to your practice. Each connection represents a source bringing patients to your door.
                     </p>
                   </div>
                   
@@ -104,7 +104,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                   {/* Interactive callout */}
                   <div className="mt-8 text-center">
                     <p className="text-sm text-connection-muted/80 italic">
-                      💡 Try hovering over any source above to see its connection light up
+                      💡 Hover over any source to see its connection
                     </p>
                   </div>
                 </div>
