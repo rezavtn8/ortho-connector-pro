@@ -10,8 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { 
-  MapPin, Save, Crosshair, AlertCircle, CheckCircle, User, Bell, 
+import { MapPin, Save, Crosshair, AlertCircle, CheckCircle, User, Bell, 
   Users, Database, Shield, Key, CreditCard, Download, Upload,
   Trash2, Eye, EyeOff, Mail, Phone, Settings2, Globe, Lock,
   UserPlus, Crown, Edit, Copy
@@ -20,6 +19,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { AddressSearch } from '@/components/AddressSearch';
+import { MapView } from '@/components/MapView';
 
 type UserRole = 'Front Desk' | 'Owner' | 'Marketing Rep' | 'Manager';
 
@@ -747,14 +747,11 @@ export function Settings() {
                     <Label>Location Preview</Label>
                     <div className="h-64 rounded-lg overflow-hidden border">
                       {hasLocation ? (
-                        <div className="flex items-center justify-center h-full bg-muted text-muted-foreground">
-                          <div className="text-center">
-                            <MapPin className="h-8 w-8 mx-auto mb-2 text-primary" />
-                            <p className="text-sm font-medium">{clinicSettings.clinic_name}</p>
-                            <p className="text-xs mt-1">Lat: {clinicSettings.clinic_latitude}, Lng: {clinicSettings.clinic_longitude}</p>
-                            <p className="text-xs mt-2 text-blue-600">Visit Maps tab to view full map</p>
-                          </div>
-                        </div>
+                        <MapView 
+                          height="256px"
+                          selectedOfficeId="clinic-location"
+                          showVisitData={false}
+                        />
                       ) : (
                         <div className="h-full bg-muted flex items-center justify-center">
                           <div className="text-center text-muted-foreground">
