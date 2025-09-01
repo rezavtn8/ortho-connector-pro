@@ -19,7 +19,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { AddressSearch } from '@/components/AddressSearch';
-import { MapView } from '@/components/MapView';
 
 type UserRole = 'Front Desk' | 'Owner' | 'Marketing Rep' | 'Manager';
 
@@ -747,10 +746,13 @@ export function Settings() {
                     <Label>Location Preview</Label>
                     <div className="h-64 rounded-lg overflow-hidden border">
                       {hasLocation ? (
-                        <MapView 
-                          height="256px"
-                          selectedOfficeId="clinic-location"
-                          showVisitData={false}
+                        <iframe
+                          className="w-full h-full"
+                          loading="lazy"
+                          allowFullScreen
+                          referrerPolicy="no-referrer-when-downgrade"
+                          src={`https://www.google.com/maps/embed/v1/place?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}&q=${clinicSettings.clinic_latitude},${clinicSettings.clinic_longitude}&zoom=15&maptype=roadmap`}
+                          title="Clinic Location"
                         />
                       ) : (
                         <div className="h-full bg-muted flex items-center justify-center">
