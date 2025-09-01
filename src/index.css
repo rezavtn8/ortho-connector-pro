@@ -284,8 +284,23 @@ All colors MUST be HSL.
     }
   }
 
-  .animate-flow {
-    animation: flow 2s ease-in-out infinite;
+  @keyframes flow-particle {
+    0% {
+      transform: translate(var(--start-x, 0), var(--start-y, 0));
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.8;
+    }
+    100% {
+      transform: translate(0, 0);
+      opacity: 0;
+    }
+  }
+
+  @keyframes bob {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-3px); }
   }
 
   .animate-pulse-dot {
@@ -337,6 +352,14 @@ All colors MUST be HSL.
     animation: travel-line 3s ease-in-out infinite;
   }
 
+  .animate-flow {
+    animation: flow-particle 4s ease-in-out infinite;
+  }
+
+  .animate-bob {
+    animation: bob 3s ease-in-out infinite;
+  }
+
   .hover-glow:hover {
     animation: glow 0.3s ease-in-out;
   }
@@ -349,7 +372,9 @@ All colors MUST be HSL.
     .animate-travel-line,
     .animate-float,
     .animate-pulse-glow,
-    .animate-pulse-dot {
+    .animate-pulse-dot,
+    .animate-flow,
+    .animate-bob {
       animation: none;
     }
     
