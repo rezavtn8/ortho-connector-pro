@@ -23,6 +23,20 @@ import { AddressSearch } from '@/components/AddressSearch';
 
 type UserRole = 'Front Desk' | 'Owner' | 'Marketing Rep' | 'Manager';
 
+// Type interfaces for database function responses
+interface AuthContextResult {
+  authenticated: boolean;
+  user_id: string | null;
+  timestamp: string;
+}
+
+interface ClinicCreationResult {
+  success: boolean;
+  clinic_id?: string;
+  error?: string;
+  message?: string;
+}
+
 interface ClinicSettings {
   clinic_name: string;
   clinic_address: string;
@@ -201,6 +215,49 @@ export function Settings() {
     );
   };
 
+  // Helper to refresh session and validate authentication context
+  const validateAndRefreshAuth = async (retryCount = 0): Promise<{ success: boolean; user?: any; error?: string }> => {
+    const maxRetries = 2;
+    
+    try {
+      // Force session refresh
+      console.log(`Auth validation attempt ${retryCount + 1}/${maxRetries + 1}`);
+      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
+      
+      if (sessionError || !session?.user?.id) {
+        console.log('Session refresh failed:', sessionError);
+        if (retryCount < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+          return validateAndRefreshAuth(retryCount + 1);
+        }
+        return { success: false, error: 'Session authentication failed' };
+      }
+
+      // Validate database auth context
+      const { data: authCheck, error: dbError } = await supabase.rpc('validate_auth_context');
+      console.log('Database auth context:', authCheck, 'DB Error:', dbError);
+      
+      const authResult = authCheck as unknown as AuthContextResult | null;
+      if (dbError || !authResult?.authenticated) {
+        console.log('Database auth validation failed:', dbError);
+        if (retryCount < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 1500)); // Wait longer for DB sync
+          return validateAndRefreshAuth(retryCount + 1);
+        }
+        return { success: false, error: 'Database authentication context failed' };
+      }
+
+      return { success: true, user: session.user };
+    } catch (error) {
+      console.error('Auth validation error:', error);
+      if (retryCount < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return validateAndRefreshAuth(retryCount + 1);
+      }
+      return { success: false, error: 'Authentication validation failed' };
+    }
+  };
+
   const saveClinicSettings = async () => {
     console.log('Save clinic settings called, user:', user);
     
@@ -232,98 +289,61 @@ export function Settings() {
       return;
     }
 
-    // Check if user is properly authenticated with valid session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    console.log('Session check:', session, 'Session error:', sessionError);
-    
-    if (!session?.user?.id) {
-      toast({
-        title: "Authentication error", 
-        description: "Session expired. Please log in again.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    const authUser = session.user;
-
     setIsSaving(true);
     
     try {
-      // Check if user profile exists first
+      // Validate and refresh authentication context
+      const authResult = await validateAndRefreshAuth();
+      if (!authResult.success) {
+        toast({
+          title: "Authentication error", 
+          description: authResult.error || "Please log in again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('Authentication validated, proceeding with clinic creation');
+
+      // Check if user already has a clinic
       const { data: existingProfile, error: profileError } = await supabase
         .from('user_profiles')
         .select('id, clinic_id')
-        .eq('user_id', authUser.id)
+        .eq('user_id', authResult.user.id)
         .maybeSingle();
 
       console.log('Existing profile:', existingProfile, 'Profile error:', profileError);
 
       let clinicId = existingProfile?.clinic_id;
 
-      // Create user profile first if it doesn't exist (clinic_id will be NULL initially)
-      if (!existingProfile) {
-        console.log('Creating user profile (clinic_id will be set after clinic creation)');
-        const { error: createProfileError } = await supabase
-          .from('user_profiles')
-          .insert({
-            user_id: authUser.id,
-            email: authUser.email || '',
-            role: 'Owner',
-            clinic_id: null, // Will be updated after clinic creation
-          });
-        
-        if (createProfileError && createProfileError.code !== '23505') {
-          console.error('Profile creation error:', createProfileError);
-          throw new Error('Could not create user profile: ' + createProfileError.message);
-        }
-      }
-
-      // If no clinic exists, create one
       if (!clinicId) {
-        console.log('Creating new clinic with owner_id:', authUser.id);
-        const { data: newClinic, error: clinicError } = await supabase
-          .from('clinics')
-          .insert({
-            name: clinicSettings.clinic_name || 'My Clinic',
-            address: clinicSettings.clinic_address || '',
-            latitude: clinicSettings.clinic_latitude,
-            longitude: clinicSettings.clinic_longitude,
-            owner_id: authUser.id
-          })
-          .select('id')
-          .single();
+        // Use secure database function for clinic creation
+        console.log('Creating clinic using secure function');
+        const { data: clinicResult, error: clinicError } = await supabase.rpc('create_clinic_for_user', {
+          p_name: clinicSettings.clinic_name,
+          p_address: clinicSettings.clinic_address,
+          p_latitude: clinicSettings.clinic_latitude,
+          p_longitude: clinicSettings.clinic_longitude
+        });
 
-        console.log('New clinic result:', newClinic, 'Clinic error:', clinicError);
-        
+        console.log('Clinic creation result:', clinicResult, 'Error:', clinicError);
+
         if (clinicError) {
-          console.error('Clinic creation error:', clinicError);
-          if (clinicError.code === '23505') {
-            throw new Error('A clinic already exists for this user.');
-          }
+          console.error('Clinic creation function error:', clinicError);
           throw new Error('Could not create clinic: ' + clinicError.message);
         }
-        clinicId = newClinic.id;
 
-        // Update user profile with the clinic_id
-        console.log('Updating user profile with clinic_id:', clinicId);
-        const { error: updateProfileError } = await supabase
-          .from('user_profiles')
-          .update({ 
-            clinic_id: clinicId,
-            clinic_name: clinicSettings.clinic_name,
-            clinic_address: clinicSettings.clinic_address,
-            clinic_latitude: clinicSettings.clinic_latitude,
-            clinic_longitude: clinicSettings.clinic_longitude,
-          })
-          .eq('user_id', authUser.id);
-        
-        if (updateProfileError) {
-          console.error('Profile update with clinic_id error:', updateProfileError);
-          throw new Error('Could not link clinic to profile: ' + updateProfileError.message);
+        const result = clinicResult as unknown as ClinicCreationResult | null;
+        if (!result?.success) {
+          console.error('Clinic creation failed:', result);
+          throw new Error(result?.error || 'Could not create clinic');
         }
+
+        clinicId = result.clinic_id;
+        console.log('Clinic created successfully with ID:', clinicId);
       } else {
         // Update existing clinic
+        console.log('Updating existing clinic:', clinicId);
         const { error: clinicUpdateError } = await supabase
           .from('clinics')
           .update({
@@ -336,26 +356,23 @@ export function Settings() {
 
         if (clinicUpdateError) {
           console.error('Clinic update error:', clinicUpdateError);
-          throw clinicUpdateError;
+          throw new Error('Could not update clinic: ' + clinicUpdateError.message);
         }
-      }
 
-      // Update user profile with clinic info (if profile already existed)
-      if (existingProfile) {
-        const { error: updateProfileError } = await supabase
+        // Also update user profile with latest clinic info
+        const { error: profileUpdateError } = await supabase
           .from('user_profiles')
           .update({
-            clinic_id: clinicId,
             clinic_name: clinicSettings.clinic_name,
             clinic_address: clinicSettings.clinic_address,
             clinic_latitude: clinicSettings.clinic_latitude,
             clinic_longitude: clinicSettings.clinic_longitude,
           })
-          .eq('user_id', authUser.id);
+          .eq('user_id', authResult.user.id);
           
-        if (updateProfileError) {
-          console.error('Profile update error:', updateProfileError);
-          throw updateProfileError;
+        if (profileUpdateError) {
+          console.error('Profile update error:', profileUpdateError);
+          throw new Error('Could not update profile: ' + profileUpdateError.message);
         }
       }
 

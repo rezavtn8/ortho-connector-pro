@@ -448,6 +448,15 @@ export type Database = {
         Args: { source_id_param: string }
         Returns: string
       }
+      create_clinic_for_user: {
+        Args: {
+          p_address?: string
+          p_latitude?: number
+          p_longitude?: number
+          p_name: string
+        }
+        Returns: Json
+      }
       get_current_month_patients: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -497,6 +506,10 @@ export type Database = {
       user_has_clinic_admin_access: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      validate_auth_context: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
     }
     Enums: {
