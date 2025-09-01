@@ -233,6 +233,22 @@ All colors MUST be HSL.
     50% { filter: brightness(1.2) drop-shadow(0 0 10px currentColor); }
   }
 
+  @keyframes pulse-line {
+    0%, 100% { 
+      opacity: 0.4;
+      stroke-width: 1;
+    }
+    50% { 
+      opacity: 0.8;
+      stroke-width: 2;
+    }
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+  }
+
   .animate-flow {
     animation: flow 2s ease-in-out infinite;
   }
@@ -255,7 +271,22 @@ All colors MUST be HSL.
   }
 
   .animate-glow {
-    animation: glow 2s ease-in-out infinite;
+    animation: glow 2s ease-in-out infinite alternate;
+  }
+
+  /* Circuit glow effects */
+  .drop-shadow-circuit {
+    filter: drop-shadow(0 0 2px hsl(var(--connection-primary) / 0.5));
+  }
+
+  /* Pulse line animation for graph connections */
+  .animate-pulse-line {
+    animation: pulse-line 3s ease-in-out infinite;
+  }
+
+  /* Float animation for particles */
+  .animate-float {
+    animation: float 4s ease-in-out infinite;
   }
 
   .hover-glow:hover {

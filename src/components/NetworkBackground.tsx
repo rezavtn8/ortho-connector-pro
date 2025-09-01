@@ -14,102 +14,126 @@ export const NetworkBackground: React.FC<NetworkBackgroundProps> = ({
   if (variant === 'hero') {
     return (
       <div className={`absolute inset-0 overflow-hidden pointer-events-none ${className}`}>
-        {/* Tech interface corner connections - avoiding text areas */}
+        {/* Gradient backgrounds for tech interface feel */}
+        <div className="absolute top-0 left-0 w-32 h-32 bg-gradient-to-br from-connection-primary/5 to-transparent rounded-full blur-3xl" />
+        <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-bl from-connection-primary/3 to-transparent rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-36 h-36 bg-gradient-to-tr from-connection-primary/4 to-transparent rounded-full blur-3xl" />
         
-        {/* Top left corner connection */}
-        <ConnectionLine
-          startX={5} startY={5}
-          endX={25} endY={5}
-          curved={false}
-          animated={false}
-          className="opacity-40"
-        />
-        <ConnectionLine
-          startX={25} startY={5}
-          endX={25} endY={20}
-          curved={false}
-          animated={false}
-          className="opacity-40"
-        />
+        {/* Circuit-style corner connections with glow */}
         
-        {/* Top right corner connection */}
+        {/* Top left circuit */}
         <ConnectionLine
-          startX={75} startY={5}
-          endX={95} endY={5}
+          startX={2} startY={8}
+          endX={18} endY={8}
           curved={false}
           animated={false}
-          className="opacity-40"
+          className="opacity-60 drop-shadow-circuit"
         />
         <ConnectionLine
-          startX={95} startY={5}
-          endX={95} endY={20}
+          startX={18} startY={8}
+          endX={18} endY={18}
           curved={false}
           animated={false}
-          className="opacity-40"
+          className="opacity-60 drop-shadow-circuit"
+        />
+        <ConnectionLine
+          startX={18} startY={18}
+          endX={28} endY={18}
+          curved={false}
+          animated={false}
+          className="opacity-40 drop-shadow-circuit"
         />
         
-        {/* Bottom left corner connection */}
+        {/* Top right circuit */}
         <ConnectionLine
-          startX={5} startY={80}
-          endX={5} endY={95}
+          startX={72} startY={8}
+          endX={82} endY={8}
           curved={false}
           animated={false}
-          className="opacity-40"
+          className="opacity-40 drop-shadow-circuit"
         />
         <ConnectionLine
-          startX={5} startY={95}
-          endX={20} endY={95}
+          startX={82} startY={8}
+          endX={98} endY={8}
           curved={false}
           animated={false}
-          className="opacity-40"
-        />
-        
-        {/* Bottom right corner connection */}
-        <ConnectionLine
-          startX={80} startY={95}
-          endX={95} endY={95}
-          curved={false}
-          animated={false}
-          className="opacity-40"
+          className="opacity-60 drop-shadow-circuit"
         />
         <ConnectionLine
-          startX={95} startY={80}
-          endX={95} endY={95}
+          startX={82} startY={8}
+          endX={82} endY={18}
           curved={false}
           animated={false}
-          className="opacity-40"
+          className="opacity-60 drop-shadow-circuit"
         />
         
-        {/* Side tech accents - in free areas */}
+        {/* Bottom left circuit */}
         <ConnectionLine
-          startX={8} startY={35}
-          endX={18} endY={35}
+          startX={2} startY={82}
+          endX={2} endY={92}
           curved={false}
           animated={false}
-          className="opacity-25"
+          className="opacity-60 drop-shadow-circuit"
         />
         <ConnectionLine
-          startX={18} startY={35}
-          endX={18} endY={45}
+          startX={2} startY={92}
+          endX={18} endY={92}
           curved={false}
           animated={false}
-          className="opacity-25"
+          className="opacity-60 drop-shadow-circuit"
+        />
+        <ConnectionLine
+          startX={18} startY={82}
+          endX={18} endY={92}
+          curved={false}
+          animated={false}
+          className="opacity-40 drop-shadow-circuit"
         />
         
+        {/* Bottom right circuit */}
         <ConnectionLine
-          startX={82} startY={55}
-          endX={92} endY={55}
+          startX={82} startY={82}
+          endX={82} endY={92}
           curved={false}
           animated={false}
-          className="opacity-25"
+          className="opacity-40 drop-shadow-circuit"
         />
         <ConnectionLine
-          startX={82} startY={55}
-          endX={82} endY={65}
+          startX={82} startY={92}
+          endX={98} endY={92}
           curved={false}
           animated={false}
-          className="opacity-25"
+          className="opacity-60 drop-shadow-circuit"
         />
+        <ConnectionLine
+          startX={82} startY={82}
+          endX={98} endY={82}
+          curved={false}
+          animated={false}
+          className="opacity-60 drop-shadow-circuit"
+        />
+        
+        {/* Subtle middle accents */}
+        <ConnectionLine
+          startX={5} startY={45}
+          endX={15} endY={45}
+          curved={false}
+          animated={false}
+          className="opacity-20 drop-shadow-circuit"
+        />
+        <ConnectionLine
+          startX={85} startY={55}
+          endX={95} endY={55}
+          curved={false}
+          animated={false}
+          className="opacity-20 drop-shadow-circuit"
+        />
+        
+        {/* Connection nodes at intersections */}
+        <ConnectionDot position={{ x: 18, y: 8 }} size="sm" className="opacity-80" animated={false} />
+        <ConnectionDot position={{ x: 82, y: 8 }} size="sm" className="opacity-80" animated={false} />
+        <ConnectionDot position={{ x: 18, y: 92 }} size="sm" className="opacity-80" animated={false} />
+        <ConnectionDot position={{ x: 82, y: 92 }} size="sm" className="opacity-80" animated={false} />
       </div>
     );
   }
