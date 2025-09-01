@@ -232,11 +232,11 @@ export function Settings() {
       return;
     }
 
-    // Check if user is properly authenticated by testing auth
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    console.log('Auth user check:', authUser);
+    // Check if user is properly authenticated with valid session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    console.log('Session check:', session, 'Session error:', sessionError);
     
-    if (!authUser?.id) {
+    if (!session?.user?.id) {
       toast({
         title: "Authentication error", 
         description: "Session expired. Please log in again.",
@@ -244,6 +244,8 @@ export function Settings() {
       });
       return;
     }
+    
+    const authUser = session.user;
 
     setIsSaving(true);
     
