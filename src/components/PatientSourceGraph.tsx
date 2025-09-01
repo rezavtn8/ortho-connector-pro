@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Building2, Globe, Star, Facebook, Users, MessageSquare, User } from 'lucide-react';
+import { Building2, Globe, Star, Facebook, Users, MessageSquare } from 'lucide-react';
 
 interface PatientSourceGraphProps {
   className?: string;
@@ -8,7 +8,6 @@ interface PatientSourceGraphProps {
 export const PatientSourceGraph: React.FC<PatientSourceGraphProps> = ({ className = '' }) => {
   const [hoveredSource, setHoveredSource] = useState<string | null>(null);
 
-  // Circular layout positions - 6 sources around the center
   const sources = [
     { id: 'google', name: 'Google', icon: Globe, angle: 0 },
     { id: 'yelp', name: 'Yelp', icon: Star, angle: 60 },
@@ -18,32 +17,28 @@ export const PatientSourceGraph: React.FC<PatientSourceGraphProps> = ({ classNam
     { id: 'word-of-mouth', name: 'Word of Mouth', icon: MessageSquare, angle: 300 }
   ];
 
-  // Calculate positions based on angle (circular orbit)
-  const radius = 35; // Percentage from center
+  const radius = 40;
   const getPosition = (angle: number) => {
     const radian = (angle * Math.PI) / 180;
-    const x = 50 + radius * Math.cos(radian - Math.PI / 2); // -π/2 to start from top
+    const x = 50 + radius * Math.cos(radian - Math.PI / 2);
     const y = 50 + radius * Math.sin(radian - Math.PI / 2);
     return { x, y };
   };
 
   return (
-    <div className={`relative w-full h-80 md:h-96 bg-white rounded-3xl overflow-hidden ${className}`}>
-      {/* Subtle gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-connection-bg/30 via-white to-connection-bg/20"></div>
-
+    <div className={`relative w-full h-80 md:h-96 bg-white ${className}`}>
       {/* Connection lines */}
-      <svg className="absolute inset-0 w-full h-full pointer-events-none z-10" viewBox="0 0 100 100" preserveAspectRatio="none">
+      <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
         <defs>
-          <linearGradient id="connectionLine" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="hsl(var(--connection-primary))" stopOpacity="0.6" />
-            <stop offset="50%" stopColor="hsl(var(--connection-primary))" stopOpacity="1" />
-            <stop offset="100%" stopColor="hsl(var(--connection-primary))" stopOpacity="0.6" />
+          <linearGradient id="flowLine" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="hsl(var(--connection-primary))" stopOpacity="0.3" />
+            <stop offset="70%" stopColor="hsl(var(--connection-primary))" stopOpacity="0.8" />
+            <stop offset="100%" stopColor="hsl(var(--connection-primary))" stopOpacity="0" />
           </linearGradient>
-          <linearGradient id="connectionLineActive" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="hsl(var(--connection-primary))" stopOpacity="0.8" />
-            <stop offset="50%" stopColor="hsl(var(--connection-primary))" stopOpacity="1" />
-            <stop offset="100%" stopColor="hsl(var(--connection-primary))" stopOpacity="0.8" />
+          <linearGradient id="flowLineActive" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="hsl(var(--connection-primary))" stopOpacity="0.6" />
+            <stop offset="70%" stopColor="hsl(var(--connection-primary))" stopOpacity="1" />
+            <stop offset="100%" stopColor="hsl(var(--connection-primary))" stopOpacity="0" />
           </linearGradient>
         </defs>
         
@@ -58,71 +53,35 @@ export const PatientSourceGraph: React.FC<PatientSourceGraphProps> = ({ classNam
               y1={position.y}
               x2="50"
               y2="50"
-              stroke={isActive ? "url(#connectionLineActive)" : "url(#connectionLine)"}
-              strokeWidth={isActive ? "3" : "2"}
-              className={`transition-all duration-300 ${isActive ? '' : 'animate-pulse'}`}
+              stroke={isActive ? "url(#flowLineActive)" : "url(#flowLine)"}
+              strokeWidth="1"
+              className="transition-all duration-300"
               style={{
-                animationDuration: '3s',
-                filter: isActive ? 'drop-shadow(0 0 4px hsl(var(--connection-primary) / 0.5))' : 'none'
+                filter: isActive ? 'drop-shadow(0 0 2px hsl(var(--connection-primary) / 0.6))' : 'none'
               }}
             />
           );
         })}
       </svg>
 
-      {/* Moving patient icons */}
-      <div className="absolute inset-0 pointer-events-none z-15">
-        {sources.map((source, index) => {
-          const position = getPosition(source.angle);
-          const isActive = hoveredSource === source.id;
-          
-          return (
-            <div
-              key={`patient-${source.id}`}
-              className={`absolute w-6 h-6 rounded-full bg-white shadow-md border-2 border-connection-primary flex items-center justify-center transition-all duration-300 ${
-                isActive ? 'scale-125' : ''
-              }`}
-              style={{
-                left: `${position.x}%`,
-                top: `${position.y}%`,
-                animationName: 'patientFlow',
-                animationDuration: '3s',
-                animationDelay: `${index * 0.5}s`,
-                animationIterationCount: 'infinite',
-                animationTimingFunction: 'ease-in-out',
-                '--start-x': `${position.x - 50}%`,
-                '--start-y': `${position.y - 50}%`,
-              } as any}
-            >
-              <User className="w-3 h-3 text-connection-primary" />
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Central dental office node */}
+      {/* Central node */}
       <div 
-        className="absolute w-16 h-16 -translate-x-1/2 -translate-y-1/2 z-20"
+        className="absolute w-8 h-8 -translate-x-1/2 -translate-y-1/2 z-10"
         style={{ left: '50%', top: '50%' }}
       >
-        <div className="w-full h-full bg-connection-primary rounded-full shadow-lg flex items-center justify-center text-white relative">
-          <Building2 className="w-7 h-7" />
-          
-          {/* Glow effect */}
-          <div className="absolute -inset-2 bg-connection-primary/20 rounded-full animate-pulse blur-sm"></div>
-          <div className="absolute -inset-4 bg-connection-primary/10 rounded-full animate-ping"></div>
+        <div className="w-full h-full bg-connection-primary rounded-full flex items-center justify-center text-white">
+          <Building2 className="w-4 h-4" />
         </div>
-        
-        {/* Center label */}
-        <div className="absolute top-full mt-3 left-1/2 -translate-x-1/2 whitespace-nowrap">
-          <div className="bg-white/95 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs font-medium text-connection-text shadow-sm border border-connection-primary/10">
-            Your Dental Office
-          </div>
+        {hoveredSource && (
+          <div className="absolute -inset-1 bg-connection-primary/30 rounded-full animate-pulse"></div>
+        )}
+        <div className="absolute top-full mt-4 left-1/2 -translate-x-1/2 whitespace-nowrap">
+          <span className="text-sm font-medium text-connection-text">Your Dental Office</span>
         </div>
       </div>
 
       {/* Source nodes */}
-      {sources.map((source, index) => {
+      {sources.map((source) => {
         const IconComponent = source.icon;
         const position = getPosition(source.angle);
         const isHovered = hoveredSource === source.id;
@@ -130,7 +89,7 @@ export const PatientSourceGraph: React.FC<PatientSourceGraphProps> = ({ classNam
         return (
           <div
             key={source.id}
-            className="absolute w-12 h-12 -translate-x-1/2 -translate-y-1/2 z-20 cursor-pointer"
+            className="absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer group"
             style={{
               left: `${position.x}%`,
               top: `${position.y}%`,
@@ -138,28 +97,21 @@ export const PatientSourceGraph: React.FC<PatientSourceGraphProps> = ({ classNam
             onMouseEnter={() => setHoveredSource(source.id)}
             onMouseLeave={() => setHoveredSource(null)}
           >
-            <div className={`w-full h-full bg-white rounded-full shadow-sm border border-connection-primary/20 flex items-center justify-center transition-all duration-300 ${
-              isHovered ? 'scale-110 shadow-lg bg-connection-primary text-white border-connection-primary' : 'text-connection-muted hover:text-connection-primary'
-            }`}>
-              <IconComponent className="w-5 h-5" />
-            </div>
-            
-            {/* Hover glow */}
-            {isHovered && (
-              <div className="absolute -inset-1 bg-connection-primary/30 rounded-full blur-sm animate-pulse"></div>
-            )}
-            
-            {/* Label pill */}
-            <div className={`absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap transition-all duration-300 ${
-              isHovered ? 'opacity-100 translate-y-0' : 'opacity-70 translate-y-1'
-            }`}>
-              <div className={`px-3 py-1 rounded-full text-xs font-medium shadow-sm border transition-all duration-300 ${
+            <div className="flex flex-col items-center space-y-2">
+              <div className={`w-6 h-6 rounded-full bg-white border flex items-center justify-center transition-all duration-300 ${
                 isHovered 
-                  ? 'bg-connection-primary text-white border-connection-primary shadow-md' 
-                  : 'bg-white/95 backdrop-blur-sm text-connection-text border-connection-primary/10'
+                  ? 'border-connection-primary text-connection-primary shadow-sm scale-110' 
+                  : 'border-gray-200 text-gray-400 hover:border-connection-primary/50 hover:text-connection-primary/70'
+              }`}>
+                <IconComponent className="w-3 h-3" />
+              </div>
+              <span className={`text-xs font-medium transition-all duration-300 ${
+                isHovered 
+                  ? 'text-connection-primary' 
+                  : 'text-connection-muted hover:text-connection-text'
               }`}>
                 {source.name}
-              </div>
+              </span>
             </div>
           </div>
         );
