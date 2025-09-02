@@ -307,6 +307,45 @@ export type Database = {
           },
         ]
       }
+      review_status: {
+        Row: {
+          clinic_id: string | null
+          created_at: string
+          google_review_id: string
+          id: string
+          needs_attention: boolean
+          notes: string | null
+          place_id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          clinic_id?: string | null
+          created_at?: string
+          google_review_id: string
+          id?: string
+          needs_attention?: boolean
+          notes?: string | null
+          place_id: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          clinic_id?: string | null
+          created_at?: string
+          google_review_id?: string
+          id?: string
+          needs_attention?: boolean
+          notes?: string | null
+          place_id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       source_tags: {
         Row: {
           clinic_id: string | null
