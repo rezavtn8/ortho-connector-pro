@@ -128,8 +128,22 @@ export const Discover = () => {
 
       if (error) {
         console.error('Edge function error:', error);
+        
+        // Handle rate limiting specifically (429 status)
+        if (error.message?.includes('Edge Function returned a non-2xx status code')) {
+          toast({
+            title: "Rate Limited",
+            description: "You can only refresh office discoveries once every 7 days.",
+            variant: "destructive"
+          });
+          
+          // Force reload to update the UI state
+          await loadDiscoveredOffices();
+          return;
+        }
+        
         toast({
-          title: "Error",
+          title: "Error", 
           description: "Failed to discover offices. Please try again.",
           variant: "destructive"
         });

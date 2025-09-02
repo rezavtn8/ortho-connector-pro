@@ -48,32 +48,50 @@ serve(async (req) => {
       throw new Error('Clinic not found or missing coordinates');
     }
 
-    // Check rate limiting - last fetch should be more than 7 days ago
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-    const { data: lastFetch } = await supabase
+    // Enhanced rate limiting security - check multiple conditions  
+    const now = new Date();
+    const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
+    
+    // Check both fetched_at and created_at for more security
+    const { data: recentFetches, error: fetchError } = await supabase
       .from('discovered_offices')
-      .select('fetched_at')
-      .eq('clinic_id', clinic_id)
+      .select('fetched_at, created_at')
       .eq('discovered_by', user.id)
+      .or(`fetched_at.gt.${sevenDaysAgo.toISOString()},created_at.gt.${sevenDaysAgo.toISOString()}`)
       .order('fetched_at', { ascending: false })
-      .limit(1)
-      .single();
+      .limit(1);
 
-    if (lastFetch && new Date(lastFetch.fetched_at) > sevenDaysAgo) {
+    if (fetchError) {
+      console.error('Error checking rate limit:', fetchError);
       return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Rate limit: You can refresh once every 7 days',
-          canRefresh: false,
-          nextRefreshDate: new Date(new Date(lastFetch.fetched_at).getTime() + 7 * 24 * 60 * 60 * 1000)
-        }),
-        {
-          status: 429,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+        JSON.stringify({ success: false, error: 'Database error checking rate limit' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    if (recentFetches && recentFetches.length > 0) {
+      const lastFetch = recentFetches[0];
+      const lastFetchDate = new Date(lastFetch.fetched_at || lastFetch.created_at);
+      const daysSinceLastFetch = (now.getTime() - lastFetchDate.getTime()) / (1000 * 60 * 60 * 24);
+      
+      if (daysSinceLastFetch < 7) {
+        const nextRefreshDate = new Date(lastFetchDate.getTime() + (7 * 24 * 60 * 60 * 1000));
+        console.log(`Rate limited: ${daysSinceLastFetch.toFixed(2)} days since last fetch, need 7 days`);
+        
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'Rate limited. You can only refresh office discoveries once every 7 days.',
+            nextRefreshDate: nextRefreshDate.toISOString(),
+            canRefresh: false,
+            daysSinceLastFetch: Math.floor(daysSinceLastFetch * 10) / 10
+          }),
+          { 
+            status: 429,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
     }
 
     // Call Google Places API
@@ -99,6 +117,17 @@ serve(async (req) => {
 
     console.log(`Found ${placesData.results?.length || 0} places from Google`);
 
+    // Get existing sources to avoid duplicates
+    const { data: existingSources } = await supabase
+      .from('patient_sources')
+      .select('google_place_id, name, address')
+      .eq('created_by', user.id)
+      .not('google_place_id', 'is', null);
+
+    const existingPlaceIds = new Set(existingSources?.map(s => s.google_place_id) || []);
+    const existingNames = new Set(existingSources?.map(s => s.name.toLowerCase()) || []);
+    const existingAddresses = new Set(existingSources?.map(s => s.address?.toLowerCase()) || []);
+
     const offices = [];
     const newOffices = [];
 
@@ -106,14 +135,36 @@ serve(async (req) => {
       // Get details for each place to get more complete information
       for (const place of placesData.results) {
         try {
-          // Skip if it's the same as user's clinic (same name or very close location)
+          // Skip if this appears to be the user's own clinic or already exists as a source
+          if (place.place_id === clinic.google_place_id) {
+            console.log(`Skipping own clinic: ${place.name}`);
+            continue;
+          }
+
+          if (existingPlaceIds.has(place.place_id)) {
+            console.log(`Skipping existing source by place_id: ${place.name}`);
+            continue;
+          }
+
+          if (existingNames.has(place.name.toLowerCase())) {
+            console.log(`Skipping existing source by name: ${place.name}`);
+            continue;
+          }
+
+          const placeAddress = place.vicinity || place.formatted_address;
+          if (placeAddress && existingAddresses.has(placeAddress.toLowerCase())) {
+            console.log(`Skipping existing source by address: ${place.name}`);
+            continue;
+          }
+
+          // Skip if it's too close and has similar name (likely same clinic)
           const distance = calculateDistance(
             clinic.latitude, clinic.longitude,
             place.geometry.location.lat, place.geometry.location.lng
           );
           
           if (distance < 0.1 && place.name.toLowerCase().includes(clinic.name.toLowerCase().split(' ')[0])) {
-            console.log(`Skipping ${place.name} - appears to be user's own clinic`);
+            console.log(`Skipping ${place.name} - appears to be user's own clinic by proximity and name`);
             continue;
           }
 
