@@ -170,27 +170,69 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
         throw new Error('User not authenticated');
       }
       
-      // Store in Supabase
-      const { error } = await supabase.from('patient_sources').insert({
-        name: match.name,
-        address: match.formatted_address,
-        phone: match.formatted_phone_number,
-        website: match.website,
-        latitude: match.geometry.location.lat,
-        longitude: match.geometry.location.lng,
-        source_type: 'Office',
-        is_active: true,
-        created_by: user.id,
-      });
+      // Get the original office name from the imported data
+      const importedOffice = importedOffices.find(o => o.id === officeId);
+      const originalName = importedOffice?.name || match.name;
+      
+      // Check if an office with this name already exists
+      const { data: existingOffice } = await supabase
+        .from('patient_sources')
+        .select('id')
+        .eq('name', originalName)
+        .eq('created_by', user.id)
+        .eq('source_type', 'Office')
+        .single();
 
-      if (error) throw error;
+      if (existingOffice) {
+        // Update existing office with Google Places data
+        const { error } = await supabase
+          .from('patient_sources')
+          .update({
+            name: match.name,
+            address: match.formatted_address,
+            phone: match.formatted_phone_number,
+            website: match.website,
+            latitude: match.geometry.location.lat,
+            longitude: match.geometry.location.lng,
+            google_place_id: match.place_id,
+            google_rating: match.rating,
+            last_updated_from_google: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingOffice.id);
+
+        if (error) throw error;
+        
+        toast({
+          title: "Office updated",
+          description: `${match.name} has been updated with Google Places data.`,
+        });
+      } else {
+        // Create new office if it doesn't exist
+        const { error } = await supabase.from('patient_sources').insert({
+          name: match.name,
+          address: match.formatted_address,
+          phone: match.formatted_phone_number,
+          website: match.website,
+          latitude: match.geometry.location.lat,
+          longitude: match.geometry.location.lng,
+          google_place_id: match.place_id,
+          google_rating: match.rating,
+          last_updated_from_google: new Date().toISOString(),
+          source_type: 'Office',
+          is_active: true,
+          created_by: user.id,
+        });
+
+        if (error) throw error;
+        
+        toast({
+          title: "Office confirmed",
+          description: `${match.name} has been added to your sources.`,
+        });
+      }
 
       setConfirmedOffices(prev => new Set([...prev, officeId]));
-      
-      toast({
-        title: "Office confirmed",
-        description: `${match.name} has been added to your sources.`,
-      });
     } catch (error) {
       console.error('Error saving office:', error);
       toast({
