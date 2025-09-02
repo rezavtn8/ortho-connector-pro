@@ -12,6 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Building2, ArrowUpDown, Filter } from 'lucide-react';
 import { PatientSource, MonthlyPatients } from '@/lib/database.types';
 import { supabase } from '@/integrations/supabase/client';
@@ -241,158 +242,181 @@ export function Offices() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-foreground">Offices</h1>
-        <div className="flex items-center gap-4">
-          <div className="text-sm text-muted-foreground">
-            {offices.length} office{offices.length !== 1 ? 's' : ''}
+    <TooltipProvider>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold text-foreground">Offices</h1>
+          <div className="flex items-center gap-4">
+            <div className="text-sm text-muted-foreground">
+              {offices.length} office{offices.length !== 1 ? 's' : ''}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Tier Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {Object.entries(TIER_CONFIG).map(([tier, config]) => (
-          <Card key={tier} className="hover:shadow-card transition-shadow">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">{config.label}</p>
-                  <p className="text-2xl font-bold">{tierCounts[tier] || 0}</p>
+        {/* Tier Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {Object.entries(TIER_CONFIG).map(([tier, config]) => (
+            <Card key={tier} className="hover:shadow-card transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">{config.label}</p>
+                    <p className="text-2xl font-bold">{tierCounts[tier] || 0}</p>
+                  </div>
+                  <div className={`px-3 py-1.5 rounded-full ${config.bg} ${config.text} ${config.border} border font-semibold text-sm shadow-sm hover:shadow-md transition-all duration-200`}>
+                    {config.label}
+                  </div>
                 </div>
-                <div className={`px-3 py-1.5 rounded-full ${config.bg} ${config.text} ${config.border} border font-semibold text-sm shadow-sm hover:shadow-md transition-all duration-200`}>
-                  {config.label}
-                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Filters */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="w-5 h-5" />
+              Office Performance
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row gap-4 mb-6">
+              <div className="flex-1">
+                <Input
+                  placeholder="Search offices..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full"
+                />
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Building2 className="w-5 h-5" />
-            Office Performance
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            <div className="flex-1">
-              <Input
-                placeholder="Search offices..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full"
-              />
+              <Select value={tierFilter} onValueChange={(value) => setTierFilter(value as TierFilter)}>
+                <SelectTrigger className="w-full sm:w-48">
+                  <SelectValue placeholder="Filter by tier" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Tiers</SelectItem>
+                  <SelectItem value="VIP">VIP</SelectItem>
+                  <SelectItem value="Warm">Warm</SelectItem>
+                  <SelectItem value="Cold">Cold</SelectItem>
+                  <SelectItem value="Dormant">Dormant</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <Select value={tierFilter} onValueChange={(value) => setTierFilter(value as TierFilter)}>
-              <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="Filter by tier" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Tiers</SelectItem>
-                <SelectItem value="VIP">VIP</SelectItem>
-                <SelectItem value="Warm">Warm</SelectItem>
-                <SelectItem value="Cold">Cold</SelectItem>
-                <SelectItem value="Dormant">Dormant</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
 
-          <div className="rounded-lg border border-border overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>
-                    <Button 
-                      variant="ghost" 
-                      onClick={() => handleSort('name')}
-                      className="h-auto p-0 font-medium"
-                    >
-                      Office Name
-                      <ArrowUpDown className="ml-2 h-4 w-4" />
-                    </Button>
-                  </TableHead>
-                  <TableHead className="text-center">Tier</TableHead>
-                  <TableHead className="text-center">
-                    <Button 
-                      variant="ghost" 
-                      onClick={() => handleSort('l12')}
-                      className="h-auto p-0 font-medium"
-                    >
-                      L12
-                      <ArrowUpDown className="ml-2 h-4 w-4" />
-                    </Button>
-                  </TableHead>
-                  <TableHead className="text-center">
-                    <Button 
-                      variant="ghost" 
-                      onClick={() => handleSort('r3')}
-                      className="h-auto p-0 font-medium"
-                    >
-                      R3
-                      <ArrowUpDown className="ml-2 h-4 w-4" />
-                    </Button>
-                  </TableHead>
-                  <TableHead className="text-center">
-                    <Button 
-                      variant="ghost" 
-                      onClick={() => handleSort('mslr')}
-                      className="h-auto p-0 font-medium"
-                    >
-                      MSLR
-                      <ArrowUpDown className="ml-2 h-4 w-4" />
-                    </Button>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredAndSortedOffices.length === 0 ? (
+            <div className="rounded-lg border border-border overflow-hidden">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8">
-                      <div className="text-muted-foreground">
-                        {offices.length === 0 ? 'No offices found' : 'No offices match your filters'}
-                      </div>
-                    </TableCell>
+                    <TableHead>
+                      <Button 
+                        variant="ghost" 
+                        onClick={() => handleSort('name')}
+                        className="h-auto p-0 font-medium"
+                      >
+                        Office Name
+                        <ArrowUpDown className="ml-2 h-4 w-4" />
+                      </Button>
+                    </TableHead>
+                    <TableHead className="text-center">Tier</TableHead>
+                    <TableHead className="text-center">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            onClick={() => handleSort('l12')}
+                            className="h-auto p-0 font-medium"
+                          >
+                            L12
+                            <ArrowUpDown className="ml-2 h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Last 12 Months - Total referrals in the past year</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TableHead>
+                    <TableHead className="text-center">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            onClick={() => handleSort('r3')}
+                            className="h-auto p-0 font-medium"
+                          >
+                            R3
+                            <ArrowUpDown className="ml-2 h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Recent 3 Months - Referrals in the last quarter</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TableHead>
+                    <TableHead className="text-center">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            onClick={() => handleSort('mslr')}
+                            className="h-auto p-0 font-medium"
+                          >
+                            MSLR
+                            <ArrowUpDown className="ml-2 h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Months Since Last Referral - Time since the last patient</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TableHead>
                   </TableRow>
-                ) : (
-                  filteredAndSortedOffices.map((office) => (
-                    <TableRow key={office.id}>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{office.name}</div>
-                          {office.address && (
-                            <div className="text-sm text-muted-foreground truncate max-w-xs">
-                              {office.address}
-                            </div>
-                          )}
+                </TableHeader>
+                <TableBody>
+                  {filteredAndSortedOffices.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8">
+                        <div className="text-muted-foreground">
+                          {offices.length === 0 ? 'No offices found' : 'No offices match your filters'}
                         </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className={`inline-flex items-center px-3 py-1.5 rounded-full ${TIER_CONFIG[office.tier].bg} ${TIER_CONFIG[office.tier].text} ${TIER_CONFIG[office.tier].border} border font-semibold text-sm shadow-sm hover:shadow-md transition-all duration-200`}>
-                          {office.tier}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center font-semibold">
-                        {office.l12}
-                      </TableCell>
-                      <TableCell className="text-center font-semibold">
-                        {office.r3}
-                      </TableCell>
-                      <TableCell className="text-center font-semibold">
-                        {office.mslr === 999 ? '—' : office.mslr}
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+                  ) : (
+                    filteredAndSortedOffices.map((office) => (
+                      <TableRow key={office.id}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{office.name}</div>
+                            {office.address && (
+                              <div className="text-sm text-muted-foreground truncate max-w-xs">
+                                {office.address}
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className={`inline-flex items-center px-3 py-1.5 rounded-full ${TIER_CONFIG[office.tier].bg} ${TIER_CONFIG[office.tier].text} ${TIER_CONFIG[office.tier].border} border font-semibold text-sm shadow-sm hover:shadow-md transition-all duration-200`}>
+                            {office.tier}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center font-semibold">
+                          {office.l12}
+                        </TableCell>
+                        <TableCell className="text-center font-semibold">
+                          {office.r3}
+                        </TableCell>
+                        <TableCell className="text-center font-semibold">
+                          {office.mslr === 999 ? '—' : office.mslr}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </TooltipProvider>
   );
 }
