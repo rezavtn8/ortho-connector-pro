@@ -6,6 +6,7 @@ import { Layout } from '@/components/Layout';
 import { LandingPage } from '@/components/LandingPage';
 import { Dashboard } from '@/pages/Dashboard';
 import { Sources } from '@/pages/Sources';
+import { Offices } from '@/pages/Offices';
 import { MarketingVisits } from '@/pages/MarketingVisits';
 import { Settings } from '@/pages/Settings';
 import { Analytics } from '@/pages/Analytics';
@@ -46,6 +47,8 @@ const Index = () => {
         return <Dashboard />;
       case 'sources':
         return <Sources />;
+      case 'offices':
+        return <Offices />;
       case 'marketing-visits':
         return <MarketingVisits />;
       case 'discover':

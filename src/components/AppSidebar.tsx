@@ -38,6 +38,7 @@ interface AppSidebarProps {
 const mainNavItems = [
   { id: 'dashboard', title: 'Dashboard', icon: Home },
   { id: 'sources', title: 'Sources', icon: Users },
+  { id: 'offices', title: 'Offices', icon: Building },
   { id: 'analytics', title: 'Analytics', icon: TrendingUp },
 ];
 
