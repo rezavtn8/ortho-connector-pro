@@ -135,7 +135,7 @@ export function Reviews() {
 
     try {
       const { data: config } = await supabase
-        .from('business_api_configs')
+        .from('business_api_configs' as any)
         .select('*')
         .eq('user_id', user.id)
         .single();
@@ -143,8 +143,8 @@ export function Reviews() {
       if (config) {
         setHasBusinessApi(true);
         setBusinessApiConfig({
-          accountId: config.account_id || '',
-          locationId: config.location_id || '',
+          accountId: (config as any).account_id || '',
+          locationId: (config as any).location_id || '',
           serviceAccountKey: '' // Never load the actual key for security
         });
       }
@@ -159,7 +159,7 @@ export function Reviews() {
 
     try {
       const { error } = await supabase
-        .from('business_api_configs')
+        .from('business_api_configs' as any)
         .upsert({
           user_id: user.id,
           account_id: businessApiConfig.accountId,
