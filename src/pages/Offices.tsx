@@ -30,36 +30,28 @@ type SortDirection = 'asc' | 'desc';
 
 const TIER_CONFIG = {
   VIP: { 
-    bg: 'bg-gradient-to-r from-amber-50 to-yellow-50', 
-    text: 'text-amber-800', 
-    border: 'border-amber-300',
-    ring: 'ring-amber-200',
-    label: 'VIP',
-    icon: '👑'
+    bg: 'bg-status-strong/10', 
+    text: 'text-status-strong', 
+    border: 'border-status-strong/30',
+    label: 'VIP'
   },
   Warm: { 
-    bg: 'bg-gradient-to-r from-emerald-50 to-green-50', 
-    text: 'text-emerald-800', 
-    border: 'border-emerald-300',
-    ring: 'ring-emerald-200',
-    label: 'Warm',
-    icon: '🔥'
+    bg: 'bg-status-moderate/10', 
+    text: 'text-status-moderate', 
+    border: 'border-status-moderate/30',
+    label: 'Warm'
   },
   Cold: { 
-    bg: 'bg-gradient-to-r from-blue-50 to-sky-50', 
-    text: 'text-blue-700', 
-    border: 'border-blue-200',
-    ring: 'ring-blue-100',
-    label: 'Cold',
-    icon: '❄️'
+    bg: 'bg-status-sporadic/10', 
+    text: 'text-status-sporadic', 
+    border: 'border-status-sporadic/30',
+    label: 'Cold'
   },
   Dormant: { 
-    bg: 'bg-gradient-to-r from-gray-50 to-slate-50', 
-    text: 'text-gray-600', 
-    border: 'border-gray-300',
-    ring: 'ring-gray-200',
-    label: 'Dormant',
-    icon: '😴'
+    bg: 'bg-status-cold/10', 
+    text: 'text-status-cold', 
+    border: 'border-status-cold/30',
+    label: 'Dormant'
   },
 };
 
@@ -266,14 +258,11 @@ export function Offices() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground flex items-center gap-1">
-                    <span>{config.icon}</span>
-                    {config.label}
-                  </p>
+                  <p className="text-sm text-muted-foreground">{config.label}</p>
                   <p className="text-2xl font-bold">{tierCounts[tier] || 0}</p>
                 </div>
-                <div className={`px-3 py-1.5 rounded-full ${config.bg} ${config.text} ${config.border} border font-medium text-sm shadow-sm`}>
-                  {config.icon} {config.label}
+                <div className={`px-3 py-1.5 rounded-full ${config.bg} ${config.text} ${config.border} border font-semibold text-sm shadow-sm hover:shadow-md transition-all duration-200`}>
+                  {config.label}
                 </div>
               </div>
             </CardContent>
@@ -383,8 +372,7 @@ export function Offices() {
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
-                        <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full ${TIER_CONFIG[office.tier].bg} ${TIER_CONFIG[office.tier].text} ${TIER_CONFIG[office.tier].border} border font-semibold text-sm shadow-sm hover:shadow-md transition-shadow`}>
-                          <span className="text-xs">{TIER_CONFIG[office.tier].icon}</span>
+                        <div className={`inline-flex items-center px-3 py-1.5 rounded-full ${TIER_CONFIG[office.tier].bg} ${TIER_CONFIG[office.tier].text} ${TIER_CONFIG[office.tier].border} border font-semibold text-sm shadow-sm hover:shadow-md transition-all duration-200`}>
                           {office.tier}
                         </div>
                       </TableCell>
