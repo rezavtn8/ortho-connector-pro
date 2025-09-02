@@ -245,8 +245,56 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
     }
   };
 
-  const handleSkip = (officeId: string) => {
-    setSkippedOffices(prev => new Set([...prev, officeId]));
+  const handleSkip = async (officeId: string) => {
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+      
+      // Get the original office data from imported offices
+      const importedOffice = importedOffices.find(o => o.id === officeId);
+      if (!importedOffice) return;
+      
+      // Check if an office with this name already exists
+      const { data: existingOffice } = await supabase
+        .from('patient_sources')
+        .select('id')
+        .eq('name', importedOffice.name)
+        .eq('created_by', user.id)
+        .eq('source_type', 'Office')
+        .single();
+
+      if (!existingOffice) {
+        // Create office with original imported data
+        const { error } = await supabase.from('patient_sources').insert({
+          name: importedOffice.name,
+          address: importedOffice.address || null,
+          phone: importedOffice.phone || null,
+          website: importedOffice.website || null,
+          source_type: 'Office',
+          is_active: true,
+          created_by: user.id,
+        });
+
+        if (error) throw error;
+        
+        toast({
+          title: "Office added",
+          description: `${importedOffice.name} has been added with original data.`,
+        });
+      }
+      
+      setSkippedOffices(prev => new Set([...prev, officeId]));
+    } catch (error) {
+      console.error('Error saving original office:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save office. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleComplete = () => {
