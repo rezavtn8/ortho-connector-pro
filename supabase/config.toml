@@ -1,1 +1,10 @@
 project_id = "vqkzqwibbcvmdwgqladn"
+
+[functions.get-google-reviews]
+verify_jwt = false
+
+[functions.get-mapbox-token]
+verify_jwt = false
+
+[functions.discover-nearby-offices]
+verify_jwt = true

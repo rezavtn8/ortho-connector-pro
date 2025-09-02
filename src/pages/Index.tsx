@@ -12,6 +12,7 @@ import { Analytics } from '@/pages/Analytics';
 import { SourceDetail } from '@/pages/SourceDetail';
 import { MapView } from '@/pages/MapView';
 import { Reviews } from '@/pages/Reviews';
+import { Discover } from '@/pages/Discover';
 
 const Index = () => {
   const { user, loading } = useAuth();
@@ -47,6 +48,8 @@ const Index = () => {
         return <Sources />;
       case 'marketing-visits':
         return <MarketingVisits />;
+      case 'discover':
+        return <Discover />;
       case 'reviews':
         return <Reviews />;
       case 'map-view':

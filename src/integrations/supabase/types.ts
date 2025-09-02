@@ -50,6 +50,63 @@ export type Database = {
         }
         Relationships: []
       }
+      discovered_offices: {
+        Row: {
+          address: string | null
+          clinic_id: string | null
+          created_at: string
+          discovered_by: string
+          fetched_at: string
+          id: string
+          imported: boolean
+          lat: number | null
+          lng: number | null
+          name: string
+          phone: string | null
+          place_id: string
+          rating: number | null
+          source: string
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          address?: string | null
+          clinic_id?: string | null
+          created_at?: string
+          discovered_by: string
+          fetched_at?: string
+          id?: string
+          imported?: boolean
+          lat?: number | null
+          lng?: number | null
+          name: string
+          phone?: string | null
+          place_id: string
+          rating?: number | null
+          source?: string
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          address?: string | null
+          clinic_id?: string | null
+          created_at?: string
+          discovered_by?: string
+          fetched_at?: string
+          id?: string
+          imported?: boolean
+          lat?: number | null
+          lng?: number | null
+          name?: string
+          phone?: string | null
+          place_id?: string
+          rating?: number | null
+          source?: string
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
       marketing_visits: {
         Row: {
           clinic_id: string | null
