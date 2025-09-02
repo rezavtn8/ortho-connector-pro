@@ -334,6 +334,38 @@ export function Reviews() {
         </Button>
       </div>
 
+      {/* API Limitation Notice */}
+      <Card className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-amber-800 dark:text-amber-200 flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5" />
+            Review Data Limitation
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <p className="text-amber-700 dark:text-amber-300 text-sm">
+              <strong>Important:</strong> Google Places API only returns the 5 most helpful reviews. 
+              For access to all your reviews, you can optionally configure Google My Business API.
+            </p>
+            <div className="flex items-center gap-4">
+              <Button variant="outline" size="sm" className="border-amber-300 text-amber-700 hover:bg-amber-100">
+                Configure Business API
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-amber-600 hover:text-amber-700"
+                onClick={() => window.open('https://developers.google.com/my-business/content/review-data', '_blank')}
+              >
+                <ExternalLink className="h-3 w-3 mr-1" />
+                Learn More
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
