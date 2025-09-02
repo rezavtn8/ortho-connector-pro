@@ -44,6 +44,7 @@ const mainNavItems = [
 
 const managementItems = [
   { id: 'marketing-visits', title: 'Marketing Visits', icon: UserPlus },
+  { id: 'campaigns', title: 'Campaigns', icon: Calendar },
   { id: 'discover', title: 'Discover', icon: Search },
   { id: 'reviews', title: 'Reviews', icon: MessageSquare },
   { id: 'map-view', title: 'Map View', icon: MapPin },

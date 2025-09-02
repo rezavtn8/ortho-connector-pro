@@ -14,6 +14,116 @@ export type Database = {
   }
   public: {
     Tables: {
+      campaign_deliveries: {
+        Row: {
+          campaign_id: string
+          created_at: string
+          created_by: string
+          delivered_at: string | null
+          delivery_notes: string | null
+          delivery_status: string
+          id: string
+          office_id: string
+          photo_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string
+          created_by: string
+          delivered_at?: string | null
+          delivery_notes?: string | null
+          delivery_status?: string
+          id?: string
+          office_id: string
+          photo_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string
+          created_by?: string
+          delivered_at?: string | null
+          delivery_notes?: string | null
+          delivery_status?: string
+          id?: string
+          office_id?: string
+          photo_url?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_deliveries_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_deliveries_office_id_fkey"
+            columns: ["office_id"]
+            isOneToOne: false
+            referencedRelation: "patient_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaigns: {
+        Row: {
+          assigned_rep_id: string | null
+          campaign_type: string
+          clinic_id: string | null
+          created_at: string
+          created_by: string
+          delivery_method: string
+          id: string
+          materials_checklist: string[] | null
+          name: string
+          notes: string | null
+          planned_delivery_date: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_rep_id?: string | null
+          campaign_type: string
+          clinic_id?: string | null
+          created_at?: string
+          created_by: string
+          delivery_method: string
+          id?: string
+          materials_checklist?: string[] | null
+          name: string
+          notes?: string | null
+          planned_delivery_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_rep_id?: string | null
+          campaign_type?: string
+          clinic_id?: string | null
+          created_at?: string
+          created_by?: string
+          delivery_method?: string
+          id?: string
+          materials_checklist?: string[] | null
+          name?: string
+          notes?: string | null
+          planned_delivery_date?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clinics: {
         Row: {
           address: string | null
