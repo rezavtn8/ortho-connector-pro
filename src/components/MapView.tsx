@@ -1,12 +1,11 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
-import { divIcon } from 'leaflet';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import mapboxgl from 'mapbox-gl';
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Building2, Phone, Users, RefreshCw, Map, Layers } from "lucide-react";
-import 'leaflet/dist/leaflet.css';
+import 'mapbox-gl/dist/mapbox-gl.css';
 
 interface Office {
   id: string;
@@ -29,12 +28,29 @@ interface Clinic {
 }
 
 export function MapView({ height = "600px" }: { height?: string }) {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
   const [offices, setOffices] = useState<Office[]>([]);
   const [clinic, setClinic] = useState<Clinic | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedOffice, setSelectedOffice] = useState<Office | null>(null);
   const [mapStyle, setMapStyle] = useState<'street' | 'satellite' | 'terrain'>('street');
   const [showConnections, setShowConnections] = useState(true);
+  const [mapboxToken, setMapboxToken] = useState<string | null>(null);
+
+  // Get Mapbox token
+  useEffect(() => {
+    const getMapboxToken = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('get-mapbox-token');
+        if (error) throw error;
+        setMapboxToken(data.token);
+      } catch (error) {
+        console.error('Error getting Mapbox token:', error);
+      }
+    };
+    getMapboxToken();
+  }, []);
 
   // Load clinic and office data
   const loadData = useCallback(async () => {
@@ -125,21 +141,120 @@ export function MapView({ height = "600px" }: { height?: string }) {
     }
   };
 
-  const getTileLayer = () => {
+  const getMapboxStyle = () => {
     switch (mapStyle) {
       case 'satellite':
-        return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+        return 'mapbox://styles/mapbox/satellite-v9';
       case 'terrain':
-        return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}';
+        return 'mapbox://styles/mapbox/outdoors-v12';
       default:
-        return 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+        return 'mapbox://styles/mapbox/streets-v12';
     }
   };
 
-  const createCustomIcon = (strength: string, count: number) => {
-    const color = getStrengthColor(strength);
-    return divIcon({
-      html: `
+  // Initialize map
+  useEffect(() => {
+    if (!mapContainer.current || !mapboxToken || !clinic) return;
+
+    mapboxgl.accessToken = mapboxToken;
+
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: getMapboxStyle(),
+      center: [clinic.longitude, clinic.latitude],
+      zoom: 10
+    });
+
+    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+    // Add markers once map loads
+    map.current.on('load', () => {
+      addMarkersAndConnections();
+    });
+
+    return () => {
+      if (map.current) {
+        map.current.remove();
+      }
+    };
+  }, [mapboxToken, clinic]);
+
+  // Update map style when changed
+  useEffect(() => {
+    if (map.current) {
+      map.current.setStyle(getMapboxStyle());
+      map.current.on('styledata', () => {
+        addMarkersAndConnections();
+      });
+    }
+  }, [mapStyle]);
+
+  // Update connections when toggled
+  useEffect(() => {
+    if (map.current) {
+      addMarkersAndConnections();
+    }
+  }, [showConnections, offices]);
+
+  const addMarkersAndConnections = () => {
+    if (!map.current || !clinic) return;
+
+    // Clear existing markers and sources
+    const markers = document.querySelectorAll('.mapboxgl-marker');
+    markers.forEach(marker => marker.remove());
+
+    if (map.current.getSource('connections')) {
+      map.current.removeLayer('connections');
+      map.current.removeSource('connections');
+    }
+
+    // Add clinic marker
+    const clinicEl = document.createElement('div');
+    clinicEl.innerHTML = `
+      <div style="
+        background-color: #2563eb;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        border: 4px solid white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        cursor: pointer;
+      ">
+        <svg width="20" height="20" fill="white" viewBox="0 0 24 24">
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+        </svg>
+      </div>
+    `;
+
+    const clinicPopup = new mapboxgl.Popup({ offset: 25 })
+      .setHTML(`
+        <div class="p-3">
+          <div class="flex items-center gap-2 mb-2">
+            <svg class="h-4 w-4 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>
+            <span class="font-semibold">${clinic.name}</span>
+          </div>
+          <p class="text-sm text-gray-600">${clinic.address}</p>
+          <div class="mt-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">Your Clinic</div>
+        </div>
+      `);
+
+    new mapboxgl.Marker(clinicEl)
+      .setLngLat([clinic.longitude, clinic.latitude])
+      .setPopup(clinicPopup)
+      .addTo(map.current);
+
+    // Add office markers
+    offices.forEach((office) => {
+      if (!office.latitude || !office.longitude) return;
+
+      const color = getStrengthColor(office.strength);
+      const officeEl = document.createElement('div');
+      officeEl.innerHTML = `
         <div style="
           background-color: ${color};
           width: 32px;
@@ -151,11 +266,12 @@ export function MapView({ height = "600px" }: { height?: string }) {
           justify-content: center;
           box-shadow: 0 2px 8px rgba(0,0,0,0.3);
           position: relative;
+          cursor: pointer;
         ">
           <svg width="16" height="16" fill="white" viewBox="0 0 24 24">
             <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
           </svg>
-          ${count > 0 ? `
+          ${office.currentMonthReferrals > 0 ? `
             <div style="
               position: absolute;
               top: -8px;
@@ -171,40 +287,119 @@ export function MapView({ height = "600px" }: { height?: string }) {
               font-size: 10px;
               font-weight: bold;
               border: 2px solid white;
-            ">${count}</div>
+            ">${office.currentMonthReferrals}</div>
           ` : ''}
         </div>
-      `,
-      className: '',
-      iconSize: [32, 32],
-      iconAnchor: [16, 32]
-    });
-  };
+      `;
 
-  const createClinicIcon = () => {
-    return divIcon({
-      html: `
-        <div style="
-          background-color: #2563eb;
-          width: 40px;
-          height: 40px;
-          border-radius: 50%;
-          border: 4px solid white;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-          animation: pulse 2s infinite;
-        ">
-          <svg width="20" height="20" fill="white" viewBox="0 0 24 24">
-            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-          </svg>
-        </div>
-      `,
-      className: '',
-      iconSize: [40, 40],
-      iconAnchor: [20, 40]
+      const officePopup = new mapboxgl.Popup({ offset: 25 })
+        .setHTML(`
+          <div class="p-3 min-w-[200px]">
+            <div class="flex items-center gap-2 mb-2">
+              <div class="w-3 h-3 rounded-full" style="background-color: ${color}"></div>
+              <span class="font-semibold">${office.name}</span>
+            </div>
+            <p class="text-sm text-gray-600 mb-3">${office.address || ''}</p>
+            
+            <div class="grid grid-cols-2 gap-3 mb-3">
+              <div class="text-center">
+                <p class="text-xs text-gray-500">This Month</p>
+                <p class="font-bold text-blue-600">${office.currentMonthReferrals}</p>
+              </div>
+              <div class="text-center">
+                <p class="text-xs text-gray-500">Total</p>
+                <p class="font-bold text-green-600">${office.totalReferrals}</p>
+              </div>
+            </div>
+            
+            <div class="flex items-center justify-between">
+              <span class="px-2 py-1 text-xs border rounded" style="border-color: ${color}; color: ${color}">
+                ${office.strength}
+              </span>
+              ${office.phone ? `<span class="text-xs text-gray-500">${office.phone}</span>` : ''}
+            </div>
+          </div>
+        `);
+
+      const marker = new mapboxgl.Marker(officeEl)
+        .setLngLat([office.longitude, office.latitude])
+        .setPopup(officePopup)
+        .addTo(map.current!);
+
+      // Handle marker click
+      officeEl.addEventListener('click', () => {
+        setSelectedOffice(office);
+      });
     });
+
+    // Add connection lines
+    if (showConnections) {
+      const connections = offices
+        .filter(office => office.latitude && office.longitude && office.currentMonthReferrals > 0)
+        .map(office => ({
+          type: 'Feature' as const,
+          geometry: {
+            type: 'LineString' as const,
+            coordinates: [
+              [clinic.longitude, clinic.latitude],
+              [office.longitude!, office.latitude!]
+            ]
+          },
+          properties: {
+            strength: office.strength,
+            count: office.currentMonthReferrals
+          }
+        }));
+
+      if (connections.length > 0) {
+        map.current!.addSource('connections', {
+          type: 'geojson',
+          data: {
+            type: 'FeatureCollection',
+            features: connections
+          }
+        });
+
+        map.current!.addLayer({
+          id: 'connections',
+          type: 'line',
+          source: 'connections',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round'
+          },
+          paint: {
+            'line-color': [
+              'case',
+              ['==', ['get', 'strength'], 'Strong'], '#10b981',
+              ['==', ['get', 'strength'], 'Moderate'], '#eab308',
+              ['==', ['get', 'strength'], 'Sporadic'], '#f97316',
+              '#9ca3af'
+            ],
+            'line-width': [
+              'interpolate',
+              ['linear'],
+              ['get', 'count'],
+              1, 2,
+              10, 6
+            ],
+            'line-opacity': 0.6
+          }
+        });
+      }
+    }
+
+    // Fit bounds to show all markers
+    if (offices.length > 0) {
+      const bounds = new mapboxgl.LngLatBounds();
+      bounds.extend([clinic.longitude, clinic.latitude]);
+      offices.forEach(office => {
+        if (office.latitude && office.longitude) {
+          bounds.extend([office.longitude, office.latitude]);
+        }
+      });
+      map.current!.fitBounds(bounds, { padding: 50 });
+    }
   };
 
   if (!clinic && !isLoading) {
@@ -219,17 +414,6 @@ export function MapView({ height = "600px" }: { height?: string }) {
       </Card>
     );
   }
-
-  const center: [number, number] = clinic 
-    ? [clinic.latitude, clinic.longitude] 
-    : [39.8283, -98.5795]; // Center of US as fallback
-  
-  const bounds = clinic && offices.length > 0 
-    ? [
-        [clinic.latitude, clinic.longitude] as [number, number],
-        ...offices.map(office => [office.latitude!, office.longitude!] as [number, number])
-      ] as [number, number][]
-    : undefined;
 
   return (
     <div className="space-y-4">
@@ -300,114 +484,15 @@ export function MapView({ height = "600px" }: { height?: string }) {
               <p className="text-sm text-muted-foreground">Loading map data...</p>
             </div>
           </div>
+        ) : !mapboxToken ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <MapPin className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-muted-foreground">Map unavailable - Mapbox token not configured</p>
+            </div>
+          </div>
         ) : clinic ? (
-          <MapContainer
-            center={center}
-            zoom={10}
-            bounds={bounds}
-            style={{ height: '100%', width: '100%' }}
-            className="z-0"
-          >
-            <TileLayer
-              url={getTileLayer()}
-              attribution={
-                mapStyle === 'street' 
-                  ? '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                  : '&copy; <a href="https://www.esri.com/">Esri</a>'
-              }
-            />
-            
-            {/* Clinic Marker */}
-            <Marker 
-              position={[clinic.latitude, clinic.longitude]} 
-              icon={createClinicIcon()}
-            >
-              <Popup>
-                <div className="p-2">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Building2 className="h-4 w-4 text-primary" />
-                    <span className="font-semibold">{clinic.name}</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{clinic.address}</p>
-                  <Badge variant="secondary" className="mt-2">Your Clinic</Badge>
-                </div>
-              </Popup>
-            </Marker>
-
-            {/* Office Markers */}
-            {offices.map((office) => {
-              if (!office.latitude || !office.longitude) return null;
-              
-              return (
-                <Marker
-                  key={office.id}
-                  position={[office.latitude, office.longitude]}
-                  icon={createCustomIcon(office.strength, office.currentMonthReferrals)}
-                  eventHandlers={{
-                    click: () => setSelectedOffice(office)
-                  }}
-                >
-                  <Popup>
-                    <div className="p-2 min-w-[200px]">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div 
-                          className="w-3 h-3 rounded-full" 
-                          style={{ backgroundColor: getStrengthColor(office.strength) }}
-                        />
-                        <span className="font-semibold">{office.name}</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-3">{office.address}</p>
-                      
-                      <div className="grid grid-cols-2 gap-3 mb-3">
-                        <div className="text-center">
-                          <p className="text-xs text-muted-foreground">This Month</p>
-                          <p className="font-bold text-primary">{office.currentMonthReferrals}</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-xs text-muted-foreground">Total</p>
-                          <p className="font-bold text-green-600">{office.totalReferrals}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <Badge 
-                          variant="outline" 
-                          style={{ 
-                            borderColor: getStrengthColor(office.strength),
-                            color: getStrengthColor(office.strength)
-                          }}
-                        >
-                          {office.strength}
-                        </Badge>
-                        {office.phone && (
-                          <span className="text-xs text-muted-foreground">{office.phone}</span>
-                        )}
-                      </div>
-                    </div>
-                  </Popup>
-                </Marker>
-              );
-            })}
-
-            {/* Connection Lines */}
-            {showConnections && offices.map((office) => {
-              if (!office.latitude || !office.longitude || office.currentMonthReferrals === 0) return null;
-              
-              return (
-                <Polyline
-                  key={`connection-${office.id}`}
-                  positions={[
-                    [clinic.latitude, clinic.longitude],
-                    [office.latitude, office.longitude]
-                  ]}
-                  color={getStrengthColor(office.strength)}
-                  weight={Math.max(2, Math.min(6, office.currentMonthReferrals))}
-                  opacity={0.6}
-                  dashArray={office.strength === 'Cold' ? '10, 10' : undefined}
-                />
-              );
-            })}
-          </MapContainer>
+          <div ref={mapContainer} className="w-full h-full" />
         ) : (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
