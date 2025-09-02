@@ -30,27 +30,27 @@ type SortDirection = 'asc' | 'desc';
 
 const TIER_CONFIG = {
   VIP: { 
-    bg: 'bg-status-strong/10', 
-    text: 'text-status-strong', 
-    border: 'border-status-strong/30',
+    bg: 'bg-gradient-to-r from-amber-100 to-yellow-100', 
+    text: 'text-amber-800', 
+    border: 'border-amber-400',
     label: 'VIP'
   },
   Warm: { 
-    bg: 'bg-status-moderate/10', 
-    text: 'text-status-moderate', 
-    border: 'border-status-moderate/30',
+    bg: 'bg-gradient-to-r from-emerald-100 to-green-100', 
+    text: 'text-emerald-800', 
+    border: 'border-emerald-400',
     label: 'Warm'
   },
   Cold: { 
-    bg: 'bg-status-sporadic/10', 
-    text: 'text-status-sporadic', 
-    border: 'border-status-sporadic/30',
+    bg: 'bg-gradient-to-r from-blue-100 to-cyan-100', 
+    text: 'text-blue-800', 
+    border: 'border-blue-400',
     label: 'Cold'
   },
   Dormant: { 
-    bg: 'bg-status-cold/10', 
-    text: 'text-status-cold', 
-    border: 'border-status-cold/30',
+    bg: 'bg-gradient-to-r from-slate-100 to-gray-100', 
+    text: 'text-slate-700', 
+    border: 'border-slate-400',
     label: 'Dormant'
   },
 };
