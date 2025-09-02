@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Building2, Phone, Users, ZoomIn, ZoomOut, Navigation, RotateCcw } from "lucide-react";
+import { MapPin, Building2, Phone, Users, ZoomIn, ZoomOut, Navigation, RotateCcw, RefreshCw } from "lucide-react";
 
 interface Office {
   id: string;
@@ -33,87 +33,131 @@ export function MapView({ height = "600px" }: { height?: string }) {
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [mapBounds, setMapBounds] = useState({ minLat: 0, maxLat: 0, minLng: 0, maxLng: 0 });
 
-  // Load clinic and office data
-  useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-      
-      try {
-        // Load user's clinic
-        const { data: profile } = await supabase
-          .from('user_profiles')
-          .select('clinic_id, clinic_name, clinic_address, clinic_latitude, clinic_longitude')
-          .eq('user_id', (await supabase.auth.getUser()).data?.user?.id)
-          .maybeSingle();
+  // Load clinic and office data with real-time sync
+  const loadData = useCallback(async () => {
+    if (!isLoading) setIsLoading(true);
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-        if (profile && profile.clinic_latitude && profile.clinic_longitude) {
-          setClinic({
-            id: profile.clinic_id || 'clinic',
-            name: profile.clinic_name || 'My Clinic',
-            address: profile.clinic_address || '',
-            latitude: profile.clinic_latitude,
-            longitude: profile.clinic_longitude
-          });
-        }
+      // Load user's clinic
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('clinic_id, clinic_name, clinic_address, clinic_latitude, clinic_longitude')
+        .eq('user_id', user.id)
+        .maybeSingle();
 
-        // Load referring offices with referral data
-        const { data: sources } = await supabase
-          .from('patient_sources')
-          .select(`
-            id, name, address, phone, latitude, longitude, source_type
-          `)
-          .eq('is_active', true)
-          .eq('source_type', 'Office')
-          .not('latitude', 'is', null)
-          .not('longitude', 'is', null);
-
-        if (sources) {
-          // Get referral data for each office
-          const officesWithData = await Promise.all(
-            sources.map(async (source) => {
-              const currentMonth = new Date().toISOString().slice(0, 7);
-              
-              // Get monthly referral data
-              const { data: monthlyData } = await supabase
-                .from('monthly_patients')
-                .select('year_month, patient_count')
-                .eq('source_id', source.id)
-                .order('year_month', { ascending: false })
-                .limit(12);
-
-              // Calculate current month referrals
-              const currentMonthData = monthlyData?.find(m => m.year_month === currentMonth);
-              const currentMonthReferrals = currentMonthData?.patient_count || 0;
-              
-              // Calculate total referrals
-              const totalReferrals = monthlyData?.reduce((sum, m) => sum + m.patient_count, 0) || 0;
-              
-              // Calculate strength
-              const { data: strengthData } = await supabase
-                .rpc('calculate_source_score', { source_id_param: source.id });
-              
-              const strength = strengthData || 'Cold';
-
-              return {
-                ...source,
-                currentMonthReferrals,
-                totalReferrals,
-                strength: strength as Office['strength']
-              };
-            })
-          );
-          
-          setOffices(officesWithData);
-        }
-      } catch (error) {
-        console.error('Error loading data:', error);
+      if (profile && profile.clinic_latitude && profile.clinic_longitude) {
+        setClinic({
+          id: profile.clinic_id || 'clinic',
+          name: profile.clinic_name || 'My Clinic',
+          address: profile.clinic_address || '',
+          latitude: profile.clinic_latitude,
+          longitude: profile.clinic_longitude
+        });
       }
-      
-      setIsLoading(false);
-    };
 
+      // Load referring offices with optimized queries
+      const { data: sources } = await supabase
+        .from('patient_sources')
+        .select(`
+          id, name, address, phone, latitude, longitude, source_type
+        `)
+        .eq('is_active', true)
+        .eq('source_type', 'Office')
+        .not('latitude', 'is', null)
+        .not('longitude', 'is', null);
+
+      if (sources) {
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        
+        // Batch load all referral data at once for better performance
+        const sourceIds = sources.map(s => s.id);
+        const { data: monthlyData } = await supabase
+          .from('monthly_patients')
+          .select('source_id, year_month, patient_count')
+          .in('source_id', sourceIds)
+          .order('year_month', { ascending: false });
+
+        // Get strength scores for all sources
+        const strengthPromises = sourceIds.map(id =>
+          supabase.rpc('calculate_source_score', { source_id_param: id })
+        );
+        const strengthResults = await Promise.all(strengthPromises);
+
+        // Process offices with data
+        const officesWithData = sources.map((source, index) => {
+          const sourceMonthlyData = monthlyData?.filter(m => m.source_id === source.id) || [];
+          
+          const currentMonthData = sourceMonthlyData.find(m => m.year_month === currentMonth);
+          const currentMonthReferrals = currentMonthData?.patient_count || 0;
+          
+          const totalReferrals = sourceMonthlyData.reduce((sum, m) => sum + m.patient_count, 0);
+          const strength = strengthResults[index]?.data || 'Cold';
+
+          return {
+            ...source,
+            currentMonthReferrals,
+            totalReferrals,
+            strength: strength as Office['strength']
+          };
+        });
+        
+        setOffices(officesWithData);
+      }
+    } catch (error) {
+      console.error('Error loading data:', error);
+    }
+    
+    setIsLoading(false);
+  }, [isLoading]);
+
+  useEffect(() => {
     loadData();
-  }, []);
+
+    // Set up real-time subscriptions for data changes
+    const patientSourcesChannel = supabase
+      .channel('patient-sources-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'patient_sources'
+        },
+        () => {
+          console.log('Patient sources updated - refreshing map data');
+          loadData();
+        }
+      )
+      .subscribe();
+
+    const monthlyPatientsChannel = supabase
+      .channel('monthly-patients-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'monthly_patients'
+        },
+        () => {
+          console.log('Monthly patients updated - refreshing map data');
+          loadData();
+        }
+      )
+      .subscribe();
+
+    // Auto-refresh every 5 minutes
+    const autoRefresh = setInterval(loadData, 5 * 60 * 1000);
+
+    return () => {
+      supabase.removeChannel(patientSourcesChannel);
+      supabase.removeChannel(monthlyPatientsChannel);
+      clearInterval(autoRefresh);
+    };
+  }, [loadData]);
 
   // Calculate map bounds and positioning
   useEffect(() => {
@@ -172,6 +216,7 @@ export function MapView({ height = "600px" }: { height?: string }) {
     setZoom(1);
     setPanOffset({ x: 0, y: 0 });
   };
+  const handleRefresh = () => loadData();
 
   if (isLoading) {
     return (
@@ -218,6 +263,15 @@ export function MapView({ height = "600px" }: { height?: string }) {
               >
                 <RotateCcw className="h-4 w-4" />
               </Button>
+              <Button 
+                size="sm" 
+                variant="secondary" 
+                onClick={handleRefresh}
+                className="w-8 h-8 p-0"
+                disabled={isLoading}
+              >
+                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              </Button>
             </div>
 
             {/* Map Header */}
@@ -238,31 +292,79 @@ export function MapView({ height = "600px" }: { height?: string }) {
 
             {/* Map Canvas */}
             <div 
-              className="h-full relative overflow-hidden bg-gradient-to-br from-blue-50 via-green-50 to-yellow-50"
+              className="h-full relative overflow-hidden"
               style={{ 
                 transform: `scale(${zoom})`,
                 transformOrigin: 'center center',
-                transition: 'transform 0.2s ease-out'
+                transition: 'transform 0.2s ease-out',
+                background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 25%, #f0fdf4 50%, #fefce8 75%, #fef7ed 100%)'
               }}
             >
-              {/* Map Grid */}
-              <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-20">
+              {/* Terrain Pattern */}
+              <div className="absolute inset-0 opacity-10">
+                <svg className="w-full h-full">
+                  <defs>
+                    <pattern id="terrain" x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse">
+                      <circle cx="20" cy="20" r="2" fill="#10b981" opacity="0.3"/>
+                      <circle cx="80" cy="40" r="1.5" fill="#10b981" opacity="0.4"/>
+                      <circle cx="50" cy="70" r="2.5" fill="#10b981" opacity="0.2"/>
+                      <path d="M10,30 Q30,25 50,30 T90,35" stroke="#059669" strokeWidth="0.5" fill="none" opacity="0.6"/>
+                      <path d="M15,80 Q35,75 55,80 T95,85" stroke="#059669" strokeWidth="0.5" fill="none" opacity="0.4"/>
+                    </pattern>
+                  </defs>
+                  <rect width="100%" height="100%" fill="url(#terrain)"/>
+                </svg>
+              </div>
+
+              {/* Road Network */}
+              <svg className="absolute inset-0 w-full h-full pointer-events-none">
                 <defs>
-                  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#94a3b8" strokeWidth="0.5"/>
-                  </pattern>
+                  <linearGradient id="roadGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#6b7280" stopOpacity="0.6"/>
+                    <stop offset="50%" stopColor="#9ca3af" stopOpacity="0.8"/>
+                    <stop offset="100%" stopColor="#6b7280" stopOpacity="0.6"/>
+                  </linearGradient>
                 </defs>
-                <rect width="100%" height="100%" fill="url(#grid)" />
+                
+                {/* Major highways */}
+                <path d="M0,30 Q25,28 50,30 T100,32" stroke="url(#roadGradient)" strokeWidth="4" fill="none" opacity="0.7"/>
+                <path d="M0,70 Q25,68 50,70 T100,72" stroke="url(#roadGradient)" strokeWidth="4" fill="none" opacity="0.7"/>
+                <path d="M20,0 Q22,25 20,50 T18,100" stroke="url(#roadGradient)" strokeWidth="4" fill="none" opacity="0.7"/>
+                <path d="M80,0 Q78,25 80,50 T82,100" stroke="url(#roadGradient)" strokeWidth="4" fill="none" opacity="0.7"/>
+                
+                {/* Secondary roads */}
+                <path d="M0,15 L100,18" stroke="#9ca3af" strokeWidth="2" fill="none" opacity="0.5"/>
+                <path d="M0,85 L100,88" stroke="#9ca3af" strokeWidth="2" fill="none" opacity="0.5"/>
+                <path d="M35,0 L38,100" stroke="#9ca3af" strokeWidth="2" fill="none" opacity="0.5"/>
+                <path d="M65,0 L62,100" stroke="#9ca3af" strokeWidth="2" fill="none" opacity="0.5"/>
+                
+                {/* Local streets */}
+                {Array.from({ length: 8 }, (_, i) => (
+                  <g key={i}>
+                    <line 
+                      x1={`${i * 12.5}%`} y1="0%" 
+                      x2={`${i * 12.5 + 2}%`} y2="100%" 
+                      stroke="#d1d5db" strokeWidth="1" opacity="0.3"
+                    />
+                    <line 
+                      x1="0%" y1={`${i * 12.5}%`} 
+                      x2="100%" y2={`${i * 12.5 + 2}%`} 
+                      stroke="#d1d5db" strokeWidth="1" opacity="0.3"
+                    />
+                  </g>
+                ))}
               </svg>
 
-              {/* Street-like Lines */}
-              <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-30">
-                <line x1="0%" y1="25%" x2="100%" y2="25%" stroke="#64748b" strokeWidth="1"/>
-                <line x1="0%" y1="50%" x2="100%" y2="50%" stroke="#64748b" strokeWidth="2"/>
-                <line x1="0%" y1="75%" x2="100%" y2="75%" stroke="#64748b" strokeWidth="1"/>
-                <line x1="25%" y1="0%" x2="25%" y2="100%" stroke="#64748b" strokeWidth="1"/>
-                <line x1="50%" y1="0%" x2="50%" y2="100%" stroke="#64748b" strokeWidth="2"/>
-                <line x1="75%" y1="0%" x2="75%" y2="100%" stroke="#64748b" strokeWidth="1"/>
+              {/* Geographic Features */}
+              <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-20">
+                {/* Water bodies */}
+                <ellipse cx="15%" cy="25%" rx="8%" ry="5%" fill="#3b82f6" opacity="0.6"/>
+                <ellipse cx="85%" cy="75%" rx="6%" ry="4%" fill="#3b82f6" opacity="0.6"/>
+                
+                {/* Parks/Green spaces */}
+                <polygon points="40,10 60,5 75,20 70,35 45,30" fill="#10b981" opacity="0.4"/>
+                <polygon points="10,60 30,55 35,75 25,85 5,80" fill="#10b981" opacity="0.4"/>
+                <polygon points="70,90 85,85 95,95 90,100 75,100" fill="#10b981" opacity="0.4"/>
               </svg>
 
               {/* Clinic Location */}
