@@ -23,7 +23,10 @@ import {
   BarChart3,
   PieChart,
   LineChart,
-  Building2
+  Building2,
+  ArrowUp,
+  ArrowDown,
+  Target
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -437,17 +440,61 @@ export function Analytics() {
 
       {/* Charts */}
       <Tabs defaultValue="trends" className="w-full">
-        <TabsList>
-          <TabsTrigger value="trends">Trends</TabsTrigger>
-          <TabsTrigger value="distribution">Distribution</TabsTrigger>
-          <TabsTrigger value="performance">Top Performers</TabsTrigger>
-          <TabsTrigger value="growing">Growing Analysis</TabsTrigger>
-          <TabsTrigger value="declining">Declining Analysis</TabsTrigger>
-          <TabsTrigger value="marketing">Marketing Outreach</TabsTrigger>
-        </TabsList>
+        <div className="flex gap-6">
+          <div className="w-64 shrink-0">
+            <TabsList className="flex flex-col h-auto w-full p-2 bg-card border">
+              {/* Core Analytics */}
+              <div className="w-full mb-2">
+                <div className="text-xs font-medium text-muted-foreground px-3 py-2 uppercase tracking-wider">
+                  Core Analytics
+                </div>
+                <TabsTrigger value="trends" className="w-full justify-start px-3 py-3 text-left">
+                  <BarChart3 className="w-4 h-4 mr-3" />
+                  Trends Overview
+                </TabsTrigger>
+                <TabsTrigger value="distribution" className="w-full justify-start px-3 py-3 text-left">
+                  <PieChart className="w-4 h-4 mr-3" />
+                  Source Distribution
+                </TabsTrigger>
+              </div>
 
-        <TabsContent value="trends" className="space-y-4">
-          <Card>
+              {/* Performance Analytics */}
+              <div className="w-full mb-2">
+                <div className="text-xs font-medium text-muted-foreground px-3 py-2 uppercase tracking-wider border-t pt-4">
+                  Performance
+                </div>
+                <TabsTrigger value="performance" className="w-full justify-start px-3 py-3 text-left">
+                  <TrendingUp className="w-4 h-4 mr-3" />
+                  Top Performers
+                </TabsTrigger>
+                <TabsTrigger value="growing" className="w-full justify-start px-3 py-3 text-left">
+                  <ArrowUp className="w-4 h-4 mr-3" />
+                  Growing Sources
+                </TabsTrigger>
+                <TabsTrigger value="declining" className="w-full justify-start px-3 py-3 text-left">
+                  <ArrowDown className="w-4 h-4 mr-3" />
+                  Declining Sources
+                </TabsTrigger>
+              </div>
+
+              {/* Marketing & Outreach */}
+              <div className="w-full">
+                <div className="text-xs font-medium text-muted-foreground px-3 py-2 uppercase tracking-wider border-t pt-4">
+                  Marketing
+                </div>
+                <TabsTrigger value="marketing" className="w-full justify-start px-3 py-3 text-left">
+                  <Target className="w-4 h-4 mr-3" />
+                  Outreach Analytics
+                </TabsTrigger>
+              </div>
+            </TabsList>
+          </div>
+
+          <div className="flex-1">
+            <div className="bg-card border rounded-lg p-6">
+
+                <TabsContent value="trends" className="space-y-4">
+                  <Card>
             <CardHeader>
               <CardTitle>Monthly Patient Trends</CardTitle>
               <CardDescription>
@@ -821,6 +868,9 @@ export function Analytics() {
             </CardContent>
           </Card>
         </TabsContent>
+            </div>
+          </div>
+        </div>
       </Tabs>
     </div>
   );
