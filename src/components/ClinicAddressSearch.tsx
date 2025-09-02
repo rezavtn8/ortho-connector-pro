@@ -303,10 +303,10 @@ export function ClinicAddressSearch({ value, onSelect, placeholder = "Search for
 
             {searchValue.length >= 3 && !isLoadingGoogle && (
               <CommandGroup>
-                <CommandItem onSelect={handleManualEntry}>
+                <CommandItem value="manual-entry" onSelect={handleManualEntry}>
                   <div className="flex items-center gap-2 w-full">
                     <MapPin className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm">Enter "{searchValue}" manually</span>
+                    <span className="text-sm">Enter address manually</span>
                   </div>
                 </CommandItem>
               </CommandGroup>
