@@ -76,20 +76,47 @@ export function Reviews() {
     if (!user?.id) return;
 
     try {
-      const { data: sources } = await supabase
-        .from('patient_sources')
-        .select('google_place_id')
-        .eq('created_by', user.id)
-        .not('google_place_id', 'is', null)
-        .limit(1)
+      // Get user profile to find their clinic
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('clinic_id')
+        .eq('user_id', user.id)
         .single();
 
-      if (sources?.google_place_id) {
-        setPlaceId(sources.google_place_id);
-        await fetchReviews(sources.google_place_id);
+      if (!profile?.clinic_id) {
+        toast({
+          title: 'No Clinic Found',
+          description: 'Please set up your clinic information in Settings first.',
+          variant: 'destructive',
+        });
+        return;
       }
+
+      // Get clinic with Google Place ID
+      const { data: clinic } = await supabase
+        .from('clinics')
+        .select('google_place_id, name')
+        .eq('id', profile.clinic_id)
+        .single();
+
+      if (!clinic?.google_place_id) {
+        toast({
+          title: 'Google Place ID Required',
+          description: 'Please add your clinic\'s Google Place ID in Settings to view reviews.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      setPlaceId(clinic.google_place_id);
+      await fetchReviews(clinic.google_place_id);
     } catch (error) {
-      console.error('Error loading place ID:', error);
+      console.error('Error loading clinic info:', error);
+      toast({
+        title: 'Setup Required',
+        description: 'Please complete your clinic setup in Settings to view reviews.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -301,7 +328,7 @@ export function Reviews() {
           <h2 className="text-2xl font-bold text-foreground">Reviews</h2>
           <p className="text-muted-foreground">Manage and respond to Google reviews</p>
         </div>
-        <Button onClick={() => fetchReviews()} disabled={loading}>
+        <Button onClick={() => fetchReviews()} disabled={loading || !placeId}>
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
           Refresh Reviews
         </Button>
@@ -400,6 +427,19 @@ export function Reviews() {
         <div className="flex items-center justify-center h-64">
           <RefreshCw className="h-8 w-8 animate-spin" />
         </div>
+      ) : !placeId ? (
+        <Card>
+          <CardContent className="p-12 text-center">
+            <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium mb-2">Clinic Setup Required</h3>
+            <p className="text-muted-foreground mb-4">
+              To view Google reviews, you need to complete your clinic setup first.
+            </p>
+            <Button onClick={() => window.location.hash = 'settings'}>
+              Go to Settings
+            </Button>
+          </CardContent>
+        </Card>
       ) : filteredReviews.length === 0 ? (
         <Card>
           <CardContent className="p-12 text-center">

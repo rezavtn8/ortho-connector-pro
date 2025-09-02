@@ -40,6 +40,7 @@ interface ClinicSettings {
   clinic_city: string;
   clinic_state: string;
   clinic_zip: string;
+  google_place_id: string;
 }
 
 interface NotificationSettings {
@@ -62,7 +63,8 @@ const initialClinicSettings: ClinicSettings = {
   clinic_address: '',
   clinic_city: '',
   clinic_state: '',
-  clinic_zip: ''
+  clinic_zip: '',
+  google_place_id: ''
 };
 
 const initialNotificationSettings: NotificationSettings = {
@@ -104,18 +106,39 @@ export function Settings() {
       // Load user profile and clinic info
       const { data: profile } = await supabase
         .from('user_profiles')
-        .select('*')
+        .select('clinic_id, clinic_name, clinic_address')
         .eq('user_id', user.id)
         .single();
       
-      if (profile) {
+      if (profile?.clinic_id) {
+        // Load full clinic details
+        const { data: clinic } = await supabase
+          .from('clinics')
+          .select('*')
+          .eq('id', profile.clinic_id)
+          .single();
+        
+        if (clinic) {
+          setClinicSettings({
+            clinic_name: clinic.name || '',
+            clinic_phone: '', // Not stored in clinics table
+            clinic_address: clinic.address || '',
+            clinic_city: '',
+            clinic_state: '',
+            clinic_zip: '',
+            google_place_id: clinic.google_place_id || ''
+          });
+        }
+      } else if (profile) {
+        // Fallback to profile data
         setClinicSettings({
           clinic_name: profile.clinic_name || '',
           clinic_phone: '',
           clinic_address: profile.clinic_address || '',
           clinic_city: '',
           clinic_state: '',
-          clinic_zip: ''
+          clinic_zip: '',
+          google_place_id: ''
         });
       }
 
@@ -145,22 +168,64 @@ export function Settings() {
     if (!user?.id) return;
     
     try {
-      const { error } = await supabase
+      // Get user's profile to check for existing clinic
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('clinic_id')
+        .eq('user_id', user.id)
+        .single();
+
+      let clinicId = profile?.clinic_id;
+
+      if (clinicId) {
+        // Update existing clinic
+        const { error: clinicError } = await supabase
+          .from('clinics')
+          .update({
+            name: clinicSettings.clinic_name,
+            address: clinicSettings.clinic_address,
+            google_place_id: clinicSettings.google_place_id || null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', clinicId);
+
+        if (clinicError) throw clinicError;
+      } else {
+        // Create new clinic
+        const { data: newClinic, error: createError } = await supabase
+          .from('clinics')
+          .insert({
+            name: clinicSettings.clinic_name,
+            address: clinicSettings.clinic_address,
+            google_place_id: clinicSettings.google_place_id || null,
+            owner_id: user.id
+          })
+          .select()
+          .single();
+
+        if (createError) throw createError;
+        clinicId = newClinic.id;
+      }
+
+      // Update user profile with clinic info
+      const { error: profileError } = await supabase
         .from('user_profiles')
         .update({ 
+          clinic_id: clinicId,
           clinic_name: clinicSettings.clinic_name,
           clinic_address: clinicSettings.clinic_address,
           updated_at: new Date().toISOString()
         })
         .eq('user_id', user.id);
 
-      if (error) throw error;
+      if (profileError) throw profileError;
 
       toast({
         title: 'Success',
         description: 'Clinic settings saved successfully',
       });
     } catch (error) {
+      console.error('Error saving clinic settings:', error);
       toast({
         title: 'Error',
         description: 'Failed to save clinic settings',
@@ -473,6 +538,27 @@ export function Settings() {
                             onChange={(e) => setClinicSettings(prev => ({ ...prev, clinic_zip: e.target.value }))}
                             placeholder="12345"
                           />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="google_place_id">Google Place ID</Label>
+                          <Input
+                            id="google_place_id"
+                            value={clinicSettings.google_place_id}
+                            onChange={(e) => setClinicSettings(prev => ({ ...prev, google_place_id: e.target.value }))}
+                            placeholder="ChIJN1t_tDeuEmsRUsoyG83frY4"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Required for Google Reviews. Find your Place ID on{' '}
+                            <a 
+                              href="https://developers.google.com/maps/documentation/places/web-service/place-id" 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline"
+                            >
+                              Google Place ID Finder
+                            </a>
+                          </p>
                         </div>
 
                         <Button onClick={saveClinicSettings} className="w-full">
