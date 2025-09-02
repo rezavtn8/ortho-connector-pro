@@ -6,8 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -65,17 +63,9 @@ export function Reviews() {
     needsAttention: 0,
     averageRating: 0
   });
-  const [showBusinessApiDialog, setShowBusinessApiDialog] = useState(false);
-  const [businessApiConfig, setBusinessApiConfig] = useState({
-    accountId: '',
-    locationId: '',
-    serviceAccountKey: ''
-  });
-  const [hasBusinessApi, setHasBusinessApi] = useState(false);
 
   useEffect(() => {
     loadUserPlaceId();
-    loadBusinessApiConfig();
   }, [user]);
 
   useEffect(() => {
@@ -130,63 +120,6 @@ export function Reviews() {
     }
   };
 
-  const loadBusinessApiConfig = async () => {
-    if (!user?.id) return;
-
-    try {
-      const { data: config } = await supabase
-        .from('business_api_configs' as any)
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (config) {
-        setHasBusinessApi(true);
-        setBusinessApiConfig({
-          accountId: (config as any).account_id || '',
-          locationId: (config as any).location_id || '',
-          serviceAccountKey: '' // Never load the actual key for security
-        });
-      }
-    } catch (error) {
-      // No config exists yet, which is fine
-      console.log('No business API config found');
-    }
-  };
-
-  const saveBusinessApiConfig = async () => {
-    if (!user?.id) return;
-
-    try {
-      const { error } = await supabase
-        .from('business_api_configs' as any)
-        .upsert({
-          user_id: user.id,
-          account_id: businessApiConfig.accountId,
-          location_id: businessApiConfig.locationId,
-          service_account_key: businessApiConfig.serviceAccountKey
-        });
-
-      if (error) throw error;
-
-      setHasBusinessApi(true);
-      setShowBusinessApiDialog(false);
-      toast({
-        title: 'Success',
-        description: 'Business API configuration saved successfully',
-      });
-
-      // Refresh reviews with new API
-      await fetchReviews();
-    } catch (error) {
-      console.error('Error saving business API config:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to save Business API configuration',
-        variant: 'destructive',
-      });
-    }
-  };
 
   const fetchReviews = async (targetPlaceId?: string) => {
     const currentPlaceId = targetPlaceId || placeId;
@@ -201,16 +134,9 @@ export function Reviews() {
 
     setLoading(true);
     try {
-      // Fetch Google reviews (use Business API if configured, otherwise Places API)
-      const functionName = hasBusinessApi ? 'get-business-reviews' : 'get-google-reviews';
-      const response = await supabase.functions.invoke(functionName, {
-        body: { 
-          place_id: currentPlaceId,
-          ...(hasBusinessApi && {
-            account_id: businessApiConfig.accountId,
-            location_id: businessApiConfig.locationId
-          })
-        }
+      // Fetch Google reviews using Places API
+      const response = await supabase.functions.invoke('get-google-reviews', {
+        body: { place_id: currentPlaceId }
       });
 
       if (response.error) throw response.error;
@@ -421,75 +347,11 @@ export function Reviews() {
           <div className="space-y-4">
             <p className="text-amber-700 dark:text-amber-300 text-sm">
               <strong>Important:</strong> Google Places API only returns the 5 most helpful reviews. 
-              For access to all your reviews, you can optionally configure Google My Business API.
+              For comprehensive review management including all reviews, ratings analytics, and response capabilities, we're implementing Google My Business API integration with OAuth2 authentication in the next update.
             </p>
-            <div className="flex items-center gap-4">
-              <Dialog open={showBusinessApiDialog} onOpenChange={setShowBusinessApiDialog}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="border-amber-300 text-amber-700 hover:bg-amber-100">
-                    {hasBusinessApi ? 'Update Business API' : 'Configure Business API'}
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Configure Google My Business API</DialogTitle>
-                    <DialogDescription>
-                      Access all your reviews by connecting to Google My Business API. You'll need to create a service account and get your location details.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="accountId">Account ID</Label>
-                      <Input
-                        id="accountId"
-                        placeholder="Your Google My Business account ID"
-                        value={businessApiConfig.accountId}
-                        onChange={(e) => setBusinessApiConfig(prev => ({ ...prev, accountId: e.target.value }))}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="locationId">Location ID</Label>
-                      <Input
-                        id="locationId"
-                        placeholder="Your business location ID"
-                        value={businessApiConfig.locationId}
-                        onChange={(e) => setBusinessApiConfig(prev => ({ ...prev, locationId: e.target.value }))}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="serviceKey">Service Account Key (JSON)</Label>
-                      <textarea
-                        id="serviceKey"
-                        className="w-full min-h-[100px] px-3 py-2 text-sm border border-input bg-background rounded-md"
-                        placeholder="Paste your service account JSON key here"
-                        value={businessApiConfig.serviceAccountKey}
-                        onChange={(e) => setBusinessApiConfig(prev => ({ ...prev, serviceAccountKey: e.target.value }))}
-                      />
-                    </div>
-                    <div className="flex justify-between">
-                      <Button
-                        variant="outline"
-                        onClick={() => window.open('https://developers.google.com/my-business/content/basic-setup', '_blank')}
-                      >
-                        Setup Guide
-                      </Button>
-                      <Button onClick={saveBusinessApiConfig}>
-                        Save Configuration
-                      </Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-amber-600 hover:text-amber-700"
-                onClick={() => window.open('https://developers.google.com/my-business/content/review-data', '_blank')}
-              >
-                <ExternalLink className="h-3 w-3 mr-1" />
-                Learn More
-              </Button>
-            </div>
+            <p className="text-amber-600 dark:text-amber-400 text-xs">
+              Coming soon: Full business API access with proper OAuth2 flow and enhanced review management features.
+            </p>
           </div>
         </CardContent>
       </Card>

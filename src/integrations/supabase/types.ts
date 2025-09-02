@@ -14,36 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      business_api_configs: {
-        Row: {
-          account_id: string
-          created_at: string
-          id: string
-          location_id: string
-          service_account_key: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          account_id: string
-          created_at?: string
-          id?: string
-          location_id: string
-          service_account_key: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          account_id?: string
-          created_at?: string
-          id?: string
-          location_id?: string
-          service_account_key?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       clinics: {
         Row: {
           address: string | null
