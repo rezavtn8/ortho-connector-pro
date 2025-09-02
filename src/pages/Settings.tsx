@@ -88,6 +88,12 @@ export function Settings() {
     if (user?.id) {
       loadSettings();
     }
+    
+    // Load notification settings from localStorage
+    const saved = localStorage.getItem('notification_settings');
+    if (saved) {
+      setNotifications(JSON.parse(saved));
+    }
   }, [user]);
 
   const loadSettings = async () => {
@@ -95,35 +101,37 @@ export function Settings() {
     setLoading(true);
     
     try {
-      // Load clinic settings
-      const { data: clinic } = await supabase
-        .from('clinic_settings')
+      // Load user profile and clinic info
+      const { data: profile } = await supabase
+        .from('user_profiles')
         .select('*')
         .eq('user_id', user.id)
         .single();
       
-      if (clinic) {
-        setClinicSettings(clinic);
+      if (profile) {
+        setClinicSettings({
+          clinic_name: profile.clinic_name || '',
+          clinic_phone: '',
+          clinic_address: profile.clinic_address || '',
+          clinic_city: '',
+          clinic_state: '',
+          clinic_zip: ''
+        });
       }
 
-      // Load notification preferences
-      const { data: notificationPrefs } = await supabase
-        .from('notification_preferences')
+      // Load team invitations (using existing user_invitations table)
+      const { data: invitations } = await supabase
+        .from('user_invitations')
         .select('*')
-        .eq('user_id', user.id)
-        .single();
+        .eq('clinic_id', profile?.clinic_id);
       
-      if (notificationPrefs) {
-        setNotifications(notificationPrefs);
-      }
-
-      // Load team members
-      const { data: members } = await supabase
-        .from('team_members')
-        .select('*')
-        .eq('clinic_id', user.id);
-      
-      if (members) {
+      if (invitations) {
+        const members: TeamMember[] = invitations.map(inv => ({
+          id: inv.id,
+          email: inv.email,
+          role: inv.role as UserRole,
+          status: inv.status as 'pending' | 'accepted'
+        }));
         setTeamMembers(members);
       }
     } catch (error) {
@@ -138,8 +146,13 @@ export function Settings() {
     
     try {
       const { error } = await supabase
-        .from('clinic_settings')
-        .upsert({ ...clinicSettings, user_id: user.id });
+        .from('user_profiles')
+        .update({ 
+          clinic_name: clinicSettings.clinic_name,
+          clinic_address: clinicSettings.clinic_address,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id);
 
       if (error) throw error;
 
@@ -157,38 +170,42 @@ export function Settings() {
   };
 
   const saveNotificationSettings = async () => {
-    if (!user?.id) return;
+    // Store notification settings in localStorage for now
+    localStorage.setItem('notification_settings', JSON.stringify(notifications));
     
-    try {
-      const { error } = await supabase
-        .from('notification_preferences')
-        .upsert({ ...notifications, user_id: user.id });
-
-      if (error) throw error;
-
-      toast({
-        title: 'Success',
-        description: 'Notification preferences saved',
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to save notification preferences',
-        variant: 'destructive',
-      });
-    }
+    toast({
+      title: 'Success',
+      description: 'Notification preferences saved',
+    });
   };
 
   const inviteTeamMember = async () => {
     if (!user?.id || !newMemberEmail || !newMemberRole) return;
 
     try {
+      // Get user's clinic_id first
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('clinic_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profile?.clinic_id) {
+        toast({
+          title: 'Error',
+          description: 'No clinic found for user',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       const { data, error } = await supabase
-        .from('team_invitations')
+        .from('user_invitations')
         .insert({
           email: newMemberEmail,
           role: newMemberRole,
           invited_by: user.id,
+          clinic_id: profile.clinic_id,
           status: 'pending'
         })
         .select()
@@ -243,9 +260,9 @@ export function Settings() {
 
     try {
       const { data: sources } = await supabase
-        .from('sources')
+        .from('patient_sources')
         .select('*')
-        .eq('user_id', user.id);
+        .eq('created_by', user.id);
 
       const { data: visits } = await supabase
         .from('marketing_visits')
