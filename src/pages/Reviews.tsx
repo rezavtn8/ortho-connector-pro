@@ -208,7 +208,9 @@ export function Reviews() {
 
       const { error } = await supabase
         .from('review_status')
-        .upsert(updateData);
+        .upsert(updateData, {
+          onConflict: 'google_review_id,user_id'
+        });
 
       if (error) throw error;
 
