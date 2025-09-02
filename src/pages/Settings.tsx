@@ -13,6 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { ClinicAddressSearch } from '@/components/ClinicAddressSearch';
 import {
   MapPin,
   User,
@@ -498,46 +499,22 @@ export function Settings() {
 
                         <div className="space-y-2">
                           <Label htmlFor="clinic_address">Address</Label>
-                          <Input
-                            id="clinic_address"
+                          <ClinicAddressSearch
                             value={clinicSettings.clinic_address}
-                            onChange={(e) => setClinicSettings(prev => ({ ...prev, clinic_address: e.target.value }))}
-                            placeholder="Street address..."
+                            onSelect={(place) => {
+                              if (place) {
+                                setClinicSettings(prev => ({
+                                  ...prev,
+                                  clinic_address: place.address || '',
+                                  google_place_id: place.google_place_id || ''
+                                }));
+                              }
+                            }}
+                            placeholder="Search for your clinic address..."
                           />
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="clinic_city">City</Label>
-                            <Input
-                              id="clinic_city"
-                              value={clinicSettings.clinic_city}
-                              onChange={(e) => setClinicSettings(prev => ({ ...prev, clinic_city: e.target.value }))}
-                              placeholder="City..."
-                            />
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <Label htmlFor="clinic_state">State</Label>
-                            <Input
-                              id="clinic_state"
-                              value={clinicSettings.clinic_state}
-                              onChange={(e) => setClinicSettings(prev => ({ ...prev, clinic_state: e.target.value }))}
-                              placeholder="State..."
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="clinic_zip">ZIP Code</Label>
-                          <Input
-                            id="clinic_zip"
-                            value={clinicSettings.clinic_zip}
-                            onChange={(e) => setClinicSettings(prev => ({ ...prev, clinic_zip: e.target.value }))}
-                            placeholder="12345"
-                          />
+                          <p className="text-xs text-muted-foreground">
+                            Search for your clinic to automatically get the Google Place ID for reviews
+                          </p>
                         </div>
 
                         <div className="space-y-2">
@@ -549,15 +526,7 @@ export function Settings() {
                             placeholder="ChIJN1t_tDeuEmsRUsoyG83frY4"
                           />
                           <p className="text-xs text-muted-foreground">
-                            Required for Google Reviews. Find your Place ID on{' '}
-                            <a 
-                              href="https://developers.google.com/maps/documentation/places/web-service/place-id" 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-primary hover:underline"
-                            >
-                              Google Place ID Finder
-                            </a>
+                            Automatically filled when using address search above, or enter manually
                           </p>
                         </div>
 
