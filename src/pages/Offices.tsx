@@ -29,10 +29,38 @@ type SortField = 'name' | 'l12' | 'r3' | 'mslr';
 type SortDirection = 'asc' | 'desc';
 
 const TIER_CONFIG = {
-  VIP: { color: 'bg-status-strong text-status-strong border-status-strong', label: 'VIP' },
-  Warm: { color: 'bg-status-moderate text-status-moderate border-status-moderate', label: 'Warm' },
-  Cold: { color: 'bg-status-sporadic text-status-sporadic border-status-sporadic', label: 'Cold' },
-  Dormant: { color: 'bg-status-cold text-status-cold border-status-cold', label: 'Dormant' },
+  VIP: { 
+    bg: 'bg-gradient-to-r from-amber-50 to-yellow-50', 
+    text: 'text-amber-800', 
+    border: 'border-amber-300',
+    ring: 'ring-amber-200',
+    label: 'VIP',
+    icon: '👑'
+  },
+  Warm: { 
+    bg: 'bg-gradient-to-r from-emerald-50 to-green-50', 
+    text: 'text-emerald-800', 
+    border: 'border-emerald-300',
+    ring: 'ring-emerald-200',
+    label: 'Warm',
+    icon: '🔥'
+  },
+  Cold: { 
+    bg: 'bg-gradient-to-r from-blue-50 to-sky-50', 
+    text: 'text-blue-700', 
+    border: 'border-blue-200',
+    ring: 'ring-blue-100',
+    label: 'Cold',
+    icon: '❄️'
+  },
+  Dormant: { 
+    bg: 'bg-gradient-to-r from-gray-50 to-slate-50', 
+    text: 'text-gray-600', 
+    border: 'border-gray-300',
+    ring: 'ring-gray-200',
+    label: 'Dormant',
+    icon: '😴'
+  },
 };
 
 export function Offices() {
@@ -238,12 +266,15 @@ export function Offices() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">{config.label}</p>
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    <span>{config.icon}</span>
+                    {config.label}
+                  </p>
                   <p className="text-2xl font-bold">{tierCounts[tier] || 0}</p>
                 </div>
-                <Badge variant="outline" className={`${config.color}/10 border-2`}>
-                  {config.label}
-                </Badge>
+                <div className={`px-3 py-1.5 rounded-full ${config.bg} ${config.text} ${config.border} border font-medium text-sm shadow-sm`}>
+                  {config.icon} {config.label}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -352,12 +383,10 @@ export function Offices() {
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
-                        <Badge 
-                          variant="outline" 
-                          className={`${TIER_CONFIG[office.tier].color}/10 border-2 ${TIER_CONFIG[office.tier].color}`}
-                        >
+                        <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full ${TIER_CONFIG[office.tier].bg} ${TIER_CONFIG[office.tier].text} ${TIER_CONFIG[office.tier].border} border font-semibold text-sm shadow-sm hover:shadow-md transition-shadow`}>
+                          <span className="text-xs">{TIER_CONFIG[office.tier].icon}</span>
                           {office.tier}
-                        </Badge>
+                        </div>
                       </TableCell>
                       <TableCell className="text-center font-semibold">
                         {office.l12}
