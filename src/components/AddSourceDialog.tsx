@@ -644,3 +644,6 @@ export const AddOfficeDialog: React.FC<AddOfficeDialogProps> = ({ onOfficeAdded 
     </Dialog>
   );
 };
+
+// Export alias for backward compatibility
+export const AddSourceDialog = AddOfficeDialog;
