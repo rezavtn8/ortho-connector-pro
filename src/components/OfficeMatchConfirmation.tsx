@@ -48,33 +48,117 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
   const [sessionOffices, setSessionOffices] = useState<Map<string, string>>(new Map()); // normalizedName -> officeId
   const { toast } = useToast();
 
-  // Helper function to normalize office names for comparison
+  // Enhanced name normalization with professional titles and descriptors
   const normalizeOfficeName = (name: string): string => {
-    return name
-      .toLowerCase()
+    let normalized = name.toLowerCase();
+    
+    // Remove professional titles and suffixes
+    const titles = [
+      'dr\\.?\\s+', 'doctor\\s+', 'dds\\s*', 'dmd\\s*', 'md\\s*', 'phd\\s*',
+      'dentist\\s*', 'dental\\s*', 'orthodontist\\s*', 'oral surgeon\\s*',
+      'periodontist\\s*', 'endodontist\\s*', 'prosthodontist\\s*'
+    ];
+    titles.forEach(title => {
+      normalized = normalized.replace(new RegExp(title, 'gi'), '');
+    });
+    
+    // Remove location descriptors and separators
+    normalized = normalized
+      .replace(/:\s*[^,]+$/i, '') // Remove ": Location" at end
+      .replace(/-\s*[^,]+$/i, '') // Remove "- Location" at end  
+      .replace(/\s*\([^)]*\)\s*/g, '') // Remove parenthetical content
+      .replace(/\s*\[[^\]]*\]\s*/g, ''); // Remove bracketed content
+    
+    // Normalize business entity variations
+    const businessTerms = [
+      ['group', ''], ['center', ''], ['centre', ''], ['clinic', ''], 
+      ['office', ''], ['practice', ''], ['associates', ''], ['assoc', ''],
+      ['dental care', ''], ['oral care', ''], ['family', ''], ['general', ''],
+      ['cosmetic', ''], ['restorative', ''], ['implant', ''], ['surgery', '']
+    ];
+    businessTerms.forEach(([term, replacement]) => {
+      normalized = normalized.replace(new RegExp(`\\b${term}\\b`, 'gi'), replacement);
+    });
+    
+    // Clean up and normalize
+    return normalized
       .replace(/[^\w\s]/g, '') // Remove punctuation
       .replace(/\s+/g, ' ') // Normalize spaces
       .trim();
   };
 
-  // Centralized duplicate detection with multiple strategies
-  const findExistingOffice = async (officeName: string, googleName?: string, phone?: string): Promise<string | null> => {
+  // Fuzzy string matching for similar names (simple Levenshtein distance)
+  const calculateSimilarity = (str1: string, str2: string): number => {
+    const longer = str1.length > str2.length ? str1 : str2;
+    const shorter = str1.length > str2.length ? str2 : str1;
+    
+    if (longer.length === 0) return 1.0;
+    
+    const distance = levenshteinDistance(longer, shorter);
+    return (longer.length - distance) / longer.length;
+  };
+
+  const levenshteinDistance = (str1: string, str2: string): number => {
+    const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
+    
+    for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
+    for (let j = 0; j <= str2.length; j++) matrix[j][0] = j;
+    
+    for (let j = 1; j <= str2.length; j++) {
+      for (let i = 1; i <= str1.length; i++) {
+        const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+        matrix[j][i] = Math.min(
+          matrix[j][i - 1] + 1,
+          matrix[j - 1][i] + 1,
+          matrix[j - 1][i - 1] + cost
+        );
+      }
+    }
+    
+    return matrix[str2.length][str1.length];
+  };
+
+  // Enhanced duplicate detection with fuzzy matching and merge-oriented approach
+  const findExistingOffice = async (
+    officeName: string, 
+    googleName?: string, 
+    phone?: string, 
+    address?: string,
+    googlePlaceId?: string
+  ): Promise<{ id: string; name: string; shouldMerge: boolean } | null> => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
 
-      // Strategy 1: Check session offices first
+      // Strategy 1: Check session offices first (exact matches)
       const normalizedOffice = normalizeOfficeName(officeName);
       const normalizedGoogle = googleName ? normalizeOfficeName(googleName) : null;
       
       if (sessionOffices.has(normalizedOffice)) {
-        return sessionOffices.get(normalizedOffice)!;
+        const id = sessionOffices.get(normalizedOffice)!;
+        return { id, name: officeName, shouldMerge: false };
       }
       if (normalizedGoogle && sessionOffices.has(normalizedGoogle)) {
-        return sessionOffices.get(normalizedGoogle)!;
+        const id = sessionOffices.get(normalizedGoogle)!;
+        return { id, name: googleName!, shouldMerge: false };
       }
 
-      // Strategy 2: Exact name matches in database
+      // Strategy 2: Google Place ID matching (highest priority)
+      if (googlePlaceId) {
+        const { data: placeIdMatch } = await supabase
+          .from('patient_sources')
+          .select('id, name')
+          .eq('google_place_id', googlePlaceId)
+          .eq('created_by', user.id)
+          .eq('source_type', 'Office')
+          .maybeSingle();
+
+        if (placeIdMatch) {
+          return { id: placeIdMatch.id, name: placeIdMatch.name, shouldMerge: true };
+        }
+      }
+
+      // Strategy 3: Exact name matches in database
       const namesToCheck = [officeName];
       if (googleName && googleName !== officeName) {
         namesToCheck.push(googleName);
@@ -83,45 +167,76 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
       for (const name of namesToCheck) {
         const { data: exactMatch } = await supabase
           .from('patient_sources')
-          .select('id')
+          .select('id, name')
           .eq('name', name)
           .eq('created_by', user.id)
           .eq('source_type', 'Office')
-          .single();
+          .maybeSingle();
 
-        if (exactMatch) return exactMatch.id;
+        if (exactMatch) {
+          return { id: exactMatch.id, name: exactMatch.name, shouldMerge: true };
+        }
       }
 
-      // Strategy 3: Normalized name comparison
+      // Strategy 4: Get all offices for advanced matching
       const { data: allOffices } = await supabase
         .from('patient_sources')
-        .select('id, name')
+        .select('id, name, phone, address, google_place_id')
         .eq('created_by', user.id)
         .eq('source_type', 'Office');
 
-      if (allOffices) {
-        for (const office of allOffices) {
-          const existingNormalized = normalizeOfficeName(office.name);
-          if (existingNormalized === normalizedOffice || 
-              (normalizedGoogle && existingNormalized === normalizedGoogle)) {
-            return office.id;
+      if (!allOffices || allOffices.length === 0) return null;
+
+      // Strategy 5: Fuzzy normalized name matching (80%+ similarity)
+      const namesToTest = [normalizedOffice];
+      if (normalizedGoogle && normalizedGoogle !== normalizedOffice) {
+        namesToTest.push(normalizedGoogle);
+      }
+
+      for (const office of allOffices) {
+        const existingNormalized = normalizeOfficeName(office.name);
+        
+        for (const testName of namesToTest) {
+          // Exact normalized match
+          if (existingNormalized === testName) {
+            return { id: office.id, name: office.name, shouldMerge: true };
+          }
+          
+          // Fuzzy match (80%+ similarity)
+          const similarity = calculateSimilarity(existingNormalized, testName);
+          if (similarity >= 0.8) {
+            return { id: office.id, name: office.name, shouldMerge: true };
           }
         }
       }
 
-      // Strategy 4: Phone number matching (if available)
+      // Strategy 6: Phone number matching (if available)
       if (phone) {
         const cleanPhone = phone.replace(/\D/g, '');
         if (cleanPhone.length >= 10) {
-          const { data: phoneMatch } = await supabase
-            .from('patient_sources')
-            .select('id')
-            .ilike('phone', `%${cleanPhone.slice(-10)}%`)
-            .eq('created_by', user.id)
-            .eq('source_type', 'Office')
-            .single();
+          for (const office of allOffices) {
+            if (office.phone) {
+              const existingCleanPhone = office.phone.replace(/\D/g, '');
+              if (existingCleanPhone.length >= 10 && 
+                  cleanPhone.slice(-10) === existingCleanPhone.slice(-10)) {
+                return { id: office.id, name: office.name, shouldMerge: true };
+              }
+            }
+          }
+        }
+      }
 
-          if (phoneMatch) return phoneMatch.id;
+      // Strategy 7: Address similarity matching (if available)
+      if (address && address.length > 10) {
+        const normalizedAddress = address.toLowerCase().replace(/[^\w\s]/g, '').trim();
+        for (const office of allOffices) {
+          if (office.address && office.address.length > 10) {
+            const existingNormalizedAddress = office.address.toLowerCase().replace(/[^\w\s]/g, '').trim();
+            const addressSimilarity = calculateSimilarity(normalizedAddress, existingNormalizedAddress);
+            if (addressSimilarity >= 0.85) {
+              return { id: office.id, name: office.name, shouldMerge: true };
+            }
+          }
         }
       }
 
@@ -260,43 +375,58 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
       const importedOffice = importedOffices.find(o => o.id === officeId);
       if (!importedOffice) return;
 
-      // Use centralized duplicate detection
-      const existingOfficeId = await findExistingOffice(
+      // Enhanced duplicate detection with merge capability
+      const existingOffice = await findExistingOffice(
         importedOffice.name, 
         match.name, 
-        match.formatted_phone_number
+        match.formatted_phone_number,
+        match.formatted_address,
+        match.place_id
       );
 
-      if (existingOfficeId) {
-        // Update existing office with Google Places data
+      if (existingOffice) {
+        // Merge with existing office - choose the best data from both sources
+        const updateData: any = {
+          // Use Google Places name if it's more complete, otherwise keep existing
+          name: match.name.length > existingOffice.name.length ? match.name : existingOffice.name,
+          // Always update with Google Places data when available
+          address: match.formatted_address,
+          phone: match.formatted_phone_number,
+          website: match.website,
+          latitude: match.geometry.location.lat,
+          longitude: match.geometry.location.lng,
+          google_place_id: match.place_id,
+          google_rating: match.rating,
+          last_updated_from_google: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
         const { error } = await supabase
           .from('patient_sources')
-          .update({
-            name: match.name,
-            address: match.formatted_address,
-            phone: match.formatted_phone_number,
-            website: match.website,
-            latitude: match.geometry.location.lat,
-            longitude: match.geometry.location.lng,
-            google_place_id: match.place_id,
-            google_rating: match.rating,
-            last_updated_from_google: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', existingOfficeId);
+          .update(updateData)
+          .eq('id', existingOffice.id);
 
         if (error) throw error;
         
-        // Track in session
-        const normalizedName = normalizeOfficeName(match.name);
-        setSessionOffices(prev => new Map(prev.set(normalizedName, existingOfficeId)));
+        // Track in session with multiple name variations
+        const normalizedOriginal = normalizeOfficeName(importedOffice.name);
+        const normalizedGoogle = normalizeOfficeName(match.name);
+        const normalizedFinal = normalizeOfficeName(updateData.name);
+        
+        setSessionOffices(prev => {
+          const updated = new Map(prev);
+          updated.set(normalizedOriginal, existingOffice.id);
+          updated.set(normalizedGoogle, existingOffice.id);
+          updated.set(normalizedFinal, existingOffice.id);
+          return updated;
+        });
         
         toast({
-          title: "Office updated",
-          description: `${match.name} has been updated with Google Places data.`,
+          title: "Office merged",
+          description: `${updateData.name} has been updated with Google Places data.`,
         });
       } else {
-        // Create new office
+        // Create new office with Google Places data
         const { data: newOffice, error } = await supabase
           .from('patient_sources')
           .insert({
@@ -318,7 +448,7 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
 
         if (error) throw error;
         
-        // Track in session using both original and Google names
+        // Track in session using multiple name variations
         if (newOffice) {
           const normalizedOriginal = normalizeOfficeName(importedOffice.name);
           const normalizedGoogle = normalizeOfficeName(match.name);
@@ -331,7 +461,7 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
         }
         
         toast({
-          title: "Office confirmed",
+          title: "Office created",
           description: `${match.name} has been added to your sources.`,
         });
       }
@@ -361,14 +491,15 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
       const importedOffice = importedOffices.find(o => o.id === officeId);
       if (!importedOffice) return;
       
-      // Use centralized duplicate detection
-      const existingOfficeId = await findExistingOffice(
+      // Enhanced duplicate detection
+      const existingOffice = await findExistingOffice(
         importedOffice.name,
         undefined,
-        importedOffice.phone
+        importedOffice.phone,
+        importedOffice.address
       );
 
-      if (!existingOfficeId) {
+      if (!existingOffice) {
         // Create office with original imported data
         const { data: newOffice, error } = await supabase
           .from('patient_sources')
@@ -393,22 +524,23 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
         }
         
         toast({
-          title: "Office added",
+          title: "Office created",
           description: `${importedOffice.name} has been added with original data.`,
         });
       } else {
+        // Office already exists - just track it as processed
         toast({
           title: "Office already exists",
-          description: `${importedOffice.name} is already in your sources.`,
+          description: `${importedOffice.name} was already in your sources (merged with existing).`,
         });
       }
       
       setSkippedOffices(prev => new Set([...prev, officeId]));
     } catch (error) {
-      console.error('Error saving original office:', error);
+      console.error('Error processing skipped office:', error);
       toast({
         title: "Error",
-        description: "Failed to save office. Please try again.",
+        description: "Failed to process office. Please try again.",
         variant: "destructive",
       });
     }
