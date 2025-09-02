@@ -232,15 +232,19 @@ export function MapView({ height = "600px" }: { height?: string }) {
   useEffect(() => {
     if (map.current) {
       map.current.setStyle(getMapboxStyle());
+      // Remove existing styledata listeners to prevent duplicates
+      map.current.off('styledata', addMarkersAndConnections);
       map.current.on('styledata', () => {
-        addMarkersAndConnections();
+        if (map.current?.isStyleLoaded()) {
+          addMarkersAndConnections();
+        }
       });
     }
   }, [mapStyle]);
 
-  // Update connections when toggled
+  // Update connections when toggled - only if style is loaded
   useEffect(() => {
-    if (map.current) {
+    if (map.current && map.current.isStyleLoaded()) {
       addMarkersAndConnections();
     }
   }, [showConnections, filteredOffices]);
@@ -248,13 +252,20 @@ export function MapView({ height = "600px" }: { height?: string }) {
   const addMarkersAndConnections = () => {
     if (!map.current || !clinic) return;
 
-    // Clear existing markers and sources
+    console.log('Adding markers and connections - map style loaded:', map.current.isStyleLoaded());
+
+    // Clear existing markers and sources safely
     const markers = document.querySelectorAll('.mapboxgl-marker');
     markers.forEach(marker => marker.remove());
 
-    if (map.current.getSource('connections')) {
-      map.current.removeLayer('connections');
-      map.current.removeSource('connections');
+    // Safely check and remove existing connections source
+    try {
+      if (map.current.isStyleLoaded() && map.current.getSource('connections')) {
+        map.current.removeLayer('connections');
+        map.current.removeSource('connections');
+      }
+    } catch (error) {
+      console.warn('Error removing existing connections source:', error);
     }
 
     // Add clinic marker
