@@ -230,7 +230,15 @@ export type Database = {
           updated_at?: string
           website?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_discovered_offices_discovery_session_id"
+            columns: ["discovery_session_id"]
+            isOneToOne: false
+            referencedRelation: "discovery_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       discovery_sessions: {
         Row: {

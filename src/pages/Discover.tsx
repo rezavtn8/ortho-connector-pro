@@ -133,12 +133,21 @@ export const Discover = () => {
 
   const searchCachedOffices = async (params: DiscoveryParams): Promise<{ offices: DiscoveredOffice[]; session: DiscoverySession | null }> => {
     if (!user || !clinicLocation) {
+      console.log('searchCachedOffices: Missing user or clinic location');
       return { offices: [], session: null };
     }
 
     // Determine search coordinates
     let searchLat = clinicLocation.lat;
     let searchLng = clinicLocation.lng;
+
+    console.log('searchCachedOffices: Searching with params:', {
+      distance: params.distance,
+      searchLat,
+      searchLng,
+      officeType: params.officeType,
+      zipCode: params.zipCode
+    });
 
     // TODO: If ZIP code override is provided, geocode it to get lat/lng
     // For now, we'll use clinic location
@@ -147,15 +156,14 @@ export const Discover = () => {
       // Look for cached offices with matching search parameters
       const { data: offices, error } = await supabase
         .from('discovered_offices')
-        .select(`
-          *,
-          discovery_sessions!inner(*)
-        `)
+        .select('*')
         .eq('discovered_by', user.id)
         .eq('search_distance', params.distance)
         .eq('search_location_lat', searchLat)
         .eq('search_location_lng', searchLng)
         .order('fetched_at', { ascending: false });
+
+      console.log('searchCachedOffices: Query result:', { offices: offices?.length || 0, error });
 
       if (error) {
         console.error('Error searching cached offices:', error);
@@ -163,6 +171,8 @@ export const Discover = () => {
       }
 
       if (offices && offices.length > 0) {
+        console.log('searchCachedOffices: Found cached offices, calculating distances');
+        
         // Calculate distances and get the session info
         const officesWithDistance = offices.map(office => {
           const distance = office.lat && office.lng ? calculateDistance(
@@ -173,26 +183,42 @@ export const Discover = () => {
         });
 
         // Get the most recent session for these results
-        const { data: sessionData } = await supabase
-          .from('discovery_sessions')
-          .select('*')
-          .eq('id', offices[0].discovery_session_id)
-          .single();
+        const sessionId = offices[0].discovery_session_id;
+        let sessionData = null;
+        
+        if (sessionId) {
+          const { data: session, error: sessionError } = await supabase
+            .from('discovery_sessions')
+            .select('*')
+            .eq('id', sessionId)
+            .single();
+            
+          if (!sessionError && session) {
+            sessionData = session as DiscoverySession;
+          }
+        }
 
+        console.log('searchCachedOffices: Returning cached results with session:', sessionData?.id);
         return { 
           offices: officesWithDistance as DiscoveredOffice[], 
-          session: sessionData as DiscoverySession | null 
+          session: sessionData 
         };
       }
     } catch (error) {
       console.error('Error in searchCachedOffices:', error);
     }
 
+    console.log('searchCachedOffices: No cached offices found');
     return { offices: [], session: null };
   };
 
   const callGooglePlacesAPI = async (params: DiscoveryParams): Promise<void> => {
-    if (!user || !clinicLocation) return;
+    if (!user || !clinicLocation) {
+      console.log('callGooglePlacesAPI: Missing user or clinic location');
+      return;
+    }
+
+    console.log('callGooglePlacesAPI: Starting API call with params:', params);
 
     try {
       const { data: profile } = await supabase
@@ -202,6 +228,7 @@ export const Discover = () => {
         .single();
 
       if (!profile?.clinic_id) {
+        console.log('callGooglePlacesAPI: No clinic_id found');
         toast({
           title: "Error",
           description: "Please set up your clinic information in Settings first.",
@@ -214,6 +241,15 @@ export const Discover = () => {
       let searchLat = clinicLocation.lat;
       let searchLng = clinicLocation.lng;
 
+      console.log('callGooglePlacesAPI: Calling edge function with:', {
+        clinic_id: profile.clinic_id,
+        distance: params.distance,
+        search_lat: searchLat,
+        search_lng: searchLng,
+        office_type_filter: params.officeType === 'all' ? null : params.officeType,
+        zip_code_override: params.zipCode || null
+      });
+
       const { data, error } = await supabase.functions.invoke('discover-nearby-offices', {
         body: {
           clinic_id: profile.clinic_id,
@@ -224,6 +260,8 @@ export const Discover = () => {
           zip_code_override: params.zipCode || null
         }
       });
+
+      console.log('callGooglePlacesAPI: Edge function response:', { data, error });
 
       if (error) {
         console.error('Edge function error:', error);
@@ -247,6 +285,7 @@ export const Discover = () => {
       }
 
       if (!data.success) {
+        console.log('callGooglePlacesAPI: API call failed:', data.error);
         if (data.error?.includes('Weekly discovery limit')) {
           toast({
             title: "Rate Limited",
@@ -265,6 +304,7 @@ export const Discover = () => {
       }
 
       // Success
+      console.log('callGooglePlacesAPI: Success! Offices found:', data.totalOfficesCount);
       toast({
         title: "Success",
         description: data.newOfficesCount > 0 
@@ -281,6 +321,7 @@ export const Discover = () => {
         return { ...office, distance };
       });
 
+      console.log('callGooglePlacesAPI: Setting discovered offices:', officesWithDistance.length);
       setDiscoveredOffices(officesWithDistance);
 
       // Create a session object for display
@@ -289,13 +330,14 @@ export const Discover = () => {
         search_distance: params.distance,
         search_lat: searchLat,
         search_lng: searchLng,
-        office_type_filter: params.officeType,
-        zip_code_override: params.zipCode,
+        office_type_filter: params.officeType === 'all' ? undefined : params.officeType,
+        zip_code_override: params.zipCode || undefined,
         results_count: data.totalOfficesCount,
         api_call_made: true,
         created_at: new Date().toISOString()
       };
 
+      console.log('callGooglePlacesAPI: Setting current session:', session);
       setCurrentSession(session);
       await loadWeeklyUsage();
 
@@ -310,13 +352,16 @@ export const Discover = () => {
   };
 
   const handleDiscover = async (params: DiscoveryParams) => {
+    console.log('handleDiscover: Starting discovery with params:', params);
     setIsLoading(true);
     
     try {
       // First, check for cached results
+      console.log('handleDiscover: Checking cached results...');
       const { offices: cachedOffices, session: cachedSession } = await searchCachedOffices(params);
       
       if (cachedOffices.length > 0) {
+        console.log('handleDiscover: Found cached results:', cachedOffices.length);
         setDiscoveredOffices(cachedOffices);
         setCurrentSession(cachedSession);
         toast({
@@ -326,8 +371,10 @@ export const Discover = () => {
         return;
       }
 
+      console.log('handleDiscover: No cached results, checking API limits...');
       // No cached results, check if we can make an API call
       if (!canDiscover) {
+        console.log('handleDiscover: Rate limited');
         toast({
           title: "Rate Limited",
           description: "You've reached the weekly discovery limit. Try again next week.",
@@ -337,8 +384,13 @@ export const Discover = () => {
       }
 
       // Prompt user before making API call
-      if (window.confirm(`No cached offices found for these parameters. Would you like to search Google Places API?\n\nThis will use 1 of your ${weeklyUsage.limit} weekly discoveries.`)) {
+      const userConfirmed = window.confirm(`No cached offices found for these parameters. Would you like to search Google Places API?\n\nThis will use 1 of your ${weeklyUsage.limit} weekly discoveries.`);
+      console.log('handleDiscover: User confirmation for API call:', userConfirmed);
+      
+      if (userConfirmed) {
         await callGooglePlacesAPI(params);
+      } else {
+        console.log('handleDiscover: User declined API call');
       }
 
     } finally {
