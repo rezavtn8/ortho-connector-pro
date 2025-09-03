@@ -61,7 +61,9 @@ export function useGoogleMapsApi(): GoogleMapsApiHook {
         }
       }
       
-      const { data, error } = await supabase.functions.invoke('get-google-maps-key');
+      const { data, error } = await supabase.functions.invoke('get-google-maps-key', {
+        method: 'GET'
+      });
       
       if (error) {
         console.error('Supabase function error:', error);
