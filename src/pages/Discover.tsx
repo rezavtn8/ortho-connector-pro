@@ -11,10 +11,12 @@ import { useAuth } from '@/hooks/useAuth';
 import { 
   Loader2, RefreshCw, Star, Phone, Globe, MapPin, Plus, Check, 
   Search, Filter, BarChart3, Map, Grid3X3, Clock, TrendingUp,
-  Building2, Users, Calendar, ExternalLink, ArrowUpDown
+  Building2, Users, Calendar, ExternalLink, ArrowUpDown, AlertCircle, Navigation
 } from 'lucide-react';
 import { ImportDiscoveredOfficeDialog } from '@/components/ImportDiscoveredOfficeDialog';
 import { MapView } from '@/components/MapView';
+import { DistanceSelector } from '@/components/DistanceSelector';
+import { calculateDistance, DistanceOption, DISTANCE_OPTIONS } from '@/utils/distanceCalculation';
 
 interface DiscoveredOffice {
   id: string;
@@ -31,15 +33,20 @@ interface DiscoveredOffice {
   fetched_at: string;
   source: string;
   imported: boolean;
+  distance?: number; // Distance from clinic in miles
 }
 
 interface UserProfile {
   clinic_id: string | null;
+  clinic_latitude: number | null;
+  clinic_longitude: number | null;
 }
 
 export const Discover = () => {
   const [offices, setOffices] = useState<DiscoveredOffice[]>([]);
   const [filteredOffices, setFilteredOffices] = useState<DiscoveredOffice[]>([]);
+  const [clinicLocation, setClinicLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [selectedDistance, setSelectedDistance] = useState<DistanceOption>(5); // Default to 5 miles
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingOffices, setIsLoadingOffices] = useState(true);
   const [canRefresh, setCanRefresh] = useState(true);
@@ -47,9 +54,10 @@ export const Discover = () => {
   const [selectedOffice, setSelectedOffice] = useState<DiscoveredOffice | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'name' | 'rating' | 'distance' | 'added'>('rating');
+  const [sortBy, setSortBy] = useState<'name' | 'rating' | 'distance' | 'added'>('distance');
   const [filterBy, setFilterBy] = useState<'all' | 'imported' | 'not-imported'>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid');
+  const [showNoResultsPrompt, setShowNoResultsPrompt] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -58,7 +66,7 @@ export const Discover = () => {
     loadDiscoveredOffices();
   }, []);
 
-  // Filter and sort offices when search/filter changes
+  // Filter and sort offices when search/filter/distance changes
   useEffect(() => {
     let filtered = offices.filter(office => {
       const matchesSearch = searchQuery === '' || 
@@ -69,7 +77,11 @@ export const Discover = () => {
         (filterBy === 'imported' && office.imported) ||
         (filterBy === 'not-imported' && !office.imported);
 
-      return matchesSearch && matchesFilter;
+      // Distance filtering
+      const matchesDistance = !clinicLocation || !office.lat || !office.lng || 
+        office.distance === undefined || office.distance <= selectedDistance;
+
+      return matchesSearch && matchesFilter && matchesDistance;
     });
 
     // Sort offices
@@ -79,6 +91,8 @@ export const Discover = () => {
           return a.name.localeCompare(b.name);
         case 'rating':
           return (b.rating || 0) - (a.rating || 0);
+        case 'distance':
+          return (a.distance || 0) - (b.distance || 0);
         case 'added':
           return Number(b.imported) - Number(a.imported);
         default:
@@ -87,7 +101,10 @@ export const Discover = () => {
     });
 
     setFilteredOffices(filtered);
-  }, [offices, searchQuery, sortBy, filterBy]);
+    
+    // Check if we should show the "no results" prompt for Google API search
+    setShowNoResultsPrompt(filtered.length === 0 && offices.length > 0);
+  }, [offices, searchQuery, sortBy, filterBy, selectedDistance, clinicLocation]);
 
   const loadDiscoveredOffices = async () => {
     if (!user) return;
@@ -95,15 +112,20 @@ export const Discover = () => {
     try {
       setIsLoadingOffices(true);
       
-      // Get user's clinic_id
+      // Get user's clinic_id and location
       const { data: profile, error: profileError } = await supabase
         .from('user_profiles')
-        .select('clinic_id')
+        .select('clinic_id, clinic_latitude, clinic_longitude')
         .eq('user_id', user.id)
         .single();
 
       if (profileError || !profile?.clinic_id) {
         return;
+      }
+
+      // Set clinic location for distance calculations
+      if (profile.clinic_latitude && profile.clinic_longitude) {
+        setClinicLocation({ lat: profile.clinic_latitude, lng: profile.clinic_longitude });
       }
 
       // Load discovered offices
@@ -119,7 +141,21 @@ export const Discover = () => {
         return;
       }
 
-      setOffices(data || []);
+      // Calculate distances if clinic location is available
+      const officesWithDistance = (data || []).map(office => {
+        if (profile.clinic_latitude && profile.clinic_longitude && office.lat && office.lng) {
+          const distance = calculateDistance(
+            profile.clinic_latitude,
+            profile.clinic_longitude,
+            office.lat,
+            office.lng
+          );
+          return { ...office, distance };
+        }
+        return office;
+      });
+
+      setOffices(officesWithDistance);
 
       // Check if user can refresh (rate limiting)
       if (data && data.length > 0) {
@@ -470,6 +506,7 @@ export const Discover = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-background border shadow-md z-50">
+                  <SelectItem value="distance">Sort by Distance</SelectItem>
                   <SelectItem value="rating">Sort by Rating</SelectItem>
                   <SelectItem value="name">Sort by Name</SelectItem>
                   <SelectItem value="added">Sort by Status</SelectItem>
@@ -493,6 +530,15 @@ export const Discover = () => {
                 <Map className="w-4 h-4" />
               </Button>
             </div>
+          </div>
+
+          {/* Distance Selector */}
+          <div className="mt-4 pt-4 border-t">
+            <DistanceSelector
+              selectedDistance={selectedDistance}
+              onDistanceChange={setSelectedDistance}
+              officeCount={filteredOffices.length}
+            />
           </div>
 
           {filteredOffices.length !== offices.length && (
@@ -546,21 +592,61 @@ export const Discover = () => {
           </CardContent>
         </Card>
       ) : filteredOffices.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No offices match your search</h3>
-            <p className="text-muted-foreground mb-4">
-              Try adjusting your search terms or filters to find offices
-            </p>
-            <Button variant="outline" onClick={() => {
-              setSearchQuery('');
-              setFilterBy('all');
-            }}>
-              Clear Filters
-            </Button>
-          </CardContent>
-        </Card>
+        showNoResultsPrompt ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <div className="max-w-md mx-auto">
+                <AlertCircle className="w-12 h-12 text-orange-500 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No offices found in this range</h3>
+                <p className="text-muted-foreground mb-6">
+                  No cached offices found within {DISTANCE_OPTIONS.find(d => d.value === selectedDistance)?.description} of your clinic.
+                  Would you like to search Google for new offices in this area?
+                </p>
+                <div className="flex gap-3 justify-center">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      setSearchQuery('');
+                      setFilterBy('all');
+                      setSelectedDistance(25); // Expand to wider network
+                    }}
+                  >
+                    Expand Search Area
+                  </Button>
+                  <Button 
+                    onClick={discoverNearbyOffices}
+                    disabled={isLoading || !canRefresh}
+                    className="bg-gradient-to-r from-primary to-blue-600"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Search className="w-4 h-4 mr-2" />
+                    )}
+                    Search Google
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No offices match your search</h3>
+              <p className="text-muted-foreground mb-4">
+                Try adjusting your search terms, filters, or distance range to find offices
+              </p>
+              <Button variant="outline" onClick={() => {
+                setSearchQuery('');
+                setFilterBy('all');
+                setSelectedDistance(10);
+              }}>
+                Clear Filters
+              </Button>
+            </CardContent>
+          </Card>
+        )
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {filteredOffices.map((office) => (
@@ -586,56 +672,64 @@ export const Discover = () => {
                 </div>
               </CardHeader>
               
-              <CardContent className="space-y-4">
-                {office.address && (
-                  <div className="flex items-start gap-2">
-                    <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                    <span className="text-sm text-muted-foreground line-clamp-2">{office.address}</span>
-                  </div>
-                )}
-                
-                <div className="flex flex-wrap gap-2">
-                  {office.phone && (
-                    <Button variant="outline" size="sm" asChild className="h-8 px-2">
-                      <a href={`tel:${office.phone}`}>
-                        <Phone className="w-3 h-3 mr-1" />
-                        Call
-                      </a>
-                    </Button>
+                <CardContent className="space-y-4">
+                  {office.address && (
+                    <div className="flex items-start gap-2">
+                      <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <span className="text-sm text-muted-foreground line-clamp-2">{office.address}</span>
+                        {office.distance !== undefined && (
+                          <div className="flex items-center gap-1 mt-1">
+                            <Navigation className="w-3 h-3 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">{office.distance} miles away</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   )}
                   
-                  {office.website && (
-                    <Button variant="outline" size="sm" asChild className="h-8 px-2">
-                      <a href={office.website} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="w-3 h-3 mr-1" />
-                        Website
-                      </a>
-                    </Button>
-                  )}
-                </div>
-                
-                <div className="pt-2 border-t">
-                  <Button 
-                    onClick={() => handleAddToSources(office)}
-                    disabled={office.imported}
-                    variant={office.imported ? "outline" : "default"}
-                    size="sm"
-                    className="w-full"
-                  >
-                    {office.imported ? (
-                      <>
-                        <Check className="w-4 h-4 mr-2" />
-                        Added to Network
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add to Network
-                      </>
+                  <div className="flex flex-wrap gap-2">
+                    {office.phone && (
+                      <Button variant="outline" size="sm" asChild className="h-8 px-2">
+                        <a href={`tel:${office.phone}`}>
+                          <Phone className="w-3 h-3 mr-1" />
+                          Call
+                        </a>
+                      </Button>
                     )}
-                  </Button>
-                </div>
-              </CardContent>
+                    
+                    {office.website && (
+                      <Button variant="outline" size="sm" asChild className="h-8 px-2">
+                        <a href={office.website} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="w-3 h-3 mr-1" />
+                          Website
+                        </a>
+                      </Button>
+                    )}
+                  </div>
+                  
+                  <div className="pt-2 border-t">
+                    <Button 
+                      onClick={() => handleAddToSources(office)}
+                      disabled={office.imported}
+                      variant={office.imported ? "outline" : "default"}
+                      size="sm"
+                      className="w-full"
+                    >
+                      {office.imported ? (
+                        <>
+                          <Check className="w-4 h-4 mr-2" />
+                          Added to Network
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add to Network
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
             </Card>
           ))}
         </div>
