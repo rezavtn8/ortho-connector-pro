@@ -54,16 +54,51 @@ interface UserProfile {
 }
 
 export const Discover = () => {
-  const [currentSession, setCurrentSession] = useState<DiscoverySession | null>(null);
-  const [discoveredOffices, setDiscoveredOffices] = useState<DiscoveredOffice[]>([]);
+  const [currentSession, setCurrentSession] = useState<DiscoverySession | null>(() => {
+    // Restore session from localStorage on component mount
+    try {
+      const saved = localStorage.getItem('discoverySession');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  
+  const [discoveredOffices, setDiscoveredOffices] = useState<DiscoveredOffice[]>(() => {
+    // Restore offices from localStorage on component mount
+    try {
+      const saved = localStorage.getItem('discoveredOffices');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  
   const [isLoading, setIsLoading] = useState(false);
-  const [weeklyUsage, setWeeklyUsage] = useState({ used: 0, limit: 2 });
+  const [weeklyUsage, setWeeklyUsage] = useState({ used: 0, limit: 999 });
   const [canDiscover, setCanDiscover] = useState(true);
   const [nextRefreshDate, setNextRefreshDate] = useState<Date | null>(null);
   const [clinicLocation, setClinicLocation] = useState<{ lat: number; lng: number } | null>(null);
   
   const { user } = useAuth();
   const { toast } = useToast();
+
+  // Persist results to localStorage whenever they change
+  useEffect(() => {
+    if (currentSession) {
+      localStorage.setItem('discoverySession', JSON.stringify(currentSession));
+    } else {
+      localStorage.removeItem('discoverySession');
+    }
+  }, [currentSession]);
+
+  useEffect(() => {
+    if (discoveredOffices.length > 0) {
+      localStorage.setItem('discoveredOffices', JSON.stringify(discoveredOffices));
+    } else {
+      localStorage.removeItem('discoveredOffices');
+    }
+  }, [discoveredOffices]);
 
   useEffect(() => {
     if (user) {
@@ -396,8 +431,12 @@ export const Discover = () => {
   };
 
   const handleStartOver = () => {
+    console.log('🔄 handleStartOver: Clearing all discovery results and starting fresh');
     setCurrentSession(null);
     setDiscoveredOffices([]);
+    // Clear localStorage as well
+    localStorage.removeItem('discoverySession');
+    localStorage.removeItem('discoveredOffices');
   };
 
   return (
