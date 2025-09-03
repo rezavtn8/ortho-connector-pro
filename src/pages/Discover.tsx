@@ -220,7 +220,7 @@ export const Discover = () => {
           distance: params.distance,
           search_lat: searchLat,
           search_lng: searchLng,
-          office_type_filter: params.officeType || null,
+          office_type_filter: params.officeType === 'all' ? null : params.officeType,
           zip_code_override: params.zipCode || null
         }
       });

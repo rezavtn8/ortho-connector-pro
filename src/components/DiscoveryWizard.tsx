@@ -29,7 +29,7 @@ const DISTANCE_OPTIONS = [
 ];
 
 const OFFICE_TYPES = [
-  { value: '', label: 'All Types' },
+  { value: 'all', label: 'All Types' },
   { value: 'General Dentist', label: 'General Dentist' },
   { value: 'Pediatric', label: 'Pediatric' },
   { value: 'Multi-specialty', label: 'Multi-specialty' },
@@ -46,7 +46,7 @@ export const DiscoveryWizard: React.FC<DiscoveryWizardProps> = ({
   const [params, setParams] = useState<DiscoveryParams>({
     distance: 5,
     zipCode: '',
-    officeType: ''
+    officeType: 'all'
   });
 
   const handleNext = () => {
