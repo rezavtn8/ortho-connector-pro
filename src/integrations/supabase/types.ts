@@ -166,15 +166,20 @@ export type Database = {
           clinic_id: string | null
           created_at: string
           discovered_by: string
+          discovery_session_id: string | null
           fetched_at: string
           id: string
           imported: boolean
           lat: number | null
           lng: number | null
           name: string
+          office_type: string | null
           phone: string | null
           place_id: string
           rating: number | null
+          search_distance: number | null
+          search_location_lat: number | null
+          search_location_lng: number | null
           source: string
           updated_at: string
           website: string | null
@@ -184,15 +189,20 @@ export type Database = {
           clinic_id?: string | null
           created_at?: string
           discovered_by: string
+          discovery_session_id?: string | null
           fetched_at?: string
           id?: string
           imported?: boolean
           lat?: number | null
           lng?: number | null
           name: string
+          office_type?: string | null
           phone?: string | null
           place_id: string
           rating?: number | null
+          search_distance?: number | null
+          search_location_lat?: number | null
+          search_location_lng?: number | null
           source?: string
           updated_at?: string
           website?: string | null
@@ -202,18 +212,68 @@ export type Database = {
           clinic_id?: string | null
           created_at?: string
           discovered_by?: string
+          discovery_session_id?: string | null
           fetched_at?: string
           id?: string
           imported?: boolean
           lat?: number | null
           lng?: number | null
           name?: string
+          office_type?: string | null
           phone?: string | null
           place_id?: string
           rating?: number | null
+          search_distance?: number | null
+          search_location_lat?: number | null
+          search_location_lng?: number | null
           source?: string
           updated_at?: string
           website?: string | null
+        }
+        Relationships: []
+      }
+      discovery_sessions: {
+        Row: {
+          api_call_made: boolean | null
+          clinic_id: string | null
+          created_at: string
+          id: string
+          office_type_filter: string | null
+          results_count: number | null
+          search_distance: number
+          search_lat: number
+          search_lng: number
+          updated_at: string
+          user_id: string
+          zip_code_override: string | null
+        }
+        Insert: {
+          api_call_made?: boolean | null
+          clinic_id?: string | null
+          created_at?: string
+          id?: string
+          office_type_filter?: string | null
+          results_count?: number | null
+          search_distance: number
+          search_lat: number
+          search_lng: number
+          updated_at?: string
+          user_id: string
+          zip_code_override?: string | null
+        }
+        Update: {
+          api_call_made?: boolean | null
+          clinic_id?: string | null
+          created_at?: string
+          id?: string
+          office_type_filter?: string | null
+          results_count?: number | null
+          search_distance?: number
+          search_lat?: number
+          search_lng?: number
+          updated_at?: string
+          user_id?: string
+          zip_code_override?: string | null
         }
         Relationships: []
       }

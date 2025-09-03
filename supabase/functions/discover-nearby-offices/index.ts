@@ -32,66 +32,103 @@ serve(async (req) => {
       throw new Error('Authentication failed');
     }
 
-    const { clinic_id } = await req.json();
+    const { 
+      clinic_id, 
+      distance = 10, 
+      search_lat, 
+      search_lng, 
+      office_type_filter = null,
+      zip_code_override = null 
+    } = await req.json();
+    
     if (!clinic_id) {
       throw new Error('clinic_id is required');
     }
 
-    // Get clinic coordinates
-    const { data: clinic, error: clinicError } = await supabase
-      .from('clinics')
-      .select('latitude, longitude, name')
-      .eq('id', clinic_id)
-      .single();
+    // Get clinic coordinates or use provided search location
+    let searchLatitude = search_lat;
+    let searchLongitude = search_lng;
+    let clinicName = '';
 
-    if (clinicError || !clinic || !clinic.latitude || !clinic.longitude) {
-      throw new Error('Clinic not found or missing coordinates');
+    if (!searchLatitude || !searchLongitude) {
+      const { data: clinic, error: clinicError } = await supabase
+        .from('clinics')
+        .select('latitude, longitude, name')
+        .eq('id', clinic_id)
+        .single();
+
+      if (clinicError || !clinic || !clinic.latitude || !clinic.longitude) {
+        throw new Error('Clinic not found or missing coordinates');
+      }
+
+      searchLatitude = clinic.latitude;
+      searchLongitude = clinic.longitude;
+      clinicName = clinic.name;
     }
 
-    // Enhanced rate limiting security - check multiple conditions  
-    const now = new Date();
-    const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
-    
-    // Check both fetched_at and created_at for more security
-    const { data: recentFetches, error: fetchError } = await supabase
+    // Check for cached results first based on search parameters
+    const { data: cachedOffices, error: cacheError } = await supabase
       .from('discovered_offices')
-      .select('fetched_at, created_at')
+      .select('*')
       .eq('discovered_by', user.id)
-      .or(`fetched_at.gt.${sevenDaysAgo.toISOString()},created_at.gt.${sevenDaysAgo.toISOString()}`)
-      .order('fetched_at', { ascending: false })
-      .limit(1);
+      .eq('clinic_id', clinic_id)
+      .eq('search_distance', distance)
+      .eq('search_location_lat', searchLatitude)
+      .eq('search_location_lng', searchLongitude)
+      .order('fetched_at', { ascending: false });
 
-    if (fetchError) {
-      console.error('Error checking rate limit:', fetchError);
+    // If we have cached results matching these exact parameters, return them
+    if (cachedOffices && cachedOffices.length > 0) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          cached: true,
+          message: `Found ${cachedOffices.length} cached offices for your search parameters`,
+          offices: cachedOffices,
+          canRefresh: true
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Enhanced rate limiting - 2 API calls per week per clinic
+    const now = new Date();
+    const oneWeekAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
+    
+    const { data: recentSessions, error: sessionError } = await supabase
+      .from('discovery_sessions')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('clinic_id', clinic_id)
+      .eq('api_call_made', true)
+      .gte('created_at', oneWeekAgo.toISOString())
+      .order('created_at', { ascending: false });
+
+    if (sessionError) {
+      console.error('Error checking rate limit:', sessionError);
       return new Response(
         JSON.stringify({ success: false, error: 'Database error checking rate limit' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    if (recentFetches && recentFetches.length > 0) {
-      const lastFetch = recentFetches[0];
-      const lastFetchDate = new Date(lastFetch.fetched_at || lastFetch.created_at);
-      const daysSinceLastFetch = (now.getTime() - lastFetchDate.getTime()) / (1000 * 60 * 60 * 24);
+    if (recentSessions && recentSessions.length >= 2) {
+      const nextWeek = new Date(recentSessions[0].created_at);
+      nextWeek.setDate(nextWeek.getDate() + 7);
       
-      if (daysSinceLastFetch < 7) {
-        const nextRefreshDate = new Date(lastFetchDate.getTime() + (7 * 24 * 60 * 60 * 1000));
-        console.log(`Rate limited: ${daysSinceLastFetch.toFixed(2)} days since last fetch, need 7 days`);
-        
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: 'Rate limited. You can only refresh office discoveries once every 7 days.',
-            nextRefreshDate: nextRefreshDate.toISOString(),
-            canRefresh: false,
-            daysSinceLastFetch: Math.floor(daysSinceLastFetch * 10) / 10
-          }),
-          { 
-            status: 429,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
-      }
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Weekly discovery limit reached. You can make 2 Google API discoveries per week.',
+          nextRefreshDate: nextWeek.toISOString(),
+          canRefresh: false,
+          sessionsUsed: recentSessions.length
+        }),
+        { 
+          status: 429,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
     }
 
     // Call Google Places API
@@ -100,12 +137,33 @@ serve(async (req) => {
       throw new Error('Google Maps API key not configured');
     }
 
-    const radius = 10000; // 10km in meters
+    // Create discovery session to track this search
+    const { data: session, error: sessionInsertError } = await supabase
+      .from('discovery_sessions')
+      .insert({
+        user_id: user.id,
+        clinic_id: clinic_id,
+        search_distance: distance,
+        search_lat: searchLatitude,
+        search_lng: searchLongitude,
+        office_type_filter: office_type_filter,
+        zip_code_override: zip_code_override,
+        api_call_made: true
+      })
+      .select()
+      .single();
+
+    if (sessionInsertError) {
+      console.error('Error creating discovery session:', sessionInsertError);
+      throw new Error('Failed to create discovery session');
+    }
+
+    const radiusMeters = distance * 1609.34; // Convert miles to meters
     const type = 'dentist';
     
-    console.log(`Searching for dentists within ${radius}m of ${clinic.latitude}, ${clinic.longitude}`);
+    console.log(`Searching for dentists within ${distance} miles (${radiusMeters}m) of ${searchLatitude}, ${searchLongitude}`);
     
-    const placesUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${clinic.latitude},${clinic.longitude}&radius=${radius}&type=${type}&key=${googleApiKey}`;
+    const placesUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${searchLatitude},${searchLongitude}&radius=${radiusMeters}&type=${type}&key=${googleApiKey}`;
     
     const placesResponse = await fetch(placesUrl);
     const placesData = await placesResponse.json();
@@ -158,12 +216,12 @@ serve(async (req) => {
           }
 
           // Skip if it's too close and has similar name (likely same clinic)
-          const distance = calculateDistance(
-            clinic.latitude, clinic.longitude,
+          const distanceFromSearch = calculateDistance(
+            searchLatitude, searchLongitude,
             place.geometry.location.lat, place.geometry.location.lng
           );
           
-          if (distance < 0.1 && place.name.toLowerCase().includes(clinic.name.toLowerCase().split(' ')[0])) {
+          if (clinicName && distanceFromSearch < 0.1 && place.name.toLowerCase().includes(clinicName.toLowerCase().split(' ')[0])) {
             console.log(`Skipping ${place.name} - appears to be user's own clinic by proximity and name`);
             continue;
           }
@@ -183,6 +241,9 @@ serve(async (req) => {
             }
           }
 
+          // Infer office type from name and Google categories
+          const inferredType = inferOfficeType(place.name, place.types || []);
+
           const office = {
             place_id: place.place_id,
             name: place.name,
@@ -194,7 +255,12 @@ serve(async (req) => {
             lng: place.geometry.location.lng,
             discovered_by: user.id,
             clinic_id: clinic_id,
-            source: 'google'
+            source: 'google',
+            search_distance: distance,
+            search_location_lat: searchLatitude,
+            search_location_lng: searchLongitude,
+            office_type: inferredType,
+            discovery_session_id: session.id
           };
 
           offices.push(office);
@@ -237,12 +303,20 @@ serve(async (req) => {
 
     console.log(`Successfully processed ${offices.length} offices, ${newOffices.length} were new`);
 
+    // Update session with results count
+    await supabase
+      .from('discovery_sessions')
+      .update({ results_count: offices.length })
+      .eq('id', session.id);
+
     return new Response(
       JSON.stringify({
         success: true,
         message: `Found ${offices.length} dental offices nearby`,
         newOfficesCount: newOffices.length,
         totalOfficesCount: offices.length,
+        offices: offices,
+        sessionId: session.id,
         canRefresh: true
       }),
       {
@@ -278,4 +352,31 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   const d = R * c; // Distance in kilometers
   return d;
+}
+
+// Helper function to infer office type from name and Google categories
+function inferOfficeType(name: string, types: string[]): string {
+  const nameUpper = name.toUpperCase();
+  
+  // Check for pediatric indicators
+  if (nameUpper.includes('PEDIATRIC') || nameUpper.includes('CHILDREN') || 
+      nameUpper.includes('KIDS') || nameUpper.includes('CHILD')) {
+    return 'Pediatric';
+  }
+  
+  // Check for specialty indicators
+  if (nameUpper.includes('ENDODONTIC') || nameUpper.includes('ORAL SURGERY') || 
+      nameUpper.includes('ORTHODONTIC') || nameUpper.includes('PERIODONTIC') ||
+      nameUpper.includes('PROSTHODONTIC') || nameUpper.includes('MAXILLOFACIAL')) {
+    return 'Multi-specialty';
+  }
+  
+  // Check Google place types for specialty indicators
+  const specialtyTypes = ['orthodontist', 'oral_surgeon', 'periodontist'];
+  if (types.some(type => specialtyTypes.includes(type))) {
+    return 'Multi-specialty';
+  }
+  
+  // Default to General Dentist
+  return 'General Dentist';
 }
