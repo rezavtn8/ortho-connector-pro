@@ -65,9 +65,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
               <div className="flex justify-center mb-8">
                 <AnimatedNexoraLogo size={120} className="text-connection-primary hover-scale" animate={true} />
               </div>
-              <h1 className="text-5xl md:text-6xl font-bold text-connection-text mb-6 leading-tight animate-fade-in" style={{ animationDelay: '0.5s', animationFillMode: 'both' }}>
-                Grow Your Practice.
-                <span className="block text-connection-primary font-light animate-fade-in" style={{ animationDelay: '0.8s', animationFillMode: 'both' }}>Nurture Your Network.</span>
+              <h1 className="text-5xl md:text-6xl font-bold text-connection-text mb-6 leading-tight">
+                <span className="block animate-fade-in hover-scale" style={{ animationDelay: '0.5s', animationFillMode: 'both' }}>
+                  Grow Your Practice.
+                </span>
+                <span className="block text-connection-primary font-light animate-fade-in" style={{ animationDelay: '0.8s', animationFillMode: 'both' }}>
+                  Nurture Your Network.
+                </span>
+                <span className="block text-2xl font-bold text-connection-text animate-fade-in" style={{ animationDelay: '1.1s', animationFillMode: 'both' }}>
+                  with Nexora Dental
+                </span>
               </h1>
               
               <p className="text-lg md:text-xl text-connection-muted mb-12 max-w-3xl mx-auto leading-relaxed animate-fade-in" style={{ animationDelay: '1.1s', animationFillMode: 'both' }}>
