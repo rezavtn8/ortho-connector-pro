@@ -302,7 +302,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                 </div>
                 <p className="text-connection-muted">Access your practice growth dashboard</p>
               </div>
-              <AuthForm />
+              <AuthForm embedded />
             </div>
           </div>
         )}
