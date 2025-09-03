@@ -8,6 +8,8 @@ import {
   format, 
   startOfMonth, 
   endOfMonth, 
+  startOfWeek,
+  endOfWeek,
   eachDayOfInterval, 
   isSameMonth, 
   isToday,
@@ -52,7 +54,9 @@ export function CalendarView({
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
-  const calendarDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 }); // Start week on Monday
+  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+  const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
   // Group events by date
   const eventsByDate = events.reduce((acc, event) => {
@@ -184,7 +188,7 @@ export function CalendarView({
           {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
             <div
               key={day}
-              className="bg-muted-foreground/10 p-2 text-center text-xs font-medium text-muted-foreground"
+              className="bg-muted-foreground/10 p-2 text-center text-xs font-medium text-muted-foreground h-8 flex items-center justify-center"
             >
               {day}
             </div>
@@ -202,17 +206,18 @@ export function CalendarView({
               <div
                 key={index}
                 className={cn(
-                  "bg-background min-h-[80px] p-1 cursor-pointer relative hover:bg-muted/50 transition-colors",
+                  "bg-background min-h-[100px] p-2 cursor-pointer relative hover:bg-muted/50 transition-colors border-r border-b border-muted",
                   !isCurrentMonth && "text-muted-foreground bg-muted/30",
-                  isTodayDate && "bg-primary/10 border border-primary/20",
-                  isSelected && "bg-primary/20 border border-primary/40"
+                  isTodayDate && "bg-primary/10 border-primary/20",
+                  isSelected && "bg-primary/20 border-primary/40"
                 )}
                 onClick={() => handleDateClick(date)}
               >
-                <div className="flex justify-between items-start">
+                <div className="flex justify-between items-start mb-1">
                   <span className={cn(
-                    "text-sm",
-                    isTodayDate && "font-bold text-primary"
+                    "text-sm font-medium",
+                    isTodayDate && "font-bold text-primary bg-primary text-primary-foreground w-6 h-6 rounded-full flex items-center justify-center text-xs",
+                    !isCurrentMonth && "text-muted-foreground"
                   )}>
                     {format(date, 'd')}
                   </span>
