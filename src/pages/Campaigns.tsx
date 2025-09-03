@@ -11,6 +11,10 @@ import { CreateCampaignDialog } from '@/components/CreateCampaignDialog';
 import { CampaignDetailDialog } from '@/components/CampaignDetailDialog';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
+import { DateRange } from 'react-day-picker';
+import { DateRangePicker } from '@/components/DateRangePicker';
+import { CalendarView } from '@/components/CalendarView';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface Campaign {
   id: string;
@@ -52,6 +56,8 @@ export function Campaigns() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [activeTab, setActiveTab] = useState('grid');
   
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -108,7 +114,12 @@ export function Campaigns() {
     const matchesStatus = statusFilter === 'all' || campaign.status === statusFilter;
     const matchesType = typeFilter === 'all' || campaign.campaign_type === typeFilter;
     
-    return matchesSearch && matchesStatus && matchesType;
+    // Date range filtering
+    const plannedDate = campaign.planned_delivery_date ? new Date(campaign.planned_delivery_date) : null;
+    const matchesDateRange = (!dateRange?.from || !plannedDate || plannedDate >= dateRange.from) &&
+                            (!dateRange?.to || !plannedDate || plannedDate <= dateRange.to);
+    
+    return matchesSearch && matchesStatus && matchesType && matchesDateRange;
   });
 
   const handleCampaignClick = (campaign: Campaign) => {
@@ -176,6 +187,13 @@ export function Campaigns() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
+            <div className="min-w-[200px]">
+              <DateRangePicker
+                value={dateRange}
+                onChange={(range) => setDateRange(range)}
+                placeholder="Filter by delivery date"
+              />
+            </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[160px]">
                 <SelectValue placeholder="Status" />
@@ -207,83 +225,120 @@ export function Campaigns() {
         </CardContent>
       </Card>
 
-      {/* Campaigns Grid */}
-      {filteredCampaigns.length === 0 ? (
-        <Card className="text-center py-12">
-          <CardContent>
-            <Calendar className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-lg font-semibold mb-2">No campaigns found</h3>
-            <p className="text-muted-foreground mb-4">
-              {campaigns.length === 0 
-                ? "Get started by creating your first campaign"
-                : "Try adjusting your filters or search query"
-              }
-            </p>
-            {campaigns.length === 0 && (
-              <Button onClick={() => setCreateDialogOpen(true)} className="gap-2">
-                <Plus className="w-4 h-4" />
-                Create Campaign
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredCampaigns.map((campaign) => (
-            <Card 
-              key={campaign.id} 
-              className="cursor-pointer hover:shadow-md transition-shadow duration-200"
-              onClick={() => handleCampaignClick(campaign)}
-            >
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="space-y-2">
-                    <h3 className="font-semibold text-lg leading-tight">{campaign.name}</h3>
-                    <Badge 
-                      variant="secondary" 
-                      className={campaignTypeColors[campaign.campaign_type] || 'bg-gray-100 text-gray-800'}
-                    >
-                      {campaign.campaign_type}
-                    </Badge>
-                  </div>
-                  <Badge 
-                    variant="secondary"
-                    className={statusColors[campaign.status]}
-                  >
-                    {campaign.status}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Truck className="w-4 h-4" />
-                  <span>{campaign.delivery_method}</span>
-                </div>
-                
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Users className="w-4 h-4" />
-                  <span>
-                    {campaign.delivered_count || 0} / {campaign.office_count || 0} offices delivered
-                  </span>
-                </div>
-                
-                {campaign.planned_delivery_date && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Calendar className="w-4 h-4" />
-                    <span>
-                      Planned: {new Date(campaign.planned_delivery_date).toLocaleDateString()}
-                    </span>
-                  </div>
+      {/* Campaigns Content */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <div className="flex items-center justify-between">
+          <TabsList>
+            <TabsTrigger value="grid">Grid View</TabsTrigger>
+            <TabsTrigger value="calendar">Calendar View</TabsTrigger>
+          </TabsList>
+          <div className="text-sm text-muted-foreground">
+            {filteredCampaigns.length} campaigns found
+          </div>
+        </div>
+
+        <TabsContent value="grid">
+          {/* Campaigns Grid */}
+          {filteredCampaigns.length === 0 ? (
+            <Card className="text-center py-12">
+              <CardContent>
+                <Calendar className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-semibold mb-2">No campaigns found</h3>
+                <p className="text-muted-foreground mb-4">
+                  {campaigns.length === 0 
+                    ? "Get started by creating your first campaign"
+                    : "Try adjusting your filters or search query"
+                  }
+                </p>
+                {campaigns.length === 0 && (
+                  <Button onClick={() => setCreateDialogOpen(true)} className="gap-2">
+                    <Plus className="w-4 h-4" />
+                    Create Campaign
+                  </Button>
                 )}
-                
-                <div className="text-xs text-muted-foreground">
-                  Created {formatDistanceToNow(new Date(campaign.created_at), { addSuffix: true })}
-                </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
-      )}
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredCampaigns.map((campaign) => (
+                <Card 
+                  key={campaign.id} 
+                  className="cursor-pointer hover:shadow-md transition-shadow duration-200"
+                  onClick={() => handleCampaignClick(campaign)}
+                >
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-2">
+                        <h3 className="font-semibold text-lg leading-tight">{campaign.name}</h3>
+                        <Badge 
+                          variant="secondary" 
+                          className={campaignTypeColors[campaign.campaign_type] || 'bg-gray-100 text-gray-800'}
+                        >
+                          {campaign.campaign_type}
+                        </Badge>
+                      </div>
+                      <Badge 
+                        variant="secondary"
+                        className={statusColors[campaign.status]}
+                      >
+                        {campaign.status}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Truck className="w-4 h-4" />
+                      <span>{campaign.delivery_method}</span>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Users className="w-4 h-4" />
+                      <span>
+                        {campaign.delivered_count || 0} / {campaign.office_count || 0} offices delivered
+                      </span>
+                    </div>
+                    
+                    {campaign.planned_delivery_date && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Calendar className="w-4 h-4" />
+                        <span>
+                          Planned: {new Date(campaign.planned_delivery_date).toLocaleDateString()}
+                        </span>
+                      </div>
+                    )}
+                    
+                    <div className="text-xs text-muted-foreground">
+                      Created {formatDistanceToNow(new Date(campaign.created_at), { addSuffix: true })}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="calendar">
+          <CalendarView
+            events={filteredCampaigns.map(campaign => ({
+              id: campaign.id,
+              title: campaign.name,
+              date: campaign.planned_delivery_date ? new Date(campaign.planned_delivery_date) : new Date(),
+              type: 'campaign' as const,
+              status: campaign.status,
+              description: `${campaign.campaign_type} - ${campaign.office_count || 0} offices`
+            }))}
+            onEventClick={(event) => {
+              const campaign = campaigns.find(c => c.id === event.id);
+              if (campaign) {
+                handleCampaignClick(campaign);
+              }
+            }}
+            onAddEvent={(date) => {
+              setCreateDialogOpen(true);
+            }}
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Create Campaign Dialog */}
       <CreateCampaignDialog

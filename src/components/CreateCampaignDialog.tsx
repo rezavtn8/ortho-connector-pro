@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar } from '@/components/ui/calendar';
+import { EnhancedDatePicker } from '@/components/EnhancedDatePicker';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
 import { CalendarIcon, X, Users } from 'lucide-react';
@@ -277,29 +277,14 @@ export function CreateCampaignDialog({ open, onOpenChange, onCampaignCreated }: 
             {/* Planned Delivery Date */}
             <div className="space-y-2">
               <Label>Planned Delivery Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !formData.planned_delivery_date && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {formData.planned_delivery_date ? format(formData.planned_delivery_date, "PPP") : "Pick a date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={formData.planned_delivery_date}
-                    onSelect={(date) => handleInputChange('planned_delivery_date', date)}
-                    initialFocus
-                    className="pointer-events-auto"
-                  />
-                </PopoverContent>
-              </Popover>
+              <EnhancedDatePicker
+                value={formData.planned_delivery_date}
+                onChange={(date) => handleInputChange('planned_delivery_date', date)}
+                placeholder="Select delivery date"
+                minDate={new Date()}
+                withTime={false}
+                presets={true}
+              />
             </div>
 
             {/* Materials Checklist */}

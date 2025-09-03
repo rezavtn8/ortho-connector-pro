@@ -9,6 +9,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { EnhancedDatePicker } from '@/components/EnhancedDatePicker';
+import { DateRangePicker } from '@/components/DateRangePicker';
+import { CalendarView } from '@/components/CalendarView';
 import { AddressSearch } from '@/components/AddressSearch';
 import { MapView } from '@/components/MapView';
 import {
@@ -70,7 +73,9 @@ export function MarketingVisits() {
   const [filterRep, setFilterRep] = useState('');
   const [filterRating, setFilterRating] = useState('');
   const [filterVisited, setFilterVisited] = useState('');
+  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
   const [selectedOffice, setSelectedOffice] = useState<Office | null>(null);
+  const [activeTab, setActiveTab] = useState('table');
 
   // Form state
   const [formData, setFormData] = useState({
@@ -265,7 +270,12 @@ export function MarketingVisits() {
                           (filterVisited === 'visited' && visit.visited) ||
                           (filterVisited === 'not_visited' && !visit.visited);
     
-    return matchesSearch && matchesRep && matchesRating && matchesVisited;
+    // Date range filtering
+    const visitDate = new Date(visit.visit_date);
+    const matchesDateRange = (!dateRange.from || visitDate >= dateRange.from) &&
+                            (!dateRange.to || visitDate <= dateRange.to);
+    
+    return matchesSearch && matchesRep && matchesRating && matchesVisited && matchesDateRange;
   });
 
   const exportToCSV = () => {
@@ -371,29 +381,13 @@ export function MarketingVisits() {
 
                 <div className="space-y-2">
                   <Label>Visit Date *</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !formData.visit_date && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {formData.visit_date ? format(formData.visit_date, "PPP") : "Pick a date"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={formData.visit_date}
-                        onSelect={(date) => date && setFormData(prev => ({ ...prev, visit_date: date }))}
-                        initialFocus
-                        className="pointer-events-auto"
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <EnhancedDatePicker
+                    value={formData.visit_date}
+                    onChange={(date) => date && setFormData(prev => ({ ...prev, visit_date: date }))}
+                    placeholder="Select visit date"
+                    withTime={true}
+                    presets={true}
+                  />
                 </div>
 
                 <div className="space-y-2">
