@@ -90,45 +90,8 @@ serve(async (req) => {
       );
     }
 
-    // Enhanced rate limiting - 2 API calls per week per clinic
-    const now = new Date();
-    const oneWeekAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
-    
-    const { data: recentSessions, error: sessionError } = await supabase
-      .from('discovery_sessions')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('clinic_id', clinic_id)
-      .eq('api_call_made', true)
-      .gte('created_at', oneWeekAgo.toISOString())
-      .order('created_at', { ascending: false });
-
-    if (sessionError) {
-      console.error('Error checking rate limit:', sessionError);
-      return new Response(
-        JSON.stringify({ success: false, error: 'Database error checking rate limit' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (recentSessions && recentSessions.length >= 2) {
-      const nextWeek = new Date(recentSessions[0].created_at);
-      nextWeek.setDate(nextWeek.getDate() + 7);
-      
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Weekly discovery limit reached. You can make 2 Google API discoveries per week.',
-          nextRefreshDate: nextWeek.toISOString(),
-          canRefresh: false,
-          sessionsUsed: recentSessions.length
-        }),
-        { 
-          status: 429,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
+    // Rate limiting temporarily disabled for testing
+    console.log('Rate limiting disabled - proceeding with API call');
 
     // Call Google Places API
     const googleApiKey = Deno.env.get('GOOGLE_MAPS_API_KEY');
