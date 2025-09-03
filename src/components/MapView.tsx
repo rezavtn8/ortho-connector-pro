@@ -1,172 +1,37 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import mapboxgl from 'mapbox-gl';
-import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MapPin, Building2, Phone, Users, RefreshCw, Map, Layers, Filter, Clock } from "lucide-react";
+import { useMapboxToken } from '@/hooks/useMapboxToken';
+import { useMapData, Office, Clinic } from '@/hooks/useMapData';
+import { createOfficeMarker, createClinicMarker } from '@/components/map/MapMarker';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-interface Office {
-  id: string;
-  name: string;
-  address?: string | null;
-  phone?: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
-  currentMonthReferrals: number;
-  totalReferrals: number;
-  strength: 'Strong' | 'Moderate' | 'Sporadic' | 'Cold';
-  category: 'VIP' | 'Strong' | 'Moderate' | 'Sporadic' | 'Cold';
-  lastActiveMonth?: string | null;
-}
-
-interface Clinic {
-  id: string;
-  name: string;
-  address: string;
-  latitude: number;
-  longitude: number;
-}
 
 export function MapView({ height = "600px" }: { height?: string }) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
-  const [offices, setOffices] = useState<Office[]>([]);
-  const [filteredOffices, setFilteredOffices] = useState<Office[]>([]);
-  const [clinic, setClinic] = useState<Clinic | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const markersRef = useRef<mapboxgl.Marker[]>([]);
+  
+  const { token: mapboxToken, isLoading: tokenLoading, error: tokenError } = useMapboxToken();
+  const { offices, clinic, isLoading: dataLoading, error: dataError, refetch } = useMapData();
+  
   const [selectedOffice, setSelectedOffice] = useState<Office | null>(null);
   const [mapStyle, setMapStyle] = useState<'light' | 'dark' | 'navigation'>('light');
   const [showConnections, setShowConnections] = useState(true);
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [mapboxToken, setMapboxToken] = useState<string | null>(null);
-  const [lastRefresh, setLastRefresh] = useState<number>(0);
 
-  // Get Mapbox token
-  useEffect(() => {
-    const getMapboxToken = async () => {
-      try {
-        const { data, error } = await supabase.functions.invoke('get-mapbox-token');
-        if (error) throw error;
-        setMapboxToken(data.token);
-      } catch (error) {
-        console.error('Error getting Mapbox token:', error);
-      }
-    };
-    getMapboxToken();
-  }, []);
-
-  // Load clinic and office data with throttling
-  const loadData = useCallback(async () => {
-    const now = Date.now();
-    if (now - lastRefresh < 300000) { // 5 minutes throttle
-      console.log('Refresh throttled - please wait 5 minutes between refreshes');
-      return;
-    }
-    
-    setIsLoading(true);
-    
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Load user's clinic
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('clinic_id, clinic_name, clinic_address, clinic_latitude, clinic_longitude')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (profile && profile.clinic_latitude && profile.clinic_longitude) {
-        setClinic({
-          id: profile.clinic_id || 'clinic',
-          name: profile.clinic_name || 'My Clinic',
-          address: profile.clinic_address || '',
-          latitude: profile.clinic_latitude,
-          longitude: profile.clinic_longitude
-        });
-      }
-
-      // Load referring offices with batch queries for better performance
-      const { data: sources } = await supabase
-        .from('patient_sources')
-        .select('id, name, address, phone, latitude, longitude, source_type')
-        .eq('is_active', true)
-        .eq('source_type', 'Office')
-        .not('latitude', 'is', null)
-        .not('longitude', 'is', null);
-
-      if (sources) {
-        const currentMonth = new Date().toISOString().slice(0, 7);
-        const sourceIds = sources.map(s => s.id);
-        
-        // Batch load monthly data
-        const { data: monthlyData } = await supabase
-          .from('monthly_patients')
-          .select('source_id, year_month, patient_count')
-          .in('source_id', sourceIds);
-
-        // Batch load strength scores
-        const strengthPromises = sourceIds.map(id =>
-          supabase.rpc('calculate_source_score', { source_id_param: id })
-        );
-        const strengthResults = await Promise.all(strengthPromises);
-
-        // Process offices
-        const officesWithData = sources.map((source, index) => {
-          const sourceMonthlyData = monthlyData?.filter(m => m.source_id === source.id) || [];
-          const currentMonthData = sourceMonthlyData.find(m => m.year_month === currentMonth);
-          const currentMonthReferrals = currentMonthData?.patient_count || 0;
-          const totalReferrals = sourceMonthlyData.reduce((sum, m) => sum + m.patient_count, 0);
-          const strength = strengthResults[index]?.data || 'Cold';
-
-          // Find last active month
-          const lastActiveData = sourceMonthlyData
-            .filter(m => m.patient_count > 0)
-            .sort((a, b) => b.year_month.localeCompare(a.year_month))[0];
-          const lastActiveMonth = lastActiveData?.year_month || null;
-
-          // Determine category based on enhanced criteria
-          let category: Office['category'];
-          if (totalReferrals >= 20 && currentMonthReferrals >= 8) {
-            category = 'VIP';
-          } else {
-            category = strength as Office['category'];
-          }
-
-          return {
-            ...source,
-            currentMonthReferrals,
-            totalReferrals,
-            strength: strength as Office['strength'],
-            category,
-            lastActiveMonth
-          };
-        });
-        
-        setOffices(officesWithData);
-        setLastRefresh(now);
-      }
-    } catch (error) {
-      console.error('Error loading data:', error);
-    }
-    
-    setIsLoading(false);
-  }, [lastRefresh]);
-
-  useEffect(() => {
-    loadData();
-  }, []);
+  const isLoading = tokenLoading || dataLoading;
 
   // Filter offices based on category
-  useEffect(() => {
+  const filteredOffices = useMemo(() => {
     if (categoryFilter === 'all') {
-      setFilteredOffices(offices);
-    } else {
-      setFilteredOffices(offices.filter(office => office.category === categoryFilter));
+      return offices;
     }
+    return offices.filter(office => office.category === categoryFilter);
   }, [offices, categoryFilter]);
 
   // Helper functions
@@ -252,11 +117,9 @@ export function MapView({ height = "600px" }: { height?: string }) {
   const addMarkersAndConnections = () => {
     if (!map.current || !clinic) return;
 
-    console.log('Adding markers and connections - map style loaded:', map.current.isStyleLoaded());
-
-    // Clear existing markers and sources safely
-    const markers = document.querySelectorAll('.mapboxgl-marker');
-    markers.forEach(marker => marker.remove());
+    // Clear existing markers
+    markersRef.current.forEach(marker => marker.remove());
+    markersRef.current = [];
 
     // Safely check and remove existing connections source
     try {
@@ -269,26 +132,7 @@ export function MapView({ height = "600px" }: { height?: string }) {
     }
 
     // Add clinic marker
-    const clinicEl = document.createElement('div');
-    clinicEl.innerHTML = `
-      <div style="
-        background-color: #2563eb;
-        width: 50px;
-        height: 50px;
-        border-radius: 50%;
-        border: 4px solid white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-        cursor: pointer;
-      ">
-        <svg width="24" height="24" fill="white" viewBox="0 0 24 24">
-          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-        </svg>
-      </div>
-    `;
-
+    const clinicEl = createClinicMarker();
     const clinicPopup = new mapboxgl.Popup({ offset: 25 })
       .setHTML(`
         <div class="p-3">
@@ -303,56 +147,20 @@ export function MapView({ height = "600px" }: { height?: string }) {
         </div>
       `);
 
-    new mapboxgl.Marker(clinicEl)
+    const clinicMarker = new mapboxgl.Marker(clinicEl)
       .setLngLat([clinic.longitude, clinic.latitude])
       .setPopup(clinicPopup)
       .addTo(map.current);
+    
+    markersRef.current.push(clinicMarker);
 
     // Add office markers
     filteredOffices.forEach((office) => {
       if (!office.latitude || !office.longitude) return;
 
       const color = getCategoryColor(office.category);
-      const size = getCategorySize(office.category);
-      const officeEl = document.createElement('div');
-      officeEl.innerHTML = `
-        <div style="
-          background-color: ${color};
-          width: ${size.width}px;
-          height: ${size.height}px;
-          border-radius: 50%;
-          border: 3px solid white;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 3px 10px rgba(0,0,0,0.3);
-          position: relative;
-          cursor: pointer;
-        ">
-          <svg width="${size.iconSize}" height="${size.iconSize}" fill="white" viewBox="0 0 24 24">
-            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
-          </svg>
-          ${office.currentMonthReferrals > 0 ? `
-            <div style="
-              position: absolute;
-              top: -8px;
-              right: -8px;
-              background-color: #ef4444;
-              color: white;
-              border-radius: 50%;
-              width: 22px;
-              height: 22px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              font-size: 11px;
-              font-weight: bold;
-              border: 2px solid white;
-            ">${office.currentMonthReferrals}</div>
-          ` : ''}
-        </div>
-      `;
-
+      const officeEl = createOfficeMarker(office, () => setSelectedOffice(office));
+      
       const officePopup = new mapboxgl.Popup({ offset: 25 })
         .setHTML(`
           <div class="p-3 min-w-[250px]">
@@ -396,11 +204,8 @@ export function MapView({ height = "600px" }: { height?: string }) {
         .setLngLat([office.longitude, office.latitude])
         .setPopup(officePopup)
         .addTo(map.current!);
-
-      // Handle marker click
-      officeEl.addEventListener('click', () => {
-        setSelectedOffice(office);
-      });
+      
+      markersRef.current.push(marker);
     });
 
     // Add connection lines for filtered offices
@@ -474,16 +279,6 @@ export function MapView({ height = "600px" }: { height?: string }) {
     }
   };
 
-  const canRefresh = () => {
-    const now = Date.now();
-    return (now - lastRefresh) >= 300000; // 5 minutes
-  };
-
-  const getRefreshCountdown = () => {
-    const now = Date.now();
-    const timeLeft = 300000 - (now - lastRefresh);
-    return Math.ceil(timeLeft / 60000); // minutes
-  };
 
   // Show a message that the Mapbox token needs to be configured
   if (!mapboxToken) {
@@ -592,12 +387,12 @@ export function MapView({ height = "600px" }: { height?: string }) {
             <Button
               size="sm"
               variant="outline"
-              onClick={loadData}
-              disabled={isLoading || !canRefresh()}
-              title={!canRefresh() ? `Wait ${getRefreshCountdown()} more minutes` : 'Refresh data'}
+              onClick={refetch}
+              disabled={isLoading}
+              title="Refresh data"
             >
               <RefreshCw className={`h-4 w-4 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
-              {!canRefresh() ? `${getRefreshCountdown()}m` : 'Refresh'}
+              Refresh
             </Button>
           </div>
         </div>
