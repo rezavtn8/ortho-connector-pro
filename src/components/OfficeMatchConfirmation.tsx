@@ -252,7 +252,9 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
     const initGoogleMaps = async () => {
       try {
         // Get API key securely from edge function
-        const response = await supabase.functions.invoke('get-google-maps-key');
+        const response = await supabase.functions.invoke('get-google-maps-key', {
+          method: 'GET'
+        });
         if (response.error) {
           const errorMsg = 'Could not get Google Maps API key from server. Please check your internet connection.';
           console.warn(errorMsg, response.error);

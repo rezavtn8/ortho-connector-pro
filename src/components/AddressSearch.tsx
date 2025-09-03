@@ -68,7 +68,9 @@ export function AddressSearch({ value, onSelect, placeholder = "Search offices..
     const initGoogleMaps = async () => {
       try {
         // Get API key securely from edge function
-        const response = await supabase.functions.invoke('get-google-maps-key');
+        const response = await supabase.functions.invoke('get-google-maps-key', {
+          method: 'GET'
+        });
         if (response.error) {
           console.warn('Could not get Google Maps API key from server:', response.error);
           return;
