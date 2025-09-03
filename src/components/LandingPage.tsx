@@ -61,6 +61,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
           {/* Hero Section */}
           <section className={`${showAuth ? 'px-0' : 'px-6'} pt-20 pb-24`}>
             <div className="max-w-4xl mx-auto text-center">
+              <div className="flex justify-center mb-8">
+                <NexoraLogo size={120} className="text-connection-primary" />
+              </div>
               <h1 className="text-5xl md:text-6xl font-bold text-connection-text mb-6 leading-tight">
                 Grow Your Practice.
                 <span className="block text-connection-primary font-light">Nurture Your Network.</span>
@@ -191,6 +194,91 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                   </Button>
                 </div>
               </section>
+
+              {/* Footer */}
+              <footer className="bg-connection-text/95 text-white">
+                <div className="max-w-6xl mx-auto px-6 py-16">
+                  <div className="grid md:grid-cols-4 gap-8 mb-12">
+                    {/* Company Info */}
+                    <div className="md:col-span-1">
+                      <div className="flex items-center space-x-3 mb-6">
+                        <NexoraLogo size={40} className="text-connection-primary" />
+                        <span className="text-2xl font-bold">Nexora</span>
+                      </div>
+                      <p className="text-white/70 mb-6 leading-relaxed">
+                        Intelligent business growth platform helping dental practices track, analyze, and optimize their patient acquisition networks.
+                      </p>
+                      <div className="flex space-x-4">
+                        <Button variant="ghost" size="icon" className="text-white/70 hover:text-white hover:bg-white/10">
+                          <MessageSquare className="w-5 h-5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="text-white/70 hover:text-white hover:bg-white/10">
+                          <Globe className="w-5 h-5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="text-white/70 hover:text-white hover:bg-white/10">
+                          <Building2 className="w-5 h-5" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Product */}
+                    <div>
+                      <h3 className="font-semibold text-lg mb-6">Product</h3>
+                      <ul className="space-y-4">
+                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Features</Button></li>
+                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Analytics</Button></li>
+                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Discovery</Button></li>
+                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Network Management</Button></li>
+                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Campaigns</Button></li>
+                      </ul>
+                    </div>
+
+                    {/* Company */}
+                    <div>
+                      <h3 className="font-semibold text-lg mb-6">Company</h3>
+                      <ul className="space-y-4">
+                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">About Us</Button></li>
+                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Careers</Button></li>
+                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Press</Button></li>
+                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Partners</Button></li>
+                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Contact</Button></li>
+                      </ul>
+                    </div>
+
+                    {/* Support */}
+                    <div>
+                      <h3 className="font-semibold text-lg mb-6">Support</h3>
+                      <ul className="space-y-4">
+                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Help Center</Button></li>
+                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Documentation</Button></li>
+                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">API Reference</Button></li>
+                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Community</Button></li>
+                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Status</Button></li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  {/* Bottom Bar */}
+                  <div className="border-t border-white/20 pt-8">
+                    <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
+                      <div className="text-white/60 text-sm">
+                        © 2024 Nexora. All rights reserved.
+                      </div>
+                      <div className="flex space-x-6 text-sm">
+                        <Button variant="ghost" className="text-white/60 hover:text-white p-0 h-auto font-normal">
+                          Privacy Policy
+                        </Button>
+                        <Button variant="ghost" className="text-white/60 hover:text-white p-0 h-auto font-normal">
+                          Terms of Service
+                        </Button>
+                        <Button variant="ghost" className="text-white/60 hover:text-white p-0 h-auto font-normal">
+                          Cookie Policy
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </footer>
             </>
           )}
         </div>
