@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { AuthForm } from './AuthForm';
 import { Building2, BarChart3, Users, Search, ArrowRight, CheckCircle, Globe, MessageSquare, MapPin, Star, TrendingUp } from 'lucide-react';
 import { NexoraLogo } from '@/components/NexoraLogo';
+import { AnimatedNexoraLogo } from '@/components/AnimatedNexoraLogo';
 
 interface LandingPageProps {
   onGetStarted: () => void;
@@ -62,23 +63,23 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
           <section className={`${showAuth ? 'px-0' : 'px-6'} pt-20 pb-24`}>
             <div className="max-w-4xl mx-auto text-center">
               <div className="flex justify-center mb-8">
-                <NexoraLogo size={120} className="text-connection-primary" />
+                <AnimatedNexoraLogo size={120} className="text-connection-primary hover-scale" animate={true} />
               </div>
-              <h1 className="text-5xl md:text-6xl font-bold text-connection-text mb-6 leading-tight">
+              <h1 className="text-5xl md:text-6xl font-bold text-connection-text mb-6 leading-tight animate-fade-in" style={{ animationDelay: '0.5s', animationFillMode: 'both' }}>
                 Grow Your Practice.
-                <span className="block text-connection-primary font-light">Nurture Your Network.</span>
+                <span className="block text-connection-primary font-light animate-fade-in" style={{ animationDelay: '0.8s', animationFillMode: 'both' }}>Nurture Your Network.</span>
               </h1>
               
-              <p className="text-lg md:text-xl text-connection-muted mb-12 max-w-3xl mx-auto leading-relaxed">
+              <p className="text-lg md:text-xl text-connection-muted mb-12 max-w-3xl mx-auto leading-relaxed animate-fade-in" style={{ animationDelay: '1.1s', animationFillMode: 'both' }}>
                 Track referrals, measure patient sources, and grow your dental practice with intelligent network insights that drive organic growth.
               </p>
               
               {!showAuth && (
-                <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                <div className="flex flex-col sm:flex-row gap-4 justify-center items-center animate-fade-in" style={{ animationDelay: '1.4s', animationFillMode: 'both' }}>
                   <Button 
                     size="lg"
                     onClick={onGetStarted}
-                    className="bg-connection-primary hover:bg-connection-primary/90 text-white px-8 py-4 text-lg rounded-xl shadow-elegant hover:shadow-glow transition-all group"
+                    className="bg-connection-primary hover:bg-connection-primary/90 text-white px-8 py-4 text-lg rounded-xl shadow-elegant hover:shadow-glow transition-all group hover-scale"
                   >
                     Start Growing Today
                     <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
