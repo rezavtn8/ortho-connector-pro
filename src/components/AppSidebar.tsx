@@ -37,17 +37,17 @@ interface AppSidebarProps {
 
 const mainNavItems = [
   { id: 'dashboard', title: 'Dashboard', icon: Home },
-  { id: 'sources', title: 'Sources', icon: Users },
-  { id: 'offices', title: 'Offices', icon: Building },
-  { id: 'analytics', title: 'Analytics', icon: TrendingUp },
+  { id: 'sources', title: 'Patient Sources', icon: Users },
+  { id: 'offices', title: 'Partner Offices', icon: Building },
+  { id: 'analytics', title: 'Reports', icon: TrendingUp },
 ];
 
 const managementItems = [
-  { id: 'marketing-visits', title: 'Marketing Visits', icon: UserPlus },
+  { id: 'marketing-visits', title: 'Outreach Visits', icon: UserPlus },
   { id: 'campaigns', title: 'Campaigns', icon: Calendar },
-  { id: 'discover', title: 'Discover', icon: Search },
+  { id: 'discover', title: 'Find Offices', icon: Search },
   { id: 'reviews', title: 'Reviews', icon: MessageSquare },
-  { id: 'map-view', title: 'Map View', icon: MapPin },
+  { id: 'map-view', title: 'Map', icon: MapPin },
 ];
 
 const systemItems = [
