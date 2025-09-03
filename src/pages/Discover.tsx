@@ -132,93 +132,12 @@ export const Discover = () => {
   };
 
   const searchCachedOffices = async (params: DiscoveryParams): Promise<{ offices: DiscoveredOffice[]; session: DiscoverySession | null }> => {
+    console.log('🔍 searchCachedOffices: Starting search with params:', params);
+    
     if (!user || !clinicLocation) {
-      console.log('searchCachedOffices: Missing user or clinic location');
+      console.log('❌ searchCachedOffices: Missing user or clinic location');
       return { offices: [], session: null };
     }
-
-    // Determine search coordinates
-    let searchLat = clinicLocation.lat;
-    let searchLng = clinicLocation.lng;
-
-    console.log('searchCachedOffices: Searching with params:', {
-      distance: params.distance,
-      searchLat,
-      searchLng,
-      officeType: params.officeType,
-      zipCode: params.zipCode
-    });
-
-    // TODO: If ZIP code override is provided, geocode it to get lat/lng
-    // For now, we'll use clinic location
-
-    try {
-      // Look for cached offices with matching search parameters
-      const { data: offices, error } = await supabase
-        .from('discovered_offices')
-        .select('*')
-        .eq('discovered_by', user.id)
-        .eq('search_distance', params.distance)
-        .eq('search_location_lat', searchLat)
-        .eq('search_location_lng', searchLng)
-        .order('fetched_at', { ascending: false });
-
-      console.log('searchCachedOffices: Query result:', { offices: offices?.length || 0, error });
-
-      if (error) {
-        console.error('Error searching cached offices:', error);
-        return { offices: [], session: null };
-      }
-
-      if (offices && offices.length > 0) {
-        console.log('searchCachedOffices: Found cached offices, calculating distances');
-        
-        // Calculate distances and get the session info
-        const officesWithDistance = offices.map(office => {
-          const distance = office.lat && office.lng ? calculateDistance(
-            searchLat, searchLng, office.lat, office.lng
-          ) : undefined;
-          
-          return { ...office, distance };
-        });
-
-        // Get the most recent session for these results
-        const sessionId = offices[0].discovery_session_id;
-        let sessionData = null;
-        
-        if (sessionId) {
-          const { data: session, error: sessionError } = await supabase
-            .from('discovery_sessions')
-            .select('*')
-            .eq('id', sessionId)
-            .single();
-            
-          if (!sessionError && session) {
-            sessionData = session as DiscoverySession;
-          }
-        }
-
-        console.log('searchCachedOffices: Returning cached results with session:', sessionData?.id);
-        return { 
-          offices: officesWithDistance as DiscoveredOffice[], 
-          session: sessionData 
-        };
-      }
-    } catch (error) {
-      console.error('Error in searchCachedOffices:', error);
-    }
-
-    console.log('searchCachedOffices: No cached offices found');
-    return { offices: [], session: null };
-  };
-
-  const callGooglePlacesAPI = async (params: DiscoveryParams): Promise<void> => {
-    if (!user || !clinicLocation) {
-      console.log('callGooglePlacesAPI: Missing user or clinic location');
-      return;
-    }
-
-    console.log('callGooglePlacesAPI: Starting API call with params:', params);
 
     try {
       const { data: profile } = await supabase
@@ -228,7 +147,85 @@ export const Discover = () => {
         .single();
 
       if (!profile?.clinic_id) {
-        console.log('callGooglePlacesAPI: No clinic_id found');
+        console.log('❌ searchCachedOffices: No clinic_id found');
+        return { offices: [], session: null };
+      }
+
+      // Look for cached offices with matching search parameters
+      const { data: offices, error } = await supabase
+        .from('discovered_offices')
+        .select('*')
+        .eq('discovered_by', user.id)
+        .eq('clinic_id', profile.clinic_id)
+        .eq('search_distance', params.distance)
+        .order('fetched_at', { ascending: false });
+
+      console.log(`✅ searchCachedOffices: Found ${offices?.length || 0} cached offices`);
+
+      if (error) {
+        console.error('❌ searchCachedOffices: Query error:', error);
+        return { offices: [], session: null };
+      }
+
+      if (offices && offices.length > 0) {
+        // Calculate distances
+        const searchLat = clinicLocation.lat;
+        const searchLng = clinicLocation.lng;
+        
+        const officesWithDistance = offices.map(office => {
+          const distance = office.lat && office.lng ? calculateDistance(
+            searchLat, searchLng, office.lat, office.lng
+          ) : undefined;
+          
+          return { ...office, distance };
+        });
+
+        // Get session info from the first office
+        const sessionId = offices[0].discovery_session_id;
+        let sessionData = null;
+        
+        if (sessionId) {
+          const { data: session } = await supabase
+            .from('discovery_sessions')
+            .select('*')
+            .eq('id', sessionId)
+            .single();
+            
+          if (session) {
+            sessionData = session as DiscoverySession;
+          }
+        }
+
+        console.log(`✅ searchCachedOffices: Returning ${officesWithDistance.length} offices with session`);
+        return { 
+          offices: officesWithDistance as DiscoveredOffice[], 
+          session: sessionData 
+        };
+      }
+    } catch (error) {
+      console.error('❌ searchCachedOffices: Exception:', error);
+    }
+
+    return { offices: [], session: null };
+  };
+
+  const callGooglePlacesAPI = async (params: DiscoveryParams): Promise<void> => {
+    console.log('🚀 callGooglePlacesAPI: Starting with params:', params);
+    
+    if (!user || !clinicLocation) {
+      console.log('❌ callGooglePlacesAPI: Missing user or clinic location');
+      return;
+    }
+
+    try {
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('clinic_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profile?.clinic_id) {
+        console.log('❌ callGooglePlacesAPI: No clinic_id found');
         toast({
           title: "Error",
           description: "Please set up your clinic information in Settings first.",
@@ -237,34 +234,30 @@ export const Discover = () => {
         return;
       }
 
-      // Determine search coordinates
-      let searchLat = clinicLocation.lat;
-      let searchLng = clinicLocation.lng;
-
-      console.log('callGooglePlacesAPI: Calling edge function with:', {
+      const requestBody = {
         clinic_id: profile.clinic_id,
         distance: params.distance,
-        search_lat: searchLat,
-        search_lng: searchLng,
+        search_lat: clinicLocation.lat,
+        search_lng: clinicLocation.lng,
         office_type_filter: params.officeType === 'all' ? null : params.officeType,
         zip_code_override: params.zipCode || null
-      });
+      };
+
+      console.log('📤 callGooglePlacesAPI: Sending request:', requestBody);
 
       const { data, error } = await supabase.functions.invoke('discover-nearby-offices', {
-        body: {
-          clinic_id: profile.clinic_id,
-          distance: params.distance,
-          search_lat: searchLat,
-          search_lng: searchLng,
-          office_type_filter: params.officeType === 'all' ? null : params.officeType,
-          zip_code_override: params.zipCode || null
-        }
+        body: requestBody
       });
 
-      console.log('callGooglePlacesAPI: Edge function response:', { data, error });
+      console.log('📥 callGooglePlacesAPI: Response received:', { 
+        success: data?.success, 
+        cached: data?.cached,
+        officesCount: data?.offices?.length, 
+        error 
+      });
 
       if (error) {
-        console.error('Edge function error:', error);
+        console.error('❌ callGooglePlacesAPI: Function error:', error);
         
         if (error.message?.includes('Edge Function returned a non-2xx status code')) {
           toast({
@@ -284,9 +277,9 @@ export const Discover = () => {
         return;
       }
 
-      if (!data.success) {
-        console.log('callGooglePlacesAPI: API call failed:', data.error);
-        if (data.error?.includes('Weekly discovery limit')) {
+      if (!data?.success) {
+        console.log('❌ callGooglePlacesAPI: API call failed:', data?.error);
+        if (data?.error?.includes('Weekly discovery limit')) {
           toast({
             title: "Rate Limited",
             description: data.error,
@@ -296,53 +289,63 @@ export const Discover = () => {
         } else {
           toast({
             title: "Error",
-            description: data.error || "Failed to discover offices",
+            description: data?.error || "Failed to discover offices",
             variant: "destructive"
           });
         }
         return;
       }
 
-      // Success
-      console.log('callGooglePlacesAPI: Success! Offices found:', data.totalOfficesCount);
-      toast({
-        title: "Success",
-        description: data.newOfficesCount > 0 
-          ? `✅ Discovered ${data.newOfficesCount} new dental offices!`
-          : `Found ${data.totalOfficesCount} offices matching your criteria`,
-      });
+      // Success - handle both cached and new results
+      const officesCount = data.offices?.length || 0;
+      console.log(`✅ callGooglePlacesAPI: Success! ${officesCount} offices found (cached: ${data.cached})`);
+      
+      if (data.cached) {
+        toast({
+          title: "Cached Results",
+          description: `Found ${officesCount} cached offices from previous search`,
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: data.newOfficesCount > 0 
+            ? `✅ Discovered ${data.newOfficesCount} new dental offices!`
+            : `Found ${officesCount} offices matching your criteria`,
+        });
+      }
 
       // Calculate distances for returned offices
       const officesWithDistance = (data.offices || []).map((office: any) => {
         const distance = office.lat && office.lng ? calculateDistance(
-          searchLat, searchLng, office.lat, office.lng
+          clinicLocation.lat, clinicLocation.lng, office.lat, office.lng
         ) : undefined;
         
         return { ...office, distance };
       });
 
-      console.log('callGooglePlacesAPI: Setting discovered offices:', officesWithDistance.length);
       setDiscoveredOffices(officesWithDistance);
 
       // Create a session object for display
       const session: DiscoverySession = {
-        id: data.sessionId,
+        id: data.sessionId || 'temp-' + Date.now(),
         search_distance: params.distance,
-        search_lat: searchLat,
-        search_lng: searchLng,
+        search_lat: clinicLocation.lat,
+        search_lng: clinicLocation.lng,
         office_type_filter: params.officeType === 'all' ? undefined : params.officeType,
         zip_code_override: params.zipCode || undefined,
-        results_count: data.totalOfficesCount,
-        api_call_made: true,
+        results_count: officesCount,
+        api_call_made: !data.cached,
         created_at: new Date().toISOString()
       };
 
-      console.log('callGooglePlacesAPI: Setting current session:', session);
       setCurrentSession(session);
-      await loadWeeklyUsage();
+      
+      if (!data.cached) {
+        await loadWeeklyUsage();
+      }
 
     } catch (error) {
-      console.error('Error in callGooglePlacesAPI:', error);
+      console.error('❌ callGooglePlacesAPI: Exception:', error);
       toast({
         title: "Error",
         description: "Failed to discover offices. Please try again.",
@@ -352,16 +355,16 @@ export const Discover = () => {
   };
 
   const handleDiscover = async (params: DiscoveryParams) => {
-    console.log('handleDiscover: Starting discovery with params:', params);
+    console.log('🎯 handleDiscover: Starting discovery with params:', params);
     setIsLoading(true);
     
     try {
-      // First, check for cached results
-      console.log('handleDiscover: Checking cached results...');
+      // Check for cached results first
+      console.log('🔍 handleDiscover: Checking for cached results...');
       const { offices: cachedOffices, session: cachedSession } = await searchCachedOffices(params);
       
       if (cachedOffices.length > 0) {
-        console.log('handleDiscover: Found cached results:', cachedOffices.length);
+        console.log(`✅ handleDiscover: Found ${cachedOffices.length} cached offices`);
         setDiscoveredOffices(cachedOffices);
         setCurrentSession(cachedSession);
         toast({
@@ -371,28 +374,29 @@ export const Discover = () => {
         return;
       }
 
-      console.log('handleDiscover: No cached results, checking API limits...');
+      console.log('📡 handleDiscover: No cached results, checking API limits...');
       // No cached results, check if we can make an API call
       if (!canDiscover) {
-        console.log('handleDiscover: Rate limited');
+        console.log('🚫 handleDiscover: Rate limited');
         toast({
-          title: "Rate Limited",
+          title: "Rate Limited", 
           description: "You've reached the weekly discovery limit. Try again next week.",
           variant: "destructive"
         });
         return;
       }
 
-      // Prompt user before making API call
-      const userConfirmed = window.confirm(`No cached offices found for these parameters. Would you like to search Google Places API?\n\nThis will use 1 of your ${weeklyUsage.limit} weekly discoveries.`);
-      console.log('handleDiscover: User confirmation for API call:', userConfirmed);
-      
-      if (userConfirmed) {
-        await callGooglePlacesAPI(params);
-      } else {
-        console.log('handleDiscover: User declined API call');
-      }
+      // Make the API call (edge function handles caching internally)
+      console.log('🚀 handleDiscover: Making API call...');
+      await callGooglePlacesAPI(params);
 
+    } catch (error) {
+      console.error('❌ handleDiscover: Exception:', error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred during discovery",
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }
