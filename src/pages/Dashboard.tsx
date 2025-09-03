@@ -1,10 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PatientSource, MonthlyPatients, SOURCE_TYPE_CONFIG, getCurrentYearMonth } from '@/lib/database.types';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { PatientSource, MonthlyPatients, SOURCE_TYPE_CONFIG, getCurrentYearMonth, formatYearMonth } from '@/lib/database.types';
 import { supabase } from '@/integrations/supabase/client';
 import { Search, TrendingUp, Building2, Star, Users, Globe, MessageSquare, FileText, BarChart3 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { 
+  ResponsiveContainer, 
+  LineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip 
+} from 'recharts';
 
 interface SourceGroupData {
   name: string;
@@ -14,6 +24,67 @@ interface SourceGroupData {
   thisMonth: number;
   color: string;
   types: string[];
+}
+
+interface PatientTrendChartProps {
+  monthlyData: MonthlyPatients[];
+  sources: PatientSource[];
+}
+
+function PatientTrendChart({ monthlyData, sources }: PatientTrendChartProps) {
+  // Get last 6 months of data
+  const now = new Date();
+  const last6Months = Array.from({ length: 6 }, (_, i) => {
+    const date = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+    return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+  });
+
+  const chartData = last6Months.map(yearMonth => {
+    const monthTotal = monthlyData
+      .filter(data => data.year_month === yearMonth)
+      .reduce((sum, data) => sum + data.patient_count, 0);
+
+    return {
+      month: formatYearMonth(yearMonth),
+      patients: monthTotal
+    };
+  });
+
+  return (
+    <div className="h-64">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={chartData}>
+          <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+          <XAxis 
+            dataKey="month" 
+            fontSize={12}
+            tickLine={false}
+            axisLine={false}
+          />
+          <YAxis 
+            fontSize={12}
+            tickLine={false}
+            axisLine={false}
+          />
+          <Tooltip 
+            contentStyle={{
+              backgroundColor: 'hsl(var(--card))',
+              border: '1px solid hsl(var(--border))',
+              borderRadius: '6px'
+            }}
+          />
+          <Line 
+            type="monotone" 
+            dataKey="patients" 
+            stroke="hsl(var(--primary))" 
+            strokeWidth={2}
+            dot={{ fill: 'hsl(var(--primary))', strokeWidth: 2, r: 4 }}
+            activeDot={{ r: 6, stroke: 'hsl(var(--primary))', strokeWidth: 2 }}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
 }
 
 export function Dashboard() {
@@ -279,7 +350,13 @@ export function Dashboard() {
             <Card 
               key={group.name}
               className="cursor-pointer hover:shadow-lg transition-all duration-200 border-l-4 border-l-transparent hover:border-l-current"
-              onClick={() => navigate('/sources')}
+              onClick={() => {
+                if (group.name === 'Dental Offices') {
+                  navigate('/offices');
+                } else {
+                  navigate('/sources');
+                }
+              }}
             >
               <CardHeader className="pb-3">
                 <CardTitle className={`text-lg flex items-center gap-2 ${group.color}`}>
@@ -306,6 +383,36 @@ export function Dashboard() {
             </Card>
           ))}
         </div>
+      </div>
+
+      {/* Analytics Overview */}
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-semibold">Analytics Overview</h2>
+          <Button 
+            variant="outline"
+            onClick={() => navigate('/analytics')}
+            className="gap-2"
+          >
+            <BarChart3 className="w-4 h-4" />
+            View Full Reports
+          </Button>
+        </div>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5" />
+              Patient Trends (Last 6 Months)
+            </CardTitle>
+            <CardDescription>
+              Monthly patient referral trends across all sources
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <PatientTrendChart monthlyData={monthlyData} sources={sources} />
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
