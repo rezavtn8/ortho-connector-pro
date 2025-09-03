@@ -45,25 +45,24 @@ serve(async (req) => {
       throw new Error('clinic_id is required');
     }
 
-    // Get clinic coordinates or use provided search location
-    let searchLatitude = search_lat;
-    let searchLongitude = search_lng;
-    let clinicName = '';
+    // Get clinic data for comparison and coordinates
+    const { data: clinic, error: clinicError } = await supabase
+      .from('clinics')
+      .select('latitude, longitude, name, google_place_id')
+      .eq('id', clinic_id)
+      .single();
+
+    if (clinicError || !clinic) {
+      throw new Error('Clinic not found');
+    }
+
+    // Use provided coordinates or fall back to clinic coordinates
+    let searchLatitude = search_lat || clinic.latitude;
+    let searchLongitude = search_lng || clinic.longitude;
+    let clinicName = clinic.name;
 
     if (!searchLatitude || !searchLongitude) {
-      const { data: clinic, error: clinicError } = await supabase
-        .from('clinics')
-        .select('latitude, longitude, name')
-        .eq('id', clinic_id)
-        .single();
-
-      if (clinicError || !clinic || !clinic.latitude || !clinic.longitude) {
-        throw new Error('Clinic not found or missing coordinates');
-      }
-
-      searchLatitude = clinic.latitude;
-      searchLongitude = clinic.longitude;
-      clinicName = clinic.name;
+      throw new Error('Search coordinates not available');
     }
 
     // Check for cached results first based on search parameters
@@ -193,8 +192,8 @@ serve(async (req) => {
       // Get details for each place to get more complete information
       for (const place of placesData.results) {
         try {
-          // Skip if this appears to be the user's own clinic or already exists as a source
-          if (place.place_id === clinic.google_place_id) {
+          // Skip if this appears to be the user's own clinic or already exists as a source  
+          if (clinic.google_place_id && place.place_id === clinic.google_place_id) {
             console.log(`Skipping own clinic: ${place.name}`);
             continue;
           }
@@ -221,9 +220,12 @@ serve(async (req) => {
             place.geometry.location.lat, place.geometry.location.lng
           );
           
-          if (clinicName && distanceFromSearch < 0.1 && place.name.toLowerCase().includes(clinicName.toLowerCase().split(' ')[0])) {
-            console.log(`Skipping ${place.name} - appears to be user's own clinic by proximity and name`);
-            continue;
+          if (clinicName && distanceFromSearch < 0.1) {
+            const clinicFirstWord = clinicName.toLowerCase().split(' ')[0];
+            if (clinicFirstWord && place.name.toLowerCase().includes(clinicFirstWord)) {
+              console.log(`Skipping ${place.name} - appears to be user's own clinic by proximity and name`);
+              continue;
+            }
           }
 
           // Get place details for phone and website
