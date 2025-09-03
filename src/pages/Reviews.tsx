@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { useGoogleReviews } from '@/hooks/useGoogleMapsApi';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Star,
@@ -63,6 +64,8 @@ export function Reviews() {
     needsAttention: 0,
     averageRating: 0
   });
+
+  const { fetchReviews: fetchGoogleReviews } = useGoogleReviews();
 
   useEffect(() => {
     loadUserPlaceId();
@@ -126,7 +129,7 @@ export function Reviews() {
     if (!currentPlaceId) {
       toast({
         title: 'No Place ID Found',
-        description: 'Please add a Google Place ID to one of your patient sources first.',
+        description: 'Please add a Google Place ID to view reviews.',
         variant: 'destructive',
       });
       return;
@@ -134,14 +137,13 @@ export function Reviews() {
 
     setLoading(true);
     try {
-      // Fetch Google reviews using Places API
-      const response = await supabase.functions.invoke('get-google-reviews', {
-        body: { place_id: currentPlaceId }
-      });
-
-      if (response.error) throw response.error;
+      console.log('Reviews: Fetching reviews for place:', currentPlaceId);
       
-      const googleReviews: GoogleReview[] = response.data.reviews || [];
+      // Use the improved Google Reviews hook
+      const reviewData = await fetchGoogleReviews(currentPlaceId);
+      
+      const googleReviews: GoogleReview[] = reviewData.reviews || [];
+      console.log(`Reviews: Fetched ${googleReviews.length} reviews from Google`);
 
       // Fetch existing review statuses
       const { data: reviewStatuses } = await supabase
@@ -177,14 +179,16 @@ export function Reviews() {
         needsAttention,
         averageRating: averageRating || 0
       });
-
-    } catch (error) {
-      console.error('Error fetching reviews:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch reviews. Please try again.',
-        variant: 'destructive',
+      
+      console.log('Reviews: Statistics calculated:', {
+        total: reviewsWithStatus.length,
+        needsAttention,
+        averageRating: averageRating || 0
       });
+
+    } catch (error: any) {
+      console.error('Reviews: Error fetching reviews:', error);
+      // Error handling is already done in the useGoogleReviews hook
     } finally {
       setLoading(false);
     }

@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Check, ChevronsUpDown, MapPin, Star } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { supabase } from '@/integrations/supabase/client';
 import { Loader } from '@googlemaps/js-api-loader';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { MapPin, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { useGoogleMapsApi } from '@/hooks/useGoogleMapsApi';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface GooglePlaceResult {
   place_id: string;
@@ -18,7 +18,6 @@ interface GooglePlaceResult {
 }
 
 interface GooglePlaceDetails {
-  place_id: string;
   name: string;
   formatted_address: string;
   geometry: {
@@ -27,25 +26,21 @@ interface GooglePlaceDetails {
       lng: () => number;
     };
   };
-  rating?: number;
-  formatted_phone_number?: string;
-  website?: string;
-  opening_hours?: {
-    weekday_text: string[];
-  };
+  place_id: string;
 }
 
 interface SelectedPlace {
   name: string;
   address: string;
-  google_place_id: string;
-  latitude?: number;
-  longitude?: number;
+  latitude: number;
+  longitude: number;
+  place_id?: string;
+  google_place_id?: string; // Add this for compatibility
 }
 
 interface ClinicAddressSearchProps {
   value?: string;
-  onSelect: (place: SelectedPlace | null) => void;
+  onSelect: (place: SelectedPlace) => void;
   placeholder?: string;
 }
 
@@ -53,29 +48,24 @@ export function ClinicAddressSearch({ value, onSelect, placeholder = "Search for
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState(value || "");
   const [googlePlaces, setGooglePlaces] = useState<GooglePlaceResult[]>([]);
-  const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
-  const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
+  const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
   const [manualEntry, setManualEntry] = useState(false);
+  const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
+  
   const geocoder = useRef<google.maps.Geocoder | null>(null);
   const placesService = useRef<google.maps.places.PlacesService | null>(null);
+  const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
+  
+  const { apiKey, isLoading: isLoadingApi, error: apiError, retry: retryApi } = useGoogleMapsApi();
 
-  // Initialize Google Maps services
+  // Initialize Google Maps services when API key is available
   useEffect(() => {
+    if (!apiKey || googleMapsLoaded) return;
+
     const initGoogleMaps = async () => {
       try {
-        // Get API key securely from edge function
-        const response = await supabase.functions.invoke('get-google-maps-key');
-        if (response.error) {
-          console.warn('Could not get Google Maps API key from server:', response.error);
-          return;
-        }
-
-        const apiKey = response.data?.google_maps_api_key;
-        if (!apiKey) {
-          console.warn('Google Maps API key not available from server');
-          return;
-        }
-
+        console.log('ClinicAddressSearch: Initializing Google Maps...');
+        
         const loader = new Loader({
           apiKey,
           version: 'weekly',
@@ -83,7 +73,10 @@ export function ClinicAddressSearch({ value, onSelect, placeholder = "Search for
         });
 
         await loader.load();
+        
+        // Initialize services
         geocoder.current = new google.maps.Geocoder();
+        autocompleteService.current = new google.maps.places.AutocompleteService();
         
         // Create a dummy map element for PlacesService
         const mapDiv = document.createElement('div');
@@ -91,107 +84,110 @@ export function ClinicAddressSearch({ value, onSelect, placeholder = "Search for
         placesService.current = new google.maps.places.PlacesService(map);
         
         setGoogleMapsLoaded(true);
+        console.log('ClinicAddressSearch: Google Maps initialized successfully');
+        
       } catch (error) {
-        console.error('Error loading Google Maps:', error);
+        console.error('ClinicAddressSearch: Error loading Google Maps:', error);
+        setGoogleMapsLoaded(false);
       }
     };
 
     initGoogleMaps();
-  }, []);
+  }, [apiKey, googleMapsLoaded]);
 
-  // Search Google Places when user types
+  // Search for Google Places
   useEffect(() => {
-    if (!searchValue || searchValue.length < 3 || !googleMapsLoaded || manualEntry) {
+    if (!searchValue || searchValue.length < 3 || !googleMapsLoaded || !autocompleteService.current) {
       setGooglePlaces([]);
       return;
     }
 
-    setIsLoadingGoogle(true);
-    
     const searchPlaces = async () => {
-      const request = {
-        input: searchValue,
-        types: ['establishment'],
-        componentRestrictions: { country: 'us' }
-      };
-
+      setIsLoadingPlaces(true);
       try {
-        const autocompleteService = new google.maps.places.AutocompleteService();
-        autocompleteService.getPlacePredictions(request, (results, status) => {
-          setIsLoadingGoogle(false);
+        const request = {
+          input: searchValue,
+          types: ['establishment'],
+          componentRestrictions: { country: 'us' }
+        };
+
+        autocompleteService.current!.getQueryPredictions(request, (results, status) => {
           if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-            setGooglePlaces(results.slice(0, 5));
+            // Map Google's QueryAutocompletePrediction to our GooglePlaceResult interface
+            const mappedResults = results.map(result => ({
+              place_id: result.place_id || '',
+              description: result.description,
+              structured_formatting: {
+                main_text: (result as any).structured_formatting?.main_text || result.description.split(',')[0],
+                secondary_text: (result as any).structured_formatting?.secondary_text || result.description.split(',').slice(1).join(',').trim()
+              }
+            }));
+            setGooglePlaces(mappedResults.slice(0, 5));
           } else {
+            console.warn('ClinicAddressSearch: Places search failed:', status);
             setGooglePlaces([]);
           }
+          setIsLoadingPlaces(false);
         });
       } catch (error) {
-        console.error('Error searching places:', error);
-        setIsLoadingGoogle(false);
+        console.error('ClinicAddressSearch: Error searching places:', error);
         setGooglePlaces([]);
+        setIsLoadingPlaces(false);
       }
     };
 
-    searchPlaces();
-  }, [searchValue, googleMapsLoaded, manualEntry]);
+    const debounceTimer = setTimeout(searchPlaces, 300);
+    return () => clearTimeout(debounceTimer);
+  }, [searchValue, googleMapsLoaded]);
 
   const handleGooglePlaceSelect = async (place: GooglePlaceResult) => {
-    if (!placesService.current) return;
+    if (!placesService.current) {
+      console.error('ClinicAddressSearch: PlacesService not initialized');
+      return;
+    }
 
     try {
-      setIsLoadingGoogle(true);
+      console.log('ClinicAddressSearch: Fetching place details for:', place.place_id);
       
-      // Get place details to fetch additional information
-      const placeDetails = await new Promise<GooglePlaceDetails>((resolve, reject) => {
-        const request = {
-          placeId: place.place_id,
-          fields: [
-            'name', 
-            'formatted_address', 
-            'geometry', 
-            'rating', 
-            'formatted_phone_number', 
-            'website', 
-            'opening_hours'
-          ]
-        };
+      const request = {
+        placeId: place.place_id,
+        fields: ['name', 'formatted_address', 'geometry', 'place_id']
+      };
 
-        placesService.current!.getDetails(request, (result, status) => {
-          if (status === google.maps.places.PlacesServiceStatus.OK && result) {
-            resolve(result as GooglePlaceDetails);
-          } else {
-            reject(new Error('Place details fetch failed'));
-          }
-        });
+      placesService.current.getDetails(request, (result, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && result?.name && result?.formatted_address) {
+          const selectedPlace: SelectedPlace = {
+            name: result.name,
+            address: result.formatted_address,
+            latitude: result.geometry?.location.lat() || 0,
+            longitude: result.geometry?.location.lng() || 0,
+            place_id: result.place_id || place.place_id,
+            google_place_id: result.place_id || place.place_id
+          };
+          
+          console.log('ClinicAddressSearch: Selected place:', selectedPlace);
+          setSearchValue(selectedPlace.name);
+          setOpen(false);
+          onSelect(selectedPlace);
+        } else {
+          console.error('ClinicAddressSearch: Failed to get place details:', status);
+          // Fallback to basic information
+          const fallbackPlace: SelectedPlace = {
+            name: place.structured_formatting.main_text,
+            address: place.description,
+            latitude: 0,
+            longitude: 0,
+            place_id: place.place_id,
+            google_place_id: place.place_id
+          };
+          
+          setSearchValue(fallbackPlace.name);
+          setOpen(false);
+          onSelect(fallbackPlace);
+        }
       });
-
-      const location = placeDetails.geometry.location;
-      
-      const selectedPlace: SelectedPlace = {
-        name: placeDetails.name,
-        address: placeDetails.formatted_address,
-        google_place_id: place.place_id,
-        latitude: location.lat(),
-        longitude: location.lng()
-      };
-
-      onSelect(selectedPlace);
-      setSearchValue(placeDetails.formatted_address);
-      setOpen(false);
     } catch (error) {
-      console.error('Error fetching Google place details:', error);
-      // Fallback to basic information
-      const selectedPlace: SelectedPlace = {
-        name: place.structured_formatting.main_text,
-        address: place.description,
-        google_place_id: place.place_id
-      };
-
-      onSelect(selectedPlace);
-      setSearchValue(place.description);
-      setOpen(false);
-    } finally {
-      setIsLoadingGoogle(false);
+      console.error('ClinicAddressSearch: Error getting place details:', error);
     }
   };
 
@@ -201,32 +197,72 @@ export function ClinicAddressSearch({ value, onSelect, placeholder = "Search for
   };
 
   const handleManualSave = () => {
-    if (searchValue) {
-      onSelect({
-        name: searchValue,
-        address: searchValue,
-        google_place_id: ''
-      });
+    if (searchValue.trim()) {
+      const manualPlace: SelectedPlace = {
+        name: searchValue.trim(),
+        address: searchValue.trim(),
+        latitude: 0,
+        longitude: 0
+      };
+      
+      onSelect(manualPlace);
+      setManualEntry(false);
     }
+  };
+
+  const handleManualCancel = () => {
+    setSearchValue(value || "");
     setManualEntry(false);
   };
 
+  // Manual entry mode
   if (manualEntry) {
     return (
       <div className="space-y-2">
         <Input
           value={searchValue}
           onChange={(e) => setSearchValue(e.target.value)}
-          placeholder="Enter clinic address manually..."
+          placeholder="Enter clinic name and address manually"
+          className="w-full"
         />
         <div className="flex gap-2">
           <Button onClick={handleManualSave} size="sm">
-            Save Address
+            Save
           </Button>
-          <Button onClick={() => setManualEntry(false)} variant="outline" size="sm">
-            Use Search
+          <Button onClick={handleManualCancel} variant="outline" size="sm">
+            Cancel
           </Button>
         </div>
+      </div>
+    );
+  }
+
+  // Show error state with retry option
+  if (apiError) {
+    return (
+      <div className="space-y-3">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between">
+            <span>Google Maps unavailable: {apiError}</span>
+            <Button 
+              onClick={retryApi} 
+              size="sm" 
+              variant="outline"
+              className="ml-2"
+            >
+              <RefreshCw className="h-3 w-3 mr-1" />
+              Retry
+            </Button>
+          </AlertDescription>
+        </Alert>
+        <Button 
+          onClick={handleManualEntry} 
+          variant="outline" 
+          className="w-full"
+        >
+          Enter Address Manually
+        </Button>
       </div>
     );
   }
@@ -238,85 +274,81 @@ export function ClinicAddressSearch({ value, onSelect, placeholder = "Search for
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between"
+          className="w-full justify-between text-left font-normal"
+          disabled={isLoadingApi}
         >
-          {searchValue ? (
-            <span className="flex items-center gap-2 truncate">
-              <MapPin className="h-4 w-4 flex-shrink-0" />
-              <span className="truncate">{searchValue}</span>
-            </span>
+          {isLoadingApi ? (
+            <div className="flex items-center">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Loading Google Maps...
+            </div>
           ) : (
-            placeholder
+            <>
+              <span className={searchValue ? "text-foreground" : "text-muted-foreground"}>
+                {searchValue || placeholder}
+              </span>
+              <MapPin className="ml-2 h-4 w-4 shrink-0" />
+            </>
           )}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-full p-0">
-        <Command>
-          <CommandInput 
-            placeholder="Search clinic addresses..."
+      <PopoverContent className="w-full p-0" align="start">
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder="Type to search..."
             value={searchValue}
             onValueChange={setSearchValue}
           />
           <CommandList>
-            {googlePlaces.length === 0 && !isLoadingGoogle && searchValue.length >= 3 && (
+            {isLoadingPlaces && (
+              <div className="flex items-center justify-center p-4">
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Searching...
+              </div>
+            )}
+            
+            {!isLoadingPlaces && googlePlaces.length === 0 && searchValue && (
               <CommandEmpty>
                 <div className="text-center py-4">
-                  <p className="text-sm text-muted-foreground mb-2">No places found.</p>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    No places found
+                  </p>
                   <Button 
-                    onClick={handleManualEntry} 
+                    onClick={handleManualEntry}
                     variant="outline" 
                     size="sm"
-                    className="gap-2"
                   >
-                    <MapPin className="h-3 w-3" />
-                    Enter address manually
+                    Enter Manually
                   </Button>
                 </div>
               </CommandEmpty>
             )}
-            
+
             {googlePlaces.length > 0 && (
-              <CommandGroup heading="Google Places">
+              <CommandGroup>
                 {googlePlaces.map((place) => (
                   <CommandItem
                     key={place.place_id}
-                    value={place.description}
                     onSelect={() => handleGooglePlaceSelect(place)}
+                    className="cursor-pointer"
                   >
-                    <div className="flex items-center gap-2 w-full">
-                      <MapPin className="w-4 h-4 text-blue-500 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">{place.structured_formatting.main_text}</div>
-                        <div className="text-sm text-muted-foreground truncate">
-                          {place.structured_formatting.secondary_text}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 text-blue-500 text-xs">
-                        <Star className="w-3 h-3" />
-                        <span>Google</span>
-                      </div>
+                    <MapPin className="mr-2 h-4 w-4 text-muted-foreground" />
+                    <div className="flex flex-col">
+                      <span className="font-medium">
+                        {place.structured_formatting.main_text}
+                      </span>
+                      <span className="text-sm text-muted-foreground">
+                        {place.structured_formatting.secondary_text}
+                      </span>
                     </div>
                   </CommandItem>
                 ))}
-              </CommandGroup>
-            )}
-
-            {searchValue.length >= 3 && !isLoadingGoogle && (
-              <CommandGroup>
-                <CommandItem value="manual-entry" onSelect={handleManualEntry}>
-                  <div className="flex items-center gap-2 w-full">
-                    <MapPin className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm">Enter address manually</span>
+                <CommandItem onSelect={handleManualEntry} className="cursor-pointer border-t">
+                  <div className="flex items-center text-sm text-muted-foreground">
+                    Can't find your clinic? Enter manually
                   </div>
                 </CommandItem>
               </CommandGroup>
-            )}
-
-            {isLoadingGoogle && (
-              <div className="p-2 text-center text-sm text-muted-foreground">
-                Searching Google Places...
-              </div>
             )}
           </CommandList>
         </Command>
