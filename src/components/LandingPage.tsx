@@ -2,7 +2,8 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { AuthForm } from './AuthForm';
-import { Activity, TrendingUp, Users, Search, ArrowRight, CheckCircle, Globe, MessageSquare, MapPin } from 'lucide-react';
+import { Building2, BarChart3, Users, Search, ArrowRight, CheckCircle, Globe, MessageSquare, MapPin, Star, TrendingUp } from 'lucide-react';
+import { LeafIcon } from './LeafIcon';
 
 interface LandingPageProps {
   onGetStarted: () => void;
@@ -12,24 +13,24 @@ interface LandingPageProps {
 export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth = false }) => {
   const features = [
     {
-      icon: <Activity className="w-8 h-8" />,
-      title: "Patient Source Tracking",
-      description: "Google, Yelp, Word-of-mouth, Referring offices — track every patient's journey to your practice."
+      icon: <Globe className="w-8 h-8" />,
+      title: "Patient Source Intelligence",
+      description: "Track Google, Yelp, referrals, and walk-ins. Organize sources into dental offices, online platforms, and other channels."
     },
     {
-      icon: <TrendingUp className="w-8 h-8" />,
-      title: "Monthly Trends", 
-      description: "Understand what's working and what's not with clear analytics and trend visualization."
+      icon: <Building2 className="w-8 h-8" />,
+      title: "Partner Office Network", 
+      description: "Manage relationships with referring practices, specialists, and other dental professionals in your network."
     },
     {
-      icon: <Users className="w-8 h-8" />,
-      title: "Outreach Tools",
-      description: "Stay in touch with key sources and nurture your most valuable professional relationships."
+      icon: <BarChart3 className="w-8 h-8" />,
+      title: "Growth Analytics",
+      description: "Visual reports and trend analysis to understand which sources drive the most valuable patients to your practice."
     },
     {
-      icon: <Search className="w-8 h-8" />,
-      title: "Visual Dashboard",
-      description: "See the full network in one view with interactive maps and connection insights."
+      icon: <MapPin className="w-8 h-8" />,
+      title: "Discovery & Outreach",
+      description: "Find nearby practices, plan outreach visits, run targeted campaigns, and monitor online reviews."
     }
   ];
 
@@ -39,8 +40,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
       <header className="relative px-6 pt-8">
         <nav className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <Activity size={32} className="text-connection-primary" />
-            <span className="text-2xl font-bold text-connection-text">PatientFlow</span>
+            <LeafIcon size={32} className="text-connection-primary" />
+            <span className="text-2xl font-bold text-connection-text">GrowthVine</span>
           </div>
           {!showAuth && (
             <Button 
@@ -61,12 +62,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
           <section className={`${showAuth ? 'px-0' : 'px-6'} pt-20 pb-24`}>
             <div className="max-w-4xl mx-auto text-center">
               <h1 className="text-5xl md:text-6xl font-bold text-connection-text mb-6 leading-tight">
-                Track the Source.
-                <span className="block text-connection-primary font-light">Understand the Growth.</span>
+                Grow Your Practice.
+                <span className="block text-connection-primary font-light">Nurture Your Network.</span>
               </h1>
               
               <p className="text-lg md:text-xl text-connection-muted mb-12 max-w-3xl mx-auto leading-relaxed">
-                Every patient has a path — visualize where they came from and optimize what brings them to your practice.
+                Track referrals, measure patient sources, and grow your dental practice with intelligent network insights that drive organic growth.
               </p>
               
               {!showAuth && (
@@ -76,7 +77,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                     onClick={onGetStarted}
                     className="bg-connection-primary hover:bg-connection-primary/90 text-white px-8 py-4 text-lg rounded-xl shadow-elegant hover:shadow-glow transition-all group"
                   >
-                    Explore Patient Flow
+                    Start Growing Today
                     <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </div>
@@ -91,11 +92,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                 <div className="max-w-6xl mx-auto">
                   <div className="text-center mb-16">
                     <h2 className="text-4xl md:text-5xl font-bold text-connection-text mb-6">
-                      Connected Intelligence
+                      Complete Practice Growth Platform
                     </h2>
                     <p className="text-lg text-connection-muted max-w-2xl mx-auto">
-                      Transform scattered patient data into a clear network of sources and connections 
-                      that drive your practice growth.
+                      Everything you need to understand, track, and optimize your patient acquisition and referral network.
                     </p>
                   </div>
 
@@ -124,10 +124,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                 <div className="max-w-4xl mx-auto">
                   <div className="text-center mb-16">
                     <h2 className="text-4xl md:text-5xl font-bold text-connection-text mb-6">
-                      See the Full Picture
+                      Built for Dental Practices
                     </h2>
                     <p className="text-lg text-connection-muted">
-                      Transform scattered patient data into meaningful connections and actionable growth insights.
+                      Designed specifically for dental professionals who want to grow through relationships and data-driven insights.
                     </p>
                   </div>
 
@@ -137,29 +137,33 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                         <li className="flex items-start space-x-4">
                           <CheckCircle className="w-6 h-6 text-connection-primary flex-shrink-0 mt-1" />
                           <div>
-                            <h4 className="font-semibold text-connection-text mb-2">Source Intelligence</h4>
-                            <p className="text-connection-muted">Automatically track and categorize every patient source from Google searches to professional referrals.</p>
+                            <h4 className="font-semibold text-connection-text mb-2">Multi-Channel Tracking</h4>
+                            <p className="text-connection-muted">Track patients from Google, Yelp, referrals, walk-ins, and more. Organize by dental offices, online sources, and other channels.</p>
                           </div>
                         </li>
                         <li className="flex items-start space-x-4">
                           <CheckCircle className="w-6 h-6 text-connection-primary flex-shrink-0 mt-1" />
                           <div>
-                            <h4 className="font-semibold text-connection-text mb-2">Connection Mapping</h4>
-                            <p className="text-connection-muted">Visualize your referral network and discover the most valuable relationships driving your growth.</p>
+                            <h4 className="font-semibold text-connection-text mb-2">Partner Network Management</h4>
+                            <p className="text-connection-muted">Manage relationships with referring specialists, general dentists, and other practices in your professional network.</p>
                           </div>
                         </li>
                         <li className="flex items-start space-x-4">
                           <CheckCircle className="w-6 h-6 text-connection-primary flex-shrink-0 mt-1" />
                           <div>
-                            <h4 className="font-semibold text-connection-text mb-2">Smart Outreach</h4>
-                            <p className="text-connection-muted">Get prompted to follow up with key sources and maintain the relationships that matter most.</p>
+                            <h4 className="font-semibold text-connection-text mb-2">Outreach Campaigns</h4>
+                            <p className="text-connection-muted">Plan visits, run targeted campaigns, discover nearby practices, and monitor your online reputation—all in one platform.</p>
                           </div>
                         </li>
                       </ul>
                     </div>
                     <div className="relative">
                       <div className="w-full h-64 bg-gradient-glow rounded-2xl flex items-center justify-center relative overflow-hidden border border-connection-primary/20">
-                        <Activity className="w-16 h-16 text-connection-primary" />
+                        <div className="flex items-center space-x-4">
+                          <Building2 className="w-12 h-12 text-connection-primary opacity-80" />
+                          <TrendingUp className="w-16 h-16 text-connection-primary" />
+                          <Star className="w-10 h-10 text-connection-primary opacity-60" />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -170,11 +174,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
               <section className="px-6 py-24 bg-connection-bg/30">
                 <div className="max-w-4xl mx-auto text-center">
                   <h2 className="text-4xl md:text-5xl font-bold text-connection-text mb-6">
-                    Ready to Connect?
+                    Ready to Grow Your Practice?
                   </h2>
                   <p className="text-lg text-connection-muted mb-12 max-w-2xl mx-auto">
-                    Join practices that are already mapping their patient sources and building 
-                    stronger referral networks with data-driven insights.
+                    Join dental practices that are already tracking their patient sources, nurturing professional relationships, 
+                    and growing through intelligent network insights.
                   </p>
                   
                   <Button 
@@ -182,7 +186,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                     onClick={onGetStarted}
                     className="bg-connection-primary hover:bg-connection-primary/90 text-white px-12 py-6 text-xl shadow-elegant hover:shadow-glow transition-all group rounded-xl"
                   >
-                    Map Your Network
+                    Start Your Growth Journey
                     <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </div>
@@ -197,10 +201,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
             <div className="w-full max-w-md bg-white/90 backdrop-blur-lg rounded-2xl p-8 shadow-xl border border-connection-primary/20 relative z-10">
               <div className="text-center mb-8">
                 <div className="flex items-center justify-center space-x-3 mb-4">
-                  <Activity size={24} className="text-connection-primary" />
+                  <LeafIcon size={24} className="text-connection-primary" />
                   <span className="text-xl font-semibold text-connection-text">Welcome Back</span>
                 </div>
-                <p className="text-connection-muted">Connect to your patient flow dashboard</p>
+                <p className="text-connection-muted">Access your practice growth dashboard</p>
               </div>
               <AuthForm />
             </div>
