@@ -66,13 +66,20 @@ export function AddressSearch({ value, onSelect, placeholder = "Search offices..
   // Initialize Google Maps services
   useEffect(() => {
     const initGoogleMaps = async () => {
-      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-      if (!apiKey) {
-        console.warn('Google Maps API key not found. Please add VITE_GOOGLE_MAPS_API_KEY to your environment variables.');
-        return;
-      }
-
       try {
+        // Get API key securely from edge function
+        const response = await supabase.functions.invoke('get-google-maps-key');
+        if (response.error) {
+          console.warn('Could not get Google Maps API key from server:', response.error);
+          return;
+        }
+
+        const apiKey = response.data?.google_maps_api_key;
+        if (!apiKey) {
+          console.warn('Google Maps API key not available from server');
+          return;
+        }
+
         const loader = new Loader({
           apiKey,
           version: 'weekly',

@@ -752,6 +752,10 @@ export type Database = {
         }
         Returns: Json
       }
+      encrypt_pin_code: {
+        Args: { pin_text: string }
+        Returns: string
+      }
       get_current_month_patients: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -798,12 +802,24 @@ export type Database = {
         Args: { p_new_count: number; p_source_id: string }
         Returns: Json
       }
+      update_user_pin_code: {
+        Args: { new_pin: string }
+        Returns: Json
+      }
       user_has_clinic_admin_access: {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
       validate_auth_context: {
         Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      verify_pin_code: {
+        Args: { encrypted_pin: string; pin_text: string }
+        Returns: boolean
+      }
+      verify_user_pin_code: {
+        Args: { input_pin: string }
         Returns: Json
       }
     }

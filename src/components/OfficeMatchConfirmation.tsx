@@ -250,20 +250,34 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
   // Load Google Maps first
   useEffect(() => {
     const initGoogleMaps = async () => {
-      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-      if (!apiKey) {
-        const errorMsg = 'Google Maps API key not found. Please add VITE_GOOGLE_MAPS_API_KEY to your environment variables.';
-        console.warn(errorMsg);
-        setGoogleMapsError(errorMsg);
-        toast({
-          title: "Google Maps API Key Missing",
-          description: errorMsg,
-          variant: "destructive",
-        });
-        return;
-      }
-
       try {
+        // Get API key securely from edge function
+        const response = await supabase.functions.invoke('get-google-maps-key');
+        if (response.error) {
+          const errorMsg = 'Could not get Google Maps API key from server. Please check your internet connection.';
+          console.warn(errorMsg, response.error);
+          setGoogleMapsError(errorMsg);
+          toast({
+            title: "API Key Error",
+            description: errorMsg,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        const apiKey = response.data?.google_maps_api_key;
+        if (!apiKey) {
+          const errorMsg = 'Google Maps API key not configured on server.';
+          console.warn(errorMsg);
+          setGoogleMapsError(errorMsg);
+          toast({
+            title: "API Key Missing",
+            description: errorMsg,
+            variant: "destructive",
+          });
+          return;
+        }
+
         const loader = new Loader({
           apiKey,
           version: 'weekly',

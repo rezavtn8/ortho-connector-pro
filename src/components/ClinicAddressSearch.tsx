@@ -62,19 +62,20 @@ export function ClinicAddressSearch({ value, onSelect, placeholder = "Search for
   // Initialize Google Maps services
   useEffect(() => {
     const initGoogleMaps = async () => {
-      const response = await supabase.functions.invoke('get-mapbox-token');
-      if (response.error) {
-        console.warn('Could not get Google Maps API key from server');
-        return;
-      }
-
-      const apiKey = response.data?.google_maps_api_key;
-      if (!apiKey) {
-        console.warn('Google Maps API key not available');
-        return;
-      }
-
       try {
+        // Get API key securely from edge function
+        const response = await supabase.functions.invoke('get-google-maps-key');
+        if (response.error) {
+          console.warn('Could not get Google Maps API key from server:', response.error);
+          return;
+        }
+
+        const apiKey = response.data?.google_maps_api_key;
+        if (!apiKey) {
+          console.warn('Google Maps API key not available from server');
+          return;
+        }
+
         const loader = new Loader({
           apiKey,
           version: 'weekly',
