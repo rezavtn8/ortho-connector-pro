@@ -101,31 +101,10 @@ export const Discover = () => {
     if (!user) return;
 
     try {
-      const oneWeekAgo = new Date();
-      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-
-      const { data: sessions, error } = await supabase
-        .from('discovery_sessions')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('api_call_made', true)
-        .gte('created_at', oneWeekAgo.toISOString())
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error loading weekly usage:', error);
-        return;
-      }
-
-      const usedCount = sessions?.length || 0;
-      setWeeklyUsage({ used: usedCount, limit: 2 });
-      setCanDiscover(usedCount < 2);
-
-      if (usedCount >= 2 && sessions && sessions.length > 0) {
-        const nextWeek = new Date(sessions[0].created_at);
-        nextWeek.setDate(nextWeek.getDate() + 7);
-        setNextRefreshDate(nextWeek);
-      }
+      // Rate limiting disabled for testing
+      setWeeklyUsage({ used: 0, limit: 999 });
+      setCanDiscover(true);
+      setNextRefreshDate(null);
     } catch (error) {
       console.error('Error loading weekly usage:', error);
     }
@@ -374,19 +353,7 @@ export const Discover = () => {
         return;
       }
 
-      console.log('📡 handleDiscover: No cached results, checking API limits...');
-      // No cached results, check if we can make an API call
-      if (!canDiscover) {
-        console.log('🚫 handleDiscover: Rate limited');
-        toast({
-          title: "Rate Limited", 
-          description: "You've reached the weekly discovery limit. Try again next week.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Make the API call (edge function handles caching internally)
+      // No rate limiting - directly call API
       console.log('🚀 handleDiscover: Making API call...');
       await callGooglePlacesAPI(params);
 
