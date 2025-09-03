@@ -2,12 +2,10 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
-  Grid3X3, Map, Star, Phone, Globe, MapPin, Plus, ExternalLink,
-  Building2, Users, ArrowUpDown, Clock, Navigation, Check
+  Star, Phone, Globe, MapPin, Plus,
+  Building2, Users, ArrowUpDown, Navigation, Check
 } from 'lucide-react';
-import { MapView } from '@/components/MapView';
 import { ImportDiscoveredOfficeDialog } from '@/components/ImportDiscoveredOfficeDialog';
 
 interface DiscoveredOffice {
@@ -52,7 +50,6 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
   onOfficeAdded,
   isLoading = false
 }) => {
-  const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid');
   const [sortBy, setSortBy] = useState<'distance' | 'rating' | 'name' | 'type'>('distance');
   const [selectedOffice, setSelectedOffice] = useState<DiscoveredOffice | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -274,107 +271,84 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
               </div>
             </div>
 
-            <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as 'grid' | 'map')}>
-              <TabsList>
-                <TabsTrigger value="grid" className="flex items-center gap-2">
-                  <Grid3X3 className="w-4 h-4" />
-                  Grid
-                </TabsTrigger>
-                <TabsTrigger value="map" className="flex items-center gap-2">
-                  <Map className="w-4 h-4" />
-                  Map
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <div className="text-sm text-muted-foreground">
+              {stats.total} offices found • Sorted by {sortBy}
+            </div>
           </div>
 
-          {/* Results Display */}
-          <Tabs value={viewMode} className="w-full">
-            <TabsContent value="grid" className="space-y-4">
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                {sortedOffices.map((office) => (
-                  <Card key={office.id} className="hover:shadow-lg transition-shadow">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <CardTitle className="text-lg leading-tight">{office.name}</CardTitle>
-                          <div className="flex items-center gap-2 mt-2">
-                            <Badge variant="outline" className="text-xs">
-                              {office.office_type}
-                            </Badge>
-                            {office.distance && (
-                              <Badge variant="secondary" className="text-xs">
-                                {office.distance.toFixed(1)} mi
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                        {(office.rating || 0) >= 4.5 && (
-                          <Badge className="bg-yellow-500 text-white">
-                            ⭐ Top Rated
+          {/* Grid Results Display */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+            {sortedOffices.map((office) => (
+              <Card key={office.id} className="hover:shadow-lg transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <CardTitle className="text-lg leading-tight">{office.name}</CardTitle>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Badge variant="outline" className="text-xs">
+                          {office.office_type}
+                        </Badge>
+                        {office.distance && (
+                          <Badge variant="secondary" className="text-xs">
+                            {office.distance.toFixed(1)} mi
                           </Badge>
                         )}
                       </div>
-                    </CardHeader>
+                    </div>
+                    {(office.rating || 0) >= 4.5 && (
+                      <Badge className="bg-yellow-500 text-white">
+                        ⭐ Top Rated
+                      </Badge>
+                    )}
+                  </div>
+                </CardHeader>
 
-                    <CardContent className="space-y-3">
-                      {office.rating && renderStars(office.rating)}
+                <CardContent className="space-y-3">
+                  {office.rating && renderStars(office.rating)}
 
-                      {office.address && (
-                        <div className="flex items-start gap-2 text-sm">
-                          <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                          <span className="text-muted-foreground">{office.address}</span>
-                        </div>
-                      )}
+                  {office.address && (
+                    <div className="flex items-start gap-2 text-sm">
+                      <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                      <span className="text-muted-foreground">{office.address}</span>
+                    </div>
+                  )}
 
-                      <div className="flex items-center gap-2">
-                        {office.phone && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="flex-1"
-                            onClick={() => window.open(`tel:${office.phone}`, '_self')}
-                          >
-                            <Phone className="w-4 h-4 mr-1" />
-                            Call
-                          </Button>
-                        )}
-                        {office.website && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="flex-1"
-                            onClick={() => window.open(office.website!, '_blank')}
-                          >
-                            <Globe className="w-4 h-4 mr-1" />
-                            Visit
-                          </Button>
-                        )}
-                      </div>
-
+                  <div className="flex items-center gap-2">
+                    {office.phone && (
                       <Button
-                        onClick={() => handleAddToNetwork(office)}
-                        className="w-full bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-600/90"
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => window.open(`tel:${office.phone}`, '_self')}
                       >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add to Network
+                        <Phone className="w-4 h-4 mr-1" />
+                        Call
                       </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </TabsContent>
+                    )}
+                    {office.website && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => window.open(office.website!, '_blank')}
+                      >
+                        <Globe className="w-4 h-4 mr-1" />
+                        Visit
+                      </Button>
+                    )}
+                  </div>
 
-            <TabsContent value="map" className="space-y-4">
-              <div className="h-[600px] rounded-lg overflow-hidden border">
-                <MapView height="600px" />
-              </div>
-              <div className="text-center text-muted-foreground">
-                <p>Map view shows your clinic and referring offices network.</p>
-                <p className="text-sm">Use the grid view above to explore discovered offices.</p>
-              </div>
-            </TabsContent>
-          </Tabs>
+                  <Button
+                    onClick={() => handleAddToNetwork(office)}
+                    className="w-full bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-600/90"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add to Network
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </>
       )}
 

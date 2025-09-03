@@ -485,6 +485,28 @@ export function MapView({ height = "600px" }: { height?: string }) {
     return Math.ceil(timeLeft / 60000); // minutes
   };
 
+  // Show a message that the Mapbox token needs to be configured
+  if (!mapboxToken) {
+    return (
+      <Card className="p-6" style={{ height }}>
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center space-y-4">
+            <MapPin className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <div>
+              <p className="font-medium mb-2">Mapbox Token Required</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                A Mapbox public token is needed to display the map. Please add your token to the Supabase Edge Function secrets.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Get your token from: <a href="https://mapbox.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">mapbox.com</a>
+              </p>
+            </div>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
   if (!clinic && !isLoading) {
     return (
       <Card className="p-6" style={{ height }}>
