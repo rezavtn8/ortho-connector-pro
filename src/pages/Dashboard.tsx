@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PatientSource, MonthlyPatients, SOURCE_TYPE_CONFIG, getCurrentYearMonth } from '@/lib/database.types';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, TrendingUp, Building2, Star, Users, Globe, MessageSquare, FileText } from 'lucide-react';
+import { Search, TrendingUp, Building2, Star, Users, Globe, MessageSquare, FileText, BarChart3 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 
@@ -111,34 +111,22 @@ export function Dashboard() {
   const getSourceGroupData = (): SourceGroupData[] => {
     const groups = [
       {
-        name: 'Google Referrals',
-        icon: Search,
-        color: 'text-green-600',
-        types: ['Google']
-      },
-      {
-        name: 'Yelp Reviews',
-        icon: Star,
-        color: 'text-red-600',
-        types: ['Yelp']
-      },
-      {
-        name: 'Online Sources',
-        icon: Globe,
-        color: 'text-blue-600',
-        types: ['Website', 'Social Media']
-      },
-      {
         name: 'Dental Offices',
         icon: Building2,
         color: 'text-purple-600',
         types: ['Office']
       },
       {
+        name: 'Online Sources',
+        icon: Globe,
+        color: 'text-blue-600',
+        types: ['Google', 'Yelp']
+      },
+      {
         name: 'Other Sources',
         icon: MessageSquare,
         color: 'text-orange-600',
-        types: ['Word of Mouth', 'Insurance', 'Other']
+        types: ['Website', 'Social Media', 'Word of Mouth', 'Insurance', 'Other']
       }
     ];
 
@@ -261,19 +249,22 @@ export function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card 
+          className="cursor-pointer hover:shadow-lg transition-all duration-200"
+          onClick={() => navigate('/analytics')}
+        >
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Active Sources
+              Reports
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
-              <div className="text-2xl font-bold">{activeSources}</div>
-              <FileText className="w-8 h-8 text-purple-500 opacity-20" />
+              <div className="text-2xl font-bold">View</div>
+              <BarChart3 className="w-8 h-8 text-purple-500 opacity-20" />
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Currently active
+              Analytics & insights
             </p>
           </CardContent>
         </Card>
