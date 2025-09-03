@@ -32,13 +32,12 @@ All colors MUST be HSL.
     --popover: 185 10% 99%;
     --popover-foreground: 185 20% 20%;
 
-    /* NexoraDental Premium Theme */
-    --connection-primary: 174 34% 56%;          /* #5EACA8 - Main teal */
-    --connection-secondary: 174 34% 46%;        /* #4A9B97 - Darker teal */
-    --connection-accent: 238 54% 71%;           /* #667eea - Purple accent */
-    --connection-bg: 174 30% 98%;               /* #FCFEFE - Ultra light teal background */
-    --connection-text: 216 15% 15%;             /* #202C33 - Dark text */
-    --connection-muted: 174 15% 45%;            /* #6B8B88 - Muted teal text */
+    /* Custom theme colors */
+    --connection-primary: 185 75% 35%;    /* Main darker teal for lines and dots */
+    --connection-secondary: 185 45% 70%;  /* Lighter teal for secondary elements */
+    --connection-bg: 185 15% 98%;         /* Background teal */
+    --connection-text: 185 20% 20%;       /* Dark text */
+    --connection-muted: 185 10% 50%;      /* Muted text */
 
     /* Medical/CRM specific colors */
     --success: 150 75% 35%;
@@ -54,25 +53,21 @@ All colors MUST be HSL.
     --status-sporadic: 25 85% 55%;
     --status-cold: 210 15% 60%;
 
-    /* Premium Gradients */
-    --gradient-connection: linear-gradient(135deg, hsl(var(--connection-primary)) 0%, hsl(var(--connection-accent)) 100%);
-    --gradient-hero: linear-gradient(135deg, hsl(var(--connection-primary) / 0.1) 0%, hsl(var(--connection-accent) / 0.05) 100%);
-    --gradient-card: linear-gradient(145deg, rgba(255,255,255,0.95), rgba(255,255,255,0.85));
-    --gradient-glow: linear-gradient(135deg, hsl(var(--connection-primary) / 0.3), hsl(var(--connection-accent) / 0.2));
-    --gradient-glass: linear-gradient(145deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
-    --gradient-primary: linear-gradient(135deg, hsl(var(--connection-primary)), hsl(var(--connection-secondary)));
-    --gradient-subtle: linear-gradient(180deg, hsl(var(--background)), hsl(var(--muted) / 0.3));
+    /* Gradients */
+    --gradient-connection: linear-gradient(135deg, hsl(185 15% 99%), hsl(185 15% 95%));
+    --gradient-card: linear-gradient(145deg, hsl(185 10% 99%), hsl(185 15% 96%));
+    --gradient-glow: radial-gradient(circle, hsl(185 75% 35% / 0.1), transparent);
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(185 75% 45%));
+    --gradient-subtle: linear-gradient(180deg, hsl(var(--background)), hsl(185 15% 95%));
 
-    /* Premium Shadows */
-    --shadow-elegant: 0 25px 50px -12px hsl(var(--connection-primary) / 0.25);
-    --shadow-card: 0 8px 32px -8px hsl(var(--connection-primary) / 0.15);
-    --shadow-glow: 0 0 60px hsl(var(--connection-primary) / 0.4);
-    --shadow-glass: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+    /* Shadows */
+    --shadow-elegant: 0 10px 30px -10px hsl(185 75% 35% / 0.2);
+    --shadow-glow: 0 0 20px hsl(185 75% 35% / 0.3);
+    --shadow-card: 0 4px 20px -4px hsl(185 20% 20% / 0.08);
 
-    /* Premium Animations */
-    --transition-smooth: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-spring: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    --transition-bounce: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-spring: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 
     --radius: 0.5rem;
 
@@ -168,41 +163,7 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 
-  /* Premium Animation keyframes */
-  @keyframes orbitRotate {
-    0% { transform: rotate(0deg) translateX(60px) rotate(0deg); }
-    100% { transform: rotate(360deg) translateX(60px) rotate(-360deg); }
-  }
-
-  @keyframes sparkle {
-    0%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
-    50% { opacity: 1; transform: scale(1) rotate(180deg); }
-  }
-
-  @keyframes countUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  @keyframes slideInFromRight {
-    from { transform: translateX(100%); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
-  }
-
-  @keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(30px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  @keyframes meshGradient {
-    0%, 100% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-  }
-
-  @keyframes ripple {
-    to { transform: scale(4); opacity: 0; }
-  }
-
+  /* Animation keyframes */
   @keyframes patientFlow {
     0% {
       transform: translate(var(--start-x), var(--start-y)) scale(0.8);
@@ -434,49 +395,6 @@ All colors MUST be HSL.
 
   .animate-bob {
     animation: bob 3s ease-in-out infinite;
-  }
-
-  /* Premium animations */
-  .animate-orbit {
-    animation: orbitRotate 8s linear infinite;
-  }
-
-  .animate-sparkle {
-    animation: sparkle 3s ease-in-out infinite;
-  }
-
-  .animate-count-up {
-    animation: countUp 0.8s ease-out forwards;
-  }
-
-  .animate-slide-in-right {
-    animation: slideInFromRight 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-  }
-
-  .animate-fade-in-up {
-    animation: fadeInUp 0.6s ease-out forwards;
-  }
-
-  .animate-mesh-gradient {
-    animation: meshGradient 8s ease-in-out infinite;
-    background-size: 400% 400%;
-  }
-
-  .animate-ripple {
-    animation: ripple 0.6s linear;
-  }
-
-  /* Glass morphism utility */
-  .glass-morphism {
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-  }
-
-  .glass-card {
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
   }
 
   .hover-glow:hover {
