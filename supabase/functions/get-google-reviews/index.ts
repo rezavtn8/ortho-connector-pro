@@ -33,19 +33,45 @@ interface GoogleErrorResponse {
 }
 
 Deno.serve(async (req) => {
-  console.log(`get-google-reviews: ${req.method} request received`)
+  const requestId = crypto.randomUUID()
+  console.log(`get-google-reviews: ${req.method} request received [${requestId}]`)
   
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  // Health check endpoint
+  if (req.method === 'GET' && new URL(req.url).pathname.endsWith('/health')) {
+    const googleMapsApiKey = Deno.env.get('GOOGLE_MAPS_API_KEY')
+    const isHealthy = !!googleMapsApiKey && googleMapsApiKey.startsWith('AIza')
+    
+    return new Response(
+      JSON.stringify({
+        status: isHealthy ? 'healthy' : 'unhealthy',
+        service: 'google-reviews',
+        timestamp: new Date().toISOString(),
+        checks: {
+          api_key_present: !!googleMapsApiKey,
+          api_key_format_valid: googleMapsApiKey?.startsWith('AIza') || false
+        }
+      }),
+      { 
+        status: isHealthy ? 200 : 503,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    )
+  }
+
+  // Only allow POST requests for main endpoint
   if (req.method !== 'POST') {
-    console.error('get-google-reviews: Method not allowed:', req.method)
+    console.error(`get-google-reviews: Method not allowed: ${req.method} [${requestId}]`)
     return new Response(
       JSON.stringify({
         error: 'Method not allowed',
         code: 'METHOD_NOT_ALLOWED',
-        success: false
+        success: false,
+        request_id: requestId
       }),
       {
         status: 405,
@@ -57,15 +83,16 @@ Deno.serve(async (req) => {
   try {
     const requestBody = await req.json()
     const { place_id } = requestBody
-    console.log('get-google-reviews: Processing place_id:', place_id)
+    console.log(`get-google-reviews: Processing place_id: ${place_id} [${requestId}]`)
     
     if (!place_id || typeof place_id !== 'string') {
-      console.error('get-google-reviews: Invalid place_id provided')
+      console.error(`get-google-reviews: Invalid place_id provided [${requestId}]`)
       return new Response(
         JSON.stringify({
           error: 'Valid Place ID is required',
           code: 'INVALID_PLACE_ID',
-          success: false
+          success: false,
+          request_id: requestId
         }),
         {
           status: 400,
@@ -76,13 +103,24 @@ Deno.serve(async (req) => {
 
     // Get Google Maps API key from Supabase secrets
     const googleApiKey = Deno.env.get('GOOGLE_MAPS_API_KEY')
+    
+    // Enhanced logging for debugging
+    console.log(`get-google-reviews: Environment check [${requestId}]:`, {
+      api_key_exists: !!googleApiKey,
+      api_key_length: googleApiKey?.length || 0,
+      api_key_prefix: googleApiKey?.substring(0, 4) || 'none',
+      all_env_vars: Object.keys(Deno.env.toObject()).filter(key => key.includes('GOOGLE')),
+    })
+    
     if (!googleApiKey) {
-      console.error('get-google-reviews: Google Maps API key not configured')
+      console.error(`get-google-reviews: Google Maps API key not configured [${requestId}]`)
       return new Response(
         JSON.stringify({
-          error: 'Google Maps API key not configured in server secrets',
+          error: 'Google Maps API key not configured. Please add the GOOGLE_MAPS_API_KEY secret in your Supabase project settings.',
           code: 'API_KEY_MISSING',
-          success: false
+          success: false,
+          request_id: requestId,
+          help: 'Visit https://supabase.com/dashboard/project/vqkzqwibbcvmdwgqladn/settings/functions to add the secret'
         }),
         {
           status: 503,
@@ -91,130 +129,247 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Fetch place details including reviews with timeout
-    const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place_id}&fields=reviews,rating,user_ratings_total&key=${googleApiKey}`
-    console.log('get-google-reviews: Making Google API request')
-    
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
-    
-    try {
-      const response = await fetch(url, {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'Nexora-Reviews/1.0'
-        }
-      })
-      clearTimeout(timeoutId)
-
-      if (!response.ok) {
-        console.error('get-google-reviews: HTTP error from Google API:', response.status, response.statusText)
-        return new Response(
-          JSON.stringify({
-            error: `Google API returned ${response.status}: ${response.statusText}`,
-            code: 'GOOGLE_API_HTTP_ERROR',
-            success: false
-          }),
-          {
-            status: 502, // Bad Gateway
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          },
-        )
-      }
-
-      const data: GooglePlaceDetails | GoogleErrorResponse = await response.json()
-      console.log('get-google-reviews: Google API response status:', (data as any).status)
-
-      // Handle Google Places API specific errors
-      if (data.status !== 'OK') {
-        const errorMessage = data.error_message || `Google Places API error: ${data.status}`
-        console.error('get-google-reviews: Google Places API error:', data.status, errorMessage)
-        
-        let userMessage = 'Failed to fetch reviews from Google Places API'
-        let statusCode = 502
-        
-        switch (data.status) {
-          case 'INVALID_REQUEST':
-            userMessage = 'Invalid Place ID provided'
-            statusCode = 400
-            break
-          case 'NOT_FOUND':
-            userMessage = 'Place not found in Google Places database'
-            statusCode = 404
-            break
-          case 'ZERO_RESULTS':
-            userMessage = 'No reviews found for this place'
-            break
-          case 'OVER_QUERY_LIMIT':
-            userMessage = 'Google API quota exceeded. Please try again later.'
-            statusCode = 429
-            break
-          case 'REQUEST_DENIED':
-            userMessage = 'Google API access denied. Please check API key configuration.'
-            statusCode = 403
-            break
-        }
-
-        return new Response(
-          JSON.stringify({
-            error: userMessage,
-            code: `GOOGLE_API_${data.status}`,
-            google_status: data.status,
-            success: false
-          }),
-          {
-            status: statusCode,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          },
-        )
-      }
-
-      // Successful response - transform the reviews
-      const placeData = data as GooglePlaceDetails
-      const reviews = (placeData.result.reviews || []).map((review, index) => ({
-        ...review,
-        google_review_id: `${place_id}_${review.time}_${index}`, // Create unique ID
-        place_id
-      }))
-
-      console.log(`get-google-reviews: Successfully fetched ${reviews.length} reviews`)
-      
+    // Enhanced API key validation
+    if (googleApiKey.length < 20) {
+      console.error(`get-google-reviews: API key too short: ${googleApiKey.length} characters [${requestId}]`)
       return new Response(
         JSON.stringify({
-          reviews,
-          place_rating: placeData.result.rating,
-          total_reviews: placeData.result.user_ratings_total,
-          success: true,
-          timestamp: new Date().toISOString()
+          error: 'Invalid Google Maps API key: too short',
+          code: 'INVALID_API_KEY_LENGTH',
+          success: false,
+          request_id: requestId
         }),
         {
+          status: 503,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         },
       )
+    }
 
-    } catch (fetchError) {
-      clearTimeout(timeoutId)
+    if (!googleApiKey.startsWith('AIza')) {
+      console.error(`get-google-reviews: Invalid API key format [${requestId}]`)
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid Google Maps API key format. Key should start with "AIza"',
+          code: 'INVALID_API_KEY_FORMAT',
+          success: false,
+          request_id: requestId
+        }),
+        {
+          status: 503,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
+    }
+
+    // Fetch place details including reviews with timeout and retry logic
+    const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place_id}&fields=reviews,rating,user_ratings_total&key=${googleApiKey}`
+    console.log(`get-google-reviews: Making Google API request [${requestId}]`)
+    
+    // Retry logic for network issues
+    const maxRetries = 2
+    let lastError: Error | null = null
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {  
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
       
-      if (fetchError.name === 'AbortError') {
-        console.error('get-google-reviews: Request timeout')
+      try {
+        const response = await fetch(url, {
+          signal: controller.signal,
+          headers: {
+            'User-Agent': 'Nexora-Clinic-Reviews/1.0',
+            'Accept': 'application/json',
+            'Referer': 'https://vqkzqwibbcvmdwgqladn.supabase.co'
+          }
+        })
+        clearTimeout(timeoutId)
+
+        if (!response.ok) {
+          console.error(`get-google-reviews: HTTP error from Google API: ${response.status} ${response.statusText} [${requestId}] (attempt ${attempt})`)
+          
+          // Don't retry on certain error codes
+          if (response.status === 403) {
+            return new Response(
+              JSON.stringify({
+                error: 'Google Maps API key is invalid or lacks required permissions. Please ensure the key has Places API enabled.',
+                code: 'FORBIDDEN_API_KEY',
+                success: false,
+                request_id: requestId
+              }),
+              {
+                status: 503,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              },
+            )
+          }
+          
+          if (response.status === 400) {
+            return new Response(
+              JSON.stringify({
+                error: `Google API bad request: ${response.statusText}`,
+                code: 'GOOGLE_API_BAD_REQUEST',
+                success: false,
+                request_id: requestId
+              }),
+              {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              },
+            )
+          }
+          
+          if (response.status === 429) {
+            return new Response(
+              JSON.stringify({
+                error: 'Google API rate limit exceeded. Please try again later.',
+                code: 'RATE_LIMIT_EXCEEDED',
+                success: false,
+                request_id: requestId
+              }),
+              {
+                status: 429,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              },
+            )
+          }
+          
+          // For 5xx errors, try again if we have attempts left
+          if (attempt < maxRetries && response.status >= 500) {
+            console.log(`get-google-reviews: Retrying after server error (attempt ${attempt + 1}/${maxRetries}) [${requestId}]`)
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt)) // Exponential backoff
+            continue
+          }
+          
+          return new Response(
+            JSON.stringify({
+              error: `Google API returned ${response.status}: ${response.statusText}`,
+              code: 'GOOGLE_API_HTTP_ERROR',
+              success: false,
+              request_id: requestId
+            }),
+            {
+              status: 502, // Bad Gateway
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            },
+          )
+        }
+
+        const data: GooglePlaceDetails | GoogleErrorResponse = await response.json()
+        console.log(`get-google-reviews: Google API response status: ${(data as any).status} [${requestId}]`)
+
+        // Handle Google Places API specific errors
+        if (data.status !== 'OK') {
+          const errorMessage = data.error_message || `Google Places API error: ${data.status}`
+          console.error(`get-google-reviews: Google Places API error: ${data.status} ${errorMessage} [${requestId}]`)
+          
+          let userMessage = 'Failed to fetch reviews from Google Places API'
+          let statusCode = 502
+          
+          switch (data.status) {
+            case 'INVALID_REQUEST':
+              userMessage = 'Invalid Place ID provided'
+              statusCode = 400
+              break
+            case 'NOT_FOUND':
+              userMessage = 'Place not found in Google Places database'
+              statusCode = 404
+              break
+            case 'ZERO_RESULTS':
+              userMessage = 'No reviews found for this place'
+              break
+            case 'OVER_QUERY_LIMIT':
+              userMessage = 'Google API quota exceeded. Please try again later.'
+              statusCode = 429
+              break
+            case 'REQUEST_DENIED':
+              userMessage = 'Google API access denied. Please check API key configuration.'
+              statusCode = 403
+              break
+          }
+
+          return new Response(
+            JSON.stringify({
+              error: userMessage,
+              code: `GOOGLE_API_${data.status}`,
+              google_status: data.status,
+              success: false,
+              request_id: requestId
+            }),
+            {
+              status: statusCode,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            },
+          )
+        }
+
+        // Successful response - transform the reviews
+        const placeData = data as GooglePlaceDetails
+        const reviews = (placeData.result.reviews || []).map((review, index) => ({
+          ...review,
+          google_review_id: `${place_id}_${review.time}_${index}`, // Create unique ID
+          place_id
+        }))
+
+        console.log(`get-google-reviews: Successfully fetched ${reviews.length} reviews [${requestId}]`)
+        
         return new Response(
           JSON.stringify({
-            error: 'Request timeout. Google API is taking too long to respond.',
-            code: 'REQUEST_TIMEOUT',
-            success: false
+            reviews,
+            place_rating: placeData.result.rating,
+            total_reviews: placeData.result.user_ratings_total,
+            success: true,
+            timestamp: new Date().toISOString(),
+            request_id: requestId
           }),
           {
-            status: 504,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           },
         )
+
+      } catch (fetchError) {
+        clearTimeout(timeoutId)
+        lastError = fetchError as Error
+        
+        if (fetchError.name === 'AbortError') {
+          console.error(`get-google-reviews: Request timeout (attempt ${attempt}) [${requestId}]`)
+          if (attempt < maxRetries) {
+            console.log(`get-google-reviews: Retrying after timeout (attempt ${attempt + 1}/${maxRetries}) [${requestId}]`)
+            await new Promise(resolve => setTimeout(resolve, 2000 * attempt))
+            continue
+          }
+          
+          return new Response(
+            JSON.stringify({
+              error: 'Request timeout. Google API is taking too long to respond after multiple attempts.',
+              code: 'REQUEST_TIMEOUT',
+              success: false,
+              request_id: requestId
+            }),
+            {
+              status: 504,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            },
+          )
+        }
+        
+        // For other network errors, retry if we have attempts left
+        if (attempt < maxRetries) {
+          console.log(`get-google-reviews: Retrying after network error (attempt ${attempt + 1}/${maxRetries}) [${requestId}]`)
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
+          continue
+        }
+        
+        // All retries exhausted
+        break
       }
-      
-      throw fetchError // Re-throw other fetch errors
     }
+    
+    // If we get here, all retries failed
+    throw lastError || new Error('All retry attempts failed')
 
   } catch (error) {
-    console.error('get-google-reviews: Unexpected error:', error)
+    console.error(`get-google-reviews: Unexpected error [${requestId}]:`, error)
     
     let errorMessage = 'Internal server error while fetching reviews'
     let statusCode = 500
@@ -229,7 +384,8 @@ Deno.serve(async (req) => {
         error: errorMessage,
         code: 'INTERNAL_ERROR',
         success: false,
-        details: error.message
+        details: error.message,
+        request_id: requestId
       }),
       {
         status: statusCode,
