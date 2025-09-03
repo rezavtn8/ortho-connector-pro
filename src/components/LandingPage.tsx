@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { AuthForm } from './AuthForm';
 import { Building2, BarChart3, Users, Search, ArrowRight, CheckCircle, Globe, MessageSquare, MapPin, Star, TrendingUp } from 'lucide-react';
-import { LeafIcon } from './LeafIcon';
+import { NexoraLogo } from '@/components/NexoraLogo';
 
 interface LandingPageProps {
   onGetStarted: () => void;
@@ -40,7 +40,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
       <header className="relative px-6 pt-8">
         <nav className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <LeafIcon size={32} className="text-connection-primary" />
+            <NexoraLogo size={32} className="text-connection-primary" />
             <span className="text-2xl font-bold text-connection-text">Nexora</span>
           </div>
           {!showAuth && (
@@ -201,7 +201,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
             <div className="w-full max-w-md bg-white/90 backdrop-blur-lg rounded-2xl p-8 shadow-xl border border-connection-primary/20 relative z-10">
               <div className="text-center mb-8">
                 <div className="flex items-center justify-center space-x-3 mb-4">
-                  <LeafIcon size={24} className="text-connection-primary" />
+                  <NexoraLogo size={24} className="text-connection-primary" />
                   <span className="text-xl font-semibold text-connection-text">Welcome Back</span>
                 </div>
                 <p className="text-connection-muted">Access your practice growth dashboard</p>

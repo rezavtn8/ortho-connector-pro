@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
+import { NexoraLogo } from '@/components/NexoraLogo';
 
 interface AppSidebarProps {
   currentPage: string;
@@ -74,7 +75,7 @@ export function AppSidebar({ currentPage, onPageChange }: AppSidebarProps) {
       <SidebarHeader className="border-b p-4">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
-            <Activity className="w-5 h-5 text-white" />
+            <NexoraLogo size={20} className="text-white" />
           </div>
           {!isCollapsed && (
             <div className="flex flex-col">
