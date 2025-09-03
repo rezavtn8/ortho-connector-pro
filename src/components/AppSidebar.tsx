@@ -78,8 +78,8 @@ export function AppSidebar({ currentPage, onPageChange }: AppSidebarProps) {
           </div>
           {!isCollapsed && (
             <div className="flex flex-col">
-              <span className="font-semibold text-sm">Patient Source</span>
-              <span className="text-xs text-muted-foreground">Intelligence</span>
+              <span className="font-semibold text-sm">Nexora</span>
+              <span className="text-xs text-muted-foreground">Dental Platform</span>
             </div>
           )}
         </div>

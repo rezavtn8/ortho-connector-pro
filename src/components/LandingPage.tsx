@@ -41,7 +41,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
         <nav className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <LeafIcon size={32} className="text-connection-primary" />
-            <span className="text-2xl font-bold text-connection-text">GrowthVine</span>
+            <span className="text-2xl font-bold text-connection-text">Nexora</span>
           </div>
           {!showAuth && (
             <Button 
