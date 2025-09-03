@@ -183,75 +183,79 @@ export function CalendarView({
       </CardHeader>
       <CardContent>
         {/* Calendar Grid */}
-        <div className="grid grid-cols-7 gap-px bg-muted rounded-md overflow-hidden">
-          {/* Header */}
-          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
-            <div
-              key={day}
-              className="bg-muted-foreground/10 p-2 text-center text-xs font-medium text-muted-foreground h-8 flex items-center justify-center"
-            >
-              {day}
-            </div>
-          ))}
-          
-          {/* Calendar Days */}
-          {calendarDays.map((date, index) => {
-            const dateKey = format(date, 'yyyy-MM-dd');
-            const dayEvents = eventsByDate[dateKey] || [];
-            const isCurrentMonth = isSameMonth(date, currentDate);
-            const isTodayDate = isToday(date);
-            const isSelected = selectedDate && isSameDay(date, selectedDate);
-
-            return (
+        <div className="border border-muted rounded-md overflow-hidden">
+          {/* Day Headers */}
+          <div className="grid grid-cols-7 bg-muted/50 border-b border-muted">
+            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
               <div
-                key={index}
-                className={cn(
-                  "bg-background min-h-[100px] p-2 cursor-pointer relative hover:bg-muted/50 transition-colors border-r border-b border-muted",
-                  !isCurrentMonth && "text-muted-foreground bg-muted/30",
-                  isTodayDate && "bg-primary/10 border-primary/20",
-                  isSelected && "bg-primary/20 border-primary/40"
-                )}
-                onClick={() => handleDateClick(date)}
+                key={day}
+                className="p-3 text-center text-sm font-semibold text-muted-foreground border-r border-muted last:border-r-0"
               >
-                <div className="flex justify-between items-start mb-1">
-                  <span className={cn(
-                    "text-sm font-medium",
-                    isTodayDate && "font-bold text-primary bg-primary text-primary-foreground w-6 h-6 rounded-full flex items-center justify-center text-xs",
-                    !isCurrentMonth && "text-muted-foreground"
-                  )}>
-                    {format(date, 'd')}
-                  </span>
-                </div>
-                
-                {/* Events */}
-                <div className="mt-1 space-y-0.5">
-                  {dayEvents.slice(0, 3).map((event, eventIndex) => (
-                    <div
-                      key={eventIndex}
-                      className={cn(
-                        "text-xs px-1 py-0.5 rounded border truncate",
-                        EVENT_COLORS[event.type]
-                      )}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onEventClick?.(event);
-                      }}
-                    >
-                      {event.title}
-                    </div>
-                  ))}
-                  {dayEvents.length > 3 && (
-                    <div className="text-xs text-muted-foreground">
-                      +{dayEvents.length - 3} more
-                    </div>
-                  )}
-                </div>
-                
-                {/* Event Indicator & Popover */}
-                {renderEventPopover(date, dayEvents)}
+                {day}
               </div>
-            );
-          })}
+            ))}
+          </div>
+          
+          {/* Calendar Days Grid */}
+          <div className="grid grid-cols-7">
+            {calendarDays.map((date, index) => {
+              const dateKey = format(date, 'yyyy-MM-dd');
+              const dayEvents = eventsByDate[dateKey] || [];
+              const isCurrentMonth = isSameMonth(date, currentDate);
+              const isTodayDate = isToday(date);
+              const isSelected = selectedDate && isSameDay(date, selectedDate);
+
+              return (
+                <div
+                  key={index}
+                  className={cn(
+                    "min-h-[100px] p-2 cursor-pointer relative hover:bg-muted/50 transition-colors border-r border-b border-muted last:border-r-0",
+                    !isCurrentMonth && "text-muted-foreground bg-muted/20",
+                    isTodayDate && "bg-primary/10",
+                    isSelected && "bg-primary/20"
+                  )}
+                  onClick={() => handleDateClick(date)}
+                >
+                  <div className="flex justify-between items-start mb-1">
+                    <span className={cn(
+                      "text-sm font-medium",
+                      isTodayDate && "font-bold text-primary bg-primary text-primary-foreground w-6 h-6 rounded-full flex items-center justify-center text-xs",
+                      !isCurrentMonth && "text-muted-foreground"
+                    )}>
+                      {format(date, 'd')}
+                    </span>
+                  </div>
+                  
+                  {/* Events */}
+                  <div className="space-y-0.5">
+                    {dayEvents.slice(0, 3).map((event, eventIndex) => (
+                      <div
+                        key={eventIndex}
+                        className={cn(
+                          "text-xs px-1 py-0.5 rounded border truncate cursor-pointer",
+                          EVENT_COLORS[event.type]
+                        )}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEventClick?.(event);
+                        }}
+                      >
+                        {event.title}
+                      </div>
+                    ))}
+                    {dayEvents.length > 3 && (
+                      <div className="text-xs text-muted-foreground">
+                        +{dayEvents.length - 3} more
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Event Indicator & Popover */}
+                  {renderEventPopover(date, dayEvents)}
+                </div>
+              );
+            })}
+          </div>
         </div>
         
         {/* Legend */}
