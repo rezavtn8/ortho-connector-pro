@@ -33,7 +33,7 @@ interface GooglePlaceMatch {
 
 interface OfficeMatchConfirmationProps {
   importedOffices: ImportedOffice[];
-  onComplete: (confirmedOffices: ImportedOffice[]) => void;
+  onComplete: (confirmedOffices: ImportedOffice[], sourceMapping: Map<string, string>) => void;
 }
 
 export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeMatchConfirmationProps) {
@@ -46,6 +46,8 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
   const [googleMapsError, setGoogleMapsError] = useState<string | null>(null);
   // Session-level tracking to prevent duplicates within this import session
   const [sessionOffices, setSessionOffices] = useState<Map<string, string>>(new Map()); // normalizedName -> officeId
+  // Track mapping from original CSV source names to database source IDs
+  const [sourceMapping, setSourceMapping] = useState<Map<string, string>>(new Map()); // originalSourceName -> databaseSourceId
   const { toast } = useToast();
 
   // Enhanced name normalization with professional titles and descriptors
@@ -436,6 +438,9 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
           updated.set(normalizedFinal, existingOffice.id);
           return updated;
         });
+
+        // Map original CSV source name to existing database source ID
+        setSourceMapping(prev => new Map(prev.set(importedOffice.name, existingOffice.id)));
         
         toast({
           title: "Office merged",
@@ -474,6 +479,9 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
             updated.set(normalizedGoogle, newOffice.id);
             return updated;
           });
+
+          // Map original CSV source name to new database source ID
+          setSourceMapping(prev => new Map(prev.set(importedOffice.name, newOffice.id)));
         }
         
         toast({
@@ -537,6 +545,9 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
         if (newOffice) {
           const normalizedName = normalizeOfficeName(importedOffice.name);
           setSessionOffices(prev => new Map(prev.set(normalizedName, newOffice.id)));
+          
+          // Map original CSV source name to new database source ID
+          setSourceMapping(prev => new Map(prev.set(importedOffice.name, newOffice.id)));
         }
         
         toast({
@@ -544,7 +555,9 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
           description: `${importedOffice.name} has been added with original data.`,
         });
       } else {
-        // Office already exists - just track it as processed
+        // Office already exists - map it so patient data goes to existing office
+        setSourceMapping(prev => new Map(prev.set(importedOffice.name, existingOffice.id)));
+        
         toast({
           title: "Office already exists",
           description: `${importedOffice.name} was already in your sources (merged with existing).`,
@@ -566,7 +579,7 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
     const finalOffices = importedOffices.filter(office => 
       confirmedOffices.has(office.id) || skippedOffices.has(office.id)
     );
-    onComplete(finalOffices);
+    onComplete(finalOffices, sourceMapping);
   };
 
   const pendingOffices = importedOffices.filter(office => 

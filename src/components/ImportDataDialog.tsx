@@ -58,6 +58,7 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
   const [showOfficeMatching, setShowOfficeMatching] = useState(false);
   const [importedOffices, setImportedOffices] = useState<any[]>([]);
   const [confirmedOfficeData, setConfirmedOfficeData] = useState<Map<string, any>>(new Map());
+  const [sourceMapping, setSourceMapping] = useState<Map<string, string>>(new Map()); // originalSourceName -> databaseSourceId
   const { toast } = useToast();
 
   // Auto-detect source type based on name
@@ -234,62 +235,55 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
         setImportProgress(`Processing ${i + 1} of ${parsedData.length}: ${row.source}`);
         
         try {
-          // Check if source exists
-          const { data: existingSource, error: searchError } = await supabase
-            .from('patient_sources')
-            .select('id')
-            .eq('name', row.source)
-            .maybeSingle();
-          
-          if (searchError && searchError.code !== 'PGRST116') {
-            throw searchError;
-          }
+          // Check if we already have a mapping from office matching process
+          const mappedSourceId = sourceMapping.get(row.source);
           
           let sourceId: string;
           
-          if (!existingSource) {
-            // Create new source with auto-detected type
-            const detectedType = detectSourceType(row.source);
-            
-            // Check if we have confirmed office data for this source
-            const confirmedOffice = confirmedOfficeData.get(row.source);
-            
-            let sourceData: any = {
-              name: row.source,
-              source_type: detectedType,
-              is_active: true,
-              created_by: userId
-            };
-
-            // If this is a confirmed office with Google Places data, use enhanced data
-            if (confirmedOffice && detectedType === 'Office') {
-              sourceData = {
-                ...sourceData,
-                name: confirmedOffice.name || row.source,
-                address: confirmedOffice.formatted_address,
-                phone: confirmedOffice.formatted_phone_number,
-                website: confirmedOffice.website,
-                latitude: confirmedOffice.geometry?.location.lat,
-                longitude: confirmedOffice.geometry?.location.lng,
-              };
-            }
-
-            const { data: newSource, error: createError } = await supabase
-              .from('patient_sources')
-              .insert(sourceData)
-              .select('id')
-              .single();
-            
-            if (createError) {
-              errors.push(`Failed to create source "${row.source}": ${createError.message}`);
-              continue;
-            }
-            
-            sourceId = newSource.id;
-            sourcesCreated++;
+          if (mappedSourceId) {
+            // Use the mapped source ID from office matching process
+            sourceId = mappedSourceId;
+            sourcesUpdated++; // Count as updated since it was handled in matching
           } else {
-            sourceId = existingSource.id;
-            sourcesUpdated++;
+            // Check if source exists in database
+            const { data: existingSource, error: searchError } = await supabase
+              .from('patient_sources')
+              .select('id')
+              .eq('name', row.source)
+              .maybeSingle();
+            
+            if (searchError && searchError.code !== 'PGRST116') {
+              throw searchError;
+            }
+            
+            if (!existingSource) {
+              // Create new source with auto-detected type
+              const detectedType = detectSourceType(row.source);
+              
+              let sourceData: any = {
+                name: row.source,
+                source_type: detectedType,
+                is_active: true,
+                created_by: userId
+              };
+
+              const { data: newSource, error: createError } = await supabase
+                .from('patient_sources')
+                .insert(sourceData)
+                .select('id')
+                .single();
+              
+              if (createError) {
+                errors.push(`Failed to create source "${row.source}": ${createError.message}`);
+                continue;
+              }
+              
+              sourceId = newSource.id;
+              sourcesCreated++;
+            } else {
+              sourceId = existingSource.id;
+              sourcesUpdated++;
+            }
           }
           
           // Import monthly data
@@ -400,6 +394,7 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
       setShowOfficeMatching(false);
       setImportedOffices([]);
       setConfirmedOfficeData(new Map());
+      setSourceMapping(new Map());
       
       onImportComplete?.();
     } catch (error: any) {
@@ -438,8 +433,11 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
     }
   };
 
-  const handleOfficeMatchingComplete = async (confirmedOffices: any[]) => {
-    // Store confirmed office data for use during import
+  const handleOfficeMatchingComplete = async (confirmedOffices: any[], officeMappings: Map<string, string>) => {
+    // Store the source mappings from office matching process
+    setSourceMapping(officeMappings);
+    
+    // Store confirmed office data for reference (though not needed for import anymore)
     const officeDataMap = new Map();
     
     // Handle all imported offices - both confirmed and skipped
