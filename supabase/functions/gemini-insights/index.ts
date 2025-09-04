@@ -176,8 +176,82 @@ serve(async (req) => {
       };
     }).sort((a, b) => b.totalRecentPatients - a.totalRecentPatients);
 
-    // Create context for Gemini
-    const context = `
+    // Create context for Gemini based on question type
+    const isInitialInsights = question.includes('initial insights');
+    
+    let context = '';
+    
+    if (isInitialInsights) {
+      context = `
+You are a healthcare marketing analytics assistant. Analyze the following data and return ONLY a JSON response with structured insights for different card types. Do not include any markdown or extra text - just valid JSON.
+
+COMPREHENSIVE DATA OVERVIEW:
+- Total Patient Sources: ${userData.offices.length} referral sources
+- Monthly Patient Records: ${userData.monthlyPatients.length} data points
+- Marketing Campaigns: ${userData.campaigns.length} campaigns  
+- Marketing Visits: ${userData.marketingVisits.length} visits
+- Discovered Offices: ${userData.discoveredOffices.length} potential referral sources
+- Review Tracking: ${userData.reviewStatus.length} reviews being monitored
+
+DATA QUALITY ANALYSIS:
+- Offices with complete addresses: ${userData.discoveryAnalytics.officesWithAddresses}/${userData.discoveryAnalytics.totalOfficesInDatabase} (${((userData.discoveryAnalytics.officesWithAddresses/userData.discoveryAnalytics.totalOfficesInDatabase)*100).toFixed(1)}%)
+- Offices with Google integration: ${userData.discoveryAnalytics.officesWithGoogleData}/${userData.discoveryAnalytics.totalOfficesInDatabase} (${((userData.discoveryAnalytics.officesWithGoogleData/userData.discoveryAnalytics.totalOfficesInDatabase)*100).toFixed(1)}%)
+- Average Google Rating: ${userData.discoveryAnalytics.averageRating.toFixed(1)}/5.0
+
+TOP PERFORMING REFERRAL SOURCES (Recent 6 months):
+${sourcePerformance.slice(0, 10).map((source, index) => 
+  `${index + 1}. ${source.officeName}: ${source.totalRecentPatients} patients (avg: ${source.averageMonthly.toFixed(1)}/month, rating: ${source.googleRating})`
+).join('\n')}
+
+UNDERPERFORMING SOURCES (Need attention):
+${sourcePerformance.slice(-5).map(source => 
+  `- ${source.officeName}: Only ${source.totalRecentPatients} recent patients, ${source.address ? 'Has address' : 'Missing address'}`
+).join('\n')}
+
+Return ONLY this JSON structure:
+{
+  "narrativeSummary": {
+    "title": "Practice Performance Overview",
+    "summary": "Brief 2-3 sentence overview",
+    "details": "Detailed narrative analysis with key findings and trends"
+  },
+  "relationshipHealth": {
+    "title": "Relationship Health",
+    "summary": "Brief health status",
+    "details": "Detailed relationship analysis",
+    "score": "Excellent/Good/Needs Attention",
+    "metrics": ["metric1", "metric2"]
+  },
+  "outreachPriorities": {
+    "title": "Outreach Priorities", 
+    "summary": "Top priority actions",
+    "details": "Detailed priority recommendations",
+    "priorities": ["priority1", "priority2", "priority3"]
+  },
+  "decliningOffices": {
+    "title": "Declining Offices",
+    "summary": "Offices needing attention", 
+    "details": "Analysis of declining referral sources",
+    "offices": ["office1", "office2"]
+  },
+  "emergingOpportunities": {
+    "title": "Emerging Opportunities",
+    "summary": "New potential sources",
+    "details": "Detailed opportunity analysis"
+  },
+  "networkBalance": {
+    "title": "Network Balance",
+    "summary": "Portfolio balance assessment",
+    "details": "Geographic and specialty distribution analysis"
+  },
+  "competitiveInsight": {
+    "title": "Competitive Insight", 
+    "summary": "Market positioning overview",
+    "details": "Competitive analysis and market opportunities"
+  }
+}`;
+    } else {
+      context = `
 You are a healthcare marketing analytics assistant analyzing comprehensive data for ${userProfile?.clinic_name || 'a medical practice'}. 
 
 COMPREHENSIVE DATA OVERVIEW:
@@ -252,6 +326,7 @@ Please provide comprehensive insights, analytics, and actionable recommendations
 
 User Question: ${question}
 `;
+    }
 
     const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
     if (!geminiApiKey) {
@@ -303,9 +378,22 @@ User Question: ${question}
 
     const aiResponse = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated';
 
+    // Check if this is an initial insights request and try to parse structured data
+    const isInitialInsights = question.includes('initial insights');
+    let structuredInsights = null;
+    
+    if (isInitialInsights) {
+      try {
+        structuredInsights = JSON.parse(aiResponse);
+      } catch (error) {
+        console.log('Failed to parse structured insights, falling back to text response');
+      }
+    }
+
     return new Response(
       JSON.stringify({
         response: aiResponse,
+        structuredInsights: structuredInsights,
         dataContext: {
           officesCount: userData.offices.length,
           monthlyRecords: userData.monthlyPatients.length,
