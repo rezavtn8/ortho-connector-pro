@@ -16,6 +16,7 @@ import { MapView } from '@/pages/MapView';
 import { Reviews } from '@/pages/Reviews';
 import { Discover } from '@/pages/Discover';
 import { Logs } from '@/pages/Logs';
+import { AIAssistant } from '@/pages/AIAssistant';
 
 const Index = () => {
   const { user, loading } = useAuth();
@@ -63,6 +64,8 @@ const Index = () => {
         return <MapView />;
       case 'analytics':
         return <Analytics />;
+      case 'ai-assistant':
+        return <AIAssistant />;
       case 'logs':
         return <Logs />;
       case 'settings':
