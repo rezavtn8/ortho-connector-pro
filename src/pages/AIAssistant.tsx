@@ -19,6 +19,13 @@ interface ChatMessage {
     monthlyRecords: number;
     campaignsCount: number;
     visitsCount: number;
+    discoveredOfficesCount?: number;
+    reviewsCount?: number;
+    dataQuality?: {
+      addressCompleteness: string;
+      googleIntegration: string;
+      averageRating: string;
+    };
   };
 }
 
@@ -194,6 +201,26 @@ export function AIAssistant() {
                 <Badge variant="secondary">
                   {initialInsights.dataContext.visitsCount} Visits
                 </Badge>
+                {initialInsights.dataContext.discoveredOfficesCount && (
+                  <Badge variant="outline">
+                    {initialInsights.dataContext.discoveredOfficesCount} Discovered
+                  </Badge>
+                )}
+                {initialInsights.dataContext.reviewsCount && (
+                  <Badge variant="outline">
+                    {initialInsights.dataContext.reviewsCount} Reviews
+                  </Badge>
+                )}
+                {initialInsights.dataContext.dataQuality && (
+                  <>
+                    <Badge variant="secondary" className="text-xs">
+                      {initialInsights.dataContext.dataQuality.addressCompleteness} Complete Data
+                    </Badge>
+                    <Badge variant="secondary" className="text-xs">
+                      Avg Rating: {initialInsights.dataContext.dataQuality.averageRating}⭐
+                    </Badge>
+                  </>
+                )}
               </div>
             )}
           </CardHeader>

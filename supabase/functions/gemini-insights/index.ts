@@ -14,6 +14,14 @@ interface UserData {
   marketingVisits: any[];
   userProfile: any;
   recentActivity: any[];
+  discoveredOffices: any[];
+  reviewStatus: any[];
+  discoveryAnalytics: {
+    totalOfficesInDatabase: number;
+    officesWithAddresses: number;
+    officesWithGoogleData: number;
+    averageRating: number;
+  };
 }
 
 serve(async (req) => {
@@ -57,87 +65,190 @@ serve(async (req) => {
       { data: campaigns },
       { data: marketingVisits },
       { data: userProfile },
-      { data: recentActivity }
+      { data: recentActivity },
+      { data: discoveredOffices },
+      { data: reviewStatus }
     ] = await Promise.all([
       supabaseClient
         .from('patient_sources')
         .select('*')
-        .eq('created_by', user.id),
+        .eq('created_by', user.id)
+        .order('name', { ascending: true }),
       
       supabaseClient
         .from('monthly_patients')
         .select('*')
         .eq('user_id', user.id)
-        .order('year_month', { ascending: false })
-        .limit(12),
+        .order('year_month', { ascending: false }),
       
       supabaseClient
         .from('campaigns')
         .select('*')
         .eq('created_by', user.id)
-        .order('created_at', { ascending: false })
-        .limit(10),
+        .order('created_at', { ascending: false }),
       
       supabaseClient
         .from('marketing_visits')
         .select('*')
         .eq('user_id', user.id)
-        .order('visit_date', { ascending: false })
-        .limit(20),
+        .order('visit_date', { ascending: false }),
       
       supabaseClient
         .from('user_profiles')
         .select('*')
         .eq('user_id', user.id)
-        .single(),
+        .maybeSingle(),
       
       supabaseClient
         .from('patient_changes_log')
         .select('*')
         .eq('user_id', user.id)
         .order('changed_at', { ascending: false })
-        .limit(10)
+        .limit(20),
+      
+      supabaseClient
+        .from('discovered_offices')
+        .select('*')
+        .eq('discovered_by', user.id)
+        .order('fetched_at', { ascending: false }),
+      
+      supabaseClient
+        .from('review_status')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
     ]);
+
+    // Calculate analytics
+    const officesData = offices || [];
+    const officesWithAddresses = officesData.filter(office => office.address).length;
+    const officesWithGoogleData = officesData.filter(office => office.google_place_id).length;
+    const ratingsAvailable = officesData.filter(office => office.google_rating).map(office => office.google_rating);
+    const averageRating = ratingsAvailable.length > 0 
+      ? ratingsAvailable.reduce((sum, rating) => sum + rating, 0) / ratingsAvailable.length 
+      : 0;
 
     // Package data for Gemini
     const userData: UserData = {
-      offices: offices || [],
+      offices: officesData,
       monthlyPatients: monthlyPatients || [],
       campaigns: campaigns || [],
       marketingVisits: marketingVisits || [],
       userProfile: userProfile || {},
-      recentActivity: recentActivity || []
+      recentActivity: recentActivity || [],
+      discoveredOffices: discoveredOffices || [],
+      reviewStatus: reviewStatus || [],
+      discoveryAnalytics: {
+        totalOfficesInDatabase: officesData.length,
+        officesWithAddresses: officesWithAddresses,
+        officesWithGoogleData: officesWithGoogleData,
+        averageRating: averageRating
+      }
     };
 
-    console.log(`Packaging data: ${userData.offices.length} offices, ${userData.monthlyPatients.length} monthly records`);
+    console.log(`Packaging data: ${userData.offices.length} offices, ${userData.monthlyPatients.length} monthly records, ${userData.discoveredOffices.length} discovered offices, ${userData.reviewStatus.length} reviews`);
+
+    // Group monthly data by source for better analysis
+    const monthlyBySource = userData.monthlyPatients.reduce((acc, record) => {
+      if (!acc[record.source_id]) {
+        acc[record.source_id] = [];
+      }
+      acc[record.source_id].push(record);
+      return acc;
+    }, {});
+
+    // Find top performing sources based on recent data
+    const sourcePerformance = Object.keys(monthlyBySource).map(sourceId => {
+      const sourceRecords = monthlyBySource[sourceId];
+      const recentRecords = sourceRecords.slice(0, 6); // Last 6 months
+      const totalRecent = recentRecords.reduce((sum, record) => sum + record.patient_count, 0);
+      const totalAll = sourceRecords.reduce((sum, record) => sum + record.patient_count, 0);
+      const office = userData.offices.find(o => o.id === sourceId);
+      
+      return {
+        sourceId,
+        officeName: office?.name || 'Unknown',
+        totalRecentPatients: totalRecent,
+        totalAllTimePatients: totalAll,
+        averageMonthly: recentRecords.length > 0 ? totalRecent / recentRecords.length : 0,
+        address: office?.address || 'No address',
+        googleRating: office?.google_rating || 'No rating'
+      };
+    }).sort((a, b) => b.totalRecentPatients - a.totalRecentPatients);
 
     // Create context for Gemini
     const context = `
-You are a healthcare marketing analytics assistant analyzing data for ${userProfile?.clinic_name || 'a medical practice'}. 
+You are a healthcare marketing analytics assistant analyzing comprehensive data for ${userProfile?.clinic_name || 'a medical practice'}. 
 
-Current Data Overview:
-- Patient Sources/Offices: ${userData.offices.length} referral sources
-- Monthly Patient Data: ${userData.monthlyPatients.length} months of data
-- Marketing Campaigns: ${userData.campaigns.length} active campaigns
-- Recent Marketing Visits: ${userData.marketingVisits.length} visits
+COMPREHENSIVE DATA OVERVIEW:
+- Total Patient Sources: ${userData.offices.length} referral sources
+- Monthly Patient Records: ${userData.monthlyPatients.length} data points
+- Marketing Campaigns: ${userData.campaigns.length} campaigns  
+- Marketing Visits: ${userData.marketingVisits.length} visits
+- Discovered Offices: ${userData.discoveredOffices.length} potential referral sources
+- Review Tracking: ${userData.reviewStatus.length} reviews being monitored
 
-Patient Sources Summary:
-${userData.offices.map(office => `- ${office.name} (${office.source_type}): ${office.address || 'No address'}`).join('\n')}
+DATA QUALITY ANALYSIS:
+- Offices with complete addresses: ${userData.discoveryAnalytics.officesWithAddresses}/${userData.discoveryAnalytics.totalOfficesInDatabase} (${((userData.discoveryAnalytics.officesWithAddresses/userData.discoveryAnalytics.totalOfficesInDatabase)*100).toFixed(1)}%)
+- Offices with Google integration: ${userData.discoveryAnalytics.officesWithGoogleData}/${userData.discoveryAnalytics.totalOfficesInDatabase} (${((userData.discoveryAnalytics.officesWithGoogleData/userData.discoveryAnalytics.totalOfficesInDatabase)*100).toFixed(1)}%)
+- Average Google Rating: ${userData.discoveryAnalytics.averageRating.toFixed(1)}/5.0
 
-Recent Monthly Patient Counts (last 6 months):
-${userData.monthlyPatients.slice(0, 6).map(mp => `- ${mp.year_month}: ${mp.patient_count} patients from source`).join('\n')}
+TOP PERFORMING REFERRAL SOURCES (Recent 6 months):
+${sourcePerformance.slice(0, 10).map((source, index) => 
+  `${index + 1}. ${source.officeName}: ${source.totalRecentPatients} patients (avg: ${source.averageMonthly.toFixed(1)}/month, rating: ${source.googleRating})`
+).join('\n')}
 
-Marketing Campaigns:
-${userData.campaigns.map(c => `- ${c.name} (${c.status}): ${c.campaign_type}`).join('\n')}
+UNDERPERFORMING SOURCES (Need attention):
+${sourcePerformance.slice(-5).map(source => 
+  `- ${source.officeName}: Only ${source.totalRecentPatients} recent patients, ${source.address ? 'Has address' : 'Missing address'}`
+).join('\n')}
 
-Recent Marketing Activity:
-${userData.marketingVisits.slice(0, 5).map(v => `- Visit to office on ${v.visit_date}: ${v.rep_name} - ${v.visit_type}`).join('\n')}
+MONTHLY TRENDS (Last 12 months):
+${userData.monthlyPatients
+  .reduce((acc, record) => {
+    if (!acc[record.year_month]) acc[record.year_month] = 0;
+    acc[record.year_month] += record.patient_count;
+    return acc;
+  }, {})
+  && Object.entries(userData.monthlyPatients
+    .reduce((acc, record) => {
+      if (!acc[record.year_month]) acc[record.year_month] = 0;
+      acc[record.year_month] += record.patient_count;
+      return acc;
+    }, {}))
+    .sort(([a], [b]) => b.localeCompare(a))
+    .slice(0, 12)
+    .map(([month, total]) => `- ${month}: ${total} total patients`)
+    .join('\n')
+}
 
-Please provide insights, analytics, and recommendations based on this data. Focus on:
-1. Patient referral trends and patterns
-2. Marketing effectiveness
-3. Growth opportunities
-4. Data-driven recommendations
+DISCOVERED OPPORTUNITIES:
+${userData.discoveredOffices.slice(0, 5).map(office => 
+  `- ${office.name} (${office.office_type}): ${office.rating ? `Rating: ${office.rating}` : 'No rating'}, ${office.imported ? 'Already imported' : 'Not yet contacted'}`
+).join('\n')}
+
+MARKETING CAMPAIGNS STATUS:
+${userData.campaigns.length > 0 
+  ? userData.campaigns.map(campaign => `- ${campaign.name} (${campaign.status}): ${campaign.campaign_type} - ${campaign.delivery_method}`).join('\n')
+  : 'No active marketing campaigns'
+}
+
+RECENT MARKETING VISITS:
+${userData.marketingVisits.slice(0, 5).map(visit => 
+  `- ${visit.visit_date}: ${visit.rep_name} visited office (${visit.visit_type}) - Rating: ${visit.star_rating || 'N/A'}`
+).join('\n')}
+
+REVIEW MONITORING:
+${userData.reviewStatus.slice(0, 3).map(review => 
+  `- Place ID ${review.place_id}: Status ${review.status} ${review.needs_attention ? '(NEEDS ATTENTION)' : ''}`
+).join('\n')}
+
+Please provide comprehensive insights, analytics, and actionable recommendations based on this data. Focus on:
+1. Patient referral trends and performance patterns
+2. Marketing campaign effectiveness and ROI
+3. Office relationship quality and opportunities  
+4. Data gaps and improvement recommendations
+5. Strategic growth opportunities
 
 User Question: ${question}
 `;
@@ -199,7 +310,14 @@ User Question: ${question}
           officesCount: userData.offices.length,
           monthlyRecords: userData.monthlyPatients.length,
           campaignsCount: userData.campaigns.length,
-          visitsCount: userData.marketingVisits.length
+          visitsCount: userData.marketingVisits.length,
+          discoveredOfficesCount: userData.discoveredOffices.length,
+          reviewsCount: userData.reviewStatus.length,
+          dataQuality: {
+            addressCompleteness: ((userData.discoveryAnalytics.officesWithAddresses / userData.discoveryAnalytics.totalOfficesInDatabase) * 100).toFixed(1) + '%',
+            googleIntegration: ((userData.discoveryAnalytics.officesWithGoogleData / userData.discoveryAnalytics.totalOfficesInDatabase) * 100).toFixed(1) + '%',
+            averageRating: userData.discoveryAnalytics.averageRating.toFixed(1)
+          }
         }
       }),
       {
