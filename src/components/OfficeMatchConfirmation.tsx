@@ -500,18 +500,18 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
           description: `${updateData.name} has been updated with Google Places data.`,
         });
       } else {
-        // Create new office preserving original name, filling in Google Places data for empty fields
+        // Create new office using imported CSV data as base, filling empty fields with Google Places data
         const { data: newOffice, error } = await supabase
           .from('patient_sources')
           .insert({
-            name: importedOffice.name, // Preserve original CSV name
-            address: match.formatted_address,
-            phone: match.formatted_phone_number,
-            website: match.website,
-            latitude: match.geometry.location.lat,
-            longitude: match.geometry.location.lng,
-            google_place_id: match.place_id,
-            google_rating: match.rating,
+            name: importedOffice.name, // Always use CSV name
+            address: importedOffice.address || match.formatted_address, // CSV first, Google as fallback
+            phone: importedOffice.phone || match.formatted_phone_number, // CSV first, Google as fallback  
+            website: importedOffice.website || match.website, // CSV first, Google as fallback
+            latitude: match.geometry.location.lat, // Google Places location data
+            longitude: match.geometry.location.lng, // Google Places location data
+            google_place_id: match.place_id, // Always from Google Places
+            google_rating: match.rating, // Always from Google Places
             last_updated_from_google: new Date().toISOString(),
             source_type: 'Office',
             is_active: true,
