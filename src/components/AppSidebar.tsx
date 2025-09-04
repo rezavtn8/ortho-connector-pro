@@ -52,6 +52,7 @@ const managementItems = [
 ];
 
 const systemItems = [
+  { id: 'logs', title: 'Activity Logs', icon: Activity },
   { id: 'settings', title: 'Settings', icon: Settings },
 ];
 

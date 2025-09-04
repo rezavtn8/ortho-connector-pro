@@ -15,6 +15,7 @@ import { SourceDetail } from '@/pages/SourceDetail';
 import { MapView } from '@/pages/MapView';
 import { Reviews } from '@/pages/Reviews';
 import { Discover } from '@/pages/Discover';
+import { Logs } from '@/pages/Logs';
 
 const Index = () => {
   const { user, loading } = useAuth();
@@ -62,6 +63,8 @@ const Index = () => {
         return <MapView />;
       case 'analytics':
         return <Analytics />;
+      case 'logs':
+        return <Logs />;
       case 'settings':
         return <Settings />;
       default:
