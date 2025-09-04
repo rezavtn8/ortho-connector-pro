@@ -15,6 +15,8 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { signIn, signUp } = useAuth();
@@ -26,7 +28,7 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
 
     try {
       const { error } = isSignUp 
-        ? await signUp(email, password)
+        ? await signUp(email, password, firstName, lastName)
         : await signIn(email, password);
 
       if (error) {
@@ -56,6 +58,38 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
   if (embedded) {
     return (
       <form onSubmit={handleSubmit} className="space-y-6">
+        {isSignUp && (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="firstName" className="text-connection-text">First Name</Label>
+              <Input
+                id="firstName"
+                type="text"
+                placeholder="Enter your first name"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                required
+                autoComplete="given-name"
+                className="border-connection-primary/20 focus:border-connection-primary bg-white/50"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="lastName" className="text-connection-text">Last Name</Label>
+              <Input
+                id="lastName"
+                type="text"
+                placeholder="Enter your last name"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                required
+                autoComplete="family-name"
+                className="border-connection-primary/20 focus:border-connection-primary bg-white/50"
+              />
+            </div>
+          </>
+        )}
+
         <div className="space-y-2">
           <Label htmlFor="email" className="text-connection-text">Email</Label>
           <Input
@@ -140,6 +174,36 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
 
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {isSignUp && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">First Name</Label>
+                  <Input
+                    id="firstName"
+                    type="text"
+                    placeholder="Enter your first name"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
+                    autoComplete="given-name"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Last Name</Label>
+                  <Input
+                    id="lastName"
+                    type="text"
+                    placeholder="Enter your last name"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    required
+                    autoComplete="family-name"
+                  />
+                </div>
+              </>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
