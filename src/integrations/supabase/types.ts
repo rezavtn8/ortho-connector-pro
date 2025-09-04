@@ -285,6 +285,45 @@ export type Database = {
         }
         Relationships: []
       }
+      google_places_audit_log: {
+        Row: {
+          action: string
+          conflict_details: Json | null
+          created_at: string
+          field_updates: Json | null
+          google_place_id: string | null
+          id: string
+          new_values: Json | null
+          office_id: string
+          old_values: Json | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          conflict_details?: Json | null
+          created_at?: string
+          field_updates?: Json | null
+          google_place_id?: string | null
+          id?: string
+          new_values?: Json | null
+          office_id: string
+          old_values?: Json | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          conflict_details?: Json | null
+          created_at?: string
+          field_updates?: Json | null
+          google_place_id?: string | null
+          id?: string
+          new_values?: Json | null
+          office_id?: string
+          old_values?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       marketing_visits: {
         Row: {
           clinic_id: string | null
@@ -792,6 +831,18 @@ export type Database = {
       }
       get_user_role: {
         Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      log_google_places_update: {
+        Args: {
+          p_action: string
+          p_conflict_details?: Json
+          p_field_updates?: Json
+          p_google_place_id: string
+          p_new_values?: Json
+          p_office_id: string
+          p_old_values?: Json
+        }
         Returns: string
       }
       set_patient_count: {

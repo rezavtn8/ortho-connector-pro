@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Check, X, MapPin, Phone, Globe, Building2 } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Loader2, Check, X, MapPin, Phone, Globe, Building2, AlertTriangle, Info, Clock, Shield } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader } from '@googlemaps/js-api-loader';
@@ -48,6 +49,10 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
   const [sessionOffices, setSessionOffices] = useState<Map<string, string>>(new Map()); // normalizedName -> officeId
   // Track mapping from original CSV source names to database source IDs
   const [sourceMapping, setSourceMapping] = useState<Map<string, string>>(new Map()); // originalSourceName -> databaseSourceId
+  // Enhanced conflict detection and audit tracking
+  const [placeIdConflicts, setPlaceIdConflicts] = useState<Map<string, any>>(new Map()); // placeId -> existing office
+  const [processingOfficeId, setProcessingOfficeId] = useState<string | null>(null);
+  const [auditLogs, setAuditLogs] = useState<Map<string, any[]>>(new Map()); // officeId -> audit entries
   const { toast } = useToast();
 
   // Enhanced name normalization with professional titles and descriptors
@@ -349,6 +354,173 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
     initGoogleMaps();
   }, []);
 
+  // Enhanced conflict detection for Google Place IDs
+  const checkGooglePlaceIdConflict = async (placeId: string, currentOfficeId?: string): Promise<any | null> => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !placeId) return null;
+
+      const { data: existingOffice } = await supabase
+        .from('patient_sources')
+        .select('*')
+        .eq('google_place_id', placeId)
+        .eq('created_by', user.id)
+        .eq('source_type', 'Office')
+        .not('id', 'eq', currentOfficeId || 'null')
+        .maybeSingle();
+
+      return existingOffice;
+    } catch (error) {
+      console.error('Error checking Google Place ID conflict:', error);
+      return null;
+    }
+  };
+
+  // Audit logging function
+  const logGooglePlacesAction = async (
+    officeId: string,
+    placeId: string,
+    action: string,
+    fieldUpdates?: any,
+    oldValues?: any,
+    newValues?: any,
+    conflictDetails?: any
+  ) => {
+    try {
+      const { error } = await supabase.rpc('log_google_places_update', {
+        p_office_id: officeId,
+        p_google_place_id: placeId,
+        p_action: action,
+        p_field_updates: fieldUpdates,
+        p_old_values: oldValues,
+        p_new_values: newValues,
+        p_conflict_details: conflictDetails
+      });
+
+      if (error) {
+        console.error('Audit logging failed:', error);
+      }
+    } catch (error) {
+      console.error('Audit logging error:', error);
+    }
+  };
+
+  // Enhanced field comparison - only fill empty fields
+  const createSafeUpdateData = (existingOffice: any, googleMatch: GooglePlaceMatch) => {
+    const safeUpdates: any = {};
+    const fieldUpdates: any = {};
+    const oldValues: any = {};
+    const newValues: any = {};
+
+    // Helper function to check if field is truly empty
+    const isEmpty = (value: any) => {
+      return value === null || value === undefined || 
+             (typeof value === 'string' && value.trim() === '') ||
+             (typeof value === 'number' && isNaN(value));
+    };
+
+    // Always preserve the name - NEVER change it
+    safeUpdates.name = existingOffice.name;
+
+    // Only fill empty fields, never overwrite existing data
+    if (isEmpty(existingOffice.address) && googleMatch.formatted_address) {
+      safeUpdates.address = googleMatch.formatted_address;
+      fieldUpdates.address = 'filled';
+      oldValues.address = null;
+      newValues.address = googleMatch.formatted_address;
+    } else {
+      safeUpdates.address = existingOffice.address;
+    }
+
+    if (isEmpty(existingOffice.phone) && googleMatch.formatted_phone_number) {
+      safeUpdates.phone = googleMatch.formatted_phone_number;
+      fieldUpdates.phone = 'filled';
+      oldValues.phone = null;
+      newValues.phone = googleMatch.formatted_phone_number;
+    } else {
+      safeUpdates.phone = existingOffice.phone;
+    }
+
+    if (isEmpty(existingOffice.website) && googleMatch.website) {
+      safeUpdates.website = googleMatch.website;
+      fieldUpdates.website = 'filled';
+      oldValues.website = null;
+      newValues.website = googleMatch.website;
+    } else {
+      safeUpdates.website = existingOffice.website;
+    }
+
+    if (isEmpty(existingOffice.latitude) && googleMatch.geometry.location.lat) {
+      safeUpdates.latitude = googleMatch.geometry.location.lat;
+      fieldUpdates.latitude = 'filled';
+      oldValues.latitude = null;
+      newValues.latitude = googleMatch.geometry.location.lat;
+    } else {
+      safeUpdates.latitude = existingOffice.latitude;
+    }
+
+    if (isEmpty(existingOffice.longitude) && googleMatch.geometry.location.lng) {
+      safeUpdates.longitude = googleMatch.geometry.location.lng;
+      fieldUpdates.longitude = 'filled';
+      oldValues.longitude = null;
+      newValues.longitude = googleMatch.geometry.location.lng;
+    } else {
+      safeUpdates.longitude = existingOffice.longitude;
+    }
+
+    if (isEmpty(existingOffice.google_place_id)) {
+      safeUpdates.google_place_id = googleMatch.place_id;
+      fieldUpdates.google_place_id = 'filled';
+      oldValues.google_place_id = null;
+      newValues.google_place_id = googleMatch.place_id;
+    } else {
+      safeUpdates.google_place_id = existingOffice.google_place_id;
+    }
+
+    if (isEmpty(existingOffice.google_rating) && googleMatch.rating) {
+      safeUpdates.google_rating = googleMatch.rating;
+      fieldUpdates.google_rating = 'filled';
+      oldValues.google_rating = null;
+      newValues.google_rating = googleMatch.rating;
+    } else {
+      safeUpdates.google_rating = existingOffice.google_rating;
+    }
+
+    // Always update the timestamp
+    safeUpdates.last_updated_from_google = new Date().toISOString();
+    safeUpdates.updated_at = new Date().toISOString();
+
+    return {
+      updateData: safeUpdates,
+      fieldUpdates,
+      oldValues,
+      newValues,
+      hasChanges: Object.keys(fieldUpdates).length > 0
+    };
+  };
+
+  // Check for existing Google Places links on search
+  useEffect(() => {
+    if (matches.size > 0) {
+      checkForConflicts();
+    }
+  }, [matches]);
+
+  const checkForConflicts = async () => {
+    const conflicts = new Map();
+    
+    for (const [officeId, match] of matches.entries()) {
+      if (match?.place_id) {
+        const conflict = await checkGooglePlaceIdConflict(match.place_id);
+        if (conflict) {
+          conflicts.set(match.place_id, conflict);
+        }
+      }
+    }
+    
+    setPlaceIdConflicts(conflicts);
+  };
+
   // Search for matches once Google Maps is loaded
   useEffect(() => {
     if (googleMapsLoaded && importedOffices.length > 0) {
@@ -426,6 +598,7 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
 
     try {
       setLoading(true);
+      setProcessingOfficeId(officeId);
       
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
@@ -437,7 +610,32 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
       const importedOffice = importedOffices.find(o => o.id === officeId);
       if (!importedOffice) return;
 
-      // Enhanced duplicate detection with merge capability
+      // Step 1: Check for Google Place ID conflicts FIRST
+      const placeIdConflict = await checkGooglePlaceIdConflict(match.place_id);
+      if (placeIdConflict) {
+        await logGooglePlacesAction(
+          'conflict', 
+          match.place_id, 
+          'conflict_detected',
+          null,
+          null,
+          null,
+          {
+            conflicting_office: placeIdConflict.name,
+            conflicting_office_id: placeIdConflict.id,
+            attempted_office: importedOffice.name
+          }
+        );
+        
+        toast({
+          title: "Google Place Conflict",
+          description: `This Google Place is already linked to "${placeIdConflict.name}". Please resolve the conflict first.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Step 2: Find existing office using enhanced matching
       const existingOffice = await findExistingOffice(
         importedOffice.name, 
         match.name, 
@@ -447,88 +645,145 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
       );
 
       if (existingOffice) {
-        // Only fill in empty fields from Google Places data - preserve all existing data
-        const updateData: any = {
-          // Keep existing name always
-          name: existingOffice.name,
-          // Only fill in empty fields from Google Places
-          address: existingOffice.address || match.formatted_address,
-          phone: existingOffice.phone || match.formatted_phone_number,
-          website: existingOffice.website || match.website,
-          latitude: existingOffice.latitude || match.geometry.location.lat,
-          longitude: existingOffice.longitude || match.geometry.location.lng,
-          google_place_id: existingOffice.google_place_id || match.place_id,
-          google_rating: existingOffice.google_rating || match.rating,
-          last_updated_from_google: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
+        // Step 3: Create safe update data that only fills empty fields
+        const {
+          updateData,
+          fieldUpdates,
+          oldValues,
+          newValues,
+          hasChanges
+        } = createSafeUpdateData(existingOffice, match);
 
-        const { error } = await supabase
-          .from('patient_sources')
-          .update(updateData)
-          .eq('id', existingOffice.id);
+        if (!hasChanges) {
+          // No empty fields to fill - log and notify
+          await logGooglePlacesAction(
+            existingOffice.id,
+            match.place_id,
+            'confirmed_no_changes',
+            {},
+            {},
+            {},
+            { message: 'All fields already populated' }
+          );
 
-        if (error) throw error;
-        
-        // Track ALL name variations comprehensively in session
-        const allVariations = [
-          ...generateNameVariations(importedOffice.name),
-          ...generateNameVariations(match.name),
-          ...generateNameVariations(updateData.name),
-          importedOffice.name, // Always include exact original name
-          match.name, // Always include exact Google name
-          updateData.name // Always include exact final name
-        ];
-        
-        setSessionOffices(prev => {
-          const updated = new Map(prev);
-          allVariations.forEach(variation => {
-            if (variation && variation.trim()) {
-              updated.set(variation.toLowerCase().trim(), existingOffice.id);
-            }
+          toast({
+            title: "No updates needed",
+            description: `${existingOffice.name} already has all available information.`,
+            variant: "default",
           });
-          return updated;
-        });
+        } else {
+          // Step 4: Apply safe updates
+          const { error } = await supabase
+            .from('patient_sources')
+            .update(updateData)
+            .eq('id', existingOffice.id);
+
+          if (error) {
+            if (error.message?.includes('unique_google_place_id')) {
+              toast({
+                title: "Google Place Already Linked",
+                description: "This Google Place is already linked to another office.",
+                variant: "destructive",
+              });
+              return;
+            }
+            throw error;
+          }
+          
+          // Step 5: Log the update
+          await logGooglePlacesAction(
+            existingOffice.id,
+            match.place_id,
+            'updated',
+            fieldUpdates,
+            oldValues,
+            newValues
+          );
+
+          // Step 6: Track all name variations in session
+          const allVariations = [
+            ...generateNameVariations(importedOffice.name),
+            ...generateNameVariations(match.name),
+            ...generateNameVariations(updateData.name),
+            importedOffice.name,
+            match.name,
+            updateData.name
+          ];
+          
+          setSessionOffices(prev => {
+            const updated = new Map(prev);
+            allVariations.forEach(variation => {
+              if (variation && variation.trim()) {
+                updated.set(variation.toLowerCase().trim(), existingOffice.id);
+              }
+            });
+            return updated;
+          });
+
+          const filledFields = Object.keys(fieldUpdates);
+          toast({
+            title: "Office Updated",
+            description: `${updateData.name} - Filled ${filledFields.length} empty field(s): ${filledFields.join(', ')}`,
+          });
+        }
 
         // Map original CSV source name to existing database source ID
         setSourceMapping(prev => new Map(prev.set(importedOffice.name, existingOffice.id)));
         
-        console.log(`[DEBUG] Merged office: ${importedOffice.name} -> ${existingOffice.id} (${updateData.name})`);
+        console.log(`[DEBUG] Processed existing office: ${importedOffice.name} -> ${existingOffice.id}`);
         
-        toast({
-          title: "Office merged",
-          description: `${updateData.name} has been updated with Google Places data.`,
-        });
       } else {
-        // Create new office using imported CSV data as base, filling empty fields with Google Places data
+        // Step 7: Create new office with imported data + Google Places data for empty fields
+        const newOfficeData = {
+          name: importedOffice.name, // Always use imported name
+          address: importedOffice.address || match.formatted_address,
+          phone: importedOffice.phone || match.formatted_phone_number,
+          website: importedOffice.website || match.website,
+          latitude: match.geometry.location.lat,
+          longitude: match.geometry.location.lng,
+          google_place_id: match.place_id,
+          google_rating: match.rating,
+          last_updated_from_google: new Date().toISOString(),
+          source_type: 'Office' as const,
+          is_active: true,
+          created_by: user.id,
+        };
+
         const { data: newOffice, error } = await supabase
           .from('patient_sources')
-          .insert({
-            name: importedOffice.name, // Always use CSV name
-            address: importedOffice.address || match.formatted_address, // CSV first, Google as fallback
-            phone: importedOffice.phone || match.formatted_phone_number, // CSV first, Google as fallback  
-            website: importedOffice.website || match.website, // CSV first, Google as fallback
-            latitude: match.geometry.location.lat, // Google Places location data
-            longitude: match.geometry.location.lng, // Google Places location data
-            google_place_id: match.place_id, // Always from Google Places
-            google_rating: match.rating, // Always from Google Places
-            last_updated_from_google: new Date().toISOString(),
-            source_type: 'Office',
-            is_active: true,
-            created_by: user.id,
-          })
+          .insert(newOfficeData)
           .select('id')
           .single();
 
-        if (error) throw error;
+        if (error) {
+          if (error.message?.includes('unique_google_place_id')) {
+            toast({
+              title: "Google Place Already Linked",
+              description: "This Google Place is already linked to another office.",
+              variant: "destructive",
+            });
+            return;
+          }
+          throw error;
+        }
         
-        // Track ALL name variations comprehensively in session
         if (newOffice) {
+          // Log the creation
+          await logGooglePlacesAction(
+            newOffice.id,
+            match.place_id,
+            'confirmed',
+            { created: true },
+            {},
+            newOfficeData
+          );
+
+          // Track all name variations in session
           const allVariations = [
             ...generateNameVariations(importedOffice.name),
             ...generateNameVariations(match.name),
-            importedOffice.name, // Always include exact original name
-            match.name // Always include exact Google name
+            importedOffice.name,
+            match.name
           ];
           
           setSessionOffices(prev => {
@@ -544,25 +799,39 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
           // Map original CSV source name to new database source ID
           setSourceMapping(prev => new Map(prev.set(importedOffice.name, newOffice.id)));
           
-          console.log(`[DEBUG] Created new office: ${importedOffice.name} -> ${newOffice.id} (${match.name})`);
+          console.log(`[DEBUG] Created new office: ${importedOffice.name} -> ${newOffice.id}`);
+          
+          toast({
+            title: "Office Created",
+            description: `${importedOffice.name} has been added with Google Places data.`,
+          });
         }
-        
-        toast({
-          title: "Office created",
-          description: `${importedOffice.name} has been added to your sources.`,
-        });
       }
 
       setConfirmedOffices(prev => new Set([...prev, officeId]));
+      
     } catch (error) {
-      console.error('Error saving office:', error);
+      console.error('Error confirming office:', error);
+      
+      // Log the error
+      await logGooglePlacesAction(
+        'error',
+        match.place_id,
+        'error',
+        null,
+        null,
+        null,
+        { error: error instanceof Error ? error.message : 'Unknown error' }
+      );
+      
       toast({
         title: "Error",
-        description: "Failed to save office. Please try again.",
+        description: "Failed to confirm office match. Please try again.",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
+      setProcessingOfficeId(null);
     }
   };
 
@@ -595,7 +864,7 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
             address: importedOffice.address || null,
             phone: importedOffice.phone || null,
             website: importedOffice.website || null,
-            source_type: 'Office',
+            source_type: 'Office' as const,
             is_active: true,
             created_by: user.id,
           })
@@ -739,79 +1008,175 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
                   <CardContent>
                     {match ? (
                       <div className="space-y-4">
-                        <div className="grid md:grid-cols-2 gap-4">
-                          <div>
-                            <h4 className="font-semibold text-foreground mb-2">Suggested Match:</h4>
-                            <div className="space-y-2">
+                        {/* Google Place ID Conflict Alert */}
+                        {placeIdConflicts.has(match.place_id) && (
+                          <Alert className="border-destructive bg-destructive/10">
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertTitle>Google Place Conflict</AlertTitle>
+                            <AlertDescription>
+                              This Google Place is already linked to "{placeIdConflicts.get(match.place_id)?.name}".
+                              You cannot link the same Google Place to multiple offices.
+                            </AlertDescription>
+                          </Alert>
+                        )}
+
+                        {/* Field-by-Field Comparison */}
+                        <div className="space-y-3">
+                          <h4 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+                            <Info className="w-4 h-4 text-blue-500" />
+                            Field Comparison - What Will Happen:
+                          </h4>
+                          
+                          <div className="grid gap-3 p-4 bg-muted/30 rounded-lg">
+                            {/* Name Field */}
+                            <div className="flex items-center justify-between p-2 bg-background rounded border">
                               <div className="flex items-center gap-2">
                                 <Building2 className="w-4 h-4 text-muted-foreground" />
-                                <span className="font-medium">{match.name}</span>
-                                {match.rating && (
-                                  <Badge variant="secondary">
-                                    ⭐ {match.rating} ({match.user_ratings_total})
-                                  </Badge>
+                                <span className="font-medium">Name:</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm">{office.name}</span>
+                                <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                                  <Shield className="w-3 h-3 mr-1" />
+                                  Preserved
+                                </Badge>
+                              </div>
+                            </div>
+
+                            {/* Address Field */}
+                            <div className="flex items-center justify-between p-2 bg-background rounded border">
+                              <div className="flex items-center gap-2">
+                                <MapPin className="w-4 h-4 text-muted-foreground" />
+                                <span className="font-medium">Address:</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {office.address ? (
+                                  <>
+                                    <span className="text-sm max-w-xs truncate">{office.address}</span>
+                                    <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                                      <Shield className="w-3 h-3 mr-1" />
+                                      Preserved
+                                    </Badge>
+                                  </>
+                                ) : match.formatted_address ? (
+                                  <>
+                                    <span className="text-sm max-w-xs truncate">{match.formatted_address}</span>
+                                    <Badge variant="outline" className="bg-green-50 text-green-700">
+                                      Will Fill Empty
+                                    </Badge>
+                                  </>
+                                ) : (
+                                  <span className="text-sm text-muted-foreground">No data available</span>
                                 )}
                               </div>
-                              
-                              {match.formatted_address && (
-                                <div className="flex items-start gap-2">
-                                  <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
-                                  <span className="text-sm">{match.formatted_address}</span>
-                                </div>
-                              )}
-                              
-                              {match.formatted_phone_number && (
-                                <div className="flex items-center gap-2">
-                                  <Phone className="w-4 h-4 text-muted-foreground" />
-                                  <span className="text-sm">{match.formatted_phone_number}</span>
-                                </div>
-                              )}
-                              
-                              {match.website && (
-                                <div className="flex items-center gap-2">
-                                  <Globe className="w-4 h-4 text-muted-foreground" />
-                                  <a 
-                                    href={match.website} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="text-sm text-primary hover:underline"
-                                  >
-                                    {match.website}
-                                  </a>
-                                </div>
-                              )}
                             </div>
-                          </div>
-                          
-                          <div>
-                            <h4 className="font-semibold text-foreground mb-2">Original Data:</h4>
-                            <div className="space-y-2 text-sm text-muted-foreground">
-                              <div>Name: {office.name}</div>
-                              {office.address && <div>Address: {office.address}</div>}
-                              {office.phone && <div>Phone: {office.phone}</div>}
-                              {office.website && <div>Website: {office.website}</div>}
+
+                            {/* Phone Field */}
+                            <div className="flex items-center justify-between p-2 bg-background rounded border">
+                              <div className="flex items-center gap-2">
+                                <Phone className="w-4 h-4 text-muted-foreground" />
+                                <span className="font-medium">Phone:</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {office.phone ? (
+                                  <>
+                                    <span className="text-sm">{office.phone}</span>
+                                    <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                                      <Shield className="w-3 h-3 mr-1" />
+                                      Preserved
+                                    </Badge>
+                                  </>
+                                ) : match.formatted_phone_number ? (
+                                  <>
+                                    <span className="text-sm">{match.formatted_phone_number}</span>
+                                    <Badge variant="outline" className="bg-green-50 text-green-700">
+                                      Will Fill Empty
+                                    </Badge>
+                                  </>
+                                ) : (
+                                  <span className="text-sm text-muted-foreground">No data available</span>
+                                )}
+                              </div>
                             </div>
+
+                            {/* Website Field */}
+                            <div className="flex items-center justify-between p-2 bg-background rounded border">
+                              <div className="flex items-center gap-2">
+                                <Globe className="w-4 h-4 text-muted-foreground" />
+                                <span className="font-medium">Website:</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {office.website ? (
+                                  <>
+                                    <span className="text-sm max-w-xs truncate">{office.website}</span>
+                                    <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                                      <Shield className="w-3 h-3 mr-1" />
+                                      Preserved
+                                    </Badge>
+                                  </>
+                                ) : match.website ? (
+                                  <>
+                                    <span className="text-sm max-w-xs truncate">{match.website}</span>
+                                    <Badge variant="outline" className="bg-green-50 text-green-700">
+                                      Will Fill Empty
+                                    </Badge>
+                                  </>
+                                ) : (
+                                  <span className="text-sm text-muted-foreground">No data available</span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Google Rating */}
+                            {match.rating && (
+                              <div className="flex items-center justify-between p-2 bg-background rounded border">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-yellow-500">⭐</span>
+                                  <span className="font-medium">Rating:</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm">{match.rating} ({match.user_ratings_total} reviews)</span>
+                                  <Badge variant="outline" className="bg-green-50 text-green-700">
+                                    Will Add
+                                  </Badge>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
-                        
+
+                        {/* Action Buttons */}
                         <div className="flex gap-2 pt-4 border-t">
                           <Button 
                             onClick={() => handleConfirm(office.id)}
                             className="flex items-center gap-2"
-                            disabled={loading}
+                            disabled={loading || processingOfficeId === office.id || placeIdConflicts.has(match.place_id)}
                           >
-                            <Check className="w-4 h-4" />
-                            Confirm Match
+                            {processingOfficeId === office.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Check className="w-4 h-4" />
+                            )}
+                            {placeIdConflicts.has(match.place_id) ? 'Resolve Conflict First' : 'Confirm Match'}
                           </Button>
                           <Button 
                             variant="outline"
                             onClick={() => handleSkip(office.id)}
                             className="flex items-center gap-2"
+                            disabled={loading || processingOfficeId === office.id}
                           >
                             <X className="w-4 h-4" />
-                            Skip
+                            Skip Google Places
                           </Button>
                         </div>
+
+                        {/* Processing Indicator */}
+                        {processingOfficeId === office.id && (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 p-3 rounded">
+                            <Clock className="w-4 h-4" />
+                            <span>Processing office data...</span>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="space-y-4">
