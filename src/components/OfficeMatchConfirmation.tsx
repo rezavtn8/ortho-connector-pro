@@ -58,7 +58,8 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
     const titles = [
       'dr\\.?\\s+', 'doctor\\s+', 'dds\\s*', 'dmd\\s*', 'md\\s*', 'phd\\s*',
       'dentist\\s*', 'dental\\s*', 'orthodontist\\s*', 'oral surgeon\\s*',
-      'periodontist\\s*', 'endodontist\\s*', 'prosthodontist\\s*'
+      'periodontist\\s*', 'endodontist\\s*', 'prosthodontist\\s*',
+      'pc\\s*$', 'pllc\\s*$', 'llc\\s*$', 'inc\\s*$', 'corp\\s*$'
     ];
     titles.forEach(title => {
       normalized = normalized.replace(new RegExp(title, 'gi'), '');
@@ -69,14 +70,17 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
       .replace(/:\s*[^,]+$/i, '') // Remove ": Location" at end
       .replace(/-\s*[^,]+$/i, '') // Remove "- Location" at end  
       .replace(/\s*\([^)]*\)\s*/g, '') // Remove parenthetical content
-      .replace(/\s*\[[^\]]*\]\s*/g, ''); // Remove bracketed content
+      .replace(/\s*\[[^\]]*\]\s*/g, '') // Remove bracketed content
+      .replace(/,.*$/i, ''); // Remove everything after first comma (addresses)
     
     // Normalize business entity variations
     const businessTerms = [
       ['group', ''], ['center', ''], ['centre', ''], ['clinic', ''], 
       ['office', ''], ['practice', ''], ['associates', ''], ['assoc', ''],
       ['dental care', ''], ['oral care', ''], ['family', ''], ['general', ''],
-      ['cosmetic', ''], ['restorative', ''], ['implant', ''], ['surgery', '']
+      ['cosmetic', ''], ['restorative', ''], ['implant', ''], ['surgery', ''],
+      ['medical', ''], ['health', ''], ['wellness', ''], ['care', ''],
+      ['& associates', ''], ['and associates', ''], ['pa$', ''], ['p\\.a\\.$', '']
     ];
     businessTerms.forEach(([term, replacement]) => {
       normalized = normalized.replace(new RegExp(`\\b${term}\\b`, 'gi'), replacement);
@@ -87,6 +91,33 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
       .replace(/[^\w\s]/g, '') // Remove punctuation
       .replace(/\s+/g, ' ') // Normalize spaces
       .trim();
+  };
+
+  // Generate name variations for better matching
+  const generateNameVariations = (name: string): string[] => {
+    const variations = new Set<string>();
+    const normalized = normalizeOfficeName(name);
+    variations.add(normalized);
+    variations.add(name.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim());
+    
+    // Add variations without common words
+    const words = normalized.split(' ').filter(w => w.length > 2);
+    if (words.length > 1) {
+      variations.add(words.join(' '));
+      // Try first two significant words
+      if (words.length >= 2) {
+        variations.add(words.slice(0, 2).join(' '));
+      }
+    }
+    
+    return Array.from(variations).filter(v => v.length > 2);
+  };
+
+  // Enhanced phone number normalization
+  const normalizePhoneNumber = (phone: string): string => {
+    const cleaned = phone.replace(/\D/g, '');
+    // Return last 10 digits for US numbers, or full cleaned number
+    return cleaned.length >= 10 ? cleaned.slice(-10) : cleaned;
   };
 
   // Fuzzy string matching for similar names (simple Levenshtein distance)
@@ -120,7 +151,7 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
     return matrix[str2.length][str1.length];
   };
 
-  // Enhanced duplicate detection with fuzzy matching and merge-oriented approach
+  // Enhanced duplicate detection with comprehensive matching and merge-oriented approach
   const findExistingOffice = async (
     officeName: string, 
     googleName?: string, 
@@ -132,17 +163,19 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
 
-      // Strategy 1: Check session offices first (exact matches)
-      const normalizedOffice = normalizeOfficeName(officeName);
-      const normalizedGoogle = googleName ? normalizeOfficeName(googleName) : null;
-      
-      if (sessionOffices.has(normalizedOffice)) {
-        const id = sessionOffices.get(normalizedOffice)!;
-        return { id, name: officeName, shouldMerge: false };
-      }
-      if (normalizedGoogle && sessionOffices.has(normalizedGoogle)) {
-        const id = sessionOffices.get(normalizedGoogle)!;
-        return { id, name: googleName!, shouldMerge: false };
+      console.log(`[DEBUG] Finding existing office for: "${officeName}", Google: "${googleName}"`);
+
+      // Strategy 1: Check session offices first with all variations
+      const officeVariations = generateNameVariations(officeName);
+      const googleVariations = googleName ? generateNameVariations(googleName) : [];
+      const allVariations = [...officeVariations, ...googleVariations];
+
+      for (const variation of allVariations) {
+        if (sessionOffices.has(variation)) {
+          const id = sessionOffices.get(variation)!;
+          console.log(`[DEBUG] Found in session: "${variation}" -> ${id}`);
+          return { id, name: officeName, shouldMerge: false };
+        }
       }
 
       // Strategy 2: Google Place ID matching (highest priority)
@@ -156,6 +189,7 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
           .maybeSingle();
 
         if (placeIdMatch) {
+          console.log(`[DEBUG] Found by Place ID: ${placeIdMatch.name} (${placeIdMatch.id})`);
           return { id: placeIdMatch.id, name: placeIdMatch.name, shouldMerge: true };
         }
       }
@@ -176,6 +210,7 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
           .maybeSingle();
 
         if (exactMatch) {
+          console.log(`[DEBUG] Exact name match: ${exactMatch.name} (${exactMatch.id})`);
           return { id: exactMatch.id, name: exactMatch.name, shouldMerge: true };
         }
       }
@@ -189,38 +224,38 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
 
       if (!allOffices || allOffices.length === 0) return null;
 
-      // Strategy 5: Fuzzy normalized name matching (80%+ similarity)
-      const namesToTest = [normalizedOffice];
-      if (normalizedGoogle && normalizedGoogle !== normalizedOffice) {
-        namesToTest.push(normalizedGoogle);
-      }
-
+      // Strategy 5: Enhanced name variation matching
       for (const office of allOffices) {
-        const existingNormalized = normalizeOfficeName(office.name);
+        const existingVariations = generateNameVariations(office.name);
         
-        for (const testName of namesToTest) {
-          // Exact normalized match
-          if (existingNormalized === testName) {
-            return { id: office.id, name: office.name, shouldMerge: true };
-          }
-          
-          // Fuzzy match (80%+ similarity)
-          const similarity = calculateSimilarity(existingNormalized, testName);
-          if (similarity >= 0.8) {
-            return { id: office.id, name: office.name, shouldMerge: true };
+        // Check all variations against all variations
+        for (const testVariation of allVariations) {
+          for (const existingVariation of existingVariations) {
+            // Exact normalized match
+            if (existingVariation === testVariation) {
+              console.log(`[DEBUG] Variation match: "${testVariation}" -> ${office.name} (${office.id})`);
+              return { id: office.id, name: office.name, shouldMerge: true };
+            }
+            
+            // Fuzzy match (85%+ similarity for more precision)
+            const similarity = calculateSimilarity(existingVariation, testVariation);
+            if (similarity >= 0.85) {
+              console.log(`[DEBUG] Fuzzy match: "${testVariation}" ~= "${existingVariation}" (${similarity.toFixed(2)}) -> ${office.name} (${office.id})`);
+              return { id: office.id, name: office.name, shouldMerge: true };
+            }
           }
         }
       }
 
-      // Strategy 6: Phone number matching (if available)
+      // Strategy 6: Enhanced phone number matching
       if (phone) {
-        const cleanPhone = phone.replace(/\D/g, '');
+        const cleanPhone = normalizePhoneNumber(phone);
         if (cleanPhone.length >= 10) {
           for (const office of allOffices) {
             if (office.phone) {
-              const existingCleanPhone = office.phone.replace(/\D/g, '');
-              if (existingCleanPhone.length >= 10 && 
-                  cleanPhone.slice(-10) === existingCleanPhone.slice(-10)) {
+              const existingCleanPhone = normalizePhoneNumber(office.phone);
+              if (existingCleanPhone.length >= 10 && cleanPhone === existingCleanPhone) {
+                console.log(`[DEBUG] Phone match: ${cleanPhone} -> ${office.name} (${office.id})`);
                 return { id: office.id, name: office.name, shouldMerge: true };
               }
             }
@@ -228,20 +263,22 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
         }
       }
 
-      // Strategy 7: Address similarity matching (if available)
+      // Strategy 7: Enhanced address similarity matching
       if (address && address.length > 10) {
-        const normalizedAddress = address.toLowerCase().replace(/[^\w\s]/g, '').trim();
+        const normalizedAddress = address.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
         for (const office of allOffices) {
           if (office.address && office.address.length > 10) {
-            const existingNormalizedAddress = office.address.toLowerCase().replace(/[^\w\s]/g, '').trim();
+            const existingNormalizedAddress = office.address.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
             const addressSimilarity = calculateSimilarity(normalizedAddress, existingNormalizedAddress);
             if (addressSimilarity >= 0.85) {
+              console.log(`[DEBUG] Address match: "${addressSimilarity.toFixed(2)}" -> ${office.name} (${office.id})`);
               return { id: office.id, name: office.name, shouldMerge: true };
             }
           }
         }
       }
 
+      console.log(`[DEBUG] No match found for "${officeName}"`);
       return null;
     } catch (error) {
       console.error('Error finding existing office:', error);
@@ -426,21 +463,30 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
 
         if (error) throw error;
         
-        // Track in session with multiple name variations
-        const normalizedOriginal = normalizeOfficeName(importedOffice.name);
-        const normalizedGoogle = normalizeOfficeName(match.name);
-        const normalizedFinal = normalizeOfficeName(updateData.name);
+        // Track ALL name variations comprehensively in session
+        const allVariations = [
+          ...generateNameVariations(importedOffice.name),
+          ...generateNameVariations(match.name),
+          ...generateNameVariations(updateData.name),
+          importedOffice.name, // Always include exact original name
+          match.name, // Always include exact Google name
+          updateData.name // Always include exact final name
+        ];
         
         setSessionOffices(prev => {
           const updated = new Map(prev);
-          updated.set(normalizedOriginal, existingOffice.id);
-          updated.set(normalizedGoogle, existingOffice.id);
-          updated.set(normalizedFinal, existingOffice.id);
+          allVariations.forEach(variation => {
+            if (variation && variation.trim()) {
+              updated.set(variation.toLowerCase().trim(), existingOffice.id);
+            }
+          });
           return updated;
         });
 
         // Map original CSV source name to existing database source ID
         setSourceMapping(prev => new Map(prev.set(importedOffice.name, existingOffice.id)));
+        
+        console.log(`[DEBUG] Merged office: ${importedOffice.name} -> ${existingOffice.id} (${updateData.name})`);
         
         toast({
           title: "Office merged",
@@ -469,19 +515,29 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
 
         if (error) throw error;
         
-        // Track in session using multiple name variations
+        // Track ALL name variations comprehensively in session
         if (newOffice) {
-          const normalizedOriginal = normalizeOfficeName(importedOffice.name);
-          const normalizedGoogle = normalizeOfficeName(match.name);
+          const allVariations = [
+            ...generateNameVariations(importedOffice.name),
+            ...generateNameVariations(match.name),
+            importedOffice.name, // Always include exact original name
+            match.name // Always include exact Google name
+          ];
+          
           setSessionOffices(prev => {
             const updated = new Map(prev);
-            updated.set(normalizedOriginal, newOffice.id);
-            updated.set(normalizedGoogle, newOffice.id);
+            allVariations.forEach(variation => {
+              if (variation && variation.trim()) {
+                updated.set(variation.toLowerCase().trim(), newOffice.id);
+              }
+            });
             return updated;
           });
 
           // Map original CSV source name to new database source ID
           setSourceMapping(prev => new Map(prev.set(importedOffice.name, newOffice.id)));
+          
+          console.log(`[DEBUG] Created new office: ${importedOffice.name} -> ${newOffice.id} (${match.name})`);
         }
         
         toast({
@@ -541,13 +597,27 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
 
         if (error) throw error;
         
-        // Track in session
+        // Track ALL name variations in session
         if (newOffice) {
-          const normalizedName = normalizeOfficeName(importedOffice.name);
-          setSessionOffices(prev => new Map(prev.set(normalizedName, newOffice.id)));
+          const allVariations = [
+            ...generateNameVariations(importedOffice.name),
+            importedOffice.name // Always include exact original name
+          ];
+          
+          setSessionOffices(prev => {
+            const updated = new Map(prev);
+            allVariations.forEach(variation => {
+              if (variation && variation.trim()) {
+                updated.set(variation.toLowerCase().trim(), newOffice.id);
+              }
+            });
+            return updated;
+          });
           
           // Map original CSV source name to new database source ID
           setSourceMapping(prev => new Map(prev.set(importedOffice.name, newOffice.id)));
+          
+          console.log(`[DEBUG] Created new office from skip: ${importedOffice.name} -> ${newOffice.id}`);
         }
         
         toast({

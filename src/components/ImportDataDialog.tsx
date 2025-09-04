@@ -61,6 +61,37 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
   const [sourceMapping, setSourceMapping] = useState<Map<string, string>>(new Map()); // originalSourceName -> databaseSourceId
   const { toast } = useToast();
 
+  // Helper function for similarity calculation (same as in OfficeMatchConfirmation)
+  const calculateSimilarity = (str1: string, str2: string): number => {
+    const longer = str1.length > str2.length ? str1 : str2;
+    const shorter = str1.length > str2.length ? str2 : str1;
+    
+    if (longer.length === 0) return 1.0;
+    
+    const distance = levenshteinDistance(longer, shorter);
+    return (longer.length - distance) / longer.length;
+  };
+
+  const levenshteinDistance = (str1: string, str2: string): number => {
+    const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
+    
+    for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
+    for (let j = 0; j <= str2.length; j++) matrix[j][0] = j;
+    
+    for (let j = 1; j <= str2.length; j++) {
+      for (let i = 1; i <= str1.length; i++) {
+        const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+        matrix[j][i] = Math.min(
+          matrix[j][i - 1] + 1,
+          matrix[j - 1][i] + 1,
+          matrix[j - 1][i - 1] + cost
+        );
+      }
+    }
+    
+    return matrix[str2.length][str1.length];
+  };
+
   // Auto-detect source type based on name
   const detectSourceType = (sourceName: string): SourceType => {
     const name = sourceName.toLowerCase();
@@ -244,16 +275,37 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
             // Use the mapped source ID from office matching process
             sourceId = mappedSourceId;
             sourcesUpdated++; // Count as updated since it was handled in matching
+            console.log(`[DEBUG] Using mapped source: ${row.source} -> ${mappedSourceId}`);
           } else {
-            // Check if source exists in database
-            const { data: existingSource, error: searchError } = await supabase
+            // Enhanced duplicate detection before creating new source
+            const { data: existingSources, error: searchError } = await supabase
               .from('patient_sources')
-              .select('id')
-              .eq('name', row.source)
-              .maybeSingle();
+              .select('id, name')
+              .eq('created_by', userId)
+              .eq('source_type', detectSourceType(row.source));
             
             if (searchError && searchError.code !== 'PGRST116') {
               throw searchError;
+            }
+            
+            // Check for exact name match first
+            let existingSource = existingSources?.find(s => s.name === row.source);
+            
+            // If no exact match and it's an office, try fuzzy matching
+            if (!existingSource && detectSourceType(row.source) === 'Office' && existingSources) {
+              const normalizedRowName = row.source.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
+              
+              for (const source of existingSources) {
+                const normalizedSourceName = source.name.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
+                
+                // Simple similarity check for office names
+                const similarity = calculateSimilarity(normalizedRowName, normalizedSourceName);
+                if (similarity >= 0.85) {
+                  existingSource = source;
+                  console.log(`[DEBUG] Found similar existing source: "${row.source}" ~= "${source.name}" (${similarity.toFixed(2)})`);
+                  break;
+                }
+              }
             }
             
             if (!existingSource) {
@@ -280,9 +332,11 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
               
               sourceId = newSource.id;
               sourcesCreated++;
+              console.log(`[DEBUG] Created new source: ${row.source} -> ${sourceId}`);
             } else {
               sourceId = existingSource.id;
               sourcesUpdated++;
+              console.log(`[DEBUG] Using existing source: ${row.source} -> ${sourceId}`);
             }
           }
           
