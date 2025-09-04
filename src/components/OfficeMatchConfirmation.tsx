@@ -500,11 +500,11 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
           description: `${updateData.name} has been updated with Google Places data.`,
         });
       } else {
-        // Create new office with Google Places data
+        // Create new office preserving original name, filling in Google Places data for empty fields
         const { data: newOffice, error } = await supabase
           .from('patient_sources')
           .insert({
-            name: match.name,
+            name: importedOffice.name, // Preserve original CSV name
             address: match.formatted_address,
             phone: match.formatted_phone_number,
             website: match.website,
@@ -549,7 +549,7 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
         
         toast({
           title: "Office created",
-          description: `${match.name} has been added to your sources.`,
+          description: `${importedOffice.name} has been added to your sources.`,
         });
       }
 
