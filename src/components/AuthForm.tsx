@@ -155,16 +155,16 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-subtle flex items-center justify-center p-4 sm:p-6 lg:p-8">
-      <Card variant="medical" className="w-full max-w-md mx-auto">
-        <CardHeader className="text-center px-6 pt-8 pb-6 sm:px-8">
-          <div className="mx-auto w-12 h-12 sm:w-16 sm:h-16 bg-gradient-primary rounded-full flex items-center justify-center mb-4 sm:mb-6">
+    <div className="min-h-screen bg-gradient-subtle flex items-center justify-center p-3 sm:p-6 lg:p-8">
+      <Card variant="medical" className="w-full max-w-sm sm:max-w-md mx-auto shadow-lg">
+        <CardHeader className="text-center px-4 pt-6 pb-4 sm:px-8 sm:pt-8 sm:pb-6">
+          <div className="mx-auto w-12 h-12 sm:w-16 sm:h-16 bg-gradient-primary rounded-full flex items-center justify-center mb-3 sm:mb-6">
             <Building2 className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
           </div>
-          <CardTitle className="text-xl sm:text-2xl font-semibold mb-2">
+          <CardTitle className="text-lg sm:text-2xl font-semibold mb-2">
             {isSignUp ? 'Create Account' : 'Welcome Back'}
           </CardTitle>
-          <CardDescription className="text-sm sm:text-base px-2">
+          <CardDescription className="text-sm sm:text-base px-1 sm:px-2">
             {isSignUp 
               ? 'Create your account for Referring Office Intelligence' 
               : 'Sign in to your Referring Office Intelligence account'
@@ -172,8 +172,8 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
           </CardDescription>
         </CardHeader>
 
-        <CardContent className="px-6 pb-8 sm:px-8">
-          <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
+        <CardContent className="px-4 pb-6 sm:px-8 sm:pb-8">
+          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
             {isSignUp && (
               <>
                 <div className="space-y-2">
@@ -186,7 +186,7 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
                     onChange={(e) => setFirstName(e.target.value)}
                     required
                     autoComplete="given-name"
-                    className="h-11 sm:h-10 text-base sm:text-sm"
+                    className="h-12 sm:h-10 text-base sm:text-sm"
                   />
                 </div>
 
@@ -200,7 +200,7 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
                     onChange={(e) => setLastName(e.target.value)}
                     required
                     autoComplete="family-name"
-                    className="h-11 sm:h-10 text-base sm:text-sm"
+                    className="h-12 sm:h-10 text-base sm:text-sm"
                   />
                 </div>
               </>
@@ -216,7 +216,7 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoComplete="email"
-                className="h-11 sm:h-10 text-base sm:text-sm"
+                className="h-12 sm:h-10 text-base sm:text-sm"
               />
             </div>
 
@@ -231,13 +231,13 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   autoComplete={isSignUp ? 'new-password' : 'current-password'}
-                  className="h-11 sm:h-10 text-base sm:text-sm pr-12"
+                  className="h-12 sm:h-10 text-base sm:text-sm pr-12"
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 hover:bg-muted/50"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 h-8 w-8 p-0 hover:bg-muted/50"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -248,7 +248,7 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
             <Button 
               type="submit" 
               variant="medical" 
-              className="w-full h-11 sm:h-10 text-base sm:text-sm font-medium mt-6" 
+              className="w-full h-12 sm:h-10 text-base sm:text-sm font-medium mt-6" 
               disabled={loading}
             >
               {loading ? 'Loading...' : (isSignUp ? 'Create Account' : 'Sign In')}
@@ -259,7 +259,7 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
                 type="button"
                 variant="link"
                 onClick={() => setIsSignUp(!isSignUp)}
-                className="text-sm text-muted-foreground hover:text-foreground h-auto p-0"
+                className="text-sm text-muted-foreground hover:text-foreground h-auto p-0 min-h-[44px] flex items-center"
               >
                 {isSignUp 
                   ? 'Already have an account? Sign in' 
