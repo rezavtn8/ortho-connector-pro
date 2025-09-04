@@ -158,7 +158,7 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
     phone?: string, 
     address?: string,
     googlePlaceId?: string
-  ): Promise<{ id: string; name: string; shouldMerge: boolean } | null> => {
+  ): Promise<any | null> => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
@@ -174,7 +174,14 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
         if (sessionOffices.has(variation)) {
           const id = sessionOffices.get(variation)!;
           console.log(`[DEBUG] Found in session: "${variation}" -> ${id}`);
-          return { id, name: officeName, shouldMerge: false };
+          // Get full office data for session match
+          const { data: sessionOffice } = await supabase
+            .from('patient_sources')
+            .select('*')
+            .eq('id', id)
+            .eq('created_by', user.id)
+            .maybeSingle();
+          return sessionOffice;
         }
       }
 
@@ -182,7 +189,7 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
       if (googlePlaceId) {
         const { data: placeIdMatch } = await supabase
           .from('patient_sources')
-          .select('id, name')
+          .select('*')
           .eq('google_place_id', googlePlaceId)
           .eq('created_by', user.id)
           .eq('source_type', 'Office')
@@ -190,7 +197,7 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
 
         if (placeIdMatch) {
           console.log(`[DEBUG] Found by Place ID: ${placeIdMatch.name} (${placeIdMatch.id})`);
-          return { id: placeIdMatch.id, name: placeIdMatch.name, shouldMerge: true };
+          return placeIdMatch;
         }
       }
 
@@ -203,7 +210,7 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
       for (const name of namesToCheck) {
         const { data: exactMatch } = await supabase
           .from('patient_sources')
-          .select('id, name')
+          .select('*')
           .eq('name', name)
           .eq('created_by', user.id)
           .eq('source_type', 'Office')
@@ -211,14 +218,14 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
 
         if (exactMatch) {
           console.log(`[DEBUG] Exact name match: ${exactMatch.name} (${exactMatch.id})`);
-          return { id: exactMatch.id, name: exactMatch.name, shouldMerge: true };
+          return exactMatch;
         }
       }
 
       // Strategy 4: Get all offices for advanced matching
       const { data: allOffices } = await supabase
         .from('patient_sources')
-        .select('id, name, phone, address, google_place_id')
+        .select('*')
         .eq('created_by', user.id)
         .eq('source_type', 'Office');
 
@@ -234,14 +241,14 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
             // Exact normalized match
             if (existingVariation === testVariation) {
               console.log(`[DEBUG] Variation match: "${testVariation}" -> ${office.name} (${office.id})`);
-              return { id: office.id, name: office.name, shouldMerge: true };
+              return office;
             }
             
             // Fuzzy match (85%+ similarity for more precision)
             const similarity = calculateSimilarity(existingVariation, testVariation);
             if (similarity >= 0.85) {
               console.log(`[DEBUG] Fuzzy match: "${testVariation}" ~= "${existingVariation}" (${similarity.toFixed(2)}) -> ${office.name} (${office.id})`);
-              return { id: office.id, name: office.name, shouldMerge: true };
+              return office;
             }
           }
         }
@@ -256,7 +263,7 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
               const existingCleanPhone = normalizePhoneNumber(office.phone);
               if (existingCleanPhone.length >= 10 && cleanPhone === existingCleanPhone) {
                 console.log(`[DEBUG] Phone match: ${cleanPhone} -> ${office.name} (${office.id})`);
-                return { id: office.id, name: office.name, shouldMerge: true };
+                return office;
               }
             }
           }
@@ -272,7 +279,7 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
             const addressSimilarity = calculateSimilarity(normalizedAddress, existingNormalizedAddress);
             if (addressSimilarity >= 0.85) {
               console.log(`[DEBUG] Address match: "${addressSimilarity.toFixed(2)}" -> ${office.name} (${office.id})`);
-              return { id: office.id, name: office.name, shouldMerge: true };
+              return office;
             }
           }
         }
@@ -440,18 +447,18 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
       );
 
       if (existingOffice) {
-        // Update existing office with Google Places data ONLY - preserve original name and all patient data
+        // Only fill in empty fields from Google Places data - preserve all existing data
         const updateData: any = {
-          // ALWAYS preserve the original name from CSV import
-          name: importedOffice.name,
-          // Only update location and contact data from Google Places
-          address: match.formatted_address,
-          phone: match.formatted_phone_number,
-          website: match.website,
-          latitude: match.geometry.location.lat,
-          longitude: match.geometry.location.lng,
-          google_place_id: match.place_id,
-          google_rating: match.rating,
+          // Keep existing name always
+          name: existingOffice.name,
+          // Only fill in empty fields from Google Places
+          address: existingOffice.address || match.formatted_address,
+          phone: existingOffice.phone || match.formatted_phone_number,
+          website: existingOffice.website || match.website,
+          latitude: existingOffice.latitude || match.geometry.location.lat,
+          longitude: existingOffice.longitude || match.geometry.location.lng,
+          google_place_id: existingOffice.google_place_id || match.place_id,
+          google_rating: existingOffice.google_rating || match.rating,
           last_updated_from_google: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
