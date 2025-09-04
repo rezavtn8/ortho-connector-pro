@@ -189,64 +189,43 @@ export function PatientCountEditor({ sourceId, currentCount, onUpdate }: Patient
   }
 
   return (
-    <div 
-      className="relative inline-flex items-center gap-1 group cursor-pointer"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      onClick={() => setIsEditing(true)}
-    >
-      <div className="relative">
-        <span className="font-semibold text-sm group-hover:text-primary transition-colors">
+    <div className="flex items-center gap-1 animate-fade-in">
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={handleDecrement}
+        disabled={isLoading}
+        className="h-6 w-6 p-0 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors"
+        title="Decrease by 1"
+      >
+        <Minus className="w-3 h-3" />
+      </Button>
+      
+      <div 
+        className="relative min-w-[2rem] text-center cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5 transition-colors"
+        onClick={() => setIsEditing(true)}
+        title="Click to edit directly"
+      >
+        <span className="font-semibold text-sm hover:text-primary transition-colors">
           {currentCount}
         </span>
-        
-        {/* Hover overlay with quick actions */}
-        {isHovered && (
-          <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 flex items-center gap-0.5 bg-popover border rounded-md shadow-md p-0.5 animate-fade-in z-10">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDecrement();
-              }}
-              className="h-5 w-5 p-0 hover:bg-red-50 hover:text-red-600"
-              title="Decrease by 1"
-            >
-              <Minus className="w-2.5 h-2.5" />
-            </Button>
-            
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsEditing(true);
-              }}
-              className="h-5 w-5 p-0 hover:bg-blue-50 hover:text-blue-600"
-              title="Edit directly"
-            >
-              <Edit3 className="w-2.5 h-2.5" />
-            </Button>
-            
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleIncrement();
-              }}
-              className="h-5 w-5 p-0 hover:bg-green-50 hover:text-green-600"
-              title="Increase by 1"
-            >
-              <Plus className="w-2.5 h-2.5" />
-            </Button>
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded">
+            <Loader2 className="w-3 h-3 animate-spin" />
           </div>
         )}
       </div>
-      
-      {/* Edit hint */}
-      <Edit3 className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={handleIncrement}
+        disabled={isLoading}
+        className="h-6 w-6 p-0 hover:bg-green-50 hover:border-green-200 hover:text-green-600 transition-colors"
+        title="Increase by 1"
+      >
+        <Plus className="w-3 h-3" />
+      </Button>
     </div>
   );
 }
