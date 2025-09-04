@@ -56,28 +56,28 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
         </nav>
       </header>
 
-      <div className={`flex ${showAuth ? 'min-h-[calc(100vh-100px)] items-center' : ''} ${showAuth ? 'flex-col lg:flex-row' : ''}`}>
+      <div className={`flex ${showAuth ? 'min-h-[calc(100vh-100px)] items-center' : ''}`}>
         {/* Main Content */}
-        <div className={`${showAuth ? 'w-full lg:w-1/2 px-6' : 'w-full'} relative z-20`}>
+        <div className={`${showAuth ? 'w-1/2 px-6' : 'w-full'} relative z-20`}>
           {/* Hero Section */}
-          <section className={`${showAuth ? 'px-0 pt-8 pb-12 lg:pt-20 lg:pb-24' : 'px-6 pt-20 pb-24'}`}>
+          <section className={`${showAuth ? 'px-0' : 'px-6'} pt-20 pb-24`}>
             <div className="max-w-4xl mx-auto text-center">
-              <div className="flex justify-center mb-6 lg:mb-8">
-                <AnimatedNexoraLogo size={showAuth ? 80 : 120} className="text-connection-primary hover-scale" animate={true} />
+              <div className="flex justify-center mb-8">
+                <AnimatedNexoraLogo size={120} className="text-connection-primary hover-scale" animate={true} />
               </div>
-              <h1 className={`${showAuth ? 'text-3xl lg:text-4xl' : 'text-5xl md:text-6xl'} font-bold text-connection-text mb-4 lg:mb-6 leading-tight`}>
+              <h1 className="text-5xl md:text-6xl font-bold text-connection-text mb-6 leading-tight">
                 <span className="block animate-fade-in hover-scale" style={{ animationDelay: '0.5s', animationFillMode: 'both' }}>
                   Grow Your Practice.
                 </span>
                 <span className="block text-connection-primary font-light animate-fade-in" style={{ animationDelay: '0.8s', animationFillMode: 'both' }}>
                   Nurture Your Network.
                 </span>
-                <span className={`block ${showAuth ? 'text-lg lg:text-xl' : 'text-2xl'} font-bold text-connection-text animate-fade-in`} style={{ animationDelay: '1.1s', animationFillMode: 'both' }}>
+                <span className="block text-2xl font-bold text-connection-text animate-fade-in" style={{ animationDelay: '1.1s', animationFillMode: 'both' }}>
                   with Nexora Dental
                 </span>
               </h1>
               
-              <p className={`${showAuth ? 'text-base lg:text-lg' : 'text-lg md:text-xl'} text-connection-muted mb-8 lg:mb-12 max-w-3xl mx-auto leading-relaxed animate-fade-in`} style={{ animationDelay: '1.1s', animationFillMode: 'both' }}>
+              <p className="text-lg md:text-xl text-connection-muted mb-12 max-w-3xl mx-auto leading-relaxed animate-fade-in" style={{ animationDelay: '1.1s', animationFillMode: 'both' }}>
                 Track referrals, measure patient sources, and grow your dental practice with intelligent network insights that drive organic growth.
               </p>
               
@@ -293,14 +293,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
 
         {/* Auth Form Side Panel */}
         {showAuth && (
-          <div className="w-full lg:w-1/2 flex items-center justify-center p-4 lg:p-6 relative">
-            <div className="w-full max-w-sm lg:max-w-md bg-white/95 backdrop-blur-lg rounded-2xl p-6 lg:p-8 shadow-xl border border-connection-primary/20 relative z-10">
-              <div className="text-center mb-6 lg:mb-8">
+          <div className="w-1/2 flex items-center justify-center p-6 relative">
+            <div className="w-full max-w-md bg-white/90 backdrop-blur-lg rounded-2xl p-8 shadow-xl border border-connection-primary/20 relative z-10">
+              <div className="text-center mb-8">
                 <div className="flex items-center justify-center space-x-3 mb-4">
                   <NexoraLogo size={24} className="text-connection-primary" />
-                  <span className="text-lg lg:text-xl font-semibold text-connection-text">Welcome Back</span>
+                  <span className="text-xl font-semibold text-connection-text">Welcome Back</span>
                 </div>
-                <p className="text-sm lg:text-base text-connection-muted">Access your practice growth dashboard</p>
+                <p className="text-connection-muted">Access your practice growth dashboard</p>
               </div>
               <AuthForm embedded />
             </div>
