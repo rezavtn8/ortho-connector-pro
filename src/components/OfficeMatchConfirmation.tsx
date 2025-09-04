@@ -440,11 +440,11 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
       );
 
       if (existingOffice) {
-        // Merge with existing office - choose the best data from both sources
+        // Update existing office with Google Places data ONLY - preserve original name and all patient data
         const updateData: any = {
-          // Use Google Places name if it's more complete, otherwise keep existing
-          name: match.name.length > existingOffice.name.length ? match.name : existingOffice.name,
-          // Always update with Google Places data when available
+          // ALWAYS preserve the original name from CSV import
+          name: importedOffice.name,
+          // Only update location and contact data from Google Places
           address: match.formatted_address,
           phone: match.formatted_phone_number,
           website: match.website,
