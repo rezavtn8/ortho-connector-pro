@@ -24,6 +24,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { PatientCountEditor } from '@/components/PatientCountEditor';
 
 export function Sources() {
   const navigate = useNavigate();
@@ -416,9 +417,13 @@ export function Sources() {
                         </Button>
                       </div>
                     </TableCell>
-                    <TableCell className="text-center font-semibold">
-                      {thisMonth}
-                    </TableCell>
+                     <TableCell className="text-center">
+                       <PatientCountEditor
+                         sourceId={source.id}
+                         currentCount={thisMonth}
+                         onUpdate={loadData}
+                       />
+                     </TableCell>
                     <TableCell className="text-center font-semibold">
                       {total}
                     </TableCell>
