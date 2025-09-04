@@ -66,12 +66,12 @@ export function Logs() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Fetch logs with source names
+      // Fetch logs with source names (using left join to preserve logs even if source is deleted)
       const { data: logsData, error } = await supabase
         .from('patient_changes_log')
         .select(`
           *,
-          patient_sources!inner(name)
+          patient_sources(name)
         `)
         .eq('user_id', user.id)
         .order('changed_at', { ascending: false })
@@ -81,7 +81,7 @@ export function Logs() {
 
       const processedLogs = logsData?.map(log => ({
         ...log,
-        source_name: log.patient_sources?.name || 'Unknown Source'
+        source_name: log.patient_sources?.name || '[Deleted Source]'
       })) || [];
 
       setLogs(processedLogs);
