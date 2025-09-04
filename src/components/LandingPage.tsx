@@ -56,9 +56,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
         </nav>
       </header>
 
-      <div className={`flex ${showAuth ? 'min-h-[calc(100vh-100px)] items-center' : ''}`}>
+      <div className={`flex ${showAuth ? 'min-h-[calc(100vh-100px)] items-center flex-col md:flex-row' : ''}`}>
         {/* Main Content */}
-        <div className={`${showAuth ? 'w-1/2 px-6' : 'w-full'} relative z-20`}>
+        <div className={`${showAuth ? 'hidden md:block md:w-1/2 px-6' : 'w-full'} relative z-20`}>
           {/* Hero Section */}
           <section className={`${showAuth ? 'px-0' : 'px-6'} pt-20 pb-24`}>
             <div className="max-w-4xl mx-auto text-center">
@@ -293,8 +293,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
 
         {/* Auth Form Side Panel */}
         {showAuth && (
-          <div className="w-1/2 flex items-center justify-center p-6 relative">
-            <div className="w-full max-w-md bg-white/90 backdrop-blur-lg rounded-2xl p-8 shadow-xl border border-connection-primary/20 relative z-10">
+          <div className="w-full md:w-1/2 flex items-center justify-center p-4 md:p-6 relative">
+            <div className="w-full max-w-sm md:max-w-md bg-white/90 backdrop-blur-lg rounded-2xl p-6 md:p-8 shadow-xl border border-connection-primary/20 relative z-10">
               <div className="text-center mb-8">
                 <div className="flex items-center justify-center space-x-3 mb-4">
                   <NexoraLogo size={24} className="text-connection-primary" />
