@@ -42,43 +42,19 @@ export function PatientCountEditor({ sourceId, currentCount, onUpdate }: Patient
     setIsLoading(true);
     
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
       const currentMonth = getCurrentYearMonth();
       
-      // Check if record exists for this month
-      const { data: existing } = await supabase
-        .from('monthly_patients')
-        .select('id, patient_count')
-        .eq('source_id', sourceId)
-        .eq('year_month', currentMonth)
-        .maybeSingle();
+      // Use the database function that includes logging
+      const { data, error } = await supabase.rpc('set_patient_count', {
+        p_source_id: sourceId,
+        p_year_month: currentMonth,
+        p_count: finalValue,
+        p_reason: newValue !== undefined ? 
+          (newValue > currentCount ? 'Quick increment' : 'Quick decrement') : 
+          'Manual edit'
+      });
 
-      if (existing) {
-        // Update existing record
-        const { error } = await supabase
-          .from('monthly_patients')
-          .update({ 
-            patient_count: finalValue,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existing.id);
-
-        if (error) throw error;
-      } else if (finalValue > 0) {
-        // Insert new record only if value is greater than 0
-        const { error } = await supabase
-          .from('monthly_patients')
-          .insert({
-            source_id: sourceId,
-            year_month: currentMonth,
-            patient_count: finalValue,
-            user_id: user.id
-          });
-
-        if (error) throw error;
-      }
+      if (error) throw error;
 
       toast({
         title: "Success",
