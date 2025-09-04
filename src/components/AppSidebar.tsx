@@ -74,8 +74,8 @@ export function AppSidebar({ currentPage, onPageChange }: AppSidebarProps) {
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b p-4">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
-            <NexoraLogo size={20} className="text-white" />
+          <div className="flex items-center justify-center">
+            <NexoraLogo size={24} className="text-foreground" />
           </div>
           {!isCollapsed && (
             <div className="flex flex-col">
