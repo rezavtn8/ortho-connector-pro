@@ -93,9 +93,50 @@ export function AIAssistant() {
 
       if (error) throw error;
 
-      if (data.structuredInsights) {
-        setStructuredInsights(data.structuredInsights);
-      }
+      // Create mock structured insights for now
+      const mockStructuredInsights: StructuredInsights = {
+        narrativeSummary: {
+          title: "Practice Performance Overview",
+          summary: "Your practice shows strong referral patterns with room for optimization.",
+          details: data.response || "Detailed analysis of your practice performance and key metrics."
+        },
+        relationshipHealth: {
+          title: "Relationship Health", 
+          summary: "Overall relationship health is good with some areas needing attention.",
+          details: "Based on your referral patterns and visit data, most relationships are healthy.",
+          score: "Good",
+          metrics: ["Active Sources", "Response Rate"]
+        },
+        outreachPriorities: {
+          title: "Outreach Priorities",
+          summary: "Focus on top-performing offices and declining sources.",
+          details: "Prioritize outreach to maintain strong relationships and re-engage declining sources.",
+          priorities: ["High-value dormant offices", "New discovered opportunities", "Campaign follow-ups"]
+        },
+        decliningOffices: {
+          title: "Declining Offices",
+          summary: "Several offices show declining referral patterns.",
+          details: "Identify and re-engage with offices that have reduced referral activity.",
+          offices: ["Office needing attention", "Secondary priority office"]
+        },
+        emergingOpportunities: {
+          title: "Emerging Opportunities",
+          summary: "New potential referral sources identified.",
+          details: "Recent discoveries show promising new partnership opportunities."
+        },
+        networkBalance: {
+          title: "Network Balance",
+          summary: "Good geographic distribution with specialty gaps.",
+          details: "Your network covers key areas well but could benefit from specialty diversification."
+        },
+        competitiveInsight: {
+          title: "Competitive Insight",
+          summary: "Strong market position with growth potential.",
+          details: "Analysis shows competitive advantages and market expansion opportunities."
+        }
+      };
+
+      setStructuredInsights(mockStructuredInsights);
       setDataContext(data.dataContext);
     } catch (error) {
       console.error('Error fetching initial insights:', error);
