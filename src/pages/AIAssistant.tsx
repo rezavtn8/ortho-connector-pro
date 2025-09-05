@@ -211,12 +211,72 @@ export function AIAssistant() {
 
   const formatMessage = (content: string) => {
     return content
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
       .split('\n')
-      .map((line, index) => (
-        <div key={index} className="mb-2" dangerouslySetInnerHTML={{ __html: line }} />
-      ));
+      .map((line, index) => {
+        // Handle main headers (##)
+        if (line.startsWith('## ')) {
+          return (
+            <h3 key={index} className="text-lg font-semibold text-foreground mt-6 mb-3 first:mt-0">
+              {line.replace('## ', '')}
+            </h3>
+          );
+        }
+        
+        // Handle sub headers (###)  
+        if (line.startsWith('### ')) {
+          return (
+            <h4 key={index} className="text-base font-medium text-foreground mt-4 mb-2 first:mt-0">
+              {line.replace('### ', '')}
+            </h4>
+          );
+        }
+        
+        // Handle numbered headers (1., 2., etc.)
+        if (/^\d+\.\s+/.test(line)) {
+          return (
+            <h4 key={index} className="text-base font-medium text-foreground mt-4 mb-2 first:mt-0">
+              {line}
+            </h4>
+          );
+        }
+        
+        // Handle bullet points
+        if (line.startsWith('* ')) {
+          const content = line.replace('* ', '');
+          // Handle bold text within bullet points
+          const formattedContent = content
+            .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-foreground">$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em class="italic">$1</em>');
+          
+          return (
+            <div key={index} className="flex items-start gap-2 mb-2 ml-4">
+              <span className="text-primary mt-1.5 text-xs">•</span>
+              <div 
+                className="text-sm text-muted-foreground flex-1" 
+                dangerouslySetInnerHTML={{ __html: formattedContent }} 
+              />
+            </div>
+          );
+        }
+        
+        // Handle regular lines
+        if (line.trim()) {
+          const formattedContent = line
+            .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-foreground">$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em class="italic">$1</em>');
+          
+          return (
+            <div 
+              key={index} 
+              className="text-sm text-muted-foreground mb-2" 
+              dangerouslySetInnerHTML={{ __html: formattedContent }} 
+            />
+          );
+        }
+        
+        // Empty lines for spacing
+        return <div key={index} className="h-2" />;
+      });
   };
 
   const getCardIcon = (cardType: string) => {
