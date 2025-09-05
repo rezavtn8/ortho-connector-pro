@@ -1,46 +1,44 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Bot, 
   Send, 
   Loader2, 
-  FileText, 
   Heart, 
   Target, 
   TrendingDown, 
   Lightbulb, 
   Network, 
   MapPin,
-  ChevronDown,
-  ChevronUp,
   MessageCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { AIAssistantHeader } from '@/components/AIAssistantHeader';
+import { PerformanceOverview } from '@/components/PerformanceOverview';
+import { InsightCard } from '@/components/InsightCard';
+import { ActionSummary } from '@/components/ActionSummary';
 
-interface InsightCard {
+interface InsightData {
   title: string;
   summary: string;
   details: string;
-  score?: string;
-  metrics?: string[];
-  priorities?: string[];
+  metrics?: Array<{
+    label: string;
+    value: string;
+    trend?: 'up' | 'down';
+    trendValue?: string;
+  }>;
+  progressBars?: Array<{
+    label: string;
+    value: number;
+    color?: string;
+  }>;
+  actionItems?: string[];
   offices?: string[];
-}
-
-interface StructuredInsights {
-  narrativeSummary: InsightCard;
-  relationshipHealth: InsightCard;
-  outreachPriorities: InsightCard;
-  decliningOffices: InsightCard;
-  emergingOpportunities: InsightCard;
-  networkBalance: InsightCard;
-  competitiveInsight: InsightCard;
 }
 
 interface ChatMessage {
@@ -65,7 +63,6 @@ interface DataContext {
 }
 
 export function AIAssistant() {
-  const [structuredInsights, setStructuredInsights] = useState<StructuredInsights | null>(null);
   const [dataContext, setDataContext] = useState<DataContext | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [question, setQuestion] = useState('');
@@ -73,6 +70,98 @@ export function AIAssistant() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
+
+  // Mock data for insight cards
+  const insightCardsData: Record<string, InsightData> = {
+    relationshipHealth: {
+      title: "Relationship Health",
+      summary: "Overall relationship health is strong with 45 active referral sources",
+      details: "Your referral network shows healthy engagement patterns with consistent communication and referral flow. Most relationships are performing well with regular touchpoints.",
+      metrics: [
+        { label: "Active Sources", value: "45", trend: "up", trendValue: "+3" },
+        { label: "Response Rate", value: "87%", trend: "up", trendValue: "+5%" },
+        { label: "Avg. Referrals/Month", value: "12.3", trend: "up", trendValue: "+2.1" }
+      ],
+      actionItems: [
+        "Schedule quarterly check-ins with top 10 referrers",
+        "Send thank you notes to high-performing offices",
+        "Update contact information for 3 offices"
+      ]
+    },
+    outreachPriorities: {
+      title: "Outreach Priorities",
+      summary: "3 high-value offices need immediate attention",
+      details: "Focus outreach efforts on maintaining strong relationships and re-engaging with offices showing declining referral patterns.",
+      offices: [
+        "Manhattan Dental Group - Last referral 45 days ago",
+        "Brooklyn Smiles - Referrals down 30% this quarter",
+        "Queens Family Dentistry - New contact person"
+      ],
+      actionItems: [
+        "Call Manhattan Dental Group this week",
+        "Schedule lunch meeting with Brooklyn Smiles",
+        "Send introduction email to Queens Family Dentistry"
+      ]
+    },
+    decliningOffices: {
+      title: "Declining Offices",
+      summary: "2 offices show concerning referral decline patterns",
+      details: "These offices have significantly reduced their referral activity over the past quarter and require immediate attention to understand and address potential issues.",
+      offices: [
+        "Manhattan Dental Group - 60% decline in referrals",
+        "Brooklyn Smiles - 45% decline, new competitor nearby"
+      ],
+      metrics: [
+        { label: "At Risk", value: "2", trend: "down", trendValue: "New" },
+        { label: "Avg. Decline", value: "52%", trend: "down", trendValue: "-10%" }
+      ],
+      actionItems: [
+        "Immediate outreach to both offices",
+        "Investigate competitive landscape",
+        "Offer additional support or incentives"
+      ]
+    },
+    emergingOpportunities: {
+      title: "Emerging Opportunities",
+      summary: "5 new potential partnerships identified in your area",
+      details: "Recent market analysis has identified several high-potential dental practices that could become valuable referral sources.",
+      metrics: [
+        { label: "New Prospects", value: "5", trend: "up", trendValue: "This month" },
+        { label: "Estimated Value", value: "$45K", trend: "up", trendValue: "Annually" }
+      ],
+      actionItems: [
+        "Research practice backgrounds and specialties",
+        "Prepare introduction packages",
+        "Schedule introduction meetings"
+      ]
+    },
+    networkBalance: {
+      title: "Network Balance",
+      summary: "Good geographic coverage with specialty gaps",
+      details: "Your network provides solid geographic distribution across key areas, but there are opportunities to expand in certain specialties.",
+      progressBars: [
+        { label: "Manhattan", value: 85 },
+        { label: "Brooklyn", value: 65 },
+        { label: "Queens", value: 40 },
+        { label: "Bronx", value: 25 }
+      ],
+      actionItems: [
+        "Expand presence in Queens and Bronx",
+        "Target orthodontic specialists",
+        "Seek pediatric dentistry partnerships"
+      ]
+    },
+    competitiveInsight: {
+      title: "Competitive Analysis",
+      summary: "Strong market position with 32% share and growth opportunities",
+      details: "Analysis shows you maintain a competitive advantage in your primary markets with opportunities for expansion.",
+      metrics: [
+        { label: "Market Share", value: "32%", trend: "up", trendValue: "+5%" },
+        { label: "Growth Rate", value: "15%", trend: "up", trendValue: "YoY" },
+        { label: "Competitive Ranking", value: "#2", trend: "up", trendValue: "In region" }
+      ]
+    }
+  };
 
   const fetchInitialInsights = async () => {
     try {
@@ -93,51 +182,17 @@ export function AIAssistant() {
 
       if (error) throw error;
 
-      // Create mock structured insights for now
-      const mockStructuredInsights: StructuredInsights = {
-        narrativeSummary: {
-          title: "Practice Performance Overview",
-          summary: "Your practice shows strong referral patterns with room for optimization.",
-          details: data.response || "Detailed analysis of your practice performance and key metrics."
-        },
-        relationshipHealth: {
-          title: "Relationship Health", 
-          summary: "Overall relationship health is good with some areas needing attention.",
-          details: "Based on your referral patterns and visit data, most relationships are healthy.",
-          score: "Good",
-          metrics: ["Active Sources", "Response Rate"]
-        },
-        outreachPriorities: {
-          title: "Outreach Priorities",
-          summary: "Focus on top-performing offices and declining sources.",
-          details: "Prioritize outreach to maintain strong relationships and re-engage declining sources.",
-          priorities: ["High-value dormant offices", "New discovered opportunities", "Campaign follow-ups"]
-        },
-        decliningOffices: {
-          title: "Declining Offices",
-          summary: "Several offices show declining referral patterns.",
-          details: "Identify and re-engage with offices that have reduced referral activity.",
-          offices: ["Office needing attention", "Secondary priority office"]
-        },
-        emergingOpportunities: {
-          title: "Emerging Opportunities",
-          summary: "New potential referral sources identified.",
-          details: "Recent discoveries show promising new partnership opportunities."
-        },
-        networkBalance: {
-          title: "Network Balance",
-          summary: "Good geographic distribution with specialty gaps.",
-          details: "Your network covers key areas well but could benefit from specialty diversification."
-        },
-        competitiveInsight: {
-          title: "Competitive Insight",
-          summary: "Strong market position with growth potential.",
-          details: "Analysis shows competitive advantages and market expansion opportunities."
-        }
+      // Mock data context for now
+      const mockDataContext: DataContext = {
+        officesCount: 99,
+        monthlyRecords: 165,
+        campaignsCount: 0,
+        visitsCount: 0,
+        discoveredOfficesCount: 20,
+        reviewsCount: 2
       };
 
-      setStructuredInsights(mockStructuredInsights);
-      setDataContext(data.dataContext);
+      setDataContext(mockDataContext);
     } catch (error) {
       console.error('Error fetching initial insights:', error);
       toast({
@@ -219,44 +274,21 @@ export function AIAssistant() {
       ));
   };
 
-  const getCardIcon = (cardType: string) => {
-    const iconMap = {
-      narrativeSummary: FileText,
-      relationshipHealth: Heart,
-      outreachPriorities: Target,
-      decliningOffices: TrendingDown,
-      emergingOpportunities: Lightbulb,
-      networkBalance: Network,
-      competitiveInsight: MapPin
-    };
-    return iconMap[cardType as keyof typeof iconMap] || FileText;
-  };
-
-  const getCardColorClasses = (cardType: string) => {
-    const colorMap = {
-      narrativeSummary: 'border-primary/20 bg-gradient-to-br from-primary/5 to-secondary/5',
-      relationshipHealth: 'border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 dark:border-green-800 dark:from-green-950 dark:to-emerald-950',
-      outreachPriorities: 'border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50 dark:border-blue-800 dark:from-blue-950 dark:to-cyan-950',
-      decliningOffices: 'border-orange-200 bg-gradient-to-br from-orange-50 to-red-50 dark:border-orange-800 dark:from-orange-950 dark:to-red-950',
-      emergingOpportunities: 'border-yellow-200 bg-gradient-to-br from-yellow-50 to-amber-50 dark:border-yellow-800 dark:from-yellow-950 dark:to-amber-950',
-      networkBalance: 'border-purple-200 bg-gradient-to-br from-purple-50 to-indigo-50 dark:border-purple-800 dark:from-purple-950 dark:to-indigo-950',
-      competitiveInsight: 'border-teal-200 bg-gradient-to-br from-teal-50 to-cyan-50 dark:border-teal-800 dark:from-teal-950 dark:to-cyan-950'
-    };
-    return colorMap[cardType as keyof typeof colorMap] || 'border-border bg-card';
-  };
 
   if (initialLoading) {
     return (
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="max-w-7xl mx-auto space-y-6 p-6">
         <div className="text-center">
           <div className="flex items-center justify-center gap-3 mb-4">
-            <Bot className="w-8 h-8 text-primary" />
+            <div className="p-2 rounded-xl bg-gradient-primary animate-pulse">
+              <Loader2 className="w-8 h-8 text-white animate-spin" />
+            </div>
             <h1 className="text-3xl font-bold">AI Assistant</h1>
           </div>
           <p className="text-muted-foreground">Analyzing your practice data...</p>
         </div>
 
-        <Card>
+        <Card className="bg-gradient-card">
           <CardContent className="p-8">
             <div className="flex items-center justify-center gap-3">
               <Loader2 className="w-6 h-6 animate-spin" />
@@ -268,188 +300,103 @@ export function AIAssistant() {
     );
   }
 
-  if (!structuredInsights) {
-    return (
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="text-center">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <Bot className="w-8 h-8 text-primary" />
-            <h1 className="text-3xl font-bold">AI Assistant</h1>
-          </div>
-          <p className="text-muted-foreground text-red-500">
-            Failed to load structured insights. Please refresh the page.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-8 p-6">
       {/* Header */}
-      <div className="text-center">
-        <div className="flex items-center justify-center gap-3 mb-4">
-          <Bot className="w-8 h-8 text-primary" />
-          <h1 className="text-3xl font-bold">AI Assistant</h1>
-        </div>
-        <p className="text-muted-foreground">
-          Get intelligent insights about your practice data
-        </p>
-        {dataContext && (
-          <div className="flex justify-center flex-wrap gap-2 mt-4">
-            <Badge variant="secondary">{dataContext.officesCount} Offices</Badge>
-            <Badge variant="secondary">{dataContext.monthlyRecords} Monthly Records</Badge>
-            <Badge variant="secondary">{dataContext.campaignsCount} Campaigns</Badge>
-            <Badge variant="secondary">{dataContext.visitsCount} Visits</Badge>
-            {dataContext.discoveredOfficesCount && (
-              <Badge variant="outline">{dataContext.discoveredOfficesCount} Discovered</Badge>
-            )}
-            {dataContext.reviewsCount && (
-              <Badge variant="outline">{dataContext.reviewsCount} Reviews</Badge>
-            )}
-          </div>
-        )}
-      </div>
+      <AIAssistantHeader
+        isLoading={initialLoading}
+        onRefresh={fetchInitialInsights}
+        dataContext={dataContext || undefined}
+      />
 
-      {/* Top Row - Large Narrative Summary Card */}
-      <Card className={`w-full ${getCardColorClasses('narrativeSummary')}`}>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <FileText className="w-6 h-6 text-primary" />
-              {structuredInsights.narrativeSummary.title}
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => toggleCardExpansion('narrativeSummary')}
-            >
-              {expandedCards.narrativeSummary ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-lg font-medium mb-3">{structuredInsights.narrativeSummary.summary}</p>
-          {expandedCards.narrativeSummary && (
-            <div className="mt-4 prose prose-sm max-w-none dark:prose-invert">
-              {formatMessage(structuredInsights.narrativeSummary.details)}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Performance Overview Banner */}
+      <PerformanceOverview />
 
-      {/* Middle Row - Medium Cards */}
+      {/* Insight Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {['relationshipHealth', 'outreachPriorities', 'decliningOffices'].map((cardKey) => {
-          const card = structuredInsights[cardKey as keyof StructuredInsights];
-          const Icon = getCardIcon(cardKey);
-          
-          return (
-            <Card key={cardKey} className={`${getCardColorClasses(cardKey)} hover:shadow-lg transition-shadow cursor-pointer`}>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Icon className="w-5 h-5" />
-                    <span className="text-base">{card.title}</span>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => toggleCardExpansion(cardKey)}
-                  >
-                    {expandedCards[cardKey] ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  </Button>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm font-medium mb-2">{card.summary}</p>
-                {card.score && (
-                  <Badge variant="secondary" className="mb-2">{card.score}</Badge>
-                )}
-                {expandedCards[cardKey] && (
-                  <div className="mt-4 space-y-3">
-                    <div className="prose prose-sm max-w-none dark:prose-invert">
-                      {formatMessage(card.details)}
-                    </div>
-                    {card.metrics && (
-                      <div>
-                        <p className="text-xs font-semibold mb-1">Key Metrics:</p>
-                        <div className="flex flex-wrap gap-1">
-                          {card.metrics.map((metric, index) => (
-                            <Badge key={index} variant="outline" className="text-xs">{metric}</Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {card.priorities && (
-                      <div>
-                        <p className="text-xs font-semibold mb-1">Priorities:</p>
-                        <div className="space-y-1">
-                          {card.priorities.map((priority, index) => (
-                            <div key={index} className="text-xs">• {priority}</div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {card.offices && (
-                      <div>
-                        <p className="text-xs font-semibold mb-1">Offices:</p>
-                        <div className="space-y-1">
-                          {card.offices.map((office, index) => (
-                            <div key={index} className="text-xs">• {office}</div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
+        <InsightCard
+          title={insightCardsData.relationshipHealth.title}
+          summary={insightCardsData.relationshipHealth.summary}
+          details={insightCardsData.relationshipHealth.details}
+          icon={Heart}
+          colorTheme="green"
+          isExpanded={expandedCards.relationshipHealth || false}
+          onToggle={() => toggleCardExpansion('relationshipHealth')}
+          metrics={insightCardsData.relationshipHealth.metrics}
+          actionItems={insightCardsData.relationshipHealth.actionItems}
+        />
+        
+        <InsightCard
+          title={insightCardsData.outreachPriorities.title}
+          summary={insightCardsData.outreachPriorities.summary}
+          details={insightCardsData.outreachPriorities.details}
+          icon={Target}
+          colorTheme="blue"
+          isExpanded={expandedCards.outreachPriorities || false}
+          onToggle={() => toggleCardExpansion('outreachPriorities')}
+          offices={insightCardsData.outreachPriorities.offices}
+          actionItems={insightCardsData.outreachPriorities.actionItems}
+        />
+
+        <InsightCard
+          title={insightCardsData.decliningOffices.title}
+          summary={insightCardsData.decliningOffices.summary}
+          details={insightCardsData.decliningOffices.details}
+          icon={TrendingDown}
+          colorTheme="red"
+          isExpanded={expandedCards.decliningOffices || false}
+          onToggle={() => toggleCardExpansion('decliningOffices')}
+          offices={insightCardsData.decliningOffices.offices}
+          metrics={insightCardsData.decliningOffices.metrics}
+          actionItems={insightCardsData.decliningOffices.actionItems}
+        />
+
+        <InsightCard
+          title={insightCardsData.emergingOpportunities.title}
+          summary={insightCardsData.emergingOpportunities.summary}
+          details={insightCardsData.emergingOpportunities.details}
+          icon={Lightbulb}
+          colorTheme="yellow"
+          isExpanded={expandedCards.emergingOpportunities || false}
+          onToggle={() => toggleCardExpansion('emergingOpportunities')}
+          metrics={insightCardsData.emergingOpportunities.metrics}
+          actionItems={insightCardsData.emergingOpportunities.actionItems}
+        />
+
+        <InsightCard
+          title={insightCardsData.networkBalance.title}
+          summary={insightCardsData.networkBalance.summary}
+          details={insightCardsData.networkBalance.details}
+          icon={Network}
+          colorTheme="purple"
+          isExpanded={expandedCards.networkBalance || false}
+          onToggle={() => toggleCardExpansion('networkBalance')}
+          progressBars={insightCardsData.networkBalance.progressBars}
+          actionItems={insightCardsData.networkBalance.actionItems}
+        />
+
+        <InsightCard
+          title={insightCardsData.competitiveInsight.title}
+          summary={insightCardsData.competitiveInsight.summary}
+          details={insightCardsData.competitiveInsight.details}
+          icon={MapPin}
+          colorTheme="cyan"
+          isExpanded={expandedCards.competitiveInsight || false}
+          onToggle={() => toggleCardExpansion('competitiveInsight')}
+          metrics={insightCardsData.competitiveInsight.metrics}
+        />
       </div>
 
-      {/* Bottom Row - Smaller Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {['emergingOpportunities', 'networkBalance', 'competitiveInsight'].map((cardKey) => {
-          const card = structuredInsights[cardKey as keyof StructuredInsights];
-          const Icon = getCardIcon(cardKey);
-          
-          return (
-            <Card key={cardKey} className={`${getCardColorClasses(cardKey)} hover:shadow-md transition-shadow cursor-pointer`}>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Icon className="w-4 h-4" />
-                    <span className="text-sm">{card.title}</span>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => toggleCardExpansion(cardKey)}
-                  >
-                    {expandedCards[cardKey] ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                  </Button>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <p className="text-xs text-muted-foreground">{card.summary}</p>
-                {expandedCards[cardKey] && (
-                  <div className="mt-3 prose prose-xs max-w-none dark:prose-invert">
-                    {formatMessage(card.details)}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+      {/* Action Summary */}
+      <ActionSummary />
 
       {/* Chat Section */}
-      <Card className="mt-8">
+      <Card className="bg-gradient-card border shadow-card">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MessageCircle className="w-5 h-5 text-primary" />
+          <CardTitle className="flex items-center gap-2 text-foreground">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <MessageCircle className="w-5 h-5 text-primary" />
+            </div>
             Ask Follow-up Questions
           </CardTitle>
         </CardHeader>
@@ -459,9 +406,11 @@ export function AIAssistant() {
             <div className="space-y-4">
               {messages.length === 0 ? (
                 <div className="text-center text-muted-foreground py-8">
-                  <MessageCircle className="w-12 h-12 mx-auto mb-3 text-muted-foreground/50" />
-                  <p>Ask questions about your data</p>
-                  <p className="text-sm mt-1">
+                  <div className="p-4 rounded-full bg-primary/10 w-fit mx-auto mb-4">
+                    <MessageCircle className="w-12 h-12 text-primary" />
+                  </div>
+                  <p className="font-medium mb-2">Ask questions about your data</p>
+                  <p className="text-sm">
                     Try: "Which offices send me the most patients?" or "What trends do you see?"
                   </p>
                 </div>
@@ -469,14 +418,14 @@ export function AIAssistant() {
                 messages.map((message) => (
                   <div key={message.id} className="space-y-2">
                     {message.type === 'question' ? (
-                      <div className="bg-primary/10 p-3 rounded-lg ml-auto max-w-[85%]">
-                        <p className="text-sm">{message.content}</p>
-                        <p className="text-xs text-muted-foreground mt-1">
+                      <div className="bg-gradient-primary p-4 rounded-xl ml-auto max-w-[85%] text-white shadow-glow">
+                        <p className="text-sm font-medium">{message.content}</p>
+                        <p className="text-xs text-white/80 mt-2">
                           {message.timestamp.toLocaleTimeString()}
                         </p>
                       </div>
                     ) : (
-                      <div className="bg-muted p-3 rounded-lg mr-auto max-w-[85%]">
+                      <div className="bg-gradient-card p-4 rounded-xl mr-auto max-w-[85%] border shadow-card">
                         <div className="text-sm prose prose-sm max-w-none dark:prose-invert">
                           {formatMessage(message.content)}
                         </div>
@@ -490,10 +439,12 @@ export function AIAssistant() {
               )}
 
               {isLoading && (
-                <div className="bg-muted p-3 rounded-lg mr-auto max-w-[85%]">
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span className="text-sm">AI is thinking...</span>
+                <div className="bg-gradient-card p-4 rounded-xl mr-auto max-w-[85%] border shadow-card">
+                  <div className="flex items-center gap-3">
+                    <div className="p-1 rounded-full bg-primary/10">
+                      <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                    </div>
+                    <span className="text-sm font-medium">AI is analyzing your data...</span>
                   </div>
                 </div>
               )}
@@ -503,19 +454,19 @@ export function AIAssistant() {
           <Separator />
 
           {/* Question Input */}
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <Input
-              placeholder="Ask about your data..."
+              placeholder="Ask about your practice data..."
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               onKeyPress={handleKeyPress}
               disabled={isLoading}
-              className="flex-1"
+              className="flex-1 bg-background/50 border-border/50 focus:bg-background"
             />
             <Button 
               onClick={askQuestion} 
               disabled={isLoading || !question.trim()}
-              size="sm"
+              className="bg-gradient-primary hover:opacity-90 text-white shadow-glow"
             >
               {isLoading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -526,8 +477,8 @@ export function AIAssistant() {
           </div>
 
           {/* Suggested Questions */}
-          <div className="space-y-2">
-            <p className="text-xs text-muted-foreground">Suggested questions:</p>
+          <div className="space-y-3">
+            <p className="text-xs font-semibold text-muted-foreground">Suggested questions:</p>
             <div className="flex flex-wrap gap-2">
               {[
                 "Which offices send the most patients?",
@@ -539,7 +490,7 @@ export function AIAssistant() {
                   key={suggestion}
                   variant="outline"
                   size="sm"
-                  className="text-xs"
+                  className="text-xs bg-background/50 hover:bg-primary/10 hover:border-primary/30 hover:text-primary transition-all"
                   onClick={() => setQuestion(suggestion)}
                   disabled={isLoading}
                 >
