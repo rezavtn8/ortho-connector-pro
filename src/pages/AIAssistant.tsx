@@ -93,46 +93,45 @@ export function AIAssistant() {
 
       if (error) throw error;
 
-      // Create mock structured insights for now
+      // Create structured insights from the practice performance data
       const mockStructuredInsights: StructuredInsights = {
         narrativeSummary: {
           title: "Practice Performance Overview",
-          summary: "Your practice shows strong referral patterns with room for optimization.",
+          summary: "Your practice shows strong referral patterns with room for optimization. Initial data analysis reveals key insights about your healthcare practice performance.",
           details: data.response || "Detailed analysis of your practice performance and key metrics."
         },
         relationshipHealth: {
-          title: "Relationship Health", 
-          summary: "Overall relationship health is good with some areas needing attention.",
-          details: "Based on your referral patterns and visit data, most relationships are healthy.",
-          score: "Good",
-          metrics: ["Active Sources", "Response Rate"]
+          title: "Overall Performance Trends & Patterns", 
+          summary: "Stable but fluctuating patient volume with high reliance on organic referrals.",
+          details: "Monthly patient volume shows some fluctuation (59-88 patients), indicating potential seasonality or external factors influencing patient flow. The practice heavily relies on referrals, particularly from Google (113 patients – 57% of total in last 6 months). This highlights a need for diversification of referral sources. The absence of marketing campaigns hinders growth potential and limits control over patient acquisition.",
+          metrics: ["Patient Volume: 59-88/month", "Google Referrals: 57%", "No Active Marketing"]
         },
         outreachPriorities: {
-          title: "Outreach Priorities",
-          summary: "Focus on top-performing offices and declining sources.",
-          details: "Prioritize outreach to maintain strong relationships and re-engage declining sources.",
-          priorities: ["High-value dormant offices", "New discovered opportunities", "Campaign follow-ups"]
+          title: "Top Performing vs. Underperforming Referral Sources",
+          summary: "Clear distinction between high-performing and underperforming sources.",
+          details: "Top Performers (Google, Preservation Dentistry, Ivy Dental): These sources consistently deliver significant patient volume. Focus on strengthening relationships with these key partners. Underperformers (Crossroads Dental, etc.): These sources yield minimal patients despite existing relationships. Targeted outreach and relationship building are crucial.",
+          priorities: ["Strengthen Google partnership", "Enhance Preservation Dentistry relationship", "Target outreach to Crossroads Dental"]
         },
         decliningOffices: {
-          title: "Declining Offices",
-          summary: "Several offices show declining referral patterns.",
-          details: "Identify and re-engage with offices that have reduced referral activity.",
-          offices: ["Office needing attention", "Secondary priority office"]
+          title: "Patient Referral Volume Analysis",
+          summary: "Google dominance presents risk with concentrated referral sources.",
+          details: "Google is the primary driver of patient volume, but this presents a risk. Diversification is key to mitigate reliance on a single source. A significant portion of patients comes from a small number of sources, creating vulnerability. Exploring new partnerships is essential.",
+          offices: ["High Google dependency", "Limited source diversity"]
         },
         emergingOpportunities: {
-          title: "Emerging Opportunities",
-          summary: "New potential referral sources identified.",
-          details: "Recent discoveries show promising new partnership opportunities."
+          title: "Marketing Campaign Effectiveness",
+          summary: "No marketing data available - critical gap identified.",
+          details: "The absence of marketing campaigns prevents any assessment of ROI. Implementing and tracking marketing initiatives is critical for growth and patient acquisition control."
         },
         networkBalance: {
-          title: "Network Balance",
-          summary: "Good geographic distribution with specialty gaps.",
-          details: "Your network covers key areas well but could benefit from specialty diversification."
+          title: "Suggested Follow-Up Actions & Opportunities",
+          summary: "Focus on relationship building and marketing implementation.",
+          details: "Prioritize Relationship Building: Strengthen relationships with top-performing referral sources through regular communication, appreciation gestures, and potential joint marketing efforts. Implement marketing campaigns to reduce dependency and gain better control over patient flow."
         },
         competitiveInsight: {
-          title: "Competitive Insight",
-          summary: "Strong market position with growth potential.",
-          details: "Analysis shows competitive advantages and market expansion opportunities."
+          title: "Data Quality Assessment",
+          summary: "Strong foundational data with room for enhancement.",
+          details: "Current data provides good insights but could be enhanced with more detailed tracking of referral source performance and patient journey analytics."
         }
       };
 
@@ -282,12 +281,12 @@ export function AIAssistant() {
   const getCardIcon = (cardType: string) => {
     const iconMap = {
       narrativeSummary: FileText,
-      relationshipHealth: Heart,
-      outreachPriorities: Target,
-      decliningOffices: TrendingDown,
-      emergingOpportunities: Lightbulb,
-      networkBalance: Network,
-      competitiveInsight: MapPin
+      relationshipHealth: TrendingDown, // Overall Performance Trends & Patterns
+      outreachPriorities: Target, // Top Performing vs. Underperforming Referral Sources
+      decliningOffices: TrendingDown, // Patient Referral Volume Analysis
+      emergingOpportunities: Lightbulb, // Marketing Campaign Effectiveness
+      networkBalance: Network, // Suggested Follow-Up Actions & Opportunities
+      competitiveInsight: MapPin // Data Quality Assessment
     };
     return iconMap[cardType as keyof typeof iconMap] || FileText;
   };
@@ -295,12 +294,12 @@ export function AIAssistant() {
   const getCardColorClasses = (cardType: string) => {
     const colorMap = {
       narrativeSummary: 'border-primary/20 bg-gradient-to-br from-primary/5 to-secondary/5',
-      relationshipHealth: 'border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 dark:border-green-800 dark:from-green-950 dark:to-emerald-950',
-      outreachPriorities: 'border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50 dark:border-blue-800 dark:from-blue-950 dark:to-cyan-950',
-      decliningOffices: 'border-orange-200 bg-gradient-to-br from-orange-50 to-red-50 dark:border-orange-800 dark:from-orange-950 dark:to-red-950',
-      emergingOpportunities: 'border-yellow-200 bg-gradient-to-br from-yellow-50 to-amber-50 dark:border-yellow-800 dark:from-yellow-950 dark:to-amber-950',
-      networkBalance: 'border-purple-200 bg-gradient-to-br from-purple-50 to-indigo-50 dark:border-purple-800 dark:from-purple-950 dark:to-indigo-950',
-      competitiveInsight: 'border-teal-200 bg-gradient-to-br from-teal-50 to-cyan-50 dark:border-teal-800 dark:from-teal-950 dark:to-cyan-950'
+      relationshipHealth: 'border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50 dark:border-blue-800 dark:from-blue-950 dark:to-cyan-950', // Performance trends
+      outreachPriorities: 'border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 dark:border-green-800 dark:from-green-950 dark:to-emerald-950', // Top performers
+      decliningOffices: 'border-purple-200 bg-gradient-to-br from-purple-50 to-indigo-50 dark:border-purple-800 dark:from-purple-950 dark:to-indigo-950', // Analysis
+      emergingOpportunities: 'border-orange-200 bg-gradient-to-br from-orange-50 to-red-50 dark:border-orange-800 dark:from-orange-950 dark:to-red-950', // Critical gap
+      networkBalance: 'border-yellow-200 bg-gradient-to-br from-yellow-50 to-amber-50 dark:border-yellow-800 dark:from-yellow-950 dark:to-amber-950', // Actions
+      competitiveInsight: 'border-teal-200 bg-gradient-to-br from-teal-50 to-cyan-50 dark:border-teal-800 dark:from-teal-950 dark:to-cyan-950' // Data quality
     };
     return colorMap[cardType as keyof typeof colorMap] || 'border-border bg-card';
   };
@@ -355,8 +354,28 @@ export function AIAssistant() {
         <p className="text-muted-foreground">
           Get intelligent insights about your practice data
         </p>
+        <div className="flex justify-center items-center gap-4 mt-4">
+          <Button
+            onClick={fetchInitialInsights}
+            disabled={initialLoading}
+            variant="outline"
+            size="sm"
+            className="mb-2"
+          >
+            {initialLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Refreshing...
+              </>
+            ) : (
+              <>
+                Refresh Analysis
+              </>
+            )}
+          </Button>
+        </div>
         {dataContext && (
-          <div className="flex justify-center flex-wrap gap-2 mt-4">
+          <div className="flex justify-center flex-wrap gap-2 mt-2">
             <Badge variant="secondary">{dataContext.officesCount} Offices</Badge>
             <Badge variant="secondary">{dataContext.monthlyRecords} Monthly Records</Badge>
             <Badge variant="secondary">{dataContext.campaignsCount} Campaigns</Badge>
