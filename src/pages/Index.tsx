@@ -17,6 +17,7 @@ import { Reviews } from '@/pages/Reviews';
 import { Discover } from '@/pages/Discover';
 import { Logs } from '@/pages/Logs';
 import { AIAssistant } from '@/pages/AIAssistant';
+import { Security } from '@/pages/Security';
 
 const Index = () => {
   const { user, loading } = useAuth();
@@ -66,6 +67,8 @@ const Index = () => {
         return <Analytics />;
       case 'ai-assistant':
         return <AIAssistant />;
+      case 'security':
+        return <Security />;
       case 'logs':
         return <Logs />;
       case 'settings':

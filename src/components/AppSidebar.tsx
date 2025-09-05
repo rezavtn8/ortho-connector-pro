@@ -13,7 +13,8 @@ import {
   BarChart3,
   MessageSquare,
   Search,
-  Bot
+  Bot,
+  Shield
 } from 'lucide-react';
 import {
   Sidebar,
@@ -54,6 +55,7 @@ const managementItems = [
 ];
 
 const systemItems = [
+  { id: 'security', title: 'Security', icon: Shield },
   { id: 'logs', title: 'Activity Logs', icon: Activity },
   { id: 'settings', title: 'Settings', icon: Settings },
 ];

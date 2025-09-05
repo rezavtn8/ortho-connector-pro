@@ -52,6 +52,21 @@ serve(async (req) => {
     }
 
     console.log(`Fetching data for user: ${user.id}`);
+    
+    // Check rate limiting for AI insights
+    const { data: rateLimitData, error: rateLimitError } = await supabaseClient
+      .rpc('check_rate_limit', {
+        p_endpoint: 'gemini-insights',
+        p_max_requests: 20,
+        p_window_minutes: 60
+      });
+    
+    if (rateLimitError || !rateLimitData) {
+      console.warn('Rate limit check failed:', rateLimitError?.message);
+      // Continue anyway to avoid blocking users if rate limit service is down
+    } else if (!rateLimitData) {
+      throw new Error('Rate limit exceeded. Please try again later.');
+    }
 
     const { question } = await req.json();
     if (!question) {
