@@ -14,6 +14,8 @@ import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { ClinicAddressSearch } from '@/components/ClinicAddressSearch';
+import { SecuritySettings } from '@/components/SecuritySettings';
+import { SecurityAuditLog } from '@/components/SecurityAuditLog';
 import {
   MapPin,
   User,
@@ -752,68 +754,9 @@ export function Settings() {
               </TabsContent>
 
               {/* Security */}
-              <TabsContent value="security" className="mt-0">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Shield className="h-5 w-5" />
-                      Security Settings
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="space-y-4">
-                      <div>
-                        <Label className="text-sm font-medium">Change Password</Label>
-                        <div className="flex gap-2 mt-2">
-                          <div className="relative flex-1">
-                            <Input
-                              type={showPassword ? 'text' : 'password'}
-                              placeholder="Enter new password"
-                              value={newPassword}
-                              onChange={(e) => setNewPassword(e.target.value)}
-                            />
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                              onClick={() => setShowPassword(!showPassword)}
-                            >
-                              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                            </Button>
-                          </div>
-                          <Button onClick={updatePassword} disabled={!newPassword}>
-                            Update
-                          </Button>
-                        </div>
-                      </div>
-
-                      <Separator />
-
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label className="text-sm font-medium">Two-Factor Authentication</Label>
-                          <p className="text-xs text-muted-foreground">Add an extra layer of security to your account</p>
-                        </div>
-                        <Button variant="outline" size="sm" disabled>
-                          Setup 2FA
-                        </Button>
-                      </div>
-
-                      <Separator />
-
-                      <div className="space-y-4">
-                        <Label className="text-sm font-medium">Account Actions</Label>
-                        <div className="flex gap-3">
-                          <Button variant="outline" onClick={signOut} className="gap-2">
-                            <Lock className="h-4 w-4" />
-                            Sign Out
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+              <TabsContent value="security" className="mt-0 space-y-6">
+                <SecuritySettings />
+                <SecurityAuditLog />
               </TabsContent>
             </div>
           </div>
