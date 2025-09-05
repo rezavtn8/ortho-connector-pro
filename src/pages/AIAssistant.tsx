@@ -493,7 +493,7 @@ export function AIAssistant() {
                     <div className="p-1.5 rounded-md bg-white/20 dark:bg-black/20">
                       <Icon className="w-4 h-4" />
                     </div>
-                    <span className="text-sm font-semibold">{card.title}</span>
+                    <span className="text-base font-semibold">{card.title}</span>
                   </div>
                   <Button
                     variant="ghost"
@@ -506,7 +506,7 @@ export function AIAssistant() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
-                <p className="text-xs text-foreground/80 font-medium">{card.summary}</p>
+                <p className="text-sm font-medium mb-3 text-foreground/90">{card.summary}</p>
                 {expandedCards[cardKey] && (
                   <div className="mt-3 p-3 rounded-lg bg-white/20 dark:bg-black/20 backdrop-blur-sm animate-fade-in">
                     <div className="prose prose-xs max-w-none dark:prose-invert">
