@@ -207,7 +207,8 @@ export function AIAssistant() {
   };
 
   useEffect(() => {
-    fetchInitialInsights();
+    // Removed automatic fetching - users now need to click refresh to generate insights
+    setInitialLoading(false);
   }, []);
 
   const formatMessage = (content: string) => {
@@ -337,10 +338,67 @@ export function AIAssistant() {
             <Bot className="w-8 h-8 text-primary" />
             <h1 className="text-3xl font-bold">AI Assistant</h1>
           </div>
-          <p className="text-muted-foreground text-red-500">
-            Failed to load structured insights. Please refresh the page.
+          <p className="text-muted-foreground">
+            Get intelligent insights about your practice data
           </p>
+          <div className="flex justify-center items-center gap-4 mt-4">
+            <Button
+              onClick={fetchInitialInsights}
+              disabled={initialLoading}
+              variant="default"
+              size="lg"
+              className="mb-2"
+            >
+              {initialLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Analyzing...
+                </>
+              ) : (
+                <>
+                  <Bot className="w-4 h-4 mr-2" />
+                  Generate AI Analysis
+                </>
+              )}
+            </Button>
+          </div>
         </div>
+
+        <Card className="max-w-2xl mx-auto">
+          <CardContent className="p-8 text-center">
+            <div className="mb-6">
+              <BarChart3 className="w-16 h-16 mx-auto text-muted-foreground/50 mb-4" />
+              <h3 className="text-xl font-semibold mb-2">Ready to Analyze Your Practice</h3>
+              <p className="text-muted-foreground">
+                Click "Generate AI Analysis" to get personalized insights about your patient referrals, 
+                practice performance, and growth opportunities.
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div className="p-3 bg-muted/50 rounded-lg">
+                <Activity className="w-5 h-5 mx-auto mb-2 text-primary" />
+                <p className="font-medium">Patient Flow Analysis</p>
+                <p className="text-xs text-muted-foreground">Track monthly patterns</p>
+              </div>
+              <div className="p-3 bg-muted/50 rounded-lg">
+                <Users className="w-5 h-5 mx-auto mb-2 text-primary" />
+                <p className="font-medium">Referral Performance</p>
+                <p className="text-xs text-muted-foreground">Top vs underperforming sources</p>
+              </div>
+              <div className="p-3 bg-muted/50 rounded-lg">
+                <AlertCircle className="w-5 h-5 mx-auto mb-2 text-primary" />
+                <p className="font-medium">Marketing Opportunities</p>
+                <p className="text-xs text-muted-foreground">Growth potential areas</p>
+              </div>
+              <div className="p-3 bg-muted/50 rounded-lg">
+                <CheckCircle className="w-5 h-5 mx-auto mb-2 text-primary" />
+                <p className="font-medium">Action Items</p>
+                <p className="text-xs text-muted-foreground">Next steps & priorities</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
