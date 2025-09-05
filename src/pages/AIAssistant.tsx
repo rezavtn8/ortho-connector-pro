@@ -24,6 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import DOMPurify from 'dompurify';
 
 interface InsightCard {
   title: string;
@@ -211,33 +212,62 @@ export function AIAssistant() {
     setInitialLoading(false);
   }, []);
 
+  // Create a safe text formatting function
+  const formatTextSafely = (text: string): React.ReactNode => {
+    // Split text by markdown patterns and create safe React elements
+    const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/);
+    
+    return parts.map((part, index) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        // Bold text
+        const content = part.slice(2, -2);
+        // Sanitize content as additional security layer
+        const sanitizedContent = DOMPurify.sanitize(content, { ALLOWED_TAGS: [] });
+        return <strong key={index} className="font-semibold text-foreground">{sanitizedContent}</strong>;
+      } else if (part.startsWith('*') && part.endsWith('*') && !part.startsWith('**')) {
+        // Italic text
+        const content = part.slice(1, -1);
+        // Sanitize content as additional security layer
+        const sanitizedContent = DOMPurify.sanitize(content, { ALLOWED_TAGS: [] });
+        return <em key={index} className="italic">{sanitizedContent}</em>;
+      } else {
+        // Regular text - sanitize to prevent any potential XSS
+        const sanitizedContent = DOMPurify.sanitize(part, { ALLOWED_TAGS: [] });
+        return sanitizedContent;
+      }
+    });
+  };
+
   const formatMessage = (content: string) => {
     return content
       .split('\n')
       .map((line, index) => {
         // Handle main headers (##)
         if (line.startsWith('## ')) {
+          const headerText = DOMPurify.sanitize(line.replace('## ', ''), { ALLOWED_TAGS: [] });
           return (
             <h3 key={index} className="text-lg font-semibold text-foreground mt-6 mb-3 first:mt-0">
-              {line.replace('## ', '')}
+              {headerText}
             </h3>
           );
         }
         
         // Handle sub headers (###)  
         if (line.startsWith('### ')) {
+          const headerText = DOMPurify.sanitize(line.replace('### ', ''), { ALLOWED_TAGS: [] });
           return (
             <h4 key={index} className="text-base font-medium text-foreground mt-4 mb-2 first:mt-0">
-              {line.replace('### ', '')}
+              {headerText}
             </h4>
           );
         }
         
         // Handle numbered headers (1., 2., etc.)
         if (/^\d+\.\s+/.test(line)) {
+          const headerText = DOMPurify.sanitize(line, { ALLOWED_TAGS: [] });
           return (
             <h4 key={index} className="text-base font-medium text-foreground mt-4 mb-2 first:mt-0">
-              {line}
+              {headerText}
             </h4>
           );
         }
@@ -245,34 +275,22 @@ export function AIAssistant() {
         // Handle bullet points
         if (line.startsWith('* ')) {
           const content = line.replace('* ', '');
-          // Handle bold text within bullet points
-          const formattedContent = content
-            .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-foreground">$1</strong>')
-            .replace(/\*(.*?)\*/g, '<em class="italic">$1</em>');
-          
           return (
             <div key={index} className="flex items-start gap-2 mb-2 ml-4">
               <span className="text-primary mt-1.5 text-xs">•</span>
-              <div 
-                className="text-sm text-muted-foreground flex-1" 
-                dangerouslySetInnerHTML={{ __html: formattedContent }} 
-              />
+              <div className="text-sm text-muted-foreground flex-1">
+                {formatTextSafely(content)}
+              </div>
             </div>
           );
         }
         
         // Handle regular lines
         if (line.trim()) {
-          const formattedContent = line
-            .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-foreground">$1</strong>')
-            .replace(/\*(.*?)\*/g, '<em class="italic">$1</em>');
-          
           return (
-            <div 
-              key={index} 
-              className="text-sm text-muted-foreground mb-2" 
-              dangerouslySetInnerHTML={{ __html: formattedContent }} 
-            />
+            <div key={index} className="text-sm text-muted-foreground mb-2">
+              {formatTextSafely(line)}
+            </div>
           );
         }
         
