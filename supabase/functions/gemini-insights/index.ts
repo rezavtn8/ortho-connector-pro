@@ -61,10 +61,10 @@ serve(async (req) => {
         p_window_minutes: 60
       });
     
-    if (rateLimitError || !rateLimitData) {
+    if (rateLimitError) {
       console.warn('Rate limit check failed:', rateLimitError?.message);
       // Continue anyway to avoid blocking users if rate limit service is down
-    } else if (!rateLimitData) {
+    } else if (rateLimitData === false) {
       throw new Error('Rate limit exceeded. Please try again later.');
     }
 
