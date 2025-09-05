@@ -3,16 +3,18 @@ import {
   Bot, 
   Send, 
   Loader2, 
-  FileText, 
-  Heart, 
+  BarChart3, 
+  Users, 
   Target, 
-  TrendingDown, 
-  Lightbulb, 
-  Network, 
-  MapPin,
+  TrendingUp, 
+  AlertCircle, 
+  CheckCircle, 
+  Activity,
   ChevronDown,
   ChevronUp,
-  MessageCircle
+  MessageCircle,
+  RefreshCw,
+  Stethoscope
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -101,35 +103,35 @@ export function AIAssistant() {
           details: data.response || "Detailed analysis of your practice performance and key metrics."
         },
         relationshipHealth: {
-          title: "Overall Performance Trends & Patterns", 
+          title: "Patient Flow Analysis", 
           summary: "Stable but fluctuating patient volume with high reliance on organic referrals.",
           details: "Monthly patient volume shows some fluctuation (59-88 patients), indicating potential seasonality or external factors influencing patient flow. The practice heavily relies on referrals, particularly from Google (113 patients – 57% of total in last 6 months). This highlights a need for diversification of referral sources. The absence of marketing campaigns hinders growth potential and limits control over patient acquisition.",
           metrics: ["Patient Volume: 59-88/month", "Google Referrals: 57%", "No Active Marketing"]
         },
         outreachPriorities: {
-          title: "Top Performing vs. Underperforming Referral Sources",
+          title: "Referral Source Performance",
           summary: "Clear distinction between high-performing and underperforming sources.",
           details: "Top Performers (Google, Preservation Dentistry, Ivy Dental): These sources consistently deliver significant patient volume. Focus on strengthening relationships with these key partners. Underperformers (Crossroads Dental, etc.): These sources yield minimal patients despite existing relationships. Targeted outreach and relationship building are crucial.",
           priorities: ["Strengthen Google partnership", "Enhance Preservation Dentistry relationship", "Target outreach to Crossroads Dental"]
         },
         decliningOffices: {
-          title: "Patient Referral Volume Analysis",
+          title: "Referral Volume Insights",
           summary: "Google dominance presents risk with concentrated referral sources.",
           details: "Google is the primary driver of patient volume, but this presents a risk. Diversification is key to mitigate reliance on a single source. A significant portion of patients comes from a small number of sources, creating vulnerability. Exploring new partnerships is essential.",
           offices: ["High Google dependency", "Limited source diversity"]
         },
         emergingOpportunities: {
-          title: "Marketing Campaign Effectiveness",
+          title: "Marketing Opportunities",
           summary: "No marketing data available - critical gap identified.",
           details: "The absence of marketing campaigns prevents any assessment of ROI. Implementing and tracking marketing initiatives is critical for growth and patient acquisition control."
         },
         networkBalance: {
-          title: "Suggested Follow-Up Actions & Opportunities",
+          title: "Action Items",
           summary: "Focus on relationship building and marketing implementation.",
           details: "Prioritize Relationship Building: Strengthen relationships with top-performing referral sources through regular communication, appreciation gestures, and potential joint marketing efforts. Implement marketing campaigns to reduce dependency and gain better control over patient flow."
         },
         competitiveInsight: {
-          title: "Data Quality Assessment",
+          title: "Data Health Check",
           summary: "Strong foundational data with room for enhancement.",
           details: "Current data provides good insights but could be enhanced with more detailed tracking of referral source performance and patient journey analytics."
         }
@@ -280,15 +282,15 @@ export function AIAssistant() {
 
   const getCardIcon = (cardType: string) => {
     const iconMap = {
-      narrativeSummary: FileText,
-      relationshipHealth: TrendingDown, // Overall Performance Trends & Patterns
-      outreachPriorities: Target, // Top Performing vs. Underperforming Referral Sources
-      decliningOffices: TrendingDown, // Patient Referral Volume Analysis
-      emergingOpportunities: Lightbulb, // Marketing Campaign Effectiveness
-      networkBalance: Network, // Suggested Follow-Up Actions & Opportunities
-      competitiveInsight: MapPin // Data Quality Assessment
+      narrativeSummary: BarChart3,
+      relationshipHealth: Activity, // Patient Flow Analysis
+      outreachPriorities: Users, // Referral Source Performance
+      decliningOffices: TrendingUp, // Referral Volume Insights
+      emergingOpportunities: AlertCircle, // Marketing Opportunities
+      networkBalance: CheckCircle, // Action Items
+      competitiveInsight: Stethoscope // Data Health Check
     };
-    return iconMap[cardType as keyof typeof iconMap] || FileText;
+    return iconMap[cardType as keyof typeof iconMap] || BarChart3;
   };
 
   const getCardColorClasses = (cardType: string) => {
@@ -360,7 +362,7 @@ export function AIAssistant() {
             disabled={initialLoading}
             variant="outline"
             size="sm"
-            className="mb-2"
+            className="mb-2 hover:bg-primary/10 hover:border-primary/20 transition-colors"
           >
             {initialLoading ? (
               <>
@@ -369,6 +371,7 @@ export function AIAssistant() {
               </>
             ) : (
               <>
+                <RefreshCw className="w-4 h-4 mr-2" />
                 Refresh Analysis
               </>
             )}
@@ -397,58 +400,73 @@ export function AIAssistant() {
           const Icon = getCardIcon(cardKey);
           
           return (
-            <Card key={cardKey} className={`${getCardColorClasses(cardKey)} hover:shadow-lg transition-shadow cursor-pointer`}>
-              <CardHeader>
+            <Card key={cardKey} className={`${getCardColorClasses(cardKey)} hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer border-0 shadow-md backdrop-blur-sm`}>
+              <CardHeader className="pb-4">
                 <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Icon className="w-5 h-5" />
-                    <span className="text-base">{card.title}</span>
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-white/20 dark:bg-black/20">
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <span className="text-base font-semibold">{card.title}</span>
                   </div>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => toggleCardExpansion(cardKey)}
+                    className="hover:bg-white/20 dark:hover:bg-black/20 rounded-lg"
                   >
                     {expandedCards[cardKey] ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </Button>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm font-medium mb-2">{card.summary}</p>
+              <CardContent className="pt-0">
+                <p className="text-sm font-medium mb-3 text-foreground/90">{card.summary}</p>
                 {card.score && (
-                  <Badge variant="secondary" className="mb-2">{card.score}</Badge>
+                  <div className="mb-3">
+                    <Badge variant="secondary" className="bg-white/30 dark:bg-black/30 border-0 backdrop-blur-sm">
+                      {card.score}
+                    </Badge>
+                  </div>
                 )}
                 {expandedCards[cardKey] && (
-                  <div className="mt-4 space-y-3">
+                  <div className="mt-4 space-y-4 animate-fade-in">
                     <div className="prose prose-sm max-w-none dark:prose-invert">
                       {formatMessage(card.details)}
                     </div>
                     {card.metrics && (
-                      <div>
-                        <p className="text-xs font-semibold mb-1">Key Metrics:</p>
-                        <div className="flex flex-wrap gap-1">
+                      <div className="p-3 rounded-lg bg-white/20 dark:bg-black/20 backdrop-blur-sm">
+                        <p className="text-xs font-semibold mb-2 text-foreground">Key Metrics:</p>
+                        <div className="flex flex-wrap gap-2">
                           {card.metrics.map((metric, index) => (
-                            <Badge key={index} variant="outline" className="text-xs">{metric}</Badge>
+                            <Badge key={index} variant="outline" className="text-xs bg-white/30 dark:bg-black/30 border-white/40 dark:border-black/40">
+                              {metric}
+                            </Badge>
                           ))}
                         </div>
                       </div>
                     )}
                     {card.priorities && (
-                      <div>
-                        <p className="text-xs font-semibold mb-1">Priorities:</p>
+                      <div className="p-3 rounded-lg bg-white/20 dark:bg-black/20 backdrop-blur-sm">
+                        <p className="text-xs font-semibold mb-2 text-foreground">Priorities:</p>
                         <div className="space-y-1">
                           {card.priorities.map((priority, index) => (
-                            <div key={index} className="text-xs">• {priority}</div>
+                            <div key={index} className="text-xs flex items-center gap-2">
+                              <div className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
+                              {priority}
+                            </div>
                           ))}
                         </div>
                       </div>
                     )}
                     {card.offices && (
-                      <div>
-                        <p className="text-xs font-semibold mb-1">Offices:</p>
+                      <div className="p-3 rounded-lg bg-white/20 dark:bg-black/20 backdrop-blur-sm">
+                        <p className="text-xs font-semibold mb-2 text-foreground">Focus Areas:</p>
                         <div className="space-y-1">
                           {card.offices.map((office, index) => (
-                            <div key={index} className="text-xs">• {office}</div>
+                            <div key={index} className="text-xs flex items-center gap-2">
+                              <div className="w-1.5 h-1.5 rounded-full bg-current opacity-60" />
+                              {office}
+                            </div>
                           ))}
                         </div>
                       </div>
@@ -468,27 +486,32 @@ export function AIAssistant() {
           const Icon = getCardIcon(cardKey);
           
           return (
-            <Card key={cardKey} className={`${getCardColorClasses(cardKey)} hover:shadow-md transition-shadow cursor-pointer`}>
+            <Card key={cardKey} className={`${getCardColorClasses(cardKey)} hover:shadow-lg hover:scale-[1.01] transition-all duration-200 cursor-pointer border-0 shadow backdrop-blur-sm`}>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Icon className="w-4 h-4" />
-                    <span className="text-sm">{card.title}</span>
+                    <div className="p-1.5 rounded-md bg-white/20 dark:bg-black/20">
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <span className="text-sm font-semibold">{card.title}</span>
                   </div>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => toggleCardExpansion(cardKey)}
+                    className="hover:bg-white/20 dark:hover:bg-black/20 rounded-md h-8 w-8 p-0"
                   >
                     {expandedCards[cardKey] ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                   </Button>
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
-                <p className="text-xs text-muted-foreground">{card.summary}</p>
+                <p className="text-xs text-foreground/80 font-medium">{card.summary}</p>
                 {expandedCards[cardKey] && (
-                  <div className="mt-3 prose prose-xs max-w-none dark:prose-invert">
-                    {formatMessage(card.details)}
+                  <div className="mt-3 p-3 rounded-lg bg-white/20 dark:bg-black/20 backdrop-blur-sm animate-fade-in">
+                    <div className="prose prose-xs max-w-none dark:prose-invert">
+                      {formatMessage(card.details)}
+                    </div>
                   </div>
                 )}
               </CardContent>
