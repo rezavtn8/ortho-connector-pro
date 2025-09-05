@@ -390,33 +390,6 @@ export function AIAssistant() {
         )}
       </div>
 
-      {/* Top Row - Large Narrative Summary Card */}
-      <Card className={`w-full ${getCardColorClasses('narrativeSummary')}`}>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <FileText className="w-6 h-6 text-primary" />
-              {structuredInsights.narrativeSummary.title}
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => toggleCardExpansion('narrativeSummary')}
-            >
-              {expandedCards.narrativeSummary ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-lg font-medium mb-3">{structuredInsights.narrativeSummary.summary}</p>
-          {expandedCards.narrativeSummary && (
-            <div className="mt-4 prose prose-sm max-w-none dark:prose-invert">
-              {formatMessage(structuredInsights.narrativeSummary.details)}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       {/* Middle Row - Medium Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {['relationshipHealth', 'outreachPriorities', 'decliningOffices'].map((cardKey) => {
