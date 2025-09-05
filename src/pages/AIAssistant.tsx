@@ -1,25 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Brain,
+  Bot, 
   Send, 
   Loader2, 
+  FileText, 
   Heart, 
   Target, 
   TrendingDown, 
   Lightbulb, 
   Network, 
   MapPin,
-  MessageCircle,
-  RefreshCw,
-  TrendingUp
+  ChevronDown,
+  ChevronUp,
+  MessageCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -27,11 +27,20 @@ interface InsightCard {
   title: string;
   summary: string;
   details: string;
-  icon: React.ElementType;
-  colorTheme: string;
+  score?: string;
   metrics?: string[];
-  actionItems?: string[];
+  priorities?: string[];
   offices?: string[];
+}
+
+interface StructuredInsights {
+  narrativeSummary: InsightCard;
+  relationshipHealth: InsightCard;
+  outreachPriorities: InsightCard;
+  decliningOffices: InsightCard;
+  emergingOpportunities: InsightCard;
+  networkBalance: InsightCard;
+  competitiveInsight: InsightCard;
 }
 
 interface ChatMessage {
@@ -48,27 +57,21 @@ interface DataContext {
   visitsCount: number;
   discoveredOfficesCount?: number;
   reviewsCount?: number;
-}
-
-interface AIInsights {
-  summary: string;
-  keyMetrics: {
-    activeReferralRate: string;
-    networkHealth: string;
-    growthPotential: string;
+  dataQuality?: {
+    addressCompleteness: string;
+    googleIntegration: string;
+    averageRating: string;
   };
-  cards: InsightCard[];
 }
 
 export function AIAssistant() {
+  const [structuredInsights, setStructuredInsights] = useState<StructuredInsights | null>(null);
   const [dataContext, setDataContext] = useState<DataContext | null>(null);
-  const [insights, setInsights] = useState<AIInsights | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [question, setQuestion] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const { toast } = useToast();
 
   const fetchInitialInsights = async () => {
@@ -77,94 +80,64 @@ export function AIAssistant() {
       
       const { data, error } = await supabase.functions.invoke('gemini-insights', {
         body: { 
-          question: `Analyze my dental practice data and provide:
-1. Overall performance summary
-2. Key metrics (referral rate, network health, growth potential)
-3. Specific insights for: relationship health, outreach priorities, declining offices, emerging opportunities, network balance, competitive analysis
-4. Actionable recommendations
-
-Format as structured analysis with specific numbers and recommendations.` 
+          question: `Please provide initial insights about my healthcare practice data. Focus on:
+          1. Overall performance trends and patterns
+          2. Top performing vs underperforming referral sources
+          3. Patient referral volume analysis
+          4. Marketing campaign effectiveness
+          5. Suggested follow-up actions and opportunities
+          
+          Keep it concise and actionable.` 
         },
       });
 
       if (error) throw error;
 
-      setDataContext(data.dataContext || {
-        officesCount: 99,
-        monthlyRecords: 165,
-        campaignsCount: 0,
-        visitsCount: 0,
-        discoveredOfficesCount: 20,
-        reviewsCount: 2
-      });
-
-      // Parse AI response into structured insights
-      const aiInsights: AIInsights = {
-        summary: data.response || "Your practice shows strong referral patterns with opportunities for optimization.",
-        keyMetrics: {
-          activeReferralRate: "73%",
-          networkHealth: "Good",
-          growthPotential: "High"
+      // Create mock structured insights for now
+      const mockStructuredInsights: StructuredInsights = {
+        narrativeSummary: {
+          title: "Practice Performance Overview",
+          summary: "Your practice shows strong referral patterns with room for optimization.",
+          details: data.response || "Detailed analysis of your practice performance and key metrics."
         },
-        cards: [
-          {
-            title: "Relationship Health",
-            summary: "45 active referral sources with strong engagement",
-            details: data.response || "Your referral network shows healthy patterns with consistent communication flow.",
-            icon: Heart,
-            colorTheme: "text-success bg-success/10",
-            metrics: ["45 Active Sources", "87% Response Rate", "12.3 Avg Referrals/Month"],
-            actionItems: ["Schedule quarterly check-ins", "Send thank you notes", "Update contact info"]
-          },
-          {
-            title: "Outreach Priorities",
-            summary: "3 high-value offices need immediate attention",
-            details: "Focus efforts on maintaining strong relationships and re-engaging declining sources.",
-            icon: Target,
-            colorTheme: "text-info bg-info/10",
-            offices: ["Manhattan Dental Group", "Brooklyn Smiles", "Queens Family Dentistry"],
-            actionItems: ["Call Manhattan Dental Group", "Schedule lunch with Brooklyn Smiles"]
-          },
-          {
-            title: "Declining Offices",
-            summary: "2 offices show concerning decline patterns",
-            details: "These offices require immediate attention to address potential issues.",
-            icon: TrendingDown,
-            colorTheme: "text-destructive bg-destructive/10",
-            offices: ["Manhattan Dental Group - 60% decline", "Brooklyn Smiles - 45% decline"],
-            actionItems: ["Immediate outreach", "Investigate competition", "Offer support"]
-          },
-          {
-            title: "Emerging Opportunities",
-            summary: "5 new potential partnerships identified",
-            details: "High-potential practices that could become valuable referral sources.",
-            icon: Lightbulb,
-            colorTheme: "text-warning bg-warning/10",
-            metrics: ["5 New Prospects", "$45K Est. Value"],
-            actionItems: ["Research backgrounds", "Prepare intro packages", "Schedule meetings"]
-          },
-          {
-            title: "Network Balance",
-            summary: "Good geographic coverage with specialty gaps",
-            details: "Solid distribution with opportunities to expand in certain specialties.",
-            icon: Network,
-            colorTheme: "text-violet-600 bg-violet-500/10",
-            actionItems: ["Expand in Queens/Bronx", "Target orthodontic specialists"]
-          },
-          {
-            title: "Competitive Analysis",
-            summary: "Strong market position with 32% share",
-            details: "Competitive advantage with expansion opportunities.",
-            icon: MapPin,
-            colorTheme: "text-primary bg-primary/10",
-            metrics: ["32% Market Share", "15% Growth Rate", "#2 Regional Ranking"]
-          }
-        ]
+        relationshipHealth: {
+          title: "Relationship Health", 
+          summary: "Overall relationship health is good with some areas needing attention.",
+          details: "Based on your referral patterns and visit data, most relationships are healthy.",
+          score: "Good",
+          metrics: ["Active Sources", "Response Rate"]
+        },
+        outreachPriorities: {
+          title: "Outreach Priorities",
+          summary: "Focus on top-performing offices and declining sources.",
+          details: "Prioritize outreach to maintain strong relationships and re-engage declining sources.",
+          priorities: ["High-value dormant offices", "New discovered opportunities", "Campaign follow-ups"]
+        },
+        decliningOffices: {
+          title: "Declining Offices",
+          summary: "Several offices show declining referral patterns.",
+          details: "Identify and re-engage with offices that have reduced referral activity.",
+          offices: ["Office needing attention", "Secondary priority office"]
+        },
+        emergingOpportunities: {
+          title: "Emerging Opportunities",
+          summary: "New potential referral sources identified.",
+          details: "Recent discoveries show promising new partnership opportunities."
+        },
+        networkBalance: {
+          title: "Network Balance",
+          summary: "Good geographic distribution with specialty gaps.",
+          details: "Your network covers key areas well but could benefit from specialty diversification."
+        },
+        competitiveInsight: {
+          title: "Competitive Insight",
+          summary: "Strong market position with growth potential.",
+          details: "Analysis shows competitive advantages and market expansion opportunities."
+        }
       };
 
-      setInsights(aiInsights);
-      setLastUpdated(new Date());
-      
+      setStructuredInsights(mockStructuredInsights);
+      setDataContext(data.dataContext);
     } catch (error) {
       console.error('Error fetching initial insights:', error);
       toast({
@@ -237,195 +210,193 @@ Format as structured analysis with specific numbers and recommendations.`
   }, []);
 
   const formatMessage = (content: string) => {
-    return content.split('\n').map((line, index) => (
-      <p key={index} className={line.trim() ? "mb-2" : "mb-1"}>
-        {line.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*(.*?)\*/g, '$1')}
-      </p>
-    ));
+    return content
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .split('\n')
+      .map((line, index) => (
+        <div key={index} className="mb-2" dangerouslySetInnerHTML={{ __html: line }} />
+      ));
   };
 
+  const getCardIcon = (cardType: string) => {
+    const iconMap = {
+      narrativeSummary: FileText,
+      relationshipHealth: Heart,
+      outreachPriorities: Target,
+      decliningOffices: TrendingDown,
+      emergingOpportunities: Lightbulb,
+      networkBalance: Network,
+      competitiveInsight: MapPin
+    };
+    return iconMap[cardType as keyof typeof iconMap] || FileText;
+  };
+
+  const getCardColorClasses = (cardType: string) => {
+    const colorMap = {
+      narrativeSummary: 'border-primary/20 bg-gradient-to-br from-primary/5 to-secondary/5',
+      relationshipHealth: 'border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 dark:border-green-800 dark:from-green-950 dark:to-emerald-950',
+      outreachPriorities: 'border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50 dark:border-blue-800 dark:from-blue-950 dark:to-cyan-950',
+      decliningOffices: 'border-orange-200 bg-gradient-to-br from-orange-50 to-red-50 dark:border-orange-800 dark:from-orange-950 dark:to-red-950',
+      emergingOpportunities: 'border-yellow-200 bg-gradient-to-br from-yellow-50 to-amber-50 dark:border-yellow-800 dark:from-yellow-950 dark:to-amber-950',
+      networkBalance: 'border-purple-200 bg-gradient-to-br from-purple-50 to-indigo-50 dark:border-purple-800 dark:from-purple-950 dark:to-indigo-950',
+      competitiveInsight: 'border-teal-200 bg-gradient-to-br from-teal-50 to-cyan-50 dark:border-teal-800 dark:from-teal-950 dark:to-cyan-950'
+    };
+    return colorMap[cardType as keyof typeof colorMap] || 'border-border bg-card';
+  };
 
   if (initialLoading) {
     return (
-      <div className="max-w-6xl mx-auto space-y-6 p-6">
-        <div className="text-center py-12">
-          <div className="p-3 rounded-xl bg-gradient-primary w-fit mx-auto mb-4">
-            <Brain className="w-10 h-10 text-white" />
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="text-center">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <Bot className="w-8 h-8 text-primary" />
+            <h1 className="text-3xl font-bold">AI Assistant</h1>
           </div>
-          <h1 className="text-3xl font-bold mb-2">AI Assistant</h1>
-          <div className="flex items-center justify-center gap-2 text-muted-foreground">
-            <Loader2 className="w-5 h-5 animate-spin" />
-            <span>Analyzing your practice data...</span>
+          <p className="text-muted-foreground">Analyzing your practice data...</p>
+        </div>
+
+        <Card>
+          <CardContent className="p-8">
+            <div className="flex items-center justify-center gap-3">
+              <Loader2 className="w-6 h-6 animate-spin" />
+              <span>Loading insights from your data...</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!structuredInsights) {
+    return (
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="text-center">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <Bot className="w-8 h-8 text-primary" />
+            <h1 className="text-3xl font-bold">AI Assistant</h1>
           </div>
+          <p className="text-muted-foreground text-red-500">
+            Failed to load structured insights. Please refresh the page.
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 p-6">
+    <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-gradient-primary">
-            <Brain className="w-8 h-8 text-white" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold">AI Assistant</h1>
-            <p className="text-muted-foreground">Intelligent insights for your dental practice</p>
-          </div>
+      <div className="text-center">
+        <div className="flex items-center justify-center gap-3 mb-4">
+          <Bot className="w-8 h-8 text-primary" />
+          <h1 className="text-3xl font-bold">AI Assistant</h1>
         </div>
-        
-        <Button 
-          onClick={fetchInitialInsights} 
-          disabled={initialLoading}
-          className="bg-gradient-primary hover:opacity-90 text-white"
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${initialLoading ? 'animate-spin' : ''}`} />
-          {initialLoading ? 'Analyzing...' : 'Refresh'}
-        </Button>
+        <p className="text-muted-foreground">
+          Get intelligent insights about your practice data
+        </p>
+        {dataContext && (
+          <div className="flex justify-center flex-wrap gap-2 mt-4">
+            <Badge variant="secondary">{dataContext.officesCount} Offices</Badge>
+            <Badge variant="secondary">{dataContext.monthlyRecords} Monthly Records</Badge>
+            <Badge variant="secondary">{dataContext.campaignsCount} Campaigns</Badge>
+            <Badge variant="secondary">{dataContext.visitsCount} Visits</Badge>
+            {dataContext.discoveredOfficesCount && (
+              <Badge variant="outline">{dataContext.discoveredOfficesCount} Discovered</Badge>
+            )}
+            {dataContext.reviewsCount && (
+              <Badge variant="outline">{dataContext.reviewsCount} Reviews</Badge>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Stats Bar */}
-      {dataContext && (
-        <div className="flex flex-wrap gap-3 p-4 bg-gradient-card rounded-xl border">
-          <Badge variant="outline" className="border-success/30 bg-success/10 text-success">
-            <span className="font-bold">{dataContext.officesCount}</span> Offices
-          </Badge>
-          <Badge variant="outline" className="border-info/30 bg-info/10 text-info">
-            <span className="font-bold">{dataContext.monthlyRecords}</span> Records
-          </Badge>
-          <Badge variant="outline" className="border-muted-foreground/30">
-            <span className="font-bold">{dataContext.campaignsCount}</span> Campaigns
-          </Badge>
-          <Badge variant="outline" className="border-muted-foreground/30">
-            <span className="font-bold">{dataContext.visitsCount}</span> Visits
-          </Badge>
-          {dataContext.discoveredOfficesCount && (
-            <Badge variant="outline" className="border-warning/30 bg-warning/10 text-warning">
-              <span className="font-bold">{dataContext.discoveredOfficesCount}</span> Discovered
-            </Badge>
-          )}
-          {lastUpdated && (
-            <Badge variant="secondary" className="ml-auto">
-              Updated {lastUpdated.toLocaleTimeString()}
-            </Badge>
-          )}
-        </div>
-      )}
-
-      {/* Performance Overview */}
-      {insights && (
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-connection-primary to-connection-secondary p-6 text-white shadow-glow">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-y-16 translate-x-16" />
-          <div className="relative z-10">
-            <h2 className="text-xl font-bold mb-3">Practice Performance Overview</h2>
-            <p className="text-white/90 mb-4">{insights.summary}</p>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Card className="bg-white/15 backdrop-blur-sm border-white/20 text-white">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <TrendingUp className="w-4 h-4" />
-                    <span className="text-sm">Active Referral Rate</span>
-                  </div>
-                  <span className="text-2xl font-bold">{insights.keyMetrics.activeReferralRate}</span>
-                </CardContent>
-              </Card>
-              
-              <Card className="bg-white/15 backdrop-blur-sm border-white/20 text-white">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Heart className="w-4 h-4" />
-                    <span className="text-sm">Network Health</span>
-                  </div>
-                  <span className="text-2xl font-bold">{insights.keyMetrics.networkHealth}</span>
-                </CardContent>
-              </Card>
-              
-              <Card className="bg-white/15 backdrop-blur-sm border-white/20 text-white">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Target className="w-4 h-4" />
-                    <span className="text-sm">Growth Potential</span>
-                  </div>
-                  <span className="text-2xl font-bold">{insights.keyMetrics.growthPotential}</span>
-                </CardContent>
-              </Card>
+      {/* Top Row - Large Narrative Summary Card */}
+      <Card className={`w-full ${getCardColorClasses('narrativeSummary')}`}>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText className="w-6 h-6 text-primary" />
+              {structuredInsights.narrativeSummary.title}
             </div>
-          </div>
-        </div>
-      )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => toggleCardExpansion('narrativeSummary')}
+            >
+              {expandedCards.narrativeSummary ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-lg font-medium mb-3">{structuredInsights.narrativeSummary.summary}</p>
+          {expandedCards.narrativeSummary && (
+            <div className="mt-4 prose prose-sm max-w-none dark:prose-invert">
+              {formatMessage(structuredInsights.narrativeSummary.details)}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-      {/* Insight Cards */}
-      {insights && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {insights.cards.map((card, index) => (
-            <Card key={index} className="hover:shadow-lg transition-all cursor-pointer group">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center justify-between text-base">
+      {/* Middle Row - Medium Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {['relationshipHealth', 'outreachPriorities', 'decliningOffices'].map((cardKey) => {
+          const card = structuredInsights[cardKey as keyof StructuredInsights];
+          const Icon = getCardIcon(cardKey);
+          
+          return (
+            <Card key={cardKey} className={`${getCardColorClasses(cardKey)} hover:shadow-lg transition-shadow cursor-pointer`}>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className={`p-2 rounded-lg ${card.colorTheme}`}>
-                      <card.icon className="w-4 h-4" />
-                    </div>
-                    <span>{card.title}</span>
+                    <Icon className="w-5 h-5" />
+                    <span className="text-base">{card.title}</span>
                   </div>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => toggleCardExpansion(card.title)}
+                    onClick={() => toggleCardExpansion(cardKey)}
                   >
-                    {expandedCards[card.title] ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                    {expandedCards[cardKey] ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </Button>
                 </CardTitle>
               </CardHeader>
-              
-              <CardContent className="pt-0">
-                <p className="text-sm text-muted-foreground mb-3">{card.summary}</p>
-                
-                {card.metrics && (
-                  <div className="flex flex-wrap gap-1 mb-3">
-                    {card.metrics.slice(0, 2).map((metric, i) => (
-                      <Badge key={i} variant="outline" className="text-xs">{metric}</Badge>
-                    ))}
-                  </div>
+              <CardContent>
+                <p className="text-sm font-medium mb-2">{card.summary}</p>
+                {card.score && (
+                  <Badge variant="secondary" className="mb-2">{card.score}</Badge>
                 )}
-
-                {expandedCards[card.title] && (
-                  <div className="space-y-3 mt-4 pt-3 border-t">
-                    <p className="text-sm">{card.details}</p>
-                    
+                {expandedCards[cardKey] && (
+                  <div className="mt-4 space-y-3">
+                    <div className="prose prose-sm max-w-none dark:prose-invert">
+                      {formatMessage(card.details)}
+                    </div>
                     {card.metrics && (
                       <div>
-                        <p className="text-xs font-semibold mb-2">Metrics</p>
-                        <div className="space-y-1">
-                          {card.metrics.map((metric, i) => (
-                            <div key={i} className="text-xs p-2 bg-muted/50 rounded">{metric}</div>
+                        <p className="text-xs font-semibold mb-1">Key Metrics:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {card.metrics.map((metric, index) => (
+                            <Badge key={index} variant="outline" className="text-xs">{metric}</Badge>
                           ))}
                         </div>
                       </div>
                     )}
-
+                    {card.priorities && (
+                      <div>
+                        <p className="text-xs font-semibold mb-1">Priorities:</p>
+                        <div className="space-y-1">
+                          {card.priorities.map((priority, index) => (
+                            <div key={index} className="text-xs">• {priority}</div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {card.offices && (
                       <div>
-                        <p className="text-xs font-semibold mb-2">Offices</p>
+                        <p className="text-xs font-semibold mb-1">Offices:</p>
                         <div className="space-y-1">
-                          {card.offices.map((office, i) => (
-                            <div key={i} className="text-xs p-2 bg-muted/50 rounded border-l-2 border-current">{office}</div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {card.actionItems && (
-                      <div>
-                        <p className="text-xs font-semibold mb-2">Actions</p>
-                        <div className="space-y-1">
-                          {card.actionItems.map((action, i) => (
-                            <div key={i} className="text-xs flex items-center gap-2">
-                              <div className="w-1 h-1 rounded-full bg-primary" />
-                              {action}
-                            </div>
+                          {card.offices.map((office, index) => (
+                            <div key={index} className="text-xs">• {office}</div>
                           ))}
                         </div>
                       </div>
@@ -434,12 +405,48 @@ Format as structured analysis with specific numbers and recommendations.`
                 )}
               </CardContent>
             </Card>
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
+
+      {/* Bottom Row - Smaller Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {['emergingOpportunities', 'networkBalance', 'competitiveInsight'].map((cardKey) => {
+          const card = structuredInsights[cardKey as keyof StructuredInsights];
+          const Icon = getCardIcon(cardKey);
+          
+          return (
+            <Card key={cardKey} className={`${getCardColorClasses(cardKey)} hover:shadow-md transition-shadow cursor-pointer`}>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Icon className="w-4 h-4" />
+                    <span className="text-sm">{card.title}</span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleCardExpansion(cardKey)}
+                  >
+                    {expandedCards[cardKey] ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <p className="text-xs text-muted-foreground">{card.summary}</p>
+                {expandedCards[cardKey] && (
+                  <div className="mt-3 prose prose-xs max-w-none dark:prose-invert">
+                    {formatMessage(card.details)}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
 
       {/* Chat Section */}
-      <Card className="bg-gradient-card border">
+      <Card className="mt-8">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <MessageCircle className="w-5 h-5 text-primary" />
@@ -447,26 +454,30 @@ Format as structured analysis with specific numbers and recommendations.`
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <ScrollArea className="h-48 pr-4">
+          {/* Chat Messages */}
+          <ScrollArea className="h-64 pr-4">
             <div className="space-y-4">
               {messages.length === 0 ? (
-                <div className="text-center text-muted-foreground py-6">
-                  <MessageCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Ask questions about your practice data</p>
+                <div className="text-center text-muted-foreground py-8">
+                  <MessageCircle className="w-12 h-12 mx-auto mb-3 text-muted-foreground/50" />
+                  <p>Ask questions about your data</p>
+                  <p className="text-sm mt-1">
+                    Try: "Which offices send me the most patients?" or "What trends do you see?"
+                  </p>
                 </div>
               ) : (
                 messages.map((message) => (
                   <div key={message.id} className="space-y-2">
                     {message.type === 'question' ? (
-                      <div className="bg-primary/10 p-3 rounded-lg ml-auto max-w-[80%]">
+                      <div className="bg-primary/10 p-3 rounded-lg ml-auto max-w-[85%]">
                         <p className="text-sm">{message.content}</p>
                         <p className="text-xs text-muted-foreground mt-1">
                           {message.timestamp.toLocaleTimeString()}
                         </p>
                       </div>
                     ) : (
-                      <div className="bg-muted/50 p-3 rounded-lg mr-auto max-w-[80%]">
-                        <div className="text-sm">
+                      <div className="bg-muted p-3 rounded-lg mr-auto max-w-[85%]">
+                        <div className="text-sm prose prose-sm max-w-none dark:prose-invert">
                           {formatMessage(message.content)}
                         </div>
                         <p className="text-xs text-muted-foreground mt-2">
@@ -479,9 +490,9 @@ Format as structured analysis with specific numbers and recommendations.`
               )}
 
               {isLoading && (
-                <div className="bg-muted/50 p-3 rounded-lg mr-auto max-w-[80%]">
+                <div className="bg-muted p-3 rounded-lg mr-auto max-w-[85%]">
                   <div className="flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                     <span className="text-sm">AI is thinking...</span>
                   </div>
                 </div>
@@ -489,6 +500,9 @@ Format as structured analysis with specific numbers and recommendations.`
             </div>
           </ScrollArea>
 
+          <Separator />
+
+          {/* Question Input */}
           <div className="flex gap-2">
             <Input
               placeholder="Ask about your data..."
@@ -501,30 +515,38 @@ Format as structured analysis with specific numbers and recommendations.`
             <Button 
               onClick={askQuestion} 
               disabled={isLoading || !question.trim()}
-              className="bg-gradient-primary hover:opacity-90 text-white"
+              size="sm"
             >
-              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              {isLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
             </Button>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            {[
-              "Which offices need attention?",
-              "Show me growth opportunities",
-              "What's my network balance?",
-              "Competitive analysis summary"
-            ].map((suggestion) => (
-              <Button
-                key={suggestion}
-                variant="outline"
-                size="sm"
-                className="text-xs hover:bg-primary/10"
-                onClick={() => setQuestion(suggestion)}
-                disabled={isLoading}
-              >
-                {suggestion}
-              </Button>
-            ))}
+          {/* Suggested Questions */}
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">Suggested questions:</p>
+            <div className="flex flex-wrap gap-2">
+              {[
+                "Which offices send the most patients?",
+                "What are my trending patterns?",
+                "How effective are my campaigns?",
+                "Which areas need attention?"
+              ].map((suggestion) => (
+                <Button
+                  key={suggestion}
+                  variant="outline"
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => setQuestion(suggestion)}
+                  disabled={isLoading}
+                >
+                  {suggestion}
+                </Button>
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>
