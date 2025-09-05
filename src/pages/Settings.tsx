@@ -170,6 +170,16 @@ export function Settings() {
   const saveClinicSettings = async () => {
     if (!user?.id) return;
     
+    // Validate required fields
+    if (!clinicSettings.clinic_name?.trim()) {
+      toast({
+        title: 'Validation Error',
+        description: 'Clinic name is required',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     try {
       // Get user's profile to check for existing clinic
       const { data: profile } = await supabase
