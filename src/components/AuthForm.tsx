@@ -6,10 +6,6 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { Building2, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { signInSchema, signUpSchema } from '@/lib/validation';
-import { PasswordStrengthIndicator } from '@/components/ui/password-strength-indicator';
 import { sanitizeText, sanitizeEmail } from '@/lib/sanitize';
 
 interface AuthFormProps {
@@ -18,26 +14,18 @@ interface AuthFormProps {
 
 export function AuthForm({ embedded = false }: AuthFormProps) {
   const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { signIn, signUp, isLocked, lockoutTimeRemaining, formatLockoutTime } = useAuth();
   const { toast } = useToast();
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    watch,
-    reset,
-    setValue
-  } = useForm<any>({
-    resolver: zodResolver(isSignUp ? signUpSchema : signInSchema),
-    mode: 'onChange',
-  });
-
-  const watchedPassword = watch('password', '');
-
-  const onSubmit = async (data: any) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
     if (isLocked && !isSignUp) {
       toast({
         title: "Account Locked",
@@ -50,10 +38,31 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
     setLoading(true);
 
     // Sanitize all inputs before submission
-    const sanitizedEmail = sanitizeEmail(data.email);
-    const sanitizedFirstName = data.firstName ? sanitizeText(data.firstName) : '';
-    const sanitizedLastName = data.lastName ? sanitizeText(data.lastName) : '';
-    const sanitizedPassword = data.password; // Don't sanitize password as it may contain special chars
+    const sanitizedEmail = sanitizeEmail(email);
+    const sanitizedFirstName = sanitizeText(firstName);
+    const sanitizedLastName = sanitizeText(lastName);
+    const sanitizedPassword = password; // Don't sanitize password as it may contain special chars
+
+    // Validate sanitized inputs
+    if (!sanitizedEmail) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid email address",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+
+    if (isSignUp && (!sanitizedFirstName || !sanitizedLastName)) {
+      toast({
+        title: "Error", 
+        description: "First name and last name are required",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
 
     try {
       const { error } = isSignUp 
@@ -72,7 +81,6 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
           description: "Please check your email to verify your account.",
           variant: "default",
         });
-        reset();
       }
     } catch (error) {
       toast({
@@ -85,15 +93,9 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
     }
   };
 
-  const toggleMode = () => {
-    setIsSignUp(!isSignUp);
-    reset();
-    setValue('password', '');
-  };
-
   if (embedded) {
     return (
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6">
         {isSignUp && (
           <>
             <div className="space-y-2">
@@ -102,16 +104,12 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
                 id="firstName"
                 type="text"
                 placeholder="Enter your first name"
-                {...register('firstName')}
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                required
                 autoComplete="given-name"
                 className="border-connection-primary/20 focus:border-connection-primary bg-white/50"
-                aria-invalid={!!errors.firstName}
               />
-              {errors.firstName && (
-                <p className="text-sm text-destructive" role="alert">
-                  {errors.firstName?.message as string}
-                </p>
-              )}
             </div>
 
             <div className="space-y-2">
@@ -120,16 +118,12 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
                 id="lastName"
                 type="text"
                 placeholder="Enter your last name"
-                {...register('lastName')}
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                required
                 autoComplete="family-name"
                 className="border-connection-primary/20 focus:border-connection-primary bg-white/50"
-                aria-invalid={!!errors.lastName}
               />
-              {errors.lastName && (
-                <p className="text-sm text-destructive" role="alert">
-                  {errors.lastName?.message as string}
-                </p>
-              )}
             </div>
           </>
         )}
@@ -140,16 +134,12 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
             id="email"
             type="email"
             placeholder="Enter your email"
-            {...register('email')}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
             autoComplete="email"
             className="border-connection-primary/20 focus:border-connection-primary bg-white/50"
-            aria-invalid={!!errors.email}
           />
-          {errors.email && (
-            <p className="text-sm text-destructive" role="alert">
-              {errors.email?.message as string}
-            </p>
-          )}
         </div>
 
         <div className="space-y-2">
@@ -159,10 +149,11 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
               id="password"
               type={showPassword ? 'text' : 'password'}
               placeholder="Enter your password"
-              {...register('password')}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
               autoComplete={isSignUp ? 'new-password' : 'current-password'}
               className="border-connection-primary/20 focus:border-connection-primary bg-white/50"
-              aria-invalid={!!errors.password}
             />
             <Button
               type="button"
@@ -170,19 +161,10 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
               size="sm"
               className="absolute right-2 top-1/2 -translate-y-1/2 h-auto p-1 text-connection-muted hover:text-connection-text"
               onClick={() => setShowPassword(!showPassword)}
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
             >
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </Button>
           </div>
-          {errors.password && (
-            <p className="text-sm text-destructive" role="alert">
-              {errors.password?.message as string}
-            </p>
-          )}
-          {isSignUp && (
-            <PasswordStrengthIndicator password={watchedPassword} className="mt-2" />
-          )}
         </div>
 
         {isLocked && !isSignUp && (
@@ -206,7 +188,7 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
           <Button
             type="button"
             variant="link"
-            onClick={toggleMode}
+            onClick={() => setIsSignUp(!isSignUp)}
             className="text-sm text-connection-muted hover:text-connection-primary"
           >
             {isSignUp 
@@ -238,7 +220,7 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
         </CardHeader>
 
         <CardContent className="px-4 pb-6 sm:px-8 sm:pb-8">
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
             {isSignUp && (
               <>
                 <div className="space-y-2">
@@ -247,16 +229,12 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
                     id="firstName"
                     type="text"
                     placeholder="Enter your first name"
-                    {...register('firstName')}
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
                     autoComplete="given-name"
                     className="h-12 sm:h-10 text-base sm:text-sm"
-                    aria-invalid={!!errors.firstName}
                   />
-                  {errors.firstName && (
-                    <p className="text-sm text-destructive" role="alert">
-                      {errors.firstName?.message as string}
-                    </p>
-                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -265,16 +243,12 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
                     id="lastName"
                     type="text"
                     placeholder="Enter your last name"
-                    {...register('lastName')}
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    required
                     autoComplete="family-name"
                     className="h-12 sm:h-10 text-base sm:text-sm"
-                    aria-invalid={!!errors.lastName}
                   />
-                  {errors.lastName && (
-                    <p className="text-sm text-destructive" role="alert">
-                      {errors.lastName?.message as string}
-                    </p>
-                  )}
                 </div>
               </>
             )}
@@ -285,16 +259,12 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
                 id="email"
                 type="email"
                 placeholder="Enter your email"
-                {...register('email')}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
                 autoComplete="email"
                 className="h-12 sm:h-10 text-base sm:text-sm"
-                aria-invalid={!!errors.email}
               />
-              {errors.email && (
-                <p className="text-sm text-destructive" role="alert">
-                  {errors.email?.message as string}
-                </p>
-              )}
             </div>
 
             <div className="space-y-2">
@@ -304,10 +274,11 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   placeholder="Enter your password"
-                  {...register('password')}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
                   autoComplete={isSignUp ? 'new-password' : 'current-password'}
                   className="h-12 sm:h-10 text-base sm:text-sm pr-12"
-                  aria-invalid={!!errors.password}
                 />
                 <Button
                   type="button"
@@ -315,19 +286,10 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
                   size="sm"
                   className="absolute right-3 top-1/2 -translate-y-1/2 h-8 w-8 p-0 hover:bg-muted/50"
                   onClick={() => setShowPassword(!showPassword)}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </Button>
               </div>
-              {errors.password && (
-                <p className="text-sm text-destructive" role="alert">
-                  {errors.password?.message as string}
-                </p>
-              )}
-              {isSignUp && (
-                <PasswordStrengthIndicator password={watchedPassword} className="mt-2" />
-              )}
             </div>
 
             {isLocked && !isSignUp && (
@@ -352,7 +314,7 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
               <Button
                 type="button"
                 variant="link"
-                onClick={toggleMode}
+                onClick={() => setIsSignUp(!isSignUp)}
                 className="text-sm text-muted-foreground hover:text-foreground h-auto p-0 min-h-[44px] flex items-center"
               >
                 {isSignUp 

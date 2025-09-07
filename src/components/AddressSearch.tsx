@@ -65,8 +65,6 @@ export function AddressSearch({ value, onSelect, placeholder = "Search offices..
 
   // Initialize Google Maps services
   useEffect(() => {
-    let isMounted = true;
-    
     const initGoogleMaps = async () => {
       try {
         // Get API key securely from edge function
@@ -91,9 +89,6 @@ export function AddressSearch({ value, onSelect, placeholder = "Search offices..
         });
 
         await loader.load();
-        
-        if (!isMounted) return;
-        
         geocoder.current = new google.maps.Geocoder();
         
         // Create a dummy map element for PlacesService
@@ -108,14 +103,6 @@ export function AddressSearch({ value, onSelect, placeholder = "Search offices..
     };
 
     initGoogleMaps();
-    
-    return () => {
-      isMounted = false;
-      // Clean up Google Maps services
-      geocoder.current = null;
-      placesService.current = null;
-      setGoogleMapsLoaded(false);
-    };
   }, []);
 
   // Load existing offices from database
@@ -142,7 +129,6 @@ export function AddressSearch({ value, onSelect, placeholder = "Search offices..
       return;
     }
 
-    let isCurrent = true;
     setIsLoadingGoogle(true);
     
     const searchPlaces = async () => {
@@ -156,8 +142,6 @@ export function AddressSearch({ value, onSelect, placeholder = "Search offices..
         // Use AutocompleteService (works despite deprecation warning)
         const autocompleteService = new google.maps.places.AutocompleteService();
         autocompleteService.getPlacePredictions(request, (results, status) => {
-          if (!isCurrent) return;
-          
           setIsLoadingGoogle(false);
           if (status === google.maps.places.PlacesServiceStatus.OK && results) {
             setGooglePlaces(results.slice(0, 5));
@@ -167,19 +151,12 @@ export function AddressSearch({ value, onSelect, placeholder = "Search offices..
         });
       } catch (error) {
         console.error('Error searching places:', error);
-        if (isCurrent) {
-          setIsLoadingGoogle(false);
-          setGooglePlaces([]);
-        }
+        setIsLoadingGoogle(false);
+        setGooglePlaces([]);
       }
     };
 
-    const timeoutId = setTimeout(searchPlaces, 300); // Debounce search
-
-    return () => {
-      isCurrent = false;
-      clearTimeout(timeoutId);
-    };
+    searchPlaces();
   }, [searchValue, googleMapsLoaded]);
 
   // Filter existing offices based on search

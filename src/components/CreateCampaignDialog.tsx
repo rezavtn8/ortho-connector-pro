@@ -84,8 +84,6 @@ export function CreateCampaignDialog({ open, onOpenChange, onCampaignCreated }: 
 
   // Fetch offices
   useEffect(() => {
-    let isMounted = true;
-    
     const fetchOffices = async () => {
       if (!user) return;
 
@@ -99,34 +97,23 @@ export function CreateCampaignDialog({ open, onOpenChange, onCampaignCreated }: 
           .order('name');
 
         if (error) throw error;
-        
-        if (isMounted) {
-          setOffices(data || []);
-        }
+        setOffices(data || []);
       } catch (error) {
         console.error('Error fetching offices:', error);
-        if (isMounted) {
-          toast({
-            title: "Error",
-            description: "Failed to load offices.",
-            variant: "destructive",
-          });
-        }
+        toast({
+          title: "Error",
+          description: "Failed to load offices.",
+          variant: "destructive",
+        });
       } finally {
-        if (isMounted) {
-          setLoadingOffices(false);
-        }
+        setLoadingOffices(false);
       }
     };
 
     if (open) {
       fetchOffices();
     }
-    
-    return () => {
-      isMounted = false;
-    };
-  }, [open, user, toast]);
+  }, [open, user]);
 
   // Reset form when dialog opens/closes
   useEffect(() => {
