@@ -50,10 +50,12 @@ interface PatientTrendChartProps {
 }
 
 function PatientTrendChart({ monthlyTrends }: PatientTrendChartProps) {
-  const chartData = (monthlyTrends || []).map(trend => ({
-    month: formatYearMonth(trend.year_month),
-    patients: trend.month_total
-  }));
+  const chartData = (monthlyTrends || [])
+    .filter(trend => trend && trend.year_month) // Filter out invalid data
+    .map(trend => ({
+      month: formatYearMonth(trend.year_month),
+      patients: trend.month_total || 0
+    }));
 
   return (
     <div className="h-64" role="img" aria-label="Patient trend chart showing monthly referral data">

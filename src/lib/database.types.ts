@@ -149,8 +149,16 @@ export function getCurrentYearMonth(): string {
 }
 
 // Utility function to format year-month for display
-export function formatYearMonth(yearMonth: string): string {
+export function formatYearMonth(yearMonth: string | undefined | null): string {
+  if (!yearMonth || typeof yearMonth !== 'string') {
+    return 'Invalid Date';
+  }
+  
   const [year, month] = yearMonth.split('-');
+  if (!year || !month) {
+    return 'Invalid Date';
+  }
+  
   const date = new Date(parseInt(year), parseInt(month) - 1);
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
 }
