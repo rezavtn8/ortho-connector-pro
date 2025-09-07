@@ -285,6 +285,51 @@ export type Database = {
         }
         Relationships: []
       }
+      error_logs: {
+        Row: {
+          component_stack: string | null
+          created_at: string
+          error_message: string
+          error_stack: string | null
+          id: string
+          metadata: Json | null
+          resolved: boolean
+          severity: string
+          timestamp: string
+          url: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          component_stack?: string | null
+          created_at?: string
+          error_message: string
+          error_stack?: string | null
+          id?: string
+          metadata?: Json | null
+          resolved?: boolean
+          severity?: string
+          timestamp?: string
+          url?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          component_stack?: string | null
+          created_at?: string
+          error_message?: string
+          error_stack?: string | null
+          id?: string
+          metadata?: Json | null
+          resolved?: boolean
+          severity?: string
+          timestamp?: string
+          url?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       google_places_audit_log: {
         Row: {
           action: string
@@ -909,6 +954,18 @@ export type Database = {
       }
       get_user_role: {
         Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      log_application_error: {
+        Args: {
+          p_component_stack?: string
+          p_error_message: string
+          p_error_stack?: string
+          p_metadata?: Json
+          p_severity?: string
+          p_url?: string
+          p_user_agent?: string
+        }
         Returns: string
       }
       log_google_places_update: {

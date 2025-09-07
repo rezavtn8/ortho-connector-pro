@@ -71,3 +71,23 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+
+## Error Handling System
+
+This project includes a comprehensive error boundary system for robust error handling:
+
+- **React Error Boundaries**: Catch component errors gracefully
+- **Automatic Error Logging**: Errors logged to Supabase database with user context
+- **User-Friendly Fallbacks**: Graceful degradation with retry options
+- **Development Tools**: Detailed error information in development mode
+- **Error Recovery**: Multiple retry strategies based on error type
+
+For detailed documentation, see [docs/ERROR_BOUNDARY_GUIDE.md](docs/ERROR_BOUNDARY_GUIDE.md).
+
+### Testing Error Boundaries
+
+In development, you can test the error boundary system by adding the ErrorTest component to any page:
+
+```tsx
+import { ErrorTest } from '@/components/ErrorTest';
+```

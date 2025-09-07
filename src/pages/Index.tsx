@@ -5,6 +5,7 @@ import { AuthForm } from '@/components/AuthForm';
 import { Layout } from '@/components/Layout';
 import { LandingPage } from '@/components/LandingPage';
 import { SessionTimeoutWarning } from '@/components/SessionTimeoutWarning';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Dashboard } from '@/pages/Dashboard';
 import { Sources } from '@/pages/Sources';
 import { Offices } from '@/pages/Offices';
@@ -43,37 +44,35 @@ const Index = () => {
   const renderPage = () => {
     // Handle source detail view
     if (currentPage === 'source-detail' && selectedSourceId) {
-      return <SourceDetail />;
+      return (
+        <ErrorBoundary level="component">
+          <SourceDetail />
+        </ErrorBoundary>
+      );
     }
 
-    switch (currentPage) {
-      case 'dashboard':
-        return <Dashboard />;
-      case 'sources':
-        return <Sources />;
-      case 'offices':
-        return <Offices />;
-      case 'marketing-visits':
-        return <MarketingVisits />;
-      case 'campaigns':
-        return <Campaigns />;
-      case 'discover':
-        return <Discover />;
-      case 'reviews':
-        return <Reviews />;
-      case 'map-view':
-        return <MapView />;
-      case 'analytics':
-        return <Analytics />;
-      case 'ai-assistant':
-        return <AIAssistant />;
-      case 'logs':
-        return <Logs />;
-      case 'settings':
-        return <Settings />;
-      default:
-        return <Dashboard />;
-    }
+    const pageComponents = {
+      'dashboard': Dashboard,
+      'sources': Sources,
+      'offices': Offices,
+      'marketing-visits': MarketingVisits,
+      'campaigns': Campaigns,
+      'discover': Discover,
+      'reviews': Reviews,
+      'map-view': MapView,
+      'analytics': Analytics,
+      'ai-assistant': AIAssistant,
+      'logs': Logs,
+      'settings': Settings,
+    };
+
+    const PageComponent = pageComponents[currentPage as keyof typeof pageComponents] || Dashboard;
+
+    return (
+      <ErrorBoundary level="component">
+        <PageComponent />
+      </ErrorBoundary>
+    );
   };
 
   return (
