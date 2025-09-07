@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { AuthForm } from '@/components/AuthForm';
 import { Layout } from '@/components/Layout';
 import { LandingPage } from '@/components/LandingPage';
+import { SessionTimeoutWarning } from '@/components/SessionTimeoutWarning';
 import { Dashboard } from '@/pages/Dashboard';
 import { Sources } from '@/pages/Sources';
 import { Offices } from '@/pages/Offices';
@@ -78,6 +79,7 @@ const Index = () => {
   return (
     <Layout currentPage={currentPage} onPageChange={setCurrentPage}>
       {renderPage()}
+      <SessionTimeoutWarning />
     </Layout>
   );
 };

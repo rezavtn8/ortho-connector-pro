@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -12,12 +12,29 @@ const RATE_LIMIT_KEY = 'auth_rate_limit';
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes in milliseconds
 
+// Session timeout constants
+const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
+const WARNING_TIMEOUT = 5 * 60 * 1000; // 5 minutes warning
+const SESSION_ACTIVITY_KEY = 'session_last_activity';
+
+interface SessionTimeoutData {
+  lastActivity: number;
+  warningShown: boolean;
+}
+
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLocked, setIsLocked] = useState(false);
   const [lockoutTimeRemaining, setLockoutTimeRemaining] = useState(0);
+  
+  // Session timeout states
+  const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
+  const [timeoutRemaining, setTimeoutRemaining] = useState(0);
+  const sessionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const activityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const getRateLimitData = (): RateLimitData => {
     const stored = localStorage.getItem(RATE_LIMIT_KEY);
@@ -78,6 +95,76 @@ export function useAuth() {
     setLockoutTimeRemaining(0);
   };
 
+  // Session timeout management
+  const getSessionActivity = (): SessionTimeoutData => {
+    const stored = localStorage.getItem(SESSION_ACTIVITY_KEY);
+    if (!stored) {
+      return { lastActivity: Date.now(), warningShown: false };
+    }
+    return JSON.parse(stored);
+  };
+
+  const setSessionActivity = (data: SessionTimeoutData) => {
+    localStorage.setItem(SESSION_ACTIVITY_KEY, JSON.stringify(data));
+  };
+
+  const clearSessionTimeouts = useCallback(() => {
+    if (sessionTimeoutRef.current) clearTimeout(sessionTimeoutRef.current);
+    if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
+    if (activityTimeoutRef.current) clearTimeout(activityTimeoutRef.current);
+    setShowTimeoutWarning(false);
+    setTimeoutRemaining(0);
+  }, []);
+
+  const handleSessionTimeout = useCallback(async () => {
+    clearSessionTimeouts();
+    await supabase.auth.signOut();
+    localStorage.removeItem(SESSION_ACTIVITY_KEY);
+  }, [clearSessionTimeouts]);
+
+  const showWarningModal = useCallback(() => {
+    setShowTimeoutWarning(true);
+    setTimeoutRemaining(WARNING_TIMEOUT / 1000);
+    
+    // Start countdown for warning
+    const countdownInterval = setInterval(() => {
+      setTimeoutRemaining(prev => {
+        if (prev <= 1) {
+          clearInterval(countdownInterval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    // Auto-logout after warning period
+    sessionTimeoutRef.current = setTimeout(() => {
+      clearInterval(countdownInterval);
+      handleSessionTimeout();
+    }, WARNING_TIMEOUT);
+  }, [handleSessionTimeout]);
+
+  const refreshSession = useCallback(() => {
+    const now = Date.now();
+    setSessionActivity({ lastActivity: now, warningShown: false });
+    clearSessionTimeouts();
+    
+    if (session) {
+      // Set warning timeout (25 minutes)
+      warningTimeoutRef.current = setTimeout(showWarningModal, SESSION_TIMEOUT - WARNING_TIMEOUT);
+    }
+  }, [session, showWarningModal, clearSessionTimeouts]);
+
+  const trackUserActivity = useCallback(() => {
+    if (!session) return;
+    refreshSession();
+  }, [session, refreshSession]);
+
+  const extendSession = useCallback(() => {
+    refreshSession();
+    setShowTimeoutWarning(false);
+  }, [refreshSession]);
+
   useEffect(() => {
     // Check lockout status on mount
     checkLockoutStatus();
@@ -92,6 +179,12 @@ export function useAuth() {
         // Reset failed attempts on successful auth
         if (session) {
           resetFailedAttempts();
+          // Initialize session timeout on login
+          setTimeout(() => refreshSession(), 0);
+        } else {
+          // Clear session timeout on logout
+          clearSessionTimeouts();
+          localStorage.removeItem(SESSION_ACTIVITY_KEY);
         }
       }
     );
@@ -101,10 +194,40 @@ export function useAuth() {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      
+      // Initialize session timeout for existing session
+      if (session) {
+        setTimeout(() => refreshSession(), 0);
+      }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [refreshSession, clearSessionTimeouts]);
+
+  // Set up user activity listeners
+  useEffect(() => {
+    if (!session) return;
+
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    
+    // Throttle activity tracking to avoid excessive calls
+    let activityTimeout: NodeJS.Timeout;
+    const throttledTrackActivity = () => {
+      clearTimeout(activityTimeout);
+      activityTimeout = setTimeout(trackUserActivity, 1000);
+    };
+
+    events.forEach(event => {
+      document.addEventListener(event, throttledTrackActivity, { passive: true });
+    });
+
+    return () => {
+      events.forEach(event => {
+        document.removeEventListener(event, throttledTrackActivity);
+      });
+      clearTimeout(activityTimeout);
+    };
+  }, [session, trackUserActivity]);
 
   // Update lockout timer every second
   useEffect(() => {
@@ -180,5 +303,10 @@ export function useAuth() {
     isLocked,
     lockoutTimeRemaining,
     formatLockoutTime,
+    // Session timeout management
+    showTimeoutWarning,
+    timeoutRemaining,
+    extendSession,
+    refreshSession,
   };
 }
