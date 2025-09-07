@@ -51,11 +51,23 @@ interface PatientTrendChartProps {
 
 function PatientTrendChart({ monthlyTrends }: PatientTrendChartProps) {
   const chartData = (monthlyTrends || [])
-    .filter(trend => trend && trend.year_month) // Filter out invalid data
+    .filter(trend => trend && trend.year_month && trend.month_total !== undefined) // Filter out invalid data
     .map(trend => ({
       month: formatYearMonth(trend.year_month),
       patients: trend.month_total || 0
     }));
+
+  // Show empty state if no data
+  if (chartData.length === 0) {
+    return (
+      <div className="h-64 flex items-center justify-center text-muted-foreground">
+        <div className="text-center">
+          <BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-50" />
+          <p className="text-sm">No trend data available</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-64" role="img" aria-label="Patient trend chart showing monthly referral data">
@@ -187,12 +199,14 @@ export function Dashboard() {
         thisMonth: groupData.reduce((sum, sg) => sum + sg.current_month_patients, 0)
       };
     });
-  };
-
-  const totalSources = dashboardData?.source_groups?.reduce((sum, sg) => sum + sg.source_count, 0) || 0;
-  const activeSources = dashboardData?.source_groups?.reduce((sum, sg) => sum + sg.active_count, 0) || 0;
-  const totalPatients = dashboardData?.source_groups?.reduce((sum, sg) => sum + sg.total_patients, 0) || 0;
-  const thisMonthPatients = dashboardData?.source_groups?.reduce((sum, sg) => sum + sg.current_month_patients, 0) || 0;
+  // Ensure we have valid data structure
+  const safeSourceGroups = dashboardData?.source_groups || [];
+  const safeMonthlyTrends = dashboardData?.monthly_trends || [];
+  
+  const totalSources = safeSourceGroups.reduce((sum, sg) => sum + (sg.source_count || 0), 0);
+  const activeSources = safeSourceGroups.reduce((sum, sg) => sum + (sg.active_count || 0), 0);
+  const totalPatients = safeSourceGroups.reduce((sum, sg) => sum + (sg.total_patients || 0), 0);
+  const thisMonthPatients = safeSourceGroups.reduce((sum, sg) => sum + (sg.current_month_patients || 0), 0);
 
   if (loading) {
     return (
@@ -236,16 +250,55 @@ export function Dashboard() {
         </div>
 
         {/* Analytics Overview Skeleton */}
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <Skeleton className="h-6 w-36" />
-            <Skeleton className="h-9 w-32" />
-          </div>
-          <SkeletonChart />
-        </div>
+        <SkeletonChart />
       </div>
     );
   }
+
+  // Handle error state
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Dashboard
+            </h1>
+            <p className="text-muted-foreground">Error loading dashboard data</p>
+          </div>
+          <Button onClick={() => refetch()} variant="outline" size="sm">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Retry
+          </Button>
+        </div>
+        
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center py-8">
+              <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Unable to load dashboard</h3>
+              <p className="text-muted-foreground mb-4">
+                There was an issue loading your dashboard data. Please try refreshing or contact support if the problem persists.
+              </p>
+              <Button onClick={() => refetch()}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Try Again
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Ensure we have valid data structure
+  const safeSourceGroups = dashboardData?.source_groups || [];
+  const safeMonthlyTrends = dashboardData?.monthly_trends || [];
+  
+  const totalSources = safeSourceGroups.reduce((sum, sg) => sum + (sg.source_count || 0), 0);
+  const activeSources = safeSourceGroups.reduce((sum, sg) => sum + (sg.active_count || 0), 0);
+  const totalPatients = safeSourceGroups.reduce((sum, sg) => sum + (sg.total_patients || 0), 0);
+  const thisMonthPatients = safeSourceGroups.reduce((sum, sg) => sum + (sg.current_month_patients || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -487,3 +540,5 @@ export function Dashboard() {
     </div>
   );
 }
+
+export default Dashboard;
