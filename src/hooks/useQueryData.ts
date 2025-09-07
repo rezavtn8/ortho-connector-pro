@@ -441,3 +441,175 @@ export function useCreateSource() {
     },
   });
 }
+
+// Campaign Mutations with Optimistic Updates
+
+export function useCreateCampaign() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ campaignData, deliveries }: { 
+      campaignData: any, 
+      deliveries: Array<{ office_id: string }> 
+    }) => {
+      try {
+        // Create campaign
+        const { data: campaign, error: campaignError } = await supabase
+          .from('campaigns')
+          .insert([campaignData])
+          .select()
+          .single();
+
+        if (campaignError) throw campaignError;
+
+        // Create campaign deliveries
+        const deliveriesWithCampaignId = deliveries.map(delivery => ({
+          ...delivery,
+          campaign_id: campaign.id,
+          created_by: campaignData.created_by
+        }));
+
+        const { data: createdDeliveries, error: deliveriesError } = await supabase
+          .from('campaign_deliveries')
+          .insert(deliveriesWithCampaignId)
+          .select();
+
+        if (deliveriesError) throw deliveriesError;
+
+        return { campaign, deliveries: createdDeliveries };
+      } catch (error) {
+        await errorHandler.handleError(error, 'useCreateCampaign');
+        throw error;
+      }
+    },
+    onMutate: async ({ campaignData, deliveries }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: queryKeys.campaigns });
+
+      // Create optimistic campaign entry
+      const optimisticCampaign = {
+        ...campaignData,
+        id: `temp-${Date.now()}`,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        status: 'Draft',
+      };
+
+      // Optimistically update campaigns list
+      queryClient.setQueryData(queryKeys.campaignsList(), (old: any) => {
+        if (!old?.pages?.[0]) return old;
+        
+        return {
+          ...old,
+          pages: [
+            {
+              ...old.pages[0],
+              data: [optimisticCampaign, ...old.pages[0].data],
+              totalCount: old.pages[0].totalCount + 1,
+            },
+            ...old.pages.slice(1),
+          ],
+        };
+      });
+
+      return { optimisticCampaign };
+    },
+    onError: (err, variables, context) => {
+      // Rollback optimistic update
+      if (context?.optimisticCampaign) {
+        queryClient.setQueryData(queryKeys.campaignsList(), (old: any) => {
+          if (!old?.pages?.[0]) return old;
+          
+          return {
+            ...old,
+            pages: [
+              {
+                ...old.pages[0],
+                data: old.pages[0].data.filter((campaign: any) => campaign.id !== context.optimisticCampaign.id),
+                totalCount: old.pages[0].totalCount - 1,
+              },
+              ...old.pages.slice(1),
+            ],
+          };
+        });
+      }
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Campaign created successfully",
+      });
+    },
+    onSettled: () => {
+      // Refetch to get accurate data
+      queryClient.invalidateQueries({ queryKey: queryKeys.campaigns });
+    },
+  });
+}
+
+export function useUpdateCampaignDelivery() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ deliveryId, updateData }: { deliveryId: string, updateData: any }) => {
+      try {
+        const { data, error } = await supabase
+          .from('campaign_deliveries')
+          .update(updateData)
+          .eq('id', deliveryId)
+          .select()
+          .single();
+
+        if (error) throw error;
+        return data;
+      } catch (error) {
+        await errorHandler.handleError(error, 'useUpdateCampaignDelivery');
+        throw error;
+      }
+    },
+    onMutate: async ({ deliveryId, updateData }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: queryKeys.campaignDeliveries });
+
+      // Snapshot previous value
+      const previousData = queryClient.getQueryData(queryKeys.campaignDeliveries);
+
+      // Optimistically update delivery
+      queryClient.setQueryData(queryKeys.campaignDeliveries, (old: any) => {
+        if (!old?.pages) return old;
+        
+        return {
+          ...old,
+          pages: old.pages.map((page: any) => ({
+            ...page,
+            data: page.data.map((delivery: any) => 
+              delivery.id === deliveryId 
+                ? { ...delivery, ...updateData, updated_at: new Date().toISOString() }
+                : delivery
+            )
+          }))
+        };
+      });
+
+      return { previousData };
+    },
+    onError: (err, variables, context) => {
+      // Rollback on error
+      if (context?.previousData) {
+        queryClient.setQueryData(queryKeys.campaignDeliveries, context.previousData);
+      }
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Delivery status updated successfully",
+      });
+    },
+    onSettled: () => {
+      // Refetch to get accurate data
+      queryClient.invalidateQueries({ queryKey: queryKeys.campaignDeliveries });
+    },
+  });
+}

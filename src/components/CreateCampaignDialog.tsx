@@ -65,6 +65,7 @@ const DEFAULT_MATERIALS: Record<string, string[]> = {
 export function CreateCampaignDialog({ open, onOpenChange, onCampaignCreated }: CreateCampaignDialogProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const createCampaignMutation = useCreateCampaign();
   
   const [formData, setFormData] = useState({
     name: '',
@@ -398,11 +399,18 @@ export function CreateCampaignDialog({ open, onOpenChange, onCampaignCreated }: 
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={createCampaignMutation.isPending}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={loading}>
-            {loading ? 'Creating...' : 'Create Campaign'}
+          <Button onClick={handleSubmit} disabled={createCampaignMutation.isPending}>
+            {createCampaignMutation.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              'Create Campaign'
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

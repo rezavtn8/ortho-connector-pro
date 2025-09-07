@@ -49,6 +49,16 @@ export const queryKeys = {
   marketingVisitsList: (filters?: any) => ['marketing-visits', 'list', filters] as const,
   marketingVisitDetail: (id: string) => ['marketing-visits', 'detail', id] as const,
   
+  // Campaigns
+  campaigns: ['campaigns'] as const,
+  campaignsList: (filters?: any) => ['campaigns', 'list', filters] as const,
+  campaignDetail: (id: string) => ['campaigns', 'detail', id] as const,
+  
+  // Campaign Deliveries
+  campaignDeliveries: ['campaign-deliveries'] as const,
+  campaignDeliveriesList: (filters?: any) => ['campaign-deliveries', 'list', filters] as const,
+  campaignDeliveriesByCampaign: (campaignId: string) => ['campaign-deliveries', 'campaign', campaignId] as const,
+  
   // Monthly data
   monthlyPatients: ['monthly-patients'] as const,
   monthlyPatientsForSource: (sourceId: string) => ['monthly-patients', 'source', sourceId] as const,
