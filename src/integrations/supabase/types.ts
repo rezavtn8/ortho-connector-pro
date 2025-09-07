@@ -63,6 +63,13 @@ export type Database = {
             foreignKeyName: "campaign_deliveries_office_id_fkey"
             columns: ["office_id"]
             isOneToOne: false
+            referencedRelation: "office_metrics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_deliveries_office_id_fkey"
+            columns: ["office_id"]
+            isOneToOne: false
             referencedRelation: "patient_sources"
             referencedColumns: ["id"]
           },
@@ -436,6 +443,13 @@ export type Database = {
             foreignKeyName: "fk_marketing_visits_office"
             columns: ["office_id"]
             isOneToOne: false
+            referencedRelation: "office_metrics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_marketing_visits_office"
+            columns: ["office_id"]
+            isOneToOne: false
             referencedRelation: "patient_sources"
             referencedColumns: ["id"]
           },
@@ -481,6 +495,13 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "monthly_patients_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "office_metrics"
             referencedColumns: ["id"]
           },
           {
@@ -538,6 +559,13 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_changes_log_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "office_metrics"
             referencedColumns: ["id"]
           },
           {
@@ -774,6 +802,13 @@ export type Database = {
             foreignKeyName: "source_tags_source_id_fkey"
             columns: ["source_id"]
             isOneToOne: false
+            referencedRelation: "office_metrics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_tags_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
             referencedRelation: "patient_sources"
             referencedColumns: ["id"]
           },
@@ -887,7 +922,43 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      dashboard_summary: {
+        Row: {
+          monthly_trends: Json | null
+          source_groups: Json | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
+      office_metrics: {
+        Row: {
+          address: string | null
+          created_at: string | null
+          created_by: string | null
+          distance_miles: number | null
+          email: string | null
+          google_place_id: string | null
+          google_rating: number | null
+          id: string | null
+          is_active: boolean | null
+          l12: number | null
+          last_updated_from_google: string | null
+          latitude: number | null
+          longitude: number | null
+          mslr: number | null
+          name: string | null
+          notes: string | null
+          opening_hours: string | null
+          phone: string | null
+          r3: number | null
+          tier: string | null
+          total_patients: number | null
+          updated_at: string | null
+          website: string | null
+          yelp_rating: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       accept_invitation: {
@@ -946,6 +1017,44 @@ export type Database = {
           source_id: string
           source_name: string
           source_type: string
+        }[]
+      }
+      get_dashboard_data: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          recent_activity: Json
+          summary: Json
+        }[]
+      }
+      get_office_data_with_relations: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          address: string
+          created_at: string
+          created_by: string
+          distance_miles: number
+          email: string
+          google_place_id: string
+          google_rating: number
+          id: string
+          is_active: boolean
+          l12: number
+          last_updated_from_google: string
+          latitude: number
+          longitude: number
+          monthly_data: Json
+          mslr: number
+          name: string
+          notes: string
+          opening_hours: string
+          phone: string
+          r3: number
+          tags: Json
+          tier: string
+          total_patients: number
+          updated_at: string
+          website: string
+          yelp_rating: number
         }[]
       }
       get_user_clinic_id: {
