@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,9 +13,10 @@ import {
 } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Building2, ArrowUpDown, Filter } from 'lucide-react';
+import { Building2, ArrowUpDown, Filter, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { usePagination, useInfiniteScroll } from '@/hooks/usePagination';
 
 interface OfficeData {
   id: string;
@@ -79,46 +80,66 @@ const TIER_CONFIG = {
 
 export function Offices() {
   const { toast } = useToast();
-  const [offices, setOffices] = useState<OfficeData[]>([]);
-  const [loading, setLoading] = useState(true);
   const [tierFilter, setTierFilter] = useState<TierFilter>('all');
   const [sortField, setSortField] = useState<SortField>('l12');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [searchTerm, setSearchTerm] = useState('');
+  const [enableInfiniteScroll, setEnableInfiniteScroll] = useState(false);
 
-  useEffect(() => {
-    loadOffices();
+  // Create query function for pagination
+  const queryFn = useCallback(async (startIndex: number, endIndex: number) => {
+    // For RPC functions, we need to handle pagination differently
+    // Since the function returns all data, we'll get all data and handle pagination client-side for now
+    const { data, error } = await supabase.rpc('get_office_data_with_relations');
+
+    if (error) throw error;
+
+    const allData = (data || []) as OfficeData[];
+    const totalCount = allData.length;
+    const paginatedData = allData.slice(startIndex, startIndex + 20);
+
+    return { 
+      data: paginatedData, 
+      error: null, 
+      count: totalCount 
+    };
   }, []);
 
+  // Use pagination hook
+  const {
+    data: offices,
+    loading,
+    loadingMore,
+    hasMore,
+    totalCount,
+    error,
+    loadMore,
+    refresh,
+  } = usePagination<OfficeData>(queryFn, { pageSize: 20 });
 
-  const loadOffices = async () => {
-    try {
-      setLoading(true);
-      
-      // Use the optimized function to get all office data with relations in one query
-      const { data: officesData, error } = await supabase.rpc('get_office_data_with_relations');
+  // Set up infinite scroll
+  useInfiniteScroll(loadMore, hasMore && enableInfiniteScroll, loadingMore);
 
-      if (error) throw error;
 
-      // Parse the JSON fields and convert to proper types
-      const processedOffices: OfficeData[] = (officesData || []).map((office: any) => ({
-        ...office,
-        tags: Array.isArray(office.tags) ? office.tags : [],
-        monthly_data: Array.isArray(office.monthly_data) ? office.monthly_data : [],
-      }));
+  // Process the raw office data from pagination hook
+  const processedOffices = useMemo(() => {
+    return offices.map((office: any) => ({
+      ...office,
+      tags: Array.isArray(office.tags) ? office.tags : [],
+      monthly_data: Array.isArray(office.monthly_data) ? office.monthly_data : [],
+    }));
+  }, [offices]);
 
-      setOffices(processedOffices);
-    } catch (error) {
-      console.error('Error loading offices:', error);
+  // Handle errors
+  useEffect(() => {
+    if (error) {
       toast({
         title: "Error",
         description: "Failed to load offices data",
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [error, toast]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -129,35 +150,39 @@ export function Offices() {
     }
   };
 
-  const filteredAndSortedOffices = offices
-    .filter(office => {
-      const matchesSearch = searchTerm === '' || 
-        office.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        office.address?.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesTier = tierFilter === 'all' || office.tier === tierFilter;
-      return matchesSearch && matchesTier;
-    })
-    .sort((a, b) => {
-      const direction = sortDirection === 'asc' ? 1 : -1;
-      
-      switch (sortField) {
-        case 'name':
-          return direction * a.name.localeCompare(b.name);
-        case 'l12':
-          return direction * (a.l12 - b.l12);
-        case 'r3':
-          return direction * (a.r3 - b.r3);
-        case 'mslr':
-          return direction * (a.mslr - b.mslr);
-        default:
-          return 0;
-      }
-    });
+  const filteredAndSortedOffices = useMemo(() => {
+    return processedOffices
+      .filter(office => {
+        const matchesSearch = searchTerm === '' || 
+          office.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          office.address?.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesTier = tierFilter === 'all' || office.tier === tierFilter;
+        return matchesSearch && matchesTier;
+      })
+      .sort((a, b) => {
+        const direction = sortDirection === 'asc' ? 1 : -1;
+        
+        switch (sortField) {
+          case 'name':
+            return direction * a.name.localeCompare(b.name);
+          case 'l12':
+            return direction * (a.l12 - b.l12);
+          case 'r3':
+            return direction * (a.r3 - b.r3);
+          case 'mslr':
+            return direction * (a.mslr - b.mslr);
+          default:
+            return 0;
+        }
+      });
+  }, [processedOffices, searchTerm, tierFilter, sortField, sortDirection]);
 
-  const tierCounts = offices.reduce((acc, office) => {
-    acc[office.tier] = (acc[office.tier] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  const tierCounts = useMemo(() => {
+    return processedOffices.reduce((acc, office) => {
+      acc[office.tier] = (acc[office.tier] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+  }, [processedOffices]);
 
   if (loading) {
     return (
@@ -184,8 +209,15 @@ export function Offices() {
           <h1 className="text-3xl font-bold text-foreground">Offices</h1>
           <div className="flex items-center gap-4">
             <div className="text-sm text-muted-foreground">
-              {offices.length} office{offices.length !== 1 ? 's' : ''}
+              {processedOffices.length} of {totalCount} office{totalCount !== 1 ? 's' : ''}
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEnableInfiniteScroll(!enableInfiniteScroll)}
+            >
+              {enableInfiniteScroll ? 'Disable' : 'Enable'} Auto-load
+            </Button>
           </div>
         </div>
 
@@ -350,6 +382,31 @@ export function Offices() {
                 </TableBody>
               </Table>
             </div>
+            
+            {/* Load More Button */}
+            {hasMore && (
+              <div className="flex justify-center pt-6">
+                <Button
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  {loadingMore && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {loadingMore ? 'Loading...' : 'Load More Offices'}
+                </Button>
+              </div>
+            )}
+
+            {/* Infinite scroll indicator */}
+            {enableInfiniteScroll && loadingMore && (
+              <div className="flex justify-center pt-4">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading more offices...
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

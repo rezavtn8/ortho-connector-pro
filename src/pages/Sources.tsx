@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,12 +12,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Search, Edit, Eye, Building2, Globe, MessageSquare, Star, Trash2, Check, X, Power } from 'lucide-react';
+import { Plus, Search, Edit, Eye, Building2, Globe, MessageSquare, Star, Trash2, Check, X, Power, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ImportDataDialog } from '@/components/ImportDataDialog';
 import { PatientSource, MonthlyPatients, SOURCE_TYPE_CONFIG, getCurrentYearMonth, SourceType } from '@/lib/database.types';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { usePagination } from '@/hooks/usePagination';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AddressSearch } from '@/components/AddressSearch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -29,49 +30,76 @@ import { PatientCountEditor } from '@/components/PatientCountEditor';
 export function Sources() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [sources, setSources] = useState<PatientSource[]>([]);
   const [monthlyData, setMonthlyData] = useState<MonthlyPatients[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [loading, setLoading] = useState(true);
   const [selectedSources, setSelectedSources] = useState<string[]>([]);
   const [editingSource, setEditingSource] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<PatientSource>>({});
   const currentMonth = getCurrentYearMonth();
 
-  useEffect(() => {
-    loadData();
+  // Create query function for pagination
+  const queryFn = useCallback(async (startIndex: number, endIndex: number) => {
+    // First get count
+    const { count, error: countError } = await supabase
+      .from('patient_sources')
+      .select('*', { count: 'exact', head: true })
+      .order('name');
+
+    if (countError) throw countError;
+
+    // Then get data with range
+    const { data, error } = await supabase
+      .from('patient_sources')
+      .select('*')
+      .order('name')
+      .range(startIndex, endIndex);
+
+    return { data, error, count };
   }, []);
 
-  const loadData = async () => {
+  // Use pagination hook
+  const {
+    data: sources,
+    loading,
+    loadingMore,
+    hasMore,
+    totalCount,
+    error,
+    loadMore,
+    refresh,
+  } = usePagination<PatientSource>(queryFn, { pageSize: 20 });
+
+  useEffect(() => {
+    loadMonthlyData();
+  }, []);
+
+  // Handle errors
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load sources data",
+        variant: "destructive",
+      });
+    }
+  }, [error, toast]);
+
+  const loadMonthlyData = async () => {
     try {
-      setLoading(true);
-      
-      // Load patient sources
-      const { data: sourcesData, error: sourcesError } = await supabase
-        .from('patient_sources')
-        .select('*')
-        .order('name');
-
-      if (sourcesError) throw sourcesError;
-
       // Load all monthly data for patient counts
       const { data: monthlyDataResult, error: monthlyError } = await supabase
         .from('monthly_patients')
         .select('*');
 
       if (monthlyError) throw monthlyError;
-
-      setSources(sourcesData || []);
       setMonthlyData(monthlyDataResult || []);
     } catch (error) {
-      console.error('Error loading data:', error);
+      console.error('Error loading monthly data:', error);
       toast({
         title: "Error",
-        description: "Failed to load data",
+        description: "Failed to load monthly data",
         variant: "destructive"
       });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -145,7 +173,7 @@ export function Sources() {
 
       setEditingSource(null);
       setEditForm({});
-      loadData();
+      refresh();
     } catch (error) {
       console.error('Error updating source:', error);
       toast({
@@ -209,7 +237,7 @@ export function Sources() {
       });
 
       setSelectedSources([]);
-      loadData();
+      refresh();
     } catch (error) {
       console.error('Error deleting sources:', error);
       toast({
@@ -234,7 +262,7 @@ export function Sources() {
         description: `Source ${isActive ? 'activated' : 'deactivated'} successfully`,
       });
 
-      loadData();
+      refresh();
     } catch (error) {
       console.error('Error updating source status:', error);
       toast({
@@ -249,7 +277,7 @@ export function Sources() {
   const officeSourceTypes = ['Office'];
   const otherSourceTypes = ['Word of Mouth', 'Insurance', 'Other'];
 
-  const renderSourceTable = (sources: PatientSource[], title: string, icon: React.ElementType) => {
+  const renderSourceTable = (sources: PatientSource[], title: string, icon: React.ElementType, showLoadMore: boolean = false) => {
     const Icon = icon;
     const isAllSelected = sources.length > 0 && sources.every(s => selectedSources.includes(s.id));
     const isSomeSelected = sources.some(s => selectedSources.includes(s.id));
@@ -418,11 +446,11 @@ export function Sources() {
                       </div>
                     </TableCell>
                      <TableCell className="text-center">
-                       <PatientCountEditor
-                         sourceId={source.id}
-                         currentCount={thisMonth}
-                         onUpdate={loadData}
-                       />
+                        <PatientCountEditor
+                          sourceId={source.id}
+                          currentCount={thisMonth}
+                          onUpdate={refresh}
+                        />
                      </TableCell>
                     <TableCell className="text-center font-semibold">
                       {total}
@@ -481,10 +509,25 @@ export function Sources() {
                   </TableRow>
                 );
               })}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              </TableBody>
+            </Table>
+            
+            {/* Load More Button */}
+            {showLoadMore && hasMore && (
+              <div className="flex justify-center pt-4">
+                <Button
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  {loadingMore && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {loadingMore ? 'Loading...' : 'Load More Sources'}
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
     );
   };
 
@@ -498,8 +541,8 @@ export function Sources() {
           </p>
         </div>
         <div className="flex gap-3">
-          <ImportDataDialog onImportComplete={loadData} />
-          <AddSourceDialog onSourceAdded={loadData} />
+          <ImportDataDialog onImportComplete={refresh} />
+          <AddSourceDialog onSourceAdded={refresh} />
         </div>
       </div>
 

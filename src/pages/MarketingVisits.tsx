@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,12 +23,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CalendarIcon, Plus, Search, Star, Camera, FileText, Download, Filter } from 'lucide-react';
+import { CalendarIcon, Plus, Search, Star, Camera, FileText, Download, Filter, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { usePagination, useInfiniteScroll } from '@/hooks/usePagination';
 
 interface MarketingVisit {
   id: string;
@@ -65,9 +66,7 @@ const MATERIALS = ['Referral Slips', 'Portfolio', 'Gifts', 'Booklets', 'Gift Car
 export function MarketingVisits() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [visits, setVisits] = useState<MarketingVisit[]>([]);
   const [offices, setOffices] = useState<Office[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRep, setFilterRep] = useState('');
@@ -76,6 +75,59 @@ export function MarketingVisits() {
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
   const [selectedOffice, setSelectedOffice] = useState<Office | null>(null);
   const [activeTab, setActiveTab] = useState('table');
+  const [enableInfiniteScroll, setEnableInfiniteScroll] = useState(false);
+
+  // Create query function for pagination
+  const queryFn = useCallback(async (startIndex: number, endIndex: number) => {
+    // First get count
+    const { count, error: countError } = await supabase
+      .from('marketing_visits')
+      .select('*', { count: 'exact', head: true })
+      .order('visit_date', { ascending: false });
+
+    if (countError) throw countError;
+
+    // Then get data with range
+    const { data, error } = await supabase
+      .from('marketing_visits')
+      .select(`
+        id,
+        office_id,
+        visit_date,
+        visit_type,
+        group_tag,
+        contact_person,
+        visited,
+        rep_name,
+        materials_handed_out,
+        star_rating,
+        follow_up_notes,
+        photo_url,
+        created_at,
+        updated_at,
+        user_id,
+        clinic_id
+      `)
+      .order('visit_date', { ascending: false })
+      .range(startIndex, endIndex);
+
+    return { data, error, count };
+  }, []);
+
+  // Use pagination hook
+  const {
+    data: visits,
+    loading,
+    loadingMore,
+    hasMore,
+    totalCount,
+    error,
+    loadMore,
+    refresh,
+  } = usePagination<MarketingVisit>(queryFn, { pageSize: 20 });
+
+  // Set up infinite scroll
+  useInfiniteScroll(loadMore, hasMore && enableInfiniteScroll, loadingMore);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -92,13 +144,22 @@ export function MarketingVisits() {
   });
 
   useEffect(() => {
-    loadData();
+    loadOfficesData();
   }, []);
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
+  // Handle errors
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: "Error loading visits",
+        description: error,
+        variant: "destructive",
+      });
+    }  
+  }, [error, toast]);
 
+  const loadOfficesData = async () => {
+    try {
       // Load offices (patient sources with type 'Office')
       const { data: officesData, error: officesError } = await supabase
         .from('patient_sources')
@@ -109,49 +170,22 @@ export function MarketingVisits() {
 
       if (officesError) throw officesError;
       setOffices(officesData || []);
-
-      // Load marketing visits with office names
-      const { data: visitsData, error: visitsError } = await supabase
-        .from('marketing_visits')
-        .select(`
-          id,
-          office_id,
-          visit_date,
-          visit_type,
-          group_tag,
-          contact_person,
-          visited,
-          rep_name,
-          materials_handed_out,
-          star_rating,
-          follow_up_notes,
-          photo_url,
-          created_at,
-          updated_at,
-          user_id,
-          clinic_id
-        `)
-        .order('visit_date', { ascending: false });
-
-      if (visitsError) throw visitsError;
-
-      // Join with office names
-      const visitsWithOffices = (visitsData || []).map(visit => ({
-        ...visit,
-        office_name: officesData?.find(office => office.id === visit.office_id)?.name || 'Unknown Office'
-      }));
-
-      setVisits(visitsWithOffices);
     } catch (error: any) {
       toast({
-        title: "Error loading data",
+        title: "Error loading offices",
         description: error.message,
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
   };
+
+  // Join visits with office names
+  const visitsWithOffices = useMemo(() => {
+    return visits.map(visit => ({
+      ...visit,
+      office_name: offices.find(office => office.id === visit.office_id)?.name || 'Unknown Office'
+    }));
+  }, [visits, offices]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -175,8 +209,6 @@ export function MarketingVisits() {
     }
 
     try {
-      setLoading(true);
-
       // If it's a new office from Google Places, create it first
       let officeId = selectedOffice.id;
       if (selectedOffice.id.startsWith('new-')) {
@@ -239,7 +271,7 @@ export function MarketingVisits() {
       });
       setSelectedOffice(null);
       setShowForm(false);
-      loadData();
+      refresh();
     } catch (error: any) {
       toast({
         title: "Error adding visit",
@@ -247,7 +279,7 @@ export function MarketingVisits() {
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      // Don't need to set loading false since it's handled by the component state
     }
   };
 
@@ -260,7 +292,7 @@ export function MarketingVisits() {
     }));
   };
 
-  const filteredVisits = visits.filter(visit => {
+  const filteredVisits = visitsWithOffices.filter(visit => {
     const matchesSearch = visit.office_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          visit.contact_person?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          visit.rep_name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -327,7 +359,7 @@ export function MarketingVisits() {
     );
   };
 
-  if (loading && visits.length === 0) {
+  if (loading && visitsWithOffices.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-96">
         <div className="text-center">
@@ -343,12 +375,23 @@ export function MarketingVisits() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Marketing Visits</h1>
-          <p className="text-muted-foreground">Track and manage office visits and outreach activities</p>
+          <p className="text-muted-foreground">
+            Track and manage office visits and outreach activities ({visitsWithOffices.length} of {totalCount} visits)
+          </p>
         </div>
-        <Button onClick={() => setShowForm(true)} className="gap-2">
-          <Plus className="w-4 h-4" />
-          Add Visit
-        </Button>
+        <div className="flex items-center gap-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setEnableInfiniteScroll(!enableInfiniteScroll)}
+          >
+            {enableInfiniteScroll ? 'Disable' : 'Enable'} Auto-load
+          </Button>
+          <Button onClick={() => setShowForm(true)} className="gap-2">
+            <Plus className="w-4 h-4" />
+            Add Visit
+          </Button>
+        </div>
       </div>
 
       {showForm && (
@@ -662,8 +705,33 @@ export function MarketingVisits() {
                       </TableCell>
                     </TableRow>
                   ))}
-                </TableBody>
-              </Table>
+              </TableBody>
+            </Table>
+            
+            {/* Load More Button */}
+            {hasMore && (
+              <div className="flex justify-center pt-4">
+                <Button
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  {loadingMore && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {loadingMore ? 'Loading...' : 'Load More Visits'}
+                </Button>
+              </div>
+            )}
+
+            {/* Infinite scroll indicator */}
+            {enableInfiniteScroll && loadingMore && (
+              <div className="flex justify-center pt-4">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading more visits...
+                </div>
+              </div>
+            )}
             </div>
           )}
         </CardContent>
