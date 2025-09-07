@@ -32,9 +32,9 @@ export function useAuth() {
   // Session timeout states
   const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
   const [timeoutRemaining, setTimeoutRemaining] = useState(0);
-  const sessionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const activityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const sessionTimeoutRef = useRef<number | null>(null);
+  const warningTimeoutRef = useRef<number | null>(null);
+  const activityTimeoutRef = useRef<number | null>(null);
 
   const getRateLimitData = (): RateLimitData => {
     const stored = localStorage.getItem(RATE_LIMIT_KEY);
@@ -109,9 +109,18 @@ export function useAuth() {
   };
 
   const clearSessionTimeouts = useCallback(() => {
-    if (sessionTimeoutRef.current) clearTimeout(sessionTimeoutRef.current);
-    if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
-    if (activityTimeoutRef.current) clearTimeout(activityTimeoutRef.current);
+    if (sessionTimeoutRef.current) {
+      clearTimeout(sessionTimeoutRef.current);
+      sessionTimeoutRef.current = null;
+    }
+    if (warningTimeoutRef.current) {
+      clearTimeout(warningTimeoutRef.current);
+      warningTimeoutRef.current = null;
+    }
+    if (activityTimeoutRef.current) {
+      clearTimeout(activityTimeoutRef.current);
+      activityTimeoutRef.current = null;
+    }
     setShowTimeoutWarning(false);
     setTimeoutRemaining(0);
   }, []);
@@ -127,7 +136,7 @@ export function useAuth() {
     setTimeoutRemaining(WARNING_TIMEOUT / 1000);
     
     // Start countdown for warning
-    const countdownInterval = setInterval(() => {
+    const countdownInterval = window.setInterval(() => {
       setTimeoutRemaining(prev => {
         if (prev <= 1) {
           clearInterval(countdownInterval);
@@ -138,7 +147,7 @@ export function useAuth() {
     }, 1000);
 
     // Auto-logout after warning period
-    sessionTimeoutRef.current = setTimeout(() => {
+    sessionTimeoutRef.current = window.setTimeout(() => {
       clearInterval(countdownInterval);
       handleSessionTimeout();
     }, WARNING_TIMEOUT);
@@ -151,7 +160,7 @@ export function useAuth() {
     
     if (session) {
       // Set warning timeout (25 minutes)
-      warningTimeoutRef.current = setTimeout(showWarningModal, SESSION_TIMEOUT - WARNING_TIMEOUT);
+      warningTimeoutRef.current = window.setTimeout(showWarningModal, SESSION_TIMEOUT - WARNING_TIMEOUT);
     }
   }, [session, showWarningModal, clearSessionTimeouts]);
 
@@ -180,7 +189,7 @@ export function useAuth() {
         if (session) {
           resetFailedAttempts();
           // Initialize session timeout on login
-          setTimeout(() => refreshSession(), 0);
+          window.setTimeout(() => refreshSession(), 0);
         } else {
           // Clear session timeout on logout
           clearSessionTimeouts();
@@ -197,7 +206,7 @@ export function useAuth() {
       
       // Initialize session timeout for existing session
       if (session) {
-        setTimeout(() => refreshSession(), 0);
+        window.setTimeout(() => refreshSession(), 0);
       }
     });
 
@@ -211,10 +220,10 @@ export function useAuth() {
     const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
     
     // Throttle activity tracking to avoid excessive calls
-    let activityTimeout: NodeJS.Timeout;
+    let activityTimeout: number;
     const throttledTrackActivity = () => {
       clearTimeout(activityTimeout);
-      activityTimeout = setTimeout(trackUserActivity, 1000);
+      activityTimeout = window.setTimeout(trackUserActivity, 1000);
     };
 
     events.forEach(event => {

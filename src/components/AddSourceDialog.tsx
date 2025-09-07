@@ -16,6 +16,19 @@ import { SourceType } from '@/lib/database.types';
 import { AddressSearch } from '@/components/AddressSearch';
 import { sanitizeText, sanitizeEmail, sanitizeURL, sanitizePhone } from '@/lib/sanitize';
 
+interface SelectedOffice {
+  id?: string;
+  name: string;
+  address?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  phone?: string | null;
+  website?: string | null;
+  google_place_id?: string | null;
+  google_rating?: number | null;
+  opening_hours?: string | null;
+}
+
 interface AddOfficeDialogProps {
   onOfficeAdded: () => void;
 }
@@ -37,7 +50,7 @@ export const AddOfficeDialog: React.FC<AddOfficeDialogProps> = ({ onOfficeAdded 
     distance_from_clinic: '',
     patient_load: '0'
   });
-  const [selectedOffice, setSelectedOffice] = useState<any>(null);
+  const [selectedOffice, setSelectedOffice] = useState<SelectedOffice | null>(null);
 
   const sourceOptions = [
     { value: 'Manual', label: 'Manual Entry', icon: '✏️' },
@@ -150,7 +163,30 @@ export const AddOfficeDialog: React.FC<AddOfficeDialogProps> = ({ onOfficeAdded 
       }
 
       // If selected from AddressSearch, use that data
-      let sourceData: any = {
+      interface SourceData {
+        name: string;
+        source_type: SourceType;
+        phone?: string | null;
+        email?: string | null;
+        website?: string | null;
+        notes?: string | null;
+        is_active: boolean;
+        created_by: string;
+        address?: string | null;
+        latitude?: number | null;
+        longitude?: number | null;
+        google_place_id?: string | null;
+        google_rating?: number | null;
+        opening_hours?: string | null;
+        last_updated_from_google?: string | null;
+      }
+
+      const userId = (await supabase.auth.getUser()).data.user?.id;
+      if (!userId) {
+        throw new Error('User not authenticated');
+      }
+
+      let sourceData: SourceData = {
         name: sanitizedName,
         source_type: 'Office' as SourceType,
         phone: sanitizedPhone || null,
@@ -158,7 +194,7 @@ export const AddOfficeDialog: React.FC<AddOfficeDialogProps> = ({ onOfficeAdded 
         website: sanitizedWebsite,
         notes: sanitizedNotes,
         is_active: true,
-        created_by: (await supabase.auth.getUser()).data.user?.id
+        created_by: userId
       };
 
       // Add address and coordinates if available
@@ -214,7 +250,7 @@ export const AddOfficeDialog: React.FC<AddOfficeDialogProps> = ({ onOfficeAdded 
 
       const { data, error } = await supabase
         .from('patient_sources')
-        .insert([sourceData])
+        .insert(sourceData)
         .select()
         .single();
 
@@ -230,11 +266,12 @@ export const AddOfficeDialog: React.FC<AddOfficeDialogProps> = ({ onOfficeAdded 
       setSelectedOffice(null);
       setOpen(false);
       onOfficeAdded();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error adding office:', error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to add office. Please try again.";
       toast({
         title: "Error",
-        description: error.message || "Failed to add office. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

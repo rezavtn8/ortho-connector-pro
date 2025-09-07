@@ -260,7 +260,7 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
                 <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
                 <select
                   value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as any)}
+                  onChange={(e) => setSortBy(e.target.value as 'name' | 'rating' | 'distance')}
                   className="text-sm border rounded px-2 py-1 bg-background"
                 >
                   <option value="distance">Distance</option>

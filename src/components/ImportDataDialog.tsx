@@ -19,6 +19,15 @@ import { useToast } from '@/hooks/use-toast';
 import { SOURCE_TYPE_CONFIG, SourceType } from '@/lib/database.types';
 import { OfficeMatchConfirmation } from '@/components/OfficeMatchConfirmation';
 
+// Import the ImportedOffice type from OfficeMatchConfirmation to avoid conflicts
+type OfficeForMatching = {
+  id: string;
+  name: string;
+  address?: string;
+  phone?: string;
+  website?: string;
+};
+
 interface ImportDataDialogProps {
   onImportComplete?: () => void;
 }
@@ -27,6 +36,21 @@ interface ParsedRow {
   source: string;
   monthlyData: { [key: string]: number };
   total: number;
+}
+
+// Rename the interface to avoid conflicts with OfficeMatchConfirmation
+interface ImportedPatientSource {
+  id?: string;
+  name: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  latitude?: number;
+  longitude?: number;
+  google_place_id?: string;
+  google_rating?: number;
+  monthlyData: { [key: string]: number };
 }
 
 interface DuplicateInfo {
@@ -56,8 +80,8 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
   const [conflictResolutions, setConflictResolutions] = useState<ConflictResolution[]>([]);
   const [showConflicts, setShowConflicts] = useState(false);
   const [showOfficeMatching, setShowOfficeMatching] = useState(false);
-  const [importedOffices, setImportedOffices] = useState<any[]>([]);
-  const [confirmedOfficeData, setConfirmedOfficeData] = useState<Map<string, any>>(new Map());
+  const [importedOffices, setImportedOffices] = useState<ImportedPatientSource[]>([]);
+  const [confirmedOfficeData, setConfirmedOfficeData] = useState<Map<string, ImportedPatientSource>>(new Map());
   const [sourceMapping, setSourceMapping] = useState<Map<string, string>>(new Map()); // originalSourceName -> databaseSourceId
   const { toast } = useToast();
 
@@ -476,6 +500,7 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
       const officesForMatching = officeSourcesNeedingMatch.map(row => ({
         id: `import-${row.source}`,
         name: row.source,
+        monthlyData: row.monthlyData
         // No existing address/phone/website from CSV import
       }));
 
@@ -487,7 +512,7 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
     }
   };
 
-  const handleOfficeMatchingComplete = async (confirmedOffices: any[], officeMappings: Map<string, string>) => {
+  const handleOfficeMatchingComplete = async (confirmedOffices: OfficeForMatching[], officeMappings: Map<string, string>) => {
     // Store the source mappings from office matching process
     setSourceMapping(officeMappings);
     
@@ -731,7 +756,13 @@ Insurance Partners,2,3,4,2,5,4,6,7,5,4,3,2,47`;
           </div>
         ) : showOfficeMatching ? (
           <OfficeMatchConfirmation
-            importedOffices={importedOffices}
+            importedOffices={importedOffices.map(office => ({
+              id: office.id || '',
+              name: office.name,
+              address: office.address,
+              phone: office.phone,
+              website: office.website
+            }))}
             onComplete={handleOfficeMatchingComplete}
           />
         ) : showConflicts ? (

@@ -130,7 +130,12 @@ export function CampaignDetailDialog({ campaign, open, onOpenChange, onCampaignU
     try {
       setUpdatingStatus(deliveryId);
       
-      const updateData: any = {
+      interface UpdateData {
+        delivery_status: 'Delivered' | 'Failed';
+        delivered_at?: string;
+      }
+      
+      const updateData: UpdateData = {
         delivery_status: status
       };
       

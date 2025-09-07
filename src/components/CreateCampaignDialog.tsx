@@ -138,7 +138,7 @@ export function CreateCampaignDialog({ open, onOpenChange, onCampaignCreated }: 
     }
   }, [formData.campaign_type]);
 
-  const handleInputChange = (field: string, value: any) => {
+  const handleInputChange = (field: string, value: string | Date | null) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
