@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { formatYearMonth } from '@/lib/database.types';
+import { PatientSource, MonthlyPatients, SOURCE_TYPE_CONFIG, getCurrentYearMonth, formatYearMonth } from '@/lib/database.types';
 import { supabase } from '@/integrations/supabase/client';
 import { Search, TrendingUp, Building2, Star, Users, Globe, MessageSquare, FileText, BarChart3 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -26,30 +26,29 @@ interface SourceGroupData {
   types: string[];
 }
 
-interface DashboardSummary {
-  user_id: string;
-  source_groups: Array<{
-    source_type: string;
-    source_count: number;
-    active_count: number;
-    total_patients: number;
-    current_month_patients: number;
-  }>;
-  monthly_trends: Array<{
-    year_month: string;
-    month_total: number;
-  }>;
-}
-
 interface PatientTrendChartProps {
-  monthlyTrends: Array<{ year_month: string; month_total: number }>;
+  monthlyData: MonthlyPatients[];
+  sources: PatientSource[];
 }
 
-function PatientTrendChart({ monthlyTrends }: PatientTrendChartProps) {
-  const chartData = (monthlyTrends || []).map(trend => ({
-    month: formatYearMonth(trend.year_month),
-    patients: trend.month_total
-  }));
+function PatientTrendChart({ monthlyData, sources }: PatientTrendChartProps) {
+  // Get last 6 months of data
+  const now = new Date();
+  const last6Months = Array.from({ length: 6 }, (_, i) => {
+    const date = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+    return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+  });
+
+  const chartData = last6Months.map(yearMonth => {
+    const monthTotal = monthlyData
+      .filter(data => data.year_month === yearMonth)
+      .reduce((sum, data) => sum + data.patient_count, 0);
+
+    return {
+      month: formatYearMonth(yearMonth),
+      patients: monthTotal
+    };
+  });
 
   return (
     <div className="h-64">
@@ -89,10 +88,12 @@ function PatientTrendChart({ monthlyTrends }: PatientTrendChartProps) {
 }
 
 export function Dashboard() {
-  const [dashboardData, setDashboardData] = useState<DashboardSummary | null>(null);
+  const [sources, setSources] = useState<PatientSource[]>([]);
+  const [monthlyData, setMonthlyData] = useState<MonthlyPatients[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const currentMonth = getCurrentYearMonth();
 
   useEffect(() => {
     loadData();
@@ -141,17 +142,31 @@ export function Dashboard() {
     try {
       setLoading(true);
       
-      // Use the optimized function to get all dashboard data in one query
-      const { data, error } = await supabase.rpc('get_dashboard_data');
+      // Load patient sources
+      const { data: sourcesData, error: sourcesError } = await supabase
+        .from('patient_sources')
+        .select('*')
+        .order('name');
 
-      if (error) throw error;
-      
-      if (data && data.length > 0 && data[0].summary) {
-        const summary = data[0].summary;
-        if (typeof summary === 'object' && summary !== null && !Array.isArray(summary)) {
-          setDashboardData((summary as unknown) as DashboardSummary);
-        }
-      }
+      if (sourcesError) throw sourcesError;
+
+      // Load monthly data for current month
+      const { data: monthlyDataResult, error: monthlyError } = await supabase
+        .from('monthly_patients')
+        .select('*')
+        .eq('year_month', currentMonth);
+
+      if (monthlyError) throw monthlyError;
+
+      // Load all-time monthly data for totals
+      const { data: allMonthlyData, error: allMonthlyError } = await supabase
+        .from('monthly_patients')
+        .select('*');
+
+      if (allMonthlyError) throw allMonthlyError;
+
+      setSources(sourcesData || []);
+      setMonthlyData(allMonthlyData || []);
     } catch (error) {
       console.error('Error loading data:', error);
       toast({
@@ -165,8 +180,6 @@ export function Dashboard() {
   };
 
   const getSourceGroupData = (): SourceGroupData[] => {
-    if (!dashboardData?.source_groups) return [];
-
     const groups = [
       {
         name: 'Dental Offices',
@@ -189,21 +202,27 @@ export function Dashboard() {
     ];
 
     return groups.map(group => {
-      const groupData = dashboardData.source_groups.filter(sg => group.types.includes(sg.source_type));
+      const groupSources = sources.filter(source => group.types.includes(source.source_type));
+      const sourceIds = groupSources.map(s => s.id);
+      
+      const groupMonthlyData = monthlyData.filter(m => sourceIds.includes(m.source_id));
+      const thisMonthData = groupMonthlyData.filter(m => m.year_month === currentMonth);
       
       return {
         ...group,
-        count: groupData.reduce((sum, sg) => sum + sg.source_count, 0),
-        totalPatients: groupData.reduce((sum, sg) => sum + sg.total_patients, 0),
-        thisMonth: groupData.reduce((sum, sg) => sum + sg.current_month_patients, 0)
+        count: groupSources.length,
+        totalPatients: groupMonthlyData.reduce((sum, m) => sum + m.patient_count, 0),
+        thisMonth: thisMonthData.reduce((sum, m) => sum + m.patient_count, 0)
       };
     });
   };
 
-  const totalSources = dashboardData?.source_groups?.reduce((sum, sg) => sum + sg.source_count, 0) || 0;
-  const activeSources = dashboardData?.source_groups?.reduce((sum, sg) => sum + sg.active_count, 0) || 0;
-  const totalPatients = dashboardData?.source_groups?.reduce((sum, sg) => sum + sg.total_patients, 0) || 0;
-  const thisMonthPatients = dashboardData?.source_groups?.reduce((sum, sg) => sum + sg.current_month_patients, 0) || 0;
+  const totalSources = sources.length;
+  const activeSources = sources.filter(source => source.is_active).length;
+  const totalPatients = monthlyData.reduce((sum, m) => sum + m.patient_count, 0);
+  const thisMonthPatients = monthlyData
+    .filter(m => m.year_month === currentMonth)
+    .reduce((sum, m) => sum + m.patient_count, 0);
 
   if (loading) {
     return (
@@ -391,7 +410,7 @@ export function Dashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <PatientTrendChart monthlyTrends={dashboardData?.monthly_trends || []} />
+            <PatientTrendChart monthlyData={monthlyData} sources={sources} />
           </CardContent>
         </Card>
       </div>

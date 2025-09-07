@@ -14,36 +14,15 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Building2, ArrowUpDown, Filter } from 'lucide-react';
+import { PatientSource, MonthlyPatients } from '@/lib/database.types';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
-interface OfficeData {
-  id: string;
-  name: string;
-  address?: string;
-  phone?: string;
-  email?: string;
-  website?: string;
-  notes?: string;
-  latitude?: number;
-  longitude?: number;
-  google_rating?: number;
-  google_place_id?: string;
-  opening_hours?: string;
-  yelp_rating?: number;
-  distance_miles?: number;
-  last_updated_from_google?: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-  created_by: string;
+interface OfficeData extends PatientSource {
   l12: number; // Last 12 months
   r3: number;  // Last 3 months  
   mslr: number; // Months since last referral
-  total_patients: number;
   tier: 'VIP' | 'Warm' | 'Cold' | 'Dormant';
-  tags: Array<{ id: string; tag_name: string; created_at: string }>;
-  monthly_data: Array<{ id: string; year_month: string; patient_count: number; created_at: string; updated_at: string }>;
 }
 
 type TierFilter = 'all' | 'VIP' | 'Warm' | 'Cold' | 'Dormant';
@@ -90,24 +69,109 @@ export function Offices() {
     loadOffices();
   }, []);
 
+  const calculateTier = (l12: number, r3: number, mslr: number, allOffices: { l12: number }[]): OfficeData['tier'] => {
+    // Dormant: no referrals in last 12 months
+    if (l12 === 0) return 'Dormant';
+
+    // VIP: top 20% by L12
+    const sortedByL12 = allOffices.map(o => o.l12).sort((a, b) => b - a);
+    const vipThresholdIndex = Math.ceil(sortedByL12.length * 0.2) - 1;
+    const vipThreshold = sortedByL12[vipThresholdIndex] || 0;
+    
+    if (l12 >= vipThreshold && vipThreshold > 0) return 'VIP';
+
+    // Warm: ≥4 in last 12 months OR ≥1 in last 3 months (but not VIP)
+    if (l12 >= 4 || r3 >= 1) return 'Warm';
+
+    // Cold: everything else
+    return 'Cold';
+  };
+
+  const calculateMonthsSinceLastReferral = (monthlyData: MonthlyPatients[]): number => {
+    const currentDate = new Date();
+    const currentYearMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+    
+    // Sort by year_month descending to find the most recent month with patients
+    const sortedData = monthlyData
+      .filter(data => data.patient_count > 0)
+      .sort((a, b) => b.year_month.localeCompare(a.year_month));
+    
+    if (sortedData.length === 0) return 999; // No referrals ever
+    
+    const lastReferralYearMonth = sortedData[0].year_month;
+    const [lastYear, lastMonth] = lastReferralYearMonth.split('-').map(Number);
+    const [currentYear, currentMonth] = [currentDate.getFullYear(), currentDate.getMonth() + 1];
+    
+    return (currentYear - lastYear) * 12 + (currentMonth - lastMonth);
+  };
 
   const loadOffices = async () => {
     try {
       setLoading(true);
       
-      // Use the optimized function to get all office data with relations in one query
-      const { data: officesData, error } = await supabase.rpc('get_office_data_with_relations');
+      // Load office sources only
+      const { data: sourcesData, error: sourcesError } = await supabase
+        .from('patient_sources')
+        .select('*')
+        .eq('source_type', 'Office')
+        .eq('is_active', true)
+        .order('name');
 
-      if (error) throw error;
+      if (sourcesError) throw sourcesError;
 
-      // Parse the JSON fields and convert to proper types
-      const processedOffices: OfficeData[] = (officesData || []).map((office: any) => ({
+      // Load monthly data for the past 12 months
+      const { data: monthlyData, error: monthlyError } = await supabase
+        .from('monthly_patients')
+        .select('*');
+
+      if (monthlyError) throw monthlyError;
+
+      // Calculate metrics for each office
+      const processedOffices: OfficeData[] = [];
+      const currentDate = new Date();
+      
+      for (const source of sourcesData || []) {
+        const sourceMonthlyData = monthlyData?.filter(m => m.source_id === source.id) || [];
+        
+        // Calculate L12 (last 12 months)
+        const l12 = sourceMonthlyData
+          .filter(m => {
+            const [year, month] = m.year_month.split('-').map(Number);
+            const dataDate = new Date(year, month - 1);
+            const twelveMonthsAgo = new Date(currentDate.getFullYear(), currentDate.getMonth() - 12);
+            return dataDate >= twelveMonthsAgo;
+          })
+          .reduce((sum, m) => sum + m.patient_count, 0);
+
+        // Calculate R3 (last 3 months)
+        const r3 = sourceMonthlyData
+          .filter(m => {
+            const [year, month] = m.year_month.split('-').map(Number);
+            const dataDate = new Date(year, month - 1);
+            const threeMonthsAgo = new Date(currentDate.getFullYear(), currentDate.getMonth() - 3);
+            return dataDate >= threeMonthsAgo;
+          })
+          .reduce((sum, m) => sum + m.patient_count, 0);
+
+        // Calculate MSLR (months since last referral)
+        const mslr = calculateMonthsSinceLastReferral(sourceMonthlyData);
+
+        processedOffices.push({
+          ...source,
+          l12,
+          r3,
+          mslr,
+          tier: 'Dormant', // Will be calculated after all offices are processed
+        });
+      }
+
+      // Calculate tiers after processing all offices (needed for VIP calculation)
+      const officesWithTiers = processedOffices.map(office => ({
         ...office,
-        tags: Array.isArray(office.tags) ? office.tags : [],
-        monthly_data: Array.isArray(office.monthly_data) ? office.monthly_data : [],
+        tier: calculateTier(office.l12, office.r3, office.mslr, processedOffices),
       }));
 
-      setOffices(processedOffices);
+      setOffices(officesWithTiers);
     } catch (error) {
       console.error('Error loading offices:', error);
       toast({
