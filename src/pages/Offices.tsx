@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,11 +13,9 @@ import {
 } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Building2, ArrowUpDown, Filter, Loader2, RefreshCw } from 'lucide-react';
+import { Building2, ArrowUpDown, Filter } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useOfficeData } from '@/hooks/useQueryData';
-import { SkeletonCard, SkeletonTable } from '@/components/ui/skeleton-card';
-import { Skeleton } from '@/components/ui/skeleton';
 
 interface OfficeData {
   id: string;
@@ -81,49 +79,46 @@ const TIER_CONFIG = {
 
 export function Offices() {
   const { toast } = useToast();
+  const [offices, setOffices] = useState<OfficeData[]>([]);
+  const [loading, setLoading] = useState(true);
   const [tierFilter, setTierFilter] = useState<TierFilter>('all');
   const [sortField, setSortField] = useState<SortField>('l12');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Use React Query for office data with infinite loading
-  const {
-    data,
-    isLoading: loading,
-    isFetchingNextPage: loadingMore,
-    hasNextPage: hasMore,
-    fetchNextPage: loadMore,
-    refetch,
-    error,
-    isFetching
-  } = useOfficeData();
+  useEffect(() => {
+    loadOffices();
+  }, []);
 
-  // Flatten pages data
-  const offices = useMemo(() => {
-    return data?.pages?.flatMap(page => page.data) || [];
-  }, [data]);
 
-  const totalCount = data?.pages?.[0]?.totalCount || 0;
+  const loadOffices = async () => {
+    try {
+      setLoading(true);
+      
+      // Use the optimized function to get all office data with relations in one query
+      const { data: officesData, error } = await supabase.rpc('get_office_data_with_relations');
 
-  // Process the raw office data
-  const processedOffices = useMemo(() => {
-    return offices.map((office: any) => ({
-      ...office,
-      tags: Array.isArray(office.tags) ? office.tags : [],
-      monthly_data: Array.isArray(office.monthly_data) ? office.monthly_data : [],
-    }));
-  }, [offices]);
+      if (error) throw error;
 
-  // Handle errors
-  React.useEffect(() => {
-    if (error) {
+      // Parse the JSON fields and convert to proper types
+      const processedOffices: OfficeData[] = (officesData || []).map((office: any) => ({
+        ...office,
+        tags: Array.isArray(office.tags) ? office.tags : [],
+        monthly_data: Array.isArray(office.monthly_data) ? office.monthly_data : [],
+      }));
+
+      setOffices(processedOffices);
+    } catch (error) {
+      console.error('Error loading offices:', error);
       toast({
         title: "Error",
         description: "Failed to load offices data",
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
-  }, [error, toast]);
+  };
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -134,75 +129,48 @@ export function Offices() {
     }
   };
 
-  const filteredAndSortedOffices = useMemo(() => {
-    return processedOffices
-      .filter(office => {
-        const matchesSearch = searchTerm === '' || 
-          office.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          office.address?.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesTier = tierFilter === 'all' || office.tier === tierFilter;
-        return matchesSearch && matchesTier;
-      })
-      .sort((a, b) => {
-        const direction = sortDirection === 'asc' ? 1 : -1;
-        
-        switch (sortField) {
-          case 'name':
-            return direction * a.name.localeCompare(b.name);
-          case 'l12':
-            return direction * (a.l12 - b.l12);
-          case 'r3':
-            return direction * (a.r3 - b.r3);
-          case 'mslr':
-            return direction * (a.mslr - b.mslr);
-          default:
-            return 0;
-        }
-      });
-  }, [processedOffices, searchTerm, tierFilter, sortField, sortDirection]);
+  const filteredAndSortedOffices = offices
+    .filter(office => {
+      const matchesSearch = searchTerm === '' || 
+        office.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        office.address?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesTier = tierFilter === 'all' || office.tier === tierFilter;
+      return matchesSearch && matchesTier;
+    })
+    .sort((a, b) => {
+      const direction = sortDirection === 'asc' ? 1 : -1;
+      
+      switch (sortField) {
+        case 'name':
+          return direction * a.name.localeCompare(b.name);
+        case 'l12':
+          return direction * (a.l12 - b.l12);
+        case 'r3':
+          return direction * (a.r3 - b.r3);
+        case 'mslr':
+          return direction * (a.mslr - b.mslr);
+        default:
+          return 0;
+      }
+    });
 
-  const tierCounts = useMemo(() => {
-    return processedOffices.reduce((acc, office) => {
-      acc[office.tier] = (acc[office.tier] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-  }, [processedOffices]);
+  const tierCounts = offices.reduce((acc, office) => {
+    acc[office.tier] = (acc[office.tier] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
 
   if (loading) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold text-foreground">Offices</h1>
-          <Skeleton className="h-9 w-24" />
         </div>
-
-        {/* Tier Summary Cards Skeletons */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <Card key={i}>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-16" />
-                    <Skeleton className="h-8 w-12" />
-                  </div>
-                  <Skeleton className="h-8 w-16 rounded-full" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Offices Table Skeleton */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="w-5 h-5" />
-              Office Performance
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <SkeletonTable rows={8} />
+          <CardContent className="p-8">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+              <p className="text-muted-foreground mt-2">Loading offices...</p>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -216,23 +184,8 @@ export function Offices() {
           <h1 className="text-3xl font-bold text-foreground">Offices</h1>
           <div className="flex items-center gap-4">
             <div className="text-sm text-muted-foreground">
-              {offices.length} of {totalCount} office{totalCount !== 1 ? 's' : ''}
+              {offices.length} office{offices.length !== 1 ? 's' : ''}
             </div>
-            {isFetching && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                Refreshing...
-              </div>
-            )}
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => refetch()}
-              disabled={isFetching}
-            >
-              <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
           </div>
         </div>
 
@@ -397,21 +350,6 @@ export function Offices() {
                 </TableBody>
               </Table>
             </div>
-            
-            {/* Load More Button */}
-            {hasMore && (
-              <div className="flex justify-center pt-6">
-                <Button
-                  onClick={() => loadMore()}
-                  disabled={loadingMore}
-                  variant="outline"
-                  className="gap-2"
-                >
-                  {loadingMore && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {loadingMore ? 'Loading...' : 'Load More Offices'}
-                </Button>
-              </div>
-            )}
           </CardContent>
         </Card>
       </div>

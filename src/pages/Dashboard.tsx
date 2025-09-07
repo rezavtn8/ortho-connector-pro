@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { formatYearMonth } from '@/lib/database.types';
-import { TrendingUp, Building2, Users, Globe, MessageSquare, BarChart3, RefreshCw } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { Search, TrendingUp, Building2, Star, Users, Globe, MessageSquare, FileText, BarChart3 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -14,9 +15,6 @@ import {
   CartesianGrid, 
   Tooltip 
 } from 'recharts';
-import { useDashboardData } from '@/hooks/useQueryData';
-import { SkeletonCard, SkeletonChart } from '@/components/ui/skeleton-card';
-import { Skeleton } from '@/components/ui/skeleton';
 
 interface SourceGroupData {
   name: string;
@@ -91,28 +89,80 @@ function PatientTrendChart({ monthlyTrends }: PatientTrendChartProps) {
 }
 
 export function Dashboard() {
+  const [dashboardData, setDashboardData] = useState<DashboardSummary | null>(null);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
-  
-  // Use React Query for dashboard data with background refetch
-  const { 
-    data: dashboardData, 
-    isLoading: loading, 
-    error, 
-    refetch,
-    isFetching 
-  } = useDashboardData();
 
-  // Handle errors
   useEffect(() => {
-    if (error) {
+    loadData();
+    
+    // Set up real-time subscriptions
+    const sourcesChannel = supabase
+      .channel('sources-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'patient_sources'
+        },
+        (payload) => {
+          console.log('Sources change:', payload);
+          loadData(); // Reload all data when sources change
+        }
+      )
+      .subscribe();
+
+    const monthlyChannel = supabase
+      .channel('monthly-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'monthly_patients'
+        },
+        (payload) => {
+          console.log('Monthly data change:', payload);
+          loadData(); // Reload all data when monthly data changes
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscriptions on unmount
+    return () => {
+      supabase.removeChannel(sourcesChannel);
+      supabase.removeChannel(monthlyChannel);
+    };
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      
+      // Use the optimized function to get all dashboard data in one query
+      const { data, error } = await supabase.rpc('get_dashboard_data');
+
+      if (error) throw error;
+      
+      if (data && data.length > 0 && data[0].summary) {
+        const summary = data[0].summary;
+        if (typeof summary === 'object' && summary !== null && !Array.isArray(summary)) {
+          setDashboardData((summary as unknown) as DashboardSummary);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading data:', error);
       toast({
         title: "Error",
-        description: "Failed to load dashboard data",
+        description: "Failed to load data",
         variant: "destructive"
       });
+    } finally {
+      setLoading(false);
     }
-  }, [error, toast]);
+  };
 
   const getSourceGroupData = (): SourceGroupData[] => {
     if (!dashboardData?.source_groups) return [];
@@ -160,49 +210,25 @@ export function Dashboard() {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Dashboard
-            </h1>
-            <p className="text-muted-foreground">Loading your data...</p>
+            <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+            <p className="text-muted-foreground">Loading...</p>
           </div>
-          <Skeleton className="h-9 w-24" />
         </div>
         
-        {/* Overview Stats Skeletons */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[1, 2, 3].map((i) => (
             <Card key={i}>
-              <CardHeader className="pb-3">
-                <Skeleton className="h-4 w-20" />
+              <CardHeader>
+                <CardTitle className="text-lg">
+                  <div className="h-4 bg-muted rounded animate-pulse w-24"></div>
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-between">
-                  <Skeleton className="h-8 w-12" />
-                  <Skeleton className="h-8 w-8 rounded" />
-                </div>
-                <Skeleton className="h-3 w-24 mt-1" />
+                <div className="h-8 bg-muted rounded animate-pulse w-16 mb-2"></div>
+                <div className="h-3 bg-muted rounded animate-pulse w-32"></div>
               </CardContent>
             </Card>
           ))}
-        </div>
-
-        {/* Source Categories Skeletons */}
-        <div className="space-y-4">
-          <Skeleton className="h-6 w-40" />
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1, 2, 3].map((i) => (
-              <SkeletonCard key={i} rows={3} />
-            ))}
-          </div>
-        </div>
-
-        {/* Analytics Overview Skeleton */}
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <Skeleton className="h-6 w-36" />
-            <Skeleton className="h-9 w-32" />
-          </div>
-          <SkeletonChart />
         </div>
       </div>
     );
@@ -219,23 +245,6 @@ export function Dashboard() {
           <p className="text-muted-foreground">
             Overview of your patient referral sources
           </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {isFetching && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <RefreshCw className="w-4 h-4 animate-spin" />
-              Refreshing...
-            </div>
-          )}
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => refetch()}
-            disabled={isFetching}
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
         </div>
       </div>
 
