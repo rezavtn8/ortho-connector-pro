@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
-import { errorHandler } from '@/utils/errorUtils';
 
 export function useMapboxToken() {
   const [token, setToken] = useState<string | null>(null);
@@ -16,7 +15,7 @@ export function useMapboxToken() {
         if (error) throw error;
         setToken(data.token);
       } catch (error) {
-        await errorHandler.handleError(error, 'getMapboxToken');
+        console.error('Error getting Mapbox token:', error);
         setError('Failed to load Mapbox token');
       } finally {
         setIsLoading(false);

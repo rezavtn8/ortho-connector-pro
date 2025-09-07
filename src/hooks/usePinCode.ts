@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { errorHandler } from '@/utils/errorUtils';
 
 interface PinCodeResult {
   success: boolean;
@@ -26,10 +25,23 @@ export function usePinCode() {
         new_pin: newPin
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating PIN:', error);
+        toast({
+          title: "Error",
+          description: "Failed to update PIN code. Please try again.",
+          variant: "destructive",
+        });
+        return { success: false, error: error.message };
+      }
 
       const result = data as unknown as PinCodeResponse;
       if (!result.success) {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to update PIN code",
+          variant: "destructive",
+        });
         return { success: false, error: result.error };
       }
 
@@ -39,8 +51,13 @@ export function usePinCode() {
       });
       return { success: true };
     } catch (error) {
-      await errorHandler.handleError(error, 'updatePinCode');
-      return { success: false, error: 'Failed to update PIN code' };
+      console.error('PIN update error:', error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
+      return { success: false, error: 'An unexpected error occurred' };
     } finally {
       setIsLoading(false);
     }
@@ -53,7 +70,10 @@ export function usePinCode() {
         input_pin: inputPin
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error verifying PIN:', error);
+        return { success: false, error: error.message };
+      }
 
       const result = data as unknown as PinCodeResponse;
       if (!result.success) {
@@ -62,8 +82,8 @@ export function usePinCode() {
 
       return { success: true, verified: result.verified };
     } catch (error) {
-      await errorHandler.handleError(error, 'verifyPinCode', false); // No toast for verification
-      return { success: false, error: 'Failed to verify PIN code' };
+      console.error('PIN verification error:', error);
+      return { success: false, error: 'An unexpected error occurred' };
     } finally {
       setIsLoading(false);
     }

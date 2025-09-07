@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from "@/integrations/supabase/client";
-import { errorHandler } from '@/utils/errorUtils';
 
 export interface Office {
   id: string;
@@ -42,13 +41,11 @@ export function useMapData() {
       }
 
       // Load clinic data
-      const { data: profile, error: profileError } = await supabase
+      const { data: profile } = await supabase
         .from('user_profiles')
         .select('clinic_id, clinic_name, clinic_address, clinic_latitude, clinic_longitude')
         .eq('user_id', user.id)
         .maybeSingle();
-
-      if (profileError) throw profileError;
 
       if (profile?.clinic_latitude && profile?.clinic_longitude) {
         setClinic({
@@ -61,7 +58,7 @@ export function useMapData() {
       }
 
       // Load offices data
-      const { data: sources, error: sourcesError } = await supabase
+      const { data: sources } = await supabase
         .from('patient_sources')
         .select('id, name, address, phone, latitude, longitude')
         .eq('is_active', true)
@@ -69,19 +66,15 @@ export function useMapData() {
         .not('latitude', 'is', null)
         .not('longitude', 'is', null);
 
-      if (sourcesError) throw sourcesError;
-
       if (sources?.length) {
         const currentMonth = new Date().toISOString().slice(0, 7);
         const sourceIds = sources.map(s => s.id);
         
         // Load monthly data
-        const { data: monthlyData, error: monthlyError } = await supabase
+        const { data: monthlyData } = await supabase
           .from('monthly_patients')
           .select('source_id, year_month, patient_count')
           .in('source_id', sourceIds);
-
-        if (monthlyError) throw monthlyError;
 
         // Load strength scores in smaller batches to prevent overload
         const batchSize = 10;
@@ -89,16 +82,9 @@ export function useMapData() {
         
         for (let i = 0; i < sourceIds.length; i += batchSize) {
           const batch = sourceIds.slice(i, i + batchSize);
-          const batchPromises = batch.map(async (id) => {
-            try {
-              const { data, error } = await supabase.rpc('calculate_source_score', { source_id_param: id });
-              if (error) throw error;
-              return { data };
-            } catch (error) {
-              console.warn(`Failed to calculate score for source ${id}:`, error);
-              return { data: 'Cold' }; // Default fallback
-            }
-          });
+          const batchPromises = batch.map(id =>
+            supabase.rpc('calculate_source_score', { source_id_param: id })
+          );
           const batchResults = await Promise.all(batchPromises);
           strengthResults.push(...batchResults);
         }
@@ -135,7 +121,7 @@ export function useMapData() {
         setOffices(officesWithData);
       }
     } catch (error) {
-      await errorHandler.handleError(error, 'loadMapData');
+      console.error('Error loading map data:', error);
       setError('Failed to load map data');
     } finally {
       setIsLoading(false);
