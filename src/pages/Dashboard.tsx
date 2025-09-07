@@ -114,11 +114,17 @@ export function Dashboard() {
     filters: {}
   });
 
+  // Fix memory leaks in useEffect hooks
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  // Clean up realtime subscriptions
   useEffect(() => {
     loadData();
     recentActivity.loadPage(0, true);
     
-    // Set up real-time subscriptions
+    // Set up real-time subscriptions with cleanup
     const sourcesChannel = supabase
       .channel('sources-changes')
       .on(

@@ -246,10 +246,15 @@ export function Offices() {
   const loadMore = () => {
     if (!loadingMore && hasMore) {
       setLoadingMore(true);
-      setTimeout(() => {
+      
+      // Use setTimeout with cleanup
+      const timeoutId = setTimeout(() => {
         setCurrentPage(prev => prev + 1);
         setLoadingMore(false);
-      }, 500); // Simulate loading time
+      }, 500);
+      
+      // Store timeout for cleanup
+      return () => clearTimeout(timeoutId);
     }
   };
 

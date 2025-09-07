@@ -43,12 +43,9 @@ export function SecurityAuditLog() {
   const { toast } = useToast();
 
   useEffect(() => {
-    const { cleanup, safeSetInterval, addSubscription } = useCleanup();
-    
     fetchSecurityEvents();
-    const interval = safeSetInterval(fetchSecurityEvents, 30000); // Refresh every 30 seconds
-    
-    return cleanup;
+    const interval = setInterval(fetchSecurityEvents, 30000); // Refresh every 30 seconds
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {

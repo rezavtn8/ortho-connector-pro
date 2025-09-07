@@ -90,12 +90,12 @@ export const patientSourceSchema = z.object({
 // Marketing visit form schema
 export const marketingVisitSchema = z.object({
   office_id: z.string().uuid('Please select a valid office'),
-  visit_date: z.date({
-    required_error: 'Visit date is required',
-    invalid_type_error: 'Please enter a valid date',
-  }),
-  visit_type: z.enum(['Cold Call', 'Scheduled Visit', 'Follow-up', 'Event', 'Other'], {
-    errorMap: () => ({ message: 'Please select a visit type' }),
+  visit_date: z.coerce.date()
+    .refine((date) => date instanceof Date && !isNaN(date.getTime()), {
+      message: 'Please enter a valid date'
+    }),
+  visit_type: z.enum(['Cold Call', 'Scheduled Visit', 'Follow-up', 'Event', 'Other']).refine((val) => val, {
+    message: 'Please select a visit type',
   }),
   rep_name: z.string()
     .min(1, 'Representative name is required')
@@ -122,11 +122,11 @@ export const campaignSchema = z.object({
   name: z.string()
     .min(1, 'Campaign name is required')
     .max(255, 'Campaign name must be less than 255 characters'),
-  campaign_type: z.enum(['Educational', 'Promotional', 'Product Launch', 'Relationship Building', 'Other'], {
-    errorMap: () => ({ message: 'Please select a campaign type' }),
+  campaign_type: z.enum(['Educational', 'Promotional', 'Product Launch', 'Relationship Building', 'Other']).refine((val) => val, {
+    message: 'Please select a campaign type',
   }),
-  delivery_method: z.enum(['In-Person', 'Mail', 'Email', 'Phone', 'Digital', 'Other'], {
-    errorMap: () => ({ message: 'Please select a delivery method' }),
+  delivery_method: z.enum(['In-Person', 'Mail', 'Email', 'Phone', 'Digital', 'Other']).refine((val) => val, {
+    message: 'Please select a delivery method',
   }),
   planned_delivery_date: z.date().optional(),
   assigned_rep_id: z.string().uuid().optional(),
