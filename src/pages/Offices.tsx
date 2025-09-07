@@ -13,10 +13,11 @@ import {
 } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Building2, ArrowUpDown, Filter } from 'lucide-react';
+import { Building2, ArrowUpDown, Filter, Loader2 } from 'lucide-react';
 import { PatientSource, MonthlyPatients } from '@/lib/database.types';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { usePagination } from '@/hooks/usePagination';
 
 interface OfficeData extends PatientSource {
   l12: number; // Last 12 months
@@ -58,12 +59,19 @@ const TIER_CONFIG = {
 
 export function Offices() {
   const { toast } = useToast();
-  const [offices, setOffices] = useState<OfficeData[]>([]);
+  const [allOffices, setAllOffices] = useState<OfficeData[]>([]);
   const [loading, setLoading] = useState(true);
   const [tierFilter, setTierFilter] = useState<TierFilter>('all');
   const [sortField, setSortField] = useState<SortField>('l12');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Paginated offices state
+  const [displayedOffices, setDisplayedOffices] = useState<OfficeData[]>([]);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const pageSize = 20;
 
   useEffect(() => {
     loadOffices();
@@ -171,7 +179,7 @@ export function Offices() {
         tier: calculateTier(office.l12, office.r3, office.mslr, processedOffices),
       }));
 
-      setOffices(officesWithTiers);
+      setAllOffices(officesWithTiers);
     } catch (error) {
       console.error('Error loading offices:', error);
       toast({
@@ -193,7 +201,8 @@ export function Offices() {
     }
   };
 
-  const filteredAndSortedOffices = offices
+  // Filter and sort logic
+  const filteredAndSortedOffices = allOffices
     .filter(office => {
       const matchesSearch = searchTerm === '' || 
         office.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -218,7 +227,28 @@ export function Offices() {
       }
     });
 
-  const tierCounts = offices.reduce((acc, office) => {
+  // Paginate filtered results
+  useEffect(() => {
+    setDisplayedOffices(filteredAndSortedOffices.slice(0, (currentPage + 1) * pageSize));
+    setHasMore(filteredAndSortedOffices.length > (currentPage + 1) * pageSize);
+  }, [filteredAndSortedOffices, currentPage]);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(0);
+  }, [searchTerm, tierFilter, sortField, sortDirection]);
+
+  const loadMore = () => {
+    if (!loadingMore && hasMore) {
+      setLoadingMore(true);
+      setTimeout(() => {
+        setCurrentPage(prev => prev + 1);
+        setLoadingMore(false);
+      }, 500); // Simulate loading time
+    }
+  };
+
+  const tierCounts = allOffices.reduce((acc, office) => {
     acc[office.tier] = (acc[office.tier] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
@@ -248,7 +278,7 @@ export function Offices() {
           <h1 className="text-3xl font-bold text-foreground">Offices</h1>
           <div className="flex items-center gap-4">
             <div className="text-sm text-muted-foreground">
-              {offices.length} office{offices.length !== 1 ? 's' : ''}
+              Showing {displayedOffices.length} of {filteredAndSortedOffices.length} office{filteredAndSortedOffices.length !== 1 ? 's' : ''}
             </div>
           </div>
         </div>
@@ -373,16 +403,16 @@ export function Offices() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredAndSortedOffices.length === 0 ? (
+                  {displayedOffices.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center py-8">
                         <div className="text-muted-foreground">
-                          {offices.length === 0 ? 'No offices found' : 'No offices match your filters'}
+                          {allOffices.length === 0 ? 'No offices found' : 'No offices match your filters'}
                         </div>
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredAndSortedOffices.map((office) => (
+                    displayedOffices.map((office) => (
                       <TableRow key={office.id}>
                         <TableCell>
                           <div>
@@ -414,6 +444,27 @@ export function Offices() {
                 </TableBody>
               </Table>
             </div>
+
+            {/* Load More Button */}
+            {hasMore && displayedOffices.length > 0 && (
+              <div className="flex justify-center pt-6">
+                <Button 
+                  onClick={loadMore} 
+                  disabled={loadingMore}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  {loadingMore ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    <>Load More Offices</>
+                  )}
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

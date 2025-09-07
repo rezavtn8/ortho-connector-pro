@@ -23,12 +23,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CalendarIcon, Plus, Search, Star, Camera, FileText, Download, Filter } from 'lucide-react';
+import { CalendarIcon, Plus, Search, Star, Camera, FileText, Download, Filter, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { usePagination } from '@/hooks/usePagination';
 
 interface MarketingVisit {
   id: string;
@@ -65,7 +66,6 @@ const MATERIALS = ['Referral Slips', 'Portfolio', 'Gifts', 'Booklets', 'Gift Car
 export function MarketingVisits() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [visits, setVisits] = useState<MarketingVisit[]>([]);
   const [offices, setOffices] = useState<Office[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -76,6 +76,31 @@ export function MarketingVisits() {
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
   const [selectedOffice, setSelectedOffice] = useState<Office | null>(null);
   const [activeTab, setActiveTab] = useState('table');
+
+  // Paginated visits using custom hook
+  const visits = usePagination({
+    tableName: 'marketing_visits',
+    pageSize: 20,
+    selectFields: `
+      id,
+      office_id,
+      visit_date,
+      visit_type,
+      group_tag,
+      contact_person,
+      visited,
+      rep_name,
+      materials_handed_out,
+      star_rating,
+      follow_up_notes,
+      photo_url,
+      created_at,
+      updated_at,
+      user_id,
+      clinic_id
+    `,
+    orderBy: { column: 'visit_date', ascending: false }
+  });
 
   // Form state
   const [formData, setFormData] = useState({
@@ -93,6 +118,7 @@ export function MarketingVisits() {
 
   useEffect(() => {
     loadData();
+    visits.loadPage(0, true);
   }, []);
 
   const loadData = async () => {
@@ -109,39 +135,6 @@ export function MarketingVisits() {
 
       if (officesError) throw officesError;
       setOffices(officesData || []);
-
-      // Load marketing visits with office names
-      const { data: visitsData, error: visitsError } = await supabase
-        .from('marketing_visits')
-        .select(`
-          id,
-          office_id,
-          visit_date,
-          visit_type,
-          group_tag,
-          contact_person,
-          visited,
-          rep_name,
-          materials_handed_out,
-          star_rating,
-          follow_up_notes,
-          photo_url,
-          created_at,
-          updated_at,
-          user_id,
-          clinic_id
-        `)
-        .order('visit_date', { ascending: false });
-
-      if (visitsError) throw visitsError;
-
-      // Join with office names
-      const visitsWithOffices = (visitsData || []).map(visit => ({
-        ...visit,
-        office_name: officesData?.find(office => office.id === visit.office_id)?.name || 'Unknown Office'
-      }));
-
-      setVisits(visitsWithOffices);
     } catch (error: any) {
       toast({
         title: "Error loading data",
@@ -239,7 +232,7 @@ export function MarketingVisits() {
       });
       setSelectedOffice(null);
       setShowForm(false);
-      loadData();
+      visits.refresh();
     } catch (error: any) {
       toast({
         title: "Error adding visit",
@@ -260,7 +253,13 @@ export function MarketingVisits() {
     }));
   };
 
-  const filteredVisits = visits.filter(visit => {
+  // Add office names to visits data for display
+  const visitsWithOfficeNames = visits.data.map(visit => ({
+    ...visit,
+    office_name: offices.find(office => office.id === visit.office_id)?.name || 'Unknown Office'
+  }));
+
+  const filteredVisits = visitsWithOfficeNames.filter(visit => {
     const matchesSearch = visit.office_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          visit.contact_person?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          visit.rep_name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -327,7 +326,7 @@ export function MarketingVisits() {
     );
   };
 
-  if (loading && visits.length === 0) {
+  if (loading && visits.data.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-96">
         <div className="text-center">
@@ -585,12 +584,12 @@ export function MarketingVisits() {
               <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-medium mb-2">No visits found</h3>
               <p className="text-muted-foreground mb-4">
-                {visits.length === 0 
+                {visits.data.length === 0 
                   ? "Start by adding your first marketing visit"
                   : "Try adjusting your filters to see more results"
                 }
               </p>
-              {visits.length === 0 && (
+              {visits.data.length === 0 && (
                 <Button onClick={() => setShowForm(true)} className="gap-2">
                   <Plus className="w-4 h-4" />
                   Add Your First Visit
@@ -665,6 +664,27 @@ export function MarketingVisits() {
                 </TableBody>
               </Table>
             </div>
+
+            {/* Load More Button */}
+            {visits.hasMore && filteredVisits.length > 0 && (
+              <div className="flex justify-center pt-6">
+                <Button 
+                  onClick={visits.loadMore} 
+                  disabled={visits.loading}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  {visits.loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    <>Load More Visits</>
+                  )}
+                </Button>
+              </div>
+            )}
           )}
         </CardContent>
       </Card>

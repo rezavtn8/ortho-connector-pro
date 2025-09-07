@@ -3,9 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { PatientSource, MonthlyPatients, SOURCE_TYPE_CONFIG, getCurrentYearMonth, formatYearMonth } from '@/lib/database.types';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, TrendingUp, Building2, Star, Users, Globe, MessageSquare, FileText, BarChart3 } from 'lucide-react';
+import { Search, TrendingUp, Building2, Star, Users, Globe, MessageSquare, FileText, BarChart3, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { usePagination } from '@/hooks/usePagination';
 import { 
   ResponsiveContainer, 
   LineChart, 
@@ -95,8 +96,24 @@ export function Dashboard() {
   const navigate = useNavigate();
   const currentMonth = getCurrentYearMonth();
 
+  // Paginated recent activity
+  const recentActivity = usePagination({
+    tableName: 'monthly_patients',
+    pageSize: 10,
+    selectFields: `
+      *,
+      patient_sources!inner(
+        name,
+        source_type
+      )
+    `,
+    orderBy: { column: 'updated_at', ascending: false },
+    filters: {}
+  });
+
   useEffect(() => {
     loadData();
+    recentActivity.loadPage(0, true);
     
     // Set up real-time subscriptions
     const sourcesChannel = supabase
@@ -110,7 +127,8 @@ export function Dashboard() {
         },
         (payload) => {
           console.log('Sources change:', payload);
-          loadData(); // Reload all data when sources change
+          loadData();
+          recentActivity.refresh();
         }
       )
       .subscribe();
@@ -126,7 +144,8 @@ export function Dashboard() {
         },
         (payload) => {
           console.log('Monthly data change:', payload);
-          loadData(); // Reload all data when monthly data changes
+          loadData();
+          recentActivity.refresh();
         }
       )
       .subscribe();
@@ -411,6 +430,73 @@ export function Dashboard() {
           </CardHeader>
           <CardContent>
             <PatientTrendChart monthlyData={monthlyData} sources={sources} />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent Activity */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-semibold">Recent Activity</h2>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5" />
+              Recent Patient Updates
+            </CardTitle>
+            <CardDescription>
+              Latest changes to patient counts across all sources
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {recentActivity.data.length === 0 && !recentActivity.loading ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No recent activity to display
+                </div>
+              ) : (
+                recentActivity.data.map((activity: any) => (
+                  <div key={activity.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <div className="flex-1">
+                      <div className="font-medium">
+                        {activity.patient_sources?.name || 'Unknown Source'}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {activity.patient_sources?.source_type} • {formatYearMonth(activity.year_month)}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-semibold text-primary">
+                        {activity.patient_count} patients
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {new Date(activity.updated_at).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+              
+              {recentActivity.hasMore && (
+                <div className="flex justify-center pt-4">
+                  <Button 
+                    onClick={recentActivity.loadMore} 
+                    disabled={recentActivity.loading}
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    {recentActivity.loading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Loading...
+                      </>
+                    ) : (
+                      <>Load More Activity</>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>
