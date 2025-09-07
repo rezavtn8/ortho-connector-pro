@@ -12,23 +12,7 @@ export function useDashboardData() {
     queryFn: async () => {
       try {
         const { data, error } = await supabase.rpc('get_dashboard_data');
-        if (error) {
-          console.warn('Dashboard RPC failed, using fallback data:', error);
-          
-          // Fallback: get basic source counts
-          const { data: sources, error: sourcesError } = await supabase
-            .from('patient_sources')
-            .select('source_type');
-            
-          if (sourcesError) throw sourcesError;
-          
-          // Return minimal dashboard data
-          return {
-            user_id: 'current-user',
-            source_groups: [],
-            monthly_trends: []
-          };
-        }
+        if (error) throw error;
         
         if (data && data.length > 0 && data[0].summary) {
           const summary = data[0].summary;
@@ -36,29 +20,15 @@ export function useDashboardData() {
             return (summary as unknown) as any;
           }
         }
-        
-        // Return fallback empty data structure
-        return {
-          user_id: 'current-user',
-          source_groups: [],
-          monthly_trends: []
-        };
+        return null;
       } catch (error) {
-        console.error('useDashboardData error:', error);
-        
-        // Return empty data instead of throwing
-        return {
-          user_id: 'current-user',
-          source_groups: [],
-          monthly_trends: []
-        };
+        await errorHandler.handleError(error, 'useDashboardData');
+        throw error;
       }
     },
     staleTime: 2 * 60 * 1000, // 2 minutes for critical dashboard data
     refetchInterval: refetchIntervals.dashboard,
     refetchIntervalInBackground: true,
-    retry: 3,
-    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 }
 
@@ -72,53 +42,13 @@ export function useOfficeData() {
       const endIndex = startIndex + pageSize - 1;
 
       try {
-        // Use direct query instead of broken RPC function
-        const { data, error } = await supabase
-          .from('patient_sources')
-          .select(`
-            *,
-            source_tags!inner(
-              id,
-              tag_name,
-              created_at
-            ),
-            monthly_patients!inner(
-              id,
-              year_month,
-              patient_count,
-              created_at,
-              updated_at
-            )
-          `)
-          .range(startIndex, endIndex);
-          
-        if (error) {
-          console.warn('Office data query failed, using fallback:', error);
-          
-          // Fallback to basic patient sources query
-          const { data: fallbackData, error: fallbackError } = await supabase
-            .from('patient_sources')
-            .select('*')
-            .range(startIndex, endIndex);
-            
-          if (fallbackError) throw fallbackError;
-          
-          const processedData = (fallbackData || []).map(source => ({
-            ...source,
-            tags: [],
-            monthly_data: []
-          }));
-          
-          return {
-            data: processedData,
-            nextPage: endIndex < processedData.length + startIndex ? pageParam + 1 : undefined,
-            totalCount: processedData.length,
-          };
-        }
+        // For RPC functions, we handle pagination client-side for now
+        const { data, error } = await supabase.rpc('get_office_data_with_relations');
+        if (error) throw error;
 
         const allData = (data || []) as any[];
         const totalCount = allData.length;
-        const paginatedData = allData.slice(0, pageSize);
+        const paginatedData = allData.slice(startIndex, startIndex + pageSize);
 
         return {
           data: paginatedData,
@@ -126,22 +56,14 @@ export function useOfficeData() {
           totalCount,
         };
       } catch (error) {
-        console.error('useOfficeData error:', error);
-        
-        // Return empty data instead of throwing to prevent app crash
-        return {
-          data: [],
-          nextPage: undefined,
-          totalCount: 0,
-        };
+        await errorHandler.handleError(error, 'useOfficeData');
+        throw error;
       }
     },
     getNextPageParam: (lastPage) => lastPage.nextPage,
     initialPageParam: 0,
     staleTime: 3 * 60 * 1000, // 3 minutes
     refetchOnWindowFocus: true,
-    retry: 3,
-    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 }
 
@@ -178,21 +100,13 @@ export function useSourcesData(filters?: any) {
           totalCount: count || 0,
         };
       } catch (error) {
-        console.error('useSourcesData error:', error);
-        
-        // Return empty data instead of throwing
-        return {
-          data: [],
-          nextPage: undefined,
-          totalCount: 0,
-        };
+        await errorHandler.handleError(error, 'useSourcesData');
+        throw error;
       }
     },
     getNextPageParam: (lastPage) => lastPage.nextPage,
     initialPageParam: 0,
     staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: 3,
-    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 }
 
@@ -258,25 +172,16 @@ export function useMonthlyPatientsData() {
   return useQuery({
     queryKey: queryKeys.monthlyPatients,
     queryFn: async () => {
-      try {
-        const { data, error } = await supabase
-          .from('monthly_patients')
-          .select('*');
+      const { data, error } = await supabase
+        .from('monthly_patients')
+        .select('*');
 
-        if (error) throw error;
-        return data || [];
-      } catch (error) {
-        console.error('useMonthlyPatientsData error:', error);
-        
-        // Return empty array instead of throwing
-        return [];
-      }
+      if (error) throw error;
+      return data || [];
     },
     staleTime: 3 * 60 * 1000, // 3 minutes
     refetchInterval: refetchIntervals.monthlyPatients,
     refetchIntervalInBackground: true,
-    retry: 3,
-    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 }
 
@@ -533,178 +438,6 @@ export function useCreateSource() {
     onSettled: () => {
       // Refetch to get accurate data
       queryClient.invalidateQueries({ queryKey: queryKeys.sources });
-    },
-  });
-}
-
-// Campaign Mutations with Optimistic Updates
-
-export function useCreateCampaign() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async ({ campaignData, deliveries }: { 
-      campaignData: any, 
-      deliveries: Array<{ office_id: string }> 
-    }) => {
-      try {
-        // Create campaign
-        const { data: campaign, error: campaignError } = await supabase
-          .from('campaigns')
-          .insert([campaignData])
-          .select()
-          .single();
-
-        if (campaignError) throw campaignError;
-
-        // Create campaign deliveries
-        const deliveriesWithCampaignId = deliveries.map(delivery => ({
-          ...delivery,
-          campaign_id: campaign.id,
-          created_by: campaignData.created_by
-        }));
-
-        const { data: createdDeliveries, error: deliveriesError } = await supabase
-          .from('campaign_deliveries')
-          .insert(deliveriesWithCampaignId)
-          .select();
-
-        if (deliveriesError) throw deliveriesError;
-
-        return { campaign, deliveries: createdDeliveries };
-      } catch (error) {
-        await errorHandler.handleError(error, 'useCreateCampaign');
-        throw error;
-      }
-    },
-    onMutate: async ({ campaignData, deliveries }) => {
-      // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: queryKeys.campaigns });
-
-      // Create optimistic campaign entry
-      const optimisticCampaign = {
-        ...campaignData,
-        id: `temp-${Date.now()}`,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        status: 'Draft',
-      };
-
-      // Optimistically update campaigns list
-      queryClient.setQueryData(queryKeys.campaignsList(), (old: any) => {
-        if (!old?.pages?.[0]) return old;
-        
-        return {
-          ...old,
-          pages: [
-            {
-              ...old.pages[0],
-              data: [optimisticCampaign, ...old.pages[0].data],
-              totalCount: old.pages[0].totalCount + 1,
-            },
-            ...old.pages.slice(1),
-          ],
-        };
-      });
-
-      return { optimisticCampaign };
-    },
-    onError: (err, variables, context) => {
-      // Rollback optimistic update
-      if (context?.optimisticCampaign) {
-        queryClient.setQueryData(queryKeys.campaignsList(), (old: any) => {
-          if (!old?.pages?.[0]) return old;
-          
-          return {
-            ...old,
-            pages: [
-              {
-                ...old.pages[0],
-                data: old.pages[0].data.filter((campaign: any) => campaign.id !== context.optimisticCampaign.id),
-                totalCount: old.pages[0].totalCount - 1,
-              },
-              ...old.pages.slice(1),
-            ],
-          };
-        });
-      }
-    },
-    onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Campaign created successfully",
-      });
-    },
-    onSettled: () => {
-      // Refetch to get accurate data
-      queryClient.invalidateQueries({ queryKey: queryKeys.campaigns });
-    },
-  });
-}
-
-export function useUpdateCampaignDelivery() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-
-  return useMutation({
-    mutationFn: async ({ deliveryId, updateData }: { deliveryId: string, updateData: any }) => {
-      try {
-        const { data, error } = await supabase
-          .from('campaign_deliveries')
-          .update(updateData)
-          .eq('id', deliveryId)
-          .select()
-          .single();
-
-        if (error) throw error;
-        return data;
-      } catch (error) {
-        await errorHandler.handleError(error, 'useUpdateCampaignDelivery');
-        throw error;
-      }
-    },
-    onMutate: async ({ deliveryId, updateData }) => {
-      // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: queryKeys.campaignDeliveries });
-
-      // Snapshot previous value
-      const previousData = queryClient.getQueryData(queryKeys.campaignDeliveries);
-
-      // Optimistically update delivery
-      queryClient.setQueryData(queryKeys.campaignDeliveries, (old: any) => {
-        if (!old?.pages) return old;
-        
-        return {
-          ...old,
-          pages: old.pages.map((page: any) => ({
-            ...page,
-            data: page.data.map((delivery: any) => 
-              delivery.id === deliveryId 
-                ? { ...delivery, ...updateData, updated_at: new Date().toISOString() }
-                : delivery
-            )
-          }))
-        };
-      });
-
-      return { previousData };
-    },
-    onError: (err, variables, context) => {
-      // Rollback on error
-      if (context?.previousData) {
-        queryClient.setQueryData(queryKeys.campaignDeliveries, context.previousData);
-      }
-    },
-    onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Delivery status updated successfully",
-      });
-    },
-    onSettled: () => {
-      // Refetch to get accurate data
-      queryClient.invalidateQueries({ queryKey: queryKeys.campaignDeliveries });
     },
   });
 }

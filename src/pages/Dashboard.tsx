@@ -50,23 +50,10 @@ interface PatientTrendChartProps {
 }
 
 function PatientTrendChart({ monthlyTrends }: PatientTrendChartProps) {
-  const chartData = (monthlyTrends || [])
-    .filter(trend => trend && trend.year_month && trend.month_total !== undefined)
-    .map(trend => ({
-      month: formatYearMonth(trend.year_month),
-      patients: trend.month_total || 0
-    }));
-
-  if (chartData.length === 0) {
-    return (
-      <div className="h-64 flex items-center justify-center text-muted-foreground">
-        <div className="text-center">
-          <BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-50" />
-          <p className="text-sm">No trend data available</p>
-        </div>
-      </div>
-    );
-  }
+  const chartData = (monthlyTrends || []).map(trend => ({
+    month: formatYearMonth(trend.year_month),
+    patients: trend.month_total
+  }));
 
   return (
     <div className="h-64" role="img" aria-label="Patient trend chart showing monthly referral data">
@@ -106,6 +93,24 @@ function PatientTrendChart({ monthlyTrends }: PatientTrendChartProps) {
           />
         </LineChart>
       </ResponsiveContainer>
+      {/* Screen reader table alternative */}
+      <table className="sr-only">
+        <caption>Monthly patient referral data</caption>
+        <thead>
+          <tr>
+            <th>Month</th>
+            <th>Patients</th>
+          </tr>
+        </thead>
+        <tbody>
+          {chartData.map((data, index) => (
+            <tr key={index}>
+              <td>{data.month}</td>
+              <td>{data.patients}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -115,8 +120,10 @@ export function Dashboard() {
   const navigate = useNavigate();
   const { announce } = useAccessibility();
   
+  // Add skip to main content
   addSkipToMain();
   
+  // Use React Query for dashboard data with background refetch
   const { 
     data: dashboardData, 
     isLoading: loading, 
@@ -125,6 +132,7 @@ export function Dashboard() {
     isFetching 
   } = useDashboardData();
 
+  // Handle errors
   useEffect(() => {
     if (error) {
       announce('Failed to load dashboard data', 'assertive');
@@ -136,6 +144,7 @@ export function Dashboard() {
     }
   }, [error, toast, announce]);
 
+  // Announce data loaded
   useEffect(() => {
     if (dashboardData && !loading) {
       announce('Dashboard data loaded successfully');
@@ -178,6 +187,11 @@ export function Dashboard() {
     });
   };
 
+  const totalSources = dashboardData?.source_groups?.reduce((sum, sg) => sum + sg.source_count, 0) || 0;
+  const activeSources = dashboardData?.source_groups?.reduce((sum, sg) => sum + sg.active_count, 0) || 0;
+  const totalPatients = dashboardData?.source_groups?.reduce((sum, sg) => sum + sg.total_patients, 0) || 0;
+  const thisMonthPatients = dashboardData?.source_groups?.reduce((sum, sg) => sum + sg.current_month_patients, 0) || 0;
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -191,6 +205,7 @@ export function Dashboard() {
           <Skeleton className="h-9 w-24" />
         </div>
         
+        {/* Overview Stats Skeletons */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4" role="grid" aria-label="Loading dashboard statistics">
           {[1, 2, 3, 4].map((i) => (
             <Card key={i} role="gridcell">
@@ -208,6 +223,7 @@ export function Dashboard() {
           ))}
         </div>
 
+        {/* Source Categories Skeletons */}
         <div className="space-y-4">
           <Skeleton className="h-6 w-40" />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" role="list" aria-label="Loading source categories">
@@ -217,57 +233,23 @@ export function Dashboard() {
           </div>
         </div>
 
-        <SkeletonChart />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Dashboard
-            </h1>
-            <p className="text-muted-foreground">Error loading dashboard data</p>
+        {/* Analytics Overview Skeleton */}
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <Skeleton className="h-6 w-36" />
+            <Skeleton className="h-9 w-32" />
           </div>
-          <Button onClick={() => refetch()} variant="outline" size="sm">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Retry
-          </Button>
+          <SkeletonChart />
         </div>
-        
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center py-8">
-              <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Unable to load dashboard</h3>
-              <p className="text-muted-foreground mb-4">
-                There was an issue loading your dashboard data. Please try refreshing or contact support if the problem persists.
-              </p>
-              <Button onClick={() => refetch()}>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Try Again
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     );
   }
-
-  const safeSourceGroups = dashboardData?.source_groups || [];
-  const safeMonthlyTrends = dashboardData?.monthly_trends || [];
-  
-  const totalSources = safeSourceGroups.reduce((sum, sg) => sum + (sg.source_count || 0), 0);
-  const activeSources = safeSourceGroups.reduce((sum, sg) => sum + (sg.active_count || 0), 0);
-  const totalPatients = safeSourceGroups.reduce((sum, sg) => sum + (sg.total_patients || 0), 0);
-  const thisMonthPatients = safeSourceGroups.reduce((sum, sg) => sum + (sg.current_month_patients || 0), 0);
 
   return (
     <div className="space-y-6">
+      {/* Main content landmark */}
       <main id="main-content" role="main">
+        {/* Header */}
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
@@ -279,7 +261,11 @@ export function Dashboard() {
           </div>
           <div className="flex items-center gap-2" role="toolbar" aria-label="Dashboard actions">
             {isFetching && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status" aria-live="polite">
+              <div 
+                className="flex items-center gap-2 text-sm text-muted-foreground"
+                role="status"
+                aria-live="polite"
+              >
                 <RefreshCw className="w-4 h-4 animate-spin" aria-hidden="true" />
                 <span>Refreshing...</span>
               </div>
@@ -303,6 +289,7 @@ export function Dashboard() {
           </div>
         </div>
 
+        {/* Overview Stats */}
         <section aria-labelledby="overview-heading">
           <h2 id="overview-heading" className="sr-only">Overview Statistics</h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4" role="grid">
@@ -314,7 +301,10 @@ export function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-between">
-                  <div className="text-2xl font-bold" aria-label={`${totalSources} total sources`}>
+                  <div 
+                    className="text-2xl font-bold" 
+                    aria-label={`${totalSources} total sources`}
+                  >
                     {totalSources}
                   </div>
                   <Building2 className="w-8 h-8 text-blue-500 opacity-20" aria-hidden="true" />
@@ -333,7 +323,10 @@ export function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-between">
-                  <div className="text-2xl font-bold" aria-label={`${totalPatients} total patients`}>
+                  <div 
+                    className="text-2xl font-bold"
+                    aria-label={`${totalPatients} total patients`}
+                  >
                     {totalPatients}
                   </div>
                   <Users className="w-8 h-8 text-green-500 opacity-20" aria-hidden="true" />
@@ -352,7 +345,10 @@ export function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-between">
-                  <div className="text-2xl font-bold" aria-label={`${thisMonthPatients} patients this month`}>
+                  <div 
+                    className="text-2xl font-bold"
+                    aria-label={`${thisMonthPatients} patients this month`}
+                  >
                     {thisMonthPatients}
                   </div>
                   <TrendingUp className="w-8 h-8 text-orange-500 opacity-20" aria-hidden="true" />
@@ -394,6 +390,7 @@ export function Dashboard() {
           </div>
         </section>
 
+        {/* Source Categories */}
         <section aria-labelledby="source-categories-heading">
           <h2 id="source-categories-heading" className="text-xl font-semibold mb-4">
             Source Categories
@@ -452,6 +449,7 @@ export function Dashboard() {
           </div>
         </section>
 
+        {/* Analytics Overview */}
         <section aria-labelledby="analytics-heading">
           <div className="flex justify-between items-center mb-4">
             <h2 id="analytics-heading" className="text-xl font-semibold">
@@ -479,7 +477,7 @@ export function Dashboard() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <PatientTrendChart monthlyTrends={safeMonthlyTrends} />
+              <PatientTrendChart monthlyTrends={dashboardData?.monthly_trends || []} />
             </CardContent>
           </Card>
         </section>
@@ -487,5 +485,3 @@ export function Dashboard() {
     </div>
   );
 }
-
-export default Dashboard;
