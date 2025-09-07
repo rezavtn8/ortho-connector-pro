@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,10 +13,9 @@ import {
 } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Building2, ArrowUpDown, Filter, Loader2 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { Building2, ArrowUpDown, Filter, Loader2, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { usePagination, useInfiniteScroll } from '@/hooks/usePagination';
+import { useOfficeData } from '@/hooks/useQueryData';
 
 interface OfficeData {
   id: string;
@@ -84,44 +83,27 @@ export function Offices() {
   const [sortField, setSortField] = useState<SortField>('l12');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [searchTerm, setSearchTerm] = useState('');
-  const [enableInfiniteScroll, setEnableInfiniteScroll] = useState(false);
 
-  // Create query function for pagination
-  const queryFn = useCallback(async (startIndex: number, endIndex: number) => {
-    // For RPC functions, we need to handle pagination differently
-    // Since the function returns all data, we'll get all data and handle pagination client-side for now
-    const { data, error } = await supabase.rpc('get_office_data_with_relations');
-
-    if (error) throw error;
-
-    const allData = (data || []) as OfficeData[];
-    const totalCount = allData.length;
-    const paginatedData = allData.slice(startIndex, startIndex + 20);
-
-    return { 
-      data: paginatedData, 
-      error: null, 
-      count: totalCount 
-    };
-  }, []);
-
-  // Use pagination hook
+  // Use React Query for office data with infinite loading
   const {
-    data: offices,
-    loading,
-    loadingMore,
-    hasMore,
-    totalCount,
+    data,
+    isLoading: loading,
+    isFetchingNextPage: loadingMore,
+    hasNextPage: hasMore,
+    fetchNextPage: loadMore,
+    refetch,
     error,
-    loadMore,
-    refresh,
-  } = usePagination<OfficeData>(queryFn, { pageSize: 20 });
+    isFetching
+  } = useOfficeData();
 
-  // Set up infinite scroll
-  useInfiniteScroll(loadMore, hasMore && enableInfiniteScroll, loadingMore);
+  // Flatten pages data
+  const offices = useMemo(() => {
+    return data?.pages?.flatMap(page => page.data) || [];
+  }, [data]);
 
+  const totalCount = data?.pages?.[0]?.totalCount || 0;
 
-  // Process the raw office data from pagination hook
+  // Process the raw office data
   const processedOffices = useMemo(() => {
     return offices.map((office: any) => ({
       ...office,
@@ -131,7 +113,7 @@ export function Offices() {
   }, [offices]);
 
   // Handle errors
-  useEffect(() => {
+  React.useEffect(() => {
     if (error) {
       toast({
         title: "Error",
@@ -209,14 +191,22 @@ export function Offices() {
           <h1 className="text-3xl font-bold text-foreground">Offices</h1>
           <div className="flex items-center gap-4">
             <div className="text-sm text-muted-foreground">
-              {processedOffices.length} of {totalCount} office{totalCount !== 1 ? 's' : ''}
+              {offices.length} of {totalCount} office{totalCount !== 1 ? 's' : ''}
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setEnableInfiniteScroll(!enableInfiniteScroll)}
+            {isFetching && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                Refreshing...
+              </div>
+            )}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => refetch()}
+              disabled={isFetching}
             >
-              {enableInfiniteScroll ? 'Disable' : 'Enable'} Auto-load
+              <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+              Refresh
             </Button>
           </div>
         </div>
@@ -387,7 +377,7 @@ export function Offices() {
             {hasMore && (
               <div className="flex justify-center pt-6">
                 <Button
-                  onClick={loadMore}
+                  onClick={() => loadMore()}
                   disabled={loadingMore}
                   variant="outline"
                   className="gap-2"
@@ -395,16 +385,6 @@ export function Offices() {
                   {loadingMore && <Loader2 className="w-4 h-4 animate-spin" />}
                   {loadingMore ? 'Loading...' : 'Load More Offices'}
                 </Button>
-              </div>
-            )}
-
-            {/* Infinite scroll indicator */}
-            {enableInfiniteScroll && loadingMore && (
-              <div className="flex justify-center pt-4">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Loading more offices...
-                </div>
               </div>
             )}
           </CardContent>

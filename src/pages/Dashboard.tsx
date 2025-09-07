@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { formatYearMonth } from '@/lib/database.types';
-import { supabase } from '@/integrations/supabase/client';
-import { Search, TrendingUp, Building2, Star, Users, Globe, MessageSquare, FileText, BarChart3 } from 'lucide-react';
+import { TrendingUp, Building2, Users, Globe, MessageSquare, BarChart3, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -15,6 +14,7 @@ import {
   CartesianGrid, 
   Tooltip 
 } from 'recharts';
+import { useDashboardData } from '@/hooks/useQueryData';
 
 interface SourceGroupData {
   name: string;
@@ -89,80 +89,28 @@ function PatientTrendChart({ monthlyTrends }: PatientTrendChartProps) {
 }
 
 export function Dashboard() {
-  const [dashboardData, setDashboardData] = useState<DashboardSummary | null>(null);
-  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
+  
+  // Use React Query for dashboard data with background refetch
+  const { 
+    data: dashboardData, 
+    isLoading: loading, 
+    error, 
+    refetch,
+    isFetching 
+  } = useDashboardData();
 
+  // Handle errors
   useEffect(() => {
-    loadData();
-    
-    // Set up real-time subscriptions
-    const sourcesChannel = supabase
-      .channel('sources-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'patient_sources'
-        },
-        (payload) => {
-          console.log('Sources change:', payload);
-          loadData(); // Reload all data when sources change
-        }
-      )
-      .subscribe();
-
-    const monthlyChannel = supabase
-      .channel('monthly-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'monthly_patients'
-        },
-        (payload) => {
-          console.log('Monthly data change:', payload);
-          loadData(); // Reload all data when monthly data changes
-        }
-      )
-      .subscribe();
-
-    // Cleanup subscriptions on unmount
-    return () => {
-      supabase.removeChannel(sourcesChannel);
-      supabase.removeChannel(monthlyChannel);
-    };
-  }, []);
-
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      
-      // Use the optimized function to get all dashboard data in one query
-      const { data, error } = await supabase.rpc('get_dashboard_data');
-
-      if (error) throw error;
-      
-      if (data && data.length > 0 && data[0].summary) {
-        const summary = data[0].summary;
-        if (typeof summary === 'object' && summary !== null && !Array.isArray(summary)) {
-          setDashboardData((summary as unknown) as DashboardSummary);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading data:', error);
+    if (error) {
       toast({
         title: "Error",
-        description: "Failed to load data",
+        description: "Failed to load dashboard data",
         variant: "destructive"
       });
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [error, toast]);
 
   const getSourceGroupData = (): SourceGroupData[] => {
     if (!dashboardData?.source_groups) return [];
@@ -245,6 +193,23 @@ export function Dashboard() {
           <p className="text-muted-foreground">
             Overview of your patient referral sources
           </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {isFetching && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <RefreshCw className="w-4 h-4 animate-spin" />
+              Refreshing...
+            </div>
+          )}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => refetch()}
+            disabled={isFetching}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
         </div>
       </div>
 
