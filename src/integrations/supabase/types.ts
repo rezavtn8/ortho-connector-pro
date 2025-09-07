@@ -997,7 +997,20 @@ export type Database = {
         Row: {
           monthly_trends: Json | null
           source_groups: Json | null
+          summary_data: Json | null
           user_id: string | null
+        }
+        Insert: {
+          monthly_trends?: never
+          source_groups?: never
+          summary_data?: never
+          user_id?: string | null
+        }
+        Update: {
+          monthly_trends?: never
+          source_groups?: never
+          summary_data?: never
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -1027,6 +1040,58 @@ export type Database = {
           updated_at: string | null
           website: string | null
           yelp_rating: number | null
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          distance_miles?: number | null
+          email?: string | null
+          google_place_id?: string | null
+          google_rating?: number | null
+          id?: string | null
+          is_active?: boolean | null
+          l12?: never
+          last_updated_from_google?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          mslr?: never
+          name?: string | null
+          notes?: string | null
+          opening_hours?: string | null
+          phone?: string | null
+          r3?: never
+          tier?: never
+          total_patients?: never
+          updated_at?: string | null
+          website?: string | null
+          yelp_rating?: number | null
+        }
+        Update: {
+          address?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          distance_miles?: number | null
+          email?: string | null
+          google_place_id?: string | null
+          google_rating?: number | null
+          id?: string | null
+          is_active?: boolean | null
+          l12?: never
+          last_updated_from_google?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          mslr?: never
+          name?: string | null
+          notes?: string | null
+          opening_hours?: string | null
+          phone?: string | null
+          r3?: never
+          tier?: never
+          total_patients?: never
+          updated_at?: string | null
+          website?: string | null
+          yelp_rating?: number | null
         }
         Relationships: []
       }
