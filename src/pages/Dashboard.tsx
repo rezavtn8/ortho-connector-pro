@@ -7,6 +7,9 @@ import { Search, TrendingUp, Building2, Star, Users, Globe, MessageSquare, FileT
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { usePagination } from '@/hooks/usePagination';
+import { SkeletonCard } from '@/components/ui/skeleton-card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { withErrorHandling } from '@/utils/errorHandler';
 import { 
   ResponsiveContainer, 
   LineChart, 
@@ -158,44 +161,47 @@ export function Dashboard() {
   }, []);
 
   const loadData = async () => {
-    try {
-      setLoading(true);
-      
-      // Load patient sources
-      const { data: sourcesData, error: sourcesError } = await supabase
-        .from('patient_sources')
-        .select('*')
-        .order('name');
+    await withErrorHandling(
+      async () => {
+        setLoading(true);
+        
+        // Load patient sources
+        const { data: sourcesData, error: sourcesError } = await supabase
+          .from('patient_sources')
+          .select('*')
+          .order('name');
 
-      if (sourcesError) throw sourcesError;
+        if (sourcesError) throw sourcesError;
 
-      // Load monthly data for current month
-      const { data: monthlyDataResult, error: monthlyError } = await supabase
-        .from('monthly_patients')
-        .select('*')
-        .eq('year_month', currentMonth);
+        // Load monthly data for current month
+        const { data: monthlyDataResult, error: monthlyError } = await supabase
+          .from('monthly_patients')
+          .select('*')
+          .eq('year_month', currentMonth);
 
-      if (monthlyError) throw monthlyError;
+        if (monthlyError) throw monthlyError;
 
-      // Load all-time monthly data for totals
-      const { data: allMonthlyData, error: allMonthlyError } = await supabase
-        .from('monthly_patients')
-        .select('*');
+        // Load all-time monthly data for totals
+        const { data: allMonthlyData, error: allMonthlyError } = await supabase
+          .from('monthly_patients')
+          .select('*');
 
-      if (allMonthlyError) throw allMonthlyError;
+        if (allMonthlyError) throw allMonthlyError;
 
-      setSources(sourcesData || []);
-      setMonthlyData(allMonthlyData || []);
-    } catch (error) {
-      console.error('Error loading data:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load data",
-        variant: "destructive"
-      });
-    } finally {
+        setSources(sourcesData || []);
+        setMonthlyData(allMonthlyData || []);
+      },
+      { 
+        component: 'Dashboard', 
+        action: 'loadData',
+        metadata: { 
+          currentMonth,
+          sourcesCount: sources.length 
+        }
+      }
+    ).finally(() => {
       setLoading(false);
-    }
+    });
   };
 
   const getSourceGroupData = (): SourceGroupData[] => {
@@ -248,25 +254,69 @@ export function Dashboard() {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-            <p className="text-muted-foreground">Loading...</p>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Dashboard
+            </h1>
+            <p className="text-muted-foreground">Loading your patient referral data...</p>
           </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[1, 2, 3].map((i) => (
-            <Card key={i}>
-              <CardHeader>
-                <CardTitle className="text-lg">
-                  <div className="h-4 bg-muted rounded animate-pulse w-24"></div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-8 bg-muted rounded animate-pulse w-16 mb-2"></div>
-                <div className="h-3 bg-muted rounded animate-pulse w-32"></div>
-              </CardContent>
-            </Card>
+        {/* Overview Stats Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <SkeletonCard key={i} variant="metric" />
           ))}
+        </div>
+
+        {/* Source Categories Skeleton */}
+        <div className="space-y-4">
+          <Skeleton className="h-6 w-48" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <SkeletonCard key={i} variant="dashboard" />
+            ))}
+          </div>
+        </div>
+
+        {/* Analytics Skeleton */}
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <Skeleton className="h-6 w-40" />
+            <Skeleton className="h-10 w-48" />
+          </div>
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-5 w-5" />
+                <Skeleton className="h-6 w-64" />
+              </div>
+              <Skeleton className="h-4 w-96" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-64 w-full" />
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent Activity Skeleton */}
+        <div className="space-y-4">
+          <Skeleton className="h-6 w-32" />
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-5 w-5" />
+                <Skeleton className="h-6 w-48" />
+              </div>
+              <Skeleton className="h-4 w-72" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <SkeletonCard key={i} variant="activity" />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );

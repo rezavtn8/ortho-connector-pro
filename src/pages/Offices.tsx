@@ -18,6 +18,9 @@ import { PatientSource, MonthlyPatients } from '@/lib/database.types';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePagination } from '@/hooks/usePagination';
+import { SkeletonCard } from '@/components/ui/skeleton-card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { withErrorHandling } from '@/utils/errorHandler';
 
 interface OfficeData extends PatientSource {
   l12: number; // Last 12 months
@@ -114,25 +117,26 @@ export function Offices() {
   };
 
   const loadOffices = async () => {
-    try {
-      setLoading(true);
-      
-      // Load office sources only
-      const { data: sourcesData, error: sourcesError } = await supabase
-        .from('patient_sources')
-        .select('*')
-        .eq('source_type', 'Office')
-        .eq('is_active', true)
-        .order('name');
+    await withErrorHandling(
+      async () => {
+        setLoading(true);
+        
+        // Load office sources only
+        const { data: sourcesData, error: sourcesError } = await supabase
+          .from('patient_sources')
+          .select('*')
+          .eq('source_type', 'Office')
+          .eq('is_active', true)
+          .order('name');
 
-      if (sourcesError) throw sourcesError;
+        if (sourcesError) throw sourcesError;
 
-      // Load monthly data for the past 12 months
-      const { data: monthlyData, error: monthlyError } = await supabase
-        .from('monthly_patients')
-        .select('*');
+        // Load monthly data for the past 12 months
+        const { data: monthlyData, error: monthlyError } = await supabase
+          .from('monthly_patients')
+          .select('*');
 
-      if (monthlyError) throw monthlyError;
+        if (monthlyError) throw monthlyError;
 
       // Calculate metrics for each office
       const processedOffices: OfficeData[] = [];
@@ -179,17 +183,18 @@ export function Offices() {
         tier: calculateTier(office.l12, office.r3, office.mslr, processedOffices),
       }));
 
-      setAllOffices(officesWithTiers);
-    } catch (error) {
-      console.error('Error loading offices:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load offices data",
-        variant: "destructive",
-      });
-    } finally {
+        setAllOffices(officesWithTiers);
+      },
+      { 
+        component: 'Offices', 
+        action: 'loadOffices',
+        metadata: { 
+          activeSourcesCount: allOffices.length 
+        }
+      }
+    ).finally(() => {
       setLoading(false);
-    }
+    });
   };
 
   const handleSort = (field: SortField) => {
@@ -259,11 +264,36 @@ export function Offices() {
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold text-foreground">Offices</h1>
         </div>
+        
+        {/* Tier Summary Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <SkeletonCard key={i} variant="metric" />
+          ))}
+        </div>
+
+        {/* Table Skeleton */}
         <Card>
-          <CardContent className="p-8">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-              <p className="text-muted-foreground mt-2">Loading offices...</p>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-5 w-5" />
+              <Skeleton className="h-6 w-48" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Filter skeleton */}
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Skeleton className="h-10 flex-1" />
+                <Skeleton className="h-10 w-48" />
+              </div>
+              
+              {/* Table rows skeleton */}
+              <div className="space-y-3">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <SkeletonCard key={i} variant="office" />
+                ))}
+              </div>
             </div>
           </CardContent>
         </Card>

@@ -21,10 +21,24 @@ const queryClient = new QueryClient({
         }
         return failureCount < 3;
       },
-      staleTime: 1000 * 60 * 5, // 5 minutes
+      staleTime: 1000 * 60 * 5, // 5 minutes - data remains fresh
+      gcTime: 1000 * 60 * 30, // 30 minutes - cached data persists
+      refetchOnWindowFocus: true, // Background refetch on focus
+      refetchOnReconnect: true, // Background refetch on reconnect
+      refetchInterval: 1000 * 60 * 10, // Auto-refetch every 10 minutes for critical data
     },
     mutations: {
-      retry: 1,
+      retry: (failureCount, error) => {
+        // Don't retry client errors but do retry server errors
+        if (error && typeof error === 'object' && 'status' in error) {
+          const status = error.status as number;
+          if (status >= 400 && status < 500) return false;
+        }
+        return failureCount < 2;
+      },
+      onError: (error) => {
+        console.error('Mutation error:', error);
+      },
     },
   },
 });
