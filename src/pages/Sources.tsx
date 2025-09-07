@@ -26,6 +26,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PatientCountEditor } from '@/components/PatientCountEditor';
+import { SkeletonCard, SkeletonTable } from '@/components/ui/skeleton-card';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export function Sources() {
   const navigate = useNavigate();
@@ -292,10 +294,7 @@ export function Sources() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-              <p className="text-muted-foreground mt-2">Loading...</p>
-            </div>
+            <SkeletonTable rows={6} />
           </CardContent>
         </Card>
       );

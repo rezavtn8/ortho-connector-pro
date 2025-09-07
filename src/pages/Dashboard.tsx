@@ -15,6 +15,8 @@ import {
   Tooltip 
 } from 'recharts';
 import { useDashboardData } from '@/hooks/useQueryData';
+import { SkeletonCard, SkeletonChart } from '@/components/ui/skeleton-card';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface SourceGroupData {
   name: string;
@@ -158,25 +160,49 @@ export function Dashboard() {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-            <p className="text-muted-foreground">Loading...</p>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Dashboard
+            </h1>
+            <p className="text-muted-foreground">Loading your data...</p>
           </div>
+          <Skeleton className="h-9 w-24" />
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[1, 2, 3].map((i) => (
+        {/* Overview Stats Skeletons */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
             <Card key={i}>
-              <CardHeader>
-                <CardTitle className="text-lg">
-                  <div className="h-4 bg-muted rounded animate-pulse w-24"></div>
-                </CardTitle>
+              <CardHeader className="pb-3">
+                <Skeleton className="h-4 w-20" />
               </CardHeader>
               <CardContent>
-                <div className="h-8 bg-muted rounded animate-pulse w-16 mb-2"></div>
-                <div className="h-3 bg-muted rounded animate-pulse w-32"></div>
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-8 w-12" />
+                  <Skeleton className="h-8 w-8 rounded" />
+                </div>
+                <Skeleton className="h-3 w-24 mt-1" />
               </CardContent>
             </Card>
           ))}
+        </div>
+
+        {/* Source Categories Skeletons */}
+        <div className="space-y-4">
+          <Skeleton className="h-6 w-40" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <SkeletonCard key={i} rows={3} />
+            ))}
+          </div>
+        </div>
+
+        {/* Analytics Overview Skeleton */}
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <Skeleton className="h-6 w-36" />
+            <Skeleton className="h-9 w-32" />
+          </div>
+          <SkeletonChart />
         </div>
       </div>
     );

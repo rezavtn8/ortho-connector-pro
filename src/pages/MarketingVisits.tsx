@@ -30,6 +30,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { usePagination, useInfiniteScroll } from '@/hooks/usePagination';
+import { SkeletonCard, SkeletonTable } from '@/components/ui/skeleton-card';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface MarketingVisit {
   id: string;
@@ -361,11 +363,26 @@ export function MarketingVisits() {
 
   if (loading && visitsWithOffices.length === 0) {
     return (
-      <div className="flex items-center justify-center min-h-96">
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading marketing visits...</p>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Marketing Visits</h1>
+            <p className="text-muted-foreground">Loading your marketing visit data...</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-9 w-32" />
+            <Skeleton className="h-9 w-24" />
+          </div>
         </div>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Marketing Visits</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <SkeletonTable rows={8} />
+          </CardContent>
+        </Card>
       </div>
     );
   }

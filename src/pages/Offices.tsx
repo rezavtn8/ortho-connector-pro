@@ -16,6 +16,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Building2, ArrowUpDown, Filter, Loader2, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useOfficeData } from '@/hooks/useQueryData';
+import { SkeletonCard, SkeletonTable } from '@/components/ui/skeleton-card';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface OfficeData {
   id: string;
@@ -171,13 +173,36 @@ export function Offices() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold text-foreground">Offices</h1>
+          <Skeleton className="h-9 w-24" />
         </div>
+
+        {/* Tier Summary Cards Skeletons */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i}>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-8 w-12" />
+                  </div>
+                  <Skeleton className="h-8 w-16 rounded-full" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Offices Table Skeleton */}
         <Card>
-          <CardContent className="p-8">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-              <p className="text-muted-foreground mt-2">Loading offices...</p>
-            </div>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="w-5 h-5" />
+              Office Performance
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <SkeletonTable rows={8} />
           </CardContent>
         </Card>
       </div>
