@@ -3,22 +3,28 @@ import { supabase } from '@/integrations/supabase/client';
 import { queryKeys, refetchIntervals } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { PatientSource, MonthlyPatients } from '@/lib/database.types';
+import { handleSupabaseOperation, errorHandler } from '@/utils/errorUtils';
 
 // Dashboard Data Hook with Background Refetch
 export function useDashboardData() {
   return useQuery({
     queryKey: queryKeys.dashboardSummary,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_dashboard_data');
-      if (error) throw error;
-      
-      if (data && data.length > 0 && data[0].summary) {
-        const summary = data[0].summary;
-        if (typeof summary === 'object' && summary !== null && !Array.isArray(summary)) {
-          return (summary as unknown) as any;
+      try {
+        const { data, error } = await supabase.rpc('get_dashboard_data');
+        if (error) throw error;
+        
+        if (data && data.length > 0 && data[0].summary) {
+          const summary = data[0].summary;
+          if (typeof summary === 'object' && summary !== null && !Array.isArray(summary)) {
+            return (summary as unknown) as any;
+          }
         }
+        return null;
+      } catch (error) {
+        await errorHandler.handleError(error, 'useDashboardData');
+        throw error;
       }
-      return null;
     },
     staleTime: 2 * 60 * 1000, // 2 minutes for critical dashboard data
     refetchInterval: refetchIntervals.dashboard,
@@ -35,19 +41,24 @@ export function useOfficeData() {
       const startIndex = pageParam * pageSize;
       const endIndex = startIndex + pageSize - 1;
 
-      // For RPC functions, we handle pagination client-side for now
-      const { data, error } = await supabase.rpc('get_office_data_with_relations');
-      if (error) throw error;
+      try {
+        // For RPC functions, we handle pagination client-side for now
+        const { data, error } = await supabase.rpc('get_office_data_with_relations');
+        if (error) throw error;
 
-      const allData = (data || []) as any[];
-      const totalCount = allData.length;
-      const paginatedData = allData.slice(startIndex, startIndex + pageSize);
+        const allData = (data || []) as any[];
+        const totalCount = allData.length;
+        const paginatedData = allData.slice(startIndex, startIndex + pageSize);
 
-      return {
-        data: paginatedData,
-        nextPage: endIndex < totalCount - 1 ? pageParam + 1 : undefined,
-        totalCount,
-      };
+        return {
+          data: paginatedData,
+          nextPage: endIndex < totalCount - 1 ? pageParam + 1 : undefined,
+          totalCount,
+        };
+      } catch (error) {
+        await errorHandler.handleError(error, 'useOfficeData');
+        throw error;
+      }
     },
     getNextPageParam: (lastPage) => lastPage.nextPage,
     initialPageParam: 0,
@@ -65,28 +76,33 @@ export function useSourcesData(filters?: any) {
       const startIndex = pageParam * pageSize;
       const endIndex = startIndex + pageSize - 1;
 
-      // First get count
-      const { count, error: countError } = await supabase
-        .from('patient_sources')
-        .select('*', { count: 'exact', head: true })
-        .order('name');
+      try {
+        // First get count
+        const { count, error: countError } = await supabase
+          .from('patient_sources')
+          .select('*', { count: 'exact', head: true })
+          .order('name');
 
-      if (countError) throw countError;
+        if (countError) throw countError;
 
-      // Then get data with range
-      const { data, error } = await supabase
-        .from('patient_sources')
-        .select('*')
-        .order('name')
-        .range(startIndex, endIndex);
+        // Then get data with range
+        const { data, error } = await supabase
+          .from('patient_sources')
+          .select('*')
+          .order('name')
+          .range(startIndex, endIndex);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      return {
-        data: data || [],
-        nextPage: endIndex < (count || 0) - 1 ? pageParam + 1 : undefined,
-        totalCount: count || 0,
-      };
+        return {
+          data: data || [],
+          nextPage: endIndex < (count || 0) - 1 ? pageParam + 1 : undefined,
+          totalCount: count || 0,
+        };
+      } catch (error) {
+        await errorHandler.handleError(error, 'useSourcesData');
+        throw error;
+      }
     },
     getNextPageParam: (lastPage) => lastPage.nextPage,
     initialPageParam: 0,
@@ -177,14 +193,19 @@ export function useUpdatePatientCount() {
 
   return useMutation({
     mutationFn: async ({ sourceId, count, yearMonth }: { sourceId: string; count: number; yearMonth: string }) => {
-      const { data, error } = await supabase.rpc('set_patient_count', {
-        p_source_id: sourceId,
-        p_year_month: yearMonth,
-        p_count: count,
-      });
+      try {
+        const { data, error } = await supabase.rpc('set_patient_count', {
+          p_source_id: sourceId,
+          p_year_month: yearMonth,
+          p_count: count,
+        });
 
-      if (error) throw error;
-      return data;
+        if (error) throw error;
+        return data;
+      } catch (error) {
+        await errorHandler.handleError(error, 'useUpdatePatientCount');
+        throw error;
+      }
     },
     onMutate: async ({ sourceId, count, yearMonth }) => {
       // Cancel outgoing refetches
@@ -229,11 +250,7 @@ export function useUpdatePatientCount() {
       if (context?.previousData) {
         queryClient.setQueryData(queryKeys.monthlyPatients, context.previousData);
       }
-      toast({
-        title: "Error",
-        description: "Failed to update patient count",
-        variant: "destructive",
-      });
+      // Error handling is done in the mutation function, no need for toast here
     },
     onSuccess: () => {
       toast({
@@ -255,14 +272,19 @@ export function useCreateMarketingVisit() {
 
   return useMutation({
     mutationFn: async (visitData: any) => {
-      const { data, error } = await supabase
-        .from('marketing_visits')
-        .insert([visitData])
-        .select()
-        .single();
+      try {
+        const { data, error } = await supabase
+          .from('marketing_visits')
+          .insert([visitData])
+          .select()
+          .single();
 
-      if (error) throw error;
-      return data;
+        if (error) throw error;
+        return data;
+      } catch (error) {
+        await errorHandler.handleError(error, 'useCreateMarketingVisit');
+        throw error;
+      }
     },
     onMutate: async (newVisit) => {
       // Cancel outgoing refetches
@@ -315,11 +337,7 @@ export function useCreateMarketingVisit() {
         });
       }
       
-      toast({
-        title: "Error",
-        description: "Failed to create marketing visit",
-        variant: "destructive",
-      });
+      // Error handling is done in the mutation function, no additional toast needed
     },
     onSuccess: () => {
       toast({
@@ -340,14 +358,19 @@ export function useCreateSource() {
 
   return useMutation({
     mutationFn: async (sourceData: Partial<PatientSource>) => {
-      const { data, error } = await supabase
-        .from('patient_sources')
-        .insert([sourceData as any])
-        .select()
-        .single();
+      try {
+        const { data, error } = await supabase
+          .from('patient_sources')
+          .insert([sourceData as any])
+          .select()
+          .single();
 
-      if (error) throw error;
-      return data;
+        if (error) throw error;
+        return data;
+      } catch (error) {
+        await errorHandler.handleError(error, 'useCreateSource');
+        throw error;
+      }
     },
     onMutate: async (newSource) => {
       // Cancel outgoing refetches
@@ -401,11 +424,7 @@ export function useCreateSource() {
         });
       }
       
-      toast({
-        title: "Error",
-        description: "Failed to create source",
-        variant: "destructive",
-      });
+      // Error handling is done in the mutation function, no additional toast needed
     },
     onSuccess: () => {
       toast({

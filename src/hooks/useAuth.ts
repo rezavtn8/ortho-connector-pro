@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { errorHandler } from '@/utils/errorUtils';
 
 interface RateLimitData {
   attempts: number;
@@ -208,6 +209,9 @@ export function useAuth() {
       if (session) {
         window.setTimeout(() => refreshSession(), 0);
       }
+    }).catch(async (error) => {
+      await errorHandler.handleError(error, 'getSession');
+      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
@@ -262,38 +266,65 @@ export function useAuth() {
       return { error: { message: `Account locked due to too many failed attempts. Try again in ${Math.ceil(lockoutTimeRemaining / 60)} minutes.` } };
     }
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) {
+      if (error) {
+        recordFailedAttempt();
+        await errorHandler.handleError(error, 'signIn', false); // Don't show toast, we handle it below
+      }
+
+      return { error };
+    } catch (error) {
       recordFailedAttempt();
+      await errorHandler.handleError(error, 'signIn');
+      return { error: { message: 'An unexpected error occurred during sign in' } };
     }
-
-    return { error };
   };
 
   const signUp = async (email: string, password: string, firstName?: string, lastName?: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          first_name: firstName,
-          last_name: lastName,
+    try {
+      const redirectUrl = `${window.location.origin}/`;
+      
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+          }
         }
+      });
+
+      if (error) {
+        await errorHandler.handleError(error, 'signUp', false);
       }
-    });
-    return { error };
+
+      return { error };
+    } catch (error) {
+      await errorHandler.handleError(error, 'signUp');
+      return { error: { message: 'An unexpected error occurred during sign up' } };
+    }
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    return { error };
+    try {
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        await errorHandler.handleError(error, 'signOut', false);
+      }
+      
+      return { error };
+    } catch (error) {
+      await errorHandler.handleError(error, 'signOut');
+      return { error: { message: 'An unexpected error occurred during sign out' } };
+    }
   };
 
   const formatLockoutTime = (seconds: number): string => {

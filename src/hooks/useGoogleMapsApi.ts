@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from '@/hooks/use-toast';
+import { errorHandler } from '@/utils/errorUtils';
 
 interface GoogleMapsApiState {
   apiKey: string | null;
@@ -97,7 +98,7 @@ export function useGoogleMapsApi(): GoogleMapsApiHook {
       return apiKey;
 
     } catch (error: any) {
-      console.error(`useGoogleMapsApi: Error on attempt ${attempt}:`, error);
+      await errorHandler.handleError(error, `fetchApiKey-attempt-${attempt}`);
       
       const errorMessage = error.message || 'Unknown error occurred';
       
