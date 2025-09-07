@@ -664,27 +664,27 @@ export function MarketingVisits() {
                 </TableBody>
               </Table>
             </div>
+          )}
 
-            {/* Load More Button */}
-            {visits.hasMore && filteredVisits.length > 0 && (
-              <div className="flex justify-center pt-6">
-                <Button 
-                  onClick={visits.loadMore} 
-                  disabled={visits.loading}
-                  variant="outline"
-                  className="gap-2"
-                >
-                  {visits.loading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Loading...
-                    </>
-                  ) : (
-                    <>Load More Visits</>
-                  )}
-                </Button>
-              </div>
-            )}
+          {/* Load More Button */}
+          {visits.hasMore && filteredVisits.length > 0 && (
+            <div className="flex justify-center pt-6">
+              <Button 
+                onClick={visits.loadMore} 
+                disabled={visits.loading}
+                variant="outline"
+                className="gap-2"
+              >
+                {visits.loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  <>Load More Visits</>
+                )}
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>
