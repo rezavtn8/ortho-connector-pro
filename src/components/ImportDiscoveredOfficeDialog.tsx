@@ -6,10 +6,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { SourceType } from '@/lib/database.types';
 import { Loader2 } from 'lucide-react';
+import { useCreateSource } from '@/hooks/useQueryData';
 import { sanitizeText, sanitizeEmail, sanitizePhone, sanitizeURL } from '@/lib/sanitize';
 
 interface ImportDiscoveredOfficeDialogProps {
@@ -36,7 +36,7 @@ export const ImportDiscoveredOfficeDialog: React.FC<ImportDiscoveredOfficeDialog
 }) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
+  const createSourceMutation = useCreateSource();
   const [formData, setFormData] = useState({
     name: prefillData.name,
     address: prefillData.address,
@@ -78,57 +78,34 @@ export const ImportDiscoveredOfficeDialog: React.FC<ImportDiscoveredOfficeDialog
       return;
     }
 
-    setLoading(true);
-    try {
-      // Insert into patient_sources
-      const { data, error } = await supabase
-        .from('patient_sources')
-        .insert({
-          name: sanitizedName,
-          address: sanitizedAddress,
-          phone: sanitizedPhone || null,
-          email: sanitizedEmail || null,
-          website: sanitizedWebsite || null,
-          source_type: formData.source_type,
-          notes: sanitizedNotes || null,
-          latitude: prefillData.latitude,
-          longitude: prefillData.longitude,
-          google_place_id: prefillData.google_place_id,
-          google_rating: prefillData.google_rating,
-          created_by: user.id,
-          is_active: true
-        })
-        .select()
-        .single();
+    // Prepare source data
+    const sourceData = {
+      name: sanitizedName,
+      address: sanitizedAddress,
+      phone: sanitizedPhone || null,
+      email: sanitizedEmail || null,
+      website: sanitizedWebsite || null,
+      source_type: formData.source_type,
+      notes: sanitizedNotes || null,
+      latitude: prefillData.latitude,
+      longitude: prefillData.longitude,
+      google_place_id: prefillData.google_place_id,
+      google_rating: prefillData.google_rating,
+      created_by: user.id,
+      is_active: true
+    };
 
-      if (error) {
-        console.error('Error adding source:', error);
+    // Use optimistic mutation
+    createSourceMutation.mutate(sourceData, {
+      onSuccess: () => {
         toast({
-          title: "Error",
-          description: "Failed to add office to sources. Please try again.",
-          variant: "destructive"
+          title: "Success",
+          description: `${formData.name} has been added to your referring sources!`
         });
-        return;
+        onSourceAdded();
+        onOpenChange(false);
       }
-
-      toast({
-        title: "Success",
-        description: `${formData.name} has been added to your referring sources!`
-      });
-
-      onSourceAdded();
-      onOpenChange(false);
-
-    } catch (error) {
-      console.error('Error in handleSubmit:', error);
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
   return (
@@ -222,12 +199,12 @@ export const ImportDiscoveredOfficeDialog: React.FC<ImportDiscoveredOfficeDialog
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
-              disabled={loading}
+              disabled={createSourceMutation.isPending}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? (
+            <Button type="submit" disabled={createSourceMutation.isPending}>
+              {createSourceMutation.isPending ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Adding...

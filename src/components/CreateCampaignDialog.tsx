@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { EnhancedDatePicker } from '@/components/EnhancedDatePicker';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
-import { CalendarIcon, X, Users } from 'lucide-react';
+import { CalendarIcon, X, Users, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -65,7 +65,7 @@ const DEFAULT_MATERIALS: Record<string, string[]> = {
 export function CreateCampaignDialog({ open, onOpenChange, onCampaignCreated }: CreateCampaignDialogProps) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const createCampaignMutation = useCreateCampaign();
+  const [loading, setLoading] = useState(false);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -80,7 +80,6 @@ export function CreateCampaignDialog({ open, onOpenChange, onCampaignCreated }: 
   const [newMaterial, setNewMaterial] = useState('');
   const [offices, setOffices] = useState<Office[]>([]);
   const [selectedOffices, setSelectedOffices] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
   const [loadingOffices, setLoadingOffices] = useState(true);
 
   // Fetch offices
@@ -399,11 +398,11 @@ export function CreateCampaignDialog({ open, onOpenChange, onCampaignCreated }: 
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={createCampaignMutation.isPending}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={createCampaignMutation.isPending}>
-            {createCampaignMutation.isPending ? (
+          <Button onClick={handleSubmit} disabled={loading}>
+            {loading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Creating...
