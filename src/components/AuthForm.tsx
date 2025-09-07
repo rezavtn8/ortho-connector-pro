@@ -20,11 +20,21 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
   const [lastName, setLastName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, isLocked, lockoutTimeRemaining, formatLockoutTime } = useAuth();
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (isLocked && !isSignUp) {
+      toast({
+        title: "Account Locked",
+        description: `Too many failed attempts. Try again in ${formatLockoutTime(lockoutTimeRemaining)}.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setLoading(true);
 
     // Sanitize all inputs before submission
@@ -157,10 +167,19 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
           </div>
         </div>
 
+        {isLocked && !isSignUp && (
+          <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-center">
+            <p className="text-sm text-destructive font-medium">Account Locked</p>
+            <p className="text-xs text-connection-muted mt-1">
+              Too many failed attempts. Try again in {formatLockoutTime(lockoutTimeRemaining)}.
+            </p>
+          </div>
+        )}
+
         <Button 
           type="submit" 
           className="w-full bg-connection-primary hover:bg-connection-primary/90 text-white shadow-elegant hover:shadow-glow transition-all" 
-          disabled={loading}
+          disabled={loading || (isLocked && !isSignUp)}
         >
           {loading ? 'Loading...' : (isSignUp ? 'Create Account' : 'Sign In')}
         </Button>
@@ -273,11 +292,20 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
               </div>
             </div>
 
+            {isLocked && !isSignUp && (
+              <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-center mb-4">
+                <p className="text-sm text-destructive font-medium">Account Locked</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Too many failed attempts. Try again in {formatLockoutTime(lockoutTimeRemaining)}.
+                </p>
+              </div>
+            )}
+
             <Button 
               type="submit" 
               variant="medical" 
               className="w-full h-12 sm:h-10 text-base sm:text-sm font-medium mt-6" 
-              disabled={loading}
+              disabled={loading || (isLocked && !isSignUp)}
             >
               {loading ? 'Loading...' : (isSignUp ? 'Create Account' : 'Sign In')}
             </Button>
