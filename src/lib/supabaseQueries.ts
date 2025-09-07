@@ -4,6 +4,8 @@ import { queryClient } from '@/lib/queryClient';
 
 // Background sync for critical data
 export function startBackgroundSync() {
+  let isSubscribed = true;
+  
   // Set up real-time subscriptions for automatic cache invalidation
   const sourcesChannel = supabase
     .channel('sources-realtime')
@@ -15,6 +17,7 @@ export function startBackgroundSync() {
         table: 'patient_sources'
       },
       (payload) => {
+        if (!isSubscribed) return;
         console.log('Sources change detected:', payload);
         // Invalidate related queries
         queryClient.invalidateQueries({ queryKey: ['sources'] });
@@ -34,6 +37,7 @@ export function startBackgroundSync() {
         table: 'monthly_patients'
       },
       (payload) => {
+        if (!isSubscribed) return;
         console.log('Monthly data change detected:', payload);
         // Invalidate related queries
         queryClient.invalidateQueries({ queryKey: ['monthly-patients'] });
@@ -52,6 +56,7 @@ export function startBackgroundSync() {
         table: 'marketing_visits'
       },
       (payload) => {
+        if (!isSubscribed) return;
         console.log('Marketing visits change detected:', payload);
         // Invalidate related queries
         queryClient.invalidateQueries({ queryKey: ['marketing-visits'] });
@@ -61,6 +66,7 @@ export function startBackgroundSync() {
 
   // Return cleanup function
   return () => {
+    isSubscribed = false;
     supabase.removeChannel(sourcesChannel);
     supabase.removeChannel(monthlyChannel);
     supabase.removeChannel(visitsChannel);
