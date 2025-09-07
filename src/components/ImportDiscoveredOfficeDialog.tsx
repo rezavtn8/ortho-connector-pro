@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { SourceType } from '@/lib/database.types';
 import { Loader2 } from 'lucide-react';
+import { sanitizeText, sanitizeEmail, sanitizePhone, sanitizeURL } from '@/lib/sanitize';
 
 interface ImportDiscoveredOfficeDialogProps {
   open: boolean;
@@ -50,19 +51,46 @@ export const ImportDiscoveredOfficeDialog: React.FC<ImportDiscoveredOfficeDialog
     e.preventDefault();
     if (!user) return;
 
+    // Sanitize all inputs before submission
+    const sanitizedName = sanitizeText(formData.name);
+    const sanitizedAddress = sanitizeText(formData.address);
+    const sanitizedPhone = sanitizePhone(formData.phone);
+    const sanitizedEmail = formData.email ? sanitizeEmail(formData.email) : '';
+    const sanitizedWebsite = formData.website ? sanitizeURL(formData.website) : '';
+    const sanitizedNotes = sanitizeText(formData.notes);
+
+    // Validate sanitized inputs
+    if (!sanitizedName) {
+      toast({
+        title: "Error",
+        description: "Office name is required and cannot contain invalid characters",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (formData.email && !sanitizedEmail) {
+      toast({
+        title: "Error", 
+        description: "Please enter a valid email address",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       // Insert into patient_sources
       const { data, error } = await supabase
         .from('patient_sources')
         .insert({
-          name: formData.name,
-          address: formData.address,
-          phone: formData.phone || null,
-          email: formData.email || null,
-          website: formData.website || null,
+          name: sanitizedName,
+          address: sanitizedAddress,
+          phone: sanitizedPhone || null,
+          email: sanitizedEmail || null,
+          website: sanitizedWebsite || null,
           source_type: formData.source_type,
-          notes: formData.notes || null,
+          notes: sanitizedNotes || null,
           latitude: prefillData.latitude,
           longitude: prefillData.longitude,
           google_place_id: prefillData.google_place_id,

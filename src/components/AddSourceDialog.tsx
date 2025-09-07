@@ -14,6 +14,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { SourceType } from '@/lib/database.types';
 import { AddressSearch } from '@/components/AddressSearch';
+import { sanitizeText, sanitizeEmail, sanitizeURL, sanitizePhone } from '@/lib/sanitize';
 
 interface AddOfficeDialogProps {
   onOfficeAdded: () => void;
@@ -119,14 +120,43 @@ export const AddOfficeDialog: React.FC<AddOfficeDialogProps> = ({ onOfficeAdded 
     setLoading(true);
 
     try {
+      // Sanitize all form inputs
+      const sanitizedName = sanitizeText(formData.name);
+      const sanitizedPhone = sanitizePhone(formData.phone);
+      const sanitizedEmail = formData.email ? sanitizeEmail(formData.email) : null;
+      const sanitizedWebsite = formData.website ? sanitizeURL(formData.website) : null;
+      const sanitizedNotes = sanitizeText(formData.notes);
+      const sanitizedAddress = sanitizeText(formData.address);
+
+      // Validate sanitized data
+      if (!sanitizedName) {
+        toast({
+          title: "Error",
+          description: "Office name is required and cannot contain invalid characters",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      if (formData.email && !sanitizedEmail) {
+        toast({
+          title: "Error", 
+          description: "Please enter a valid email address",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
       // If selected from AddressSearch, use that data
       let sourceData: any = {
-        name: formData.name.trim(),
+        name: sanitizedName,
         source_type: 'Office' as SourceType,
-        phone: formData.phone.trim() || null,
-        email: formData.email.trim() || null,
-        website: formData.website.trim() || null,
-        notes: formData.notes.trim() || null,
+        phone: sanitizedPhone || null,
+        email: sanitizedEmail,
+        website: sanitizedWebsite,
+        notes: sanitizedNotes,
         is_active: true,
         created_by: (await supabase.auth.getUser()).data.user?.id
       };
@@ -156,7 +186,7 @@ export const AddOfficeDialog: React.FC<AddOfficeDialogProps> = ({ onOfficeAdded 
           sourceData.website = selectedOffice.website;
         }
       } else {
-        sourceData.address = formData.address.trim() || null;
+        sourceData.address = sanitizedAddress || null;
       }
 
       // Check for existing office with same Google Place ID to prevent duplicates

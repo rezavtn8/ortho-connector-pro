@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { sanitizeText } from '@/lib/sanitize';
 import { 
   Shield, 
   AlertTriangle, 
@@ -255,7 +256,7 @@ export function SecurityAuditLog() {
             <Input
               placeholder="Search events..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => setSearchTerm(sanitizeText(e.target.value))}
               className="pl-10"
             />
           </div>

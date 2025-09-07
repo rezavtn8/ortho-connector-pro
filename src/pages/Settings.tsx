@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ClinicAddressSearch } from '@/components/ClinicAddressSearch';
 import { SecuritySettings } from '@/components/SecuritySettings';
 import { SecurityAuditLog } from '@/components/SecurityAuditLog';
+import { sanitizeText, sanitizePhone, sanitizeEmail } from '@/lib/sanitize';
 import {
   MapPin,
   User,
@@ -170,6 +171,23 @@ export function Settings() {
   const saveClinicSettings = async () => {
     if (!user?.id) return;
     
+    // Sanitize all clinic settings inputs
+    const sanitizedSettings = {
+      clinic_name: sanitizeText(clinicSettings.clinic_name),
+      clinic_address: sanitizeText(clinicSettings.clinic_address),
+      google_place_id: sanitizeText(clinicSettings.google_place_id)
+    };
+
+    // Validate required fields
+    if (!sanitizedSettings.clinic_name) {
+      toast({
+        title: "Error",
+        description: "Clinic name is required and cannot contain invalid characters",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     try {
       // Get user's profile to check for existing clinic
       const { data: profile } = await supabase
@@ -185,9 +203,9 @@ export function Settings() {
         const { error: clinicError } = await supabase
           .from('clinics')
           .update({
-            name: clinicSettings.clinic_name,
-            address: clinicSettings.clinic_address,
-            google_place_id: clinicSettings.google_place_id || null,
+            name: sanitizedSettings.clinic_name,
+            address: sanitizedSettings.clinic_address,
+            google_place_id: sanitizedSettings.google_place_id || null,
             updated_at: new Date().toISOString()
           })
           .eq('id', clinicId);

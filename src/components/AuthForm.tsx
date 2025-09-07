@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { Building2, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { sanitizeText, sanitizeEmail } from '@/lib/sanitize';
 
 interface AuthFormProps {
   embedded?: boolean;
@@ -26,10 +27,37 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
     e.preventDefault();
     setLoading(true);
 
+    // Sanitize all inputs before submission
+    const sanitizedEmail = sanitizeEmail(email);
+    const sanitizedFirstName = sanitizeText(firstName);
+    const sanitizedLastName = sanitizeText(lastName);
+    const sanitizedPassword = password; // Don't sanitize password as it may contain special chars
+
+    // Validate sanitized inputs
+    if (!sanitizedEmail) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid email address",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+
+    if (isSignUp && (!sanitizedFirstName || !sanitizedLastName)) {
+      toast({
+        title: "Error", 
+        description: "First name and last name are required",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+
     try {
       const { error } = isSignUp 
-        ? await signUp(email, password, firstName, lastName)
-        : await signIn(email, password);
+        ? await signUp(sanitizedEmail, sanitizedPassword, sanitizedFirstName, sanitizedLastName)
+        : await signIn(sanitizedEmail, sanitizedPassword);
 
       if (error) {
         toast({

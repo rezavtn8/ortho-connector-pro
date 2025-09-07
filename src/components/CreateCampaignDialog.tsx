@@ -21,6 +21,7 @@ import { CalendarIcon, X, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { sanitizeText } from '@/lib/sanitize';
 
 interface Office {
   id: string;
@@ -163,7 +164,11 @@ export function CreateCampaignDialog({ open, onOpenChange, onCampaignCreated }: 
   const handleSubmit = async () => {
     if (!user) return;
 
-    if (!formData.name || !formData.campaign_type || !formData.delivery_method || selectedOffices.length === 0) {
+    // Sanitize form inputs
+    const sanitizedName = sanitizeText(formData.name);
+    const sanitizedNotes = sanitizeText(formData.notes);
+
+    if (!sanitizedName || !formData.campaign_type || !formData.delivery_method || selectedOffices.length === 0) {
       toast({
         title: "Validation Error",
         description: "Please fill in all required fields and select at least one office.",
@@ -179,13 +184,13 @@ export function CreateCampaignDialog({ open, onOpenChange, onCampaignCreated }: 
       const { data: campaign, error: campaignError } = await supabase
         .from('campaigns')
         .insert({
-          name: formData.name,
+          name: sanitizedName,
           campaign_type: formData.campaign_type,
           delivery_method: formData.delivery_method,
           assigned_rep_id: formData.assigned_rep_id || null,
           materials_checklist: materials,
           planned_delivery_date: formData.planned_delivery_date?.toISOString().split('T')[0] || null,
-          notes: formData.notes,
+          notes: sanitizedNotes,
           created_by: user.id
         })
         .select()

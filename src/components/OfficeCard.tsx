@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { MapPin, Phone, Mail, Globe, Star, TrendingUp, TrendingDown, Users, ExternalLink, Edit2, Clock, Building2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { PatientSource, SourceTag } from '@/lib/database.types';
+import { SafeText } from '@/components/SafeText';
 
 type OfficeScore = 'Strong' | 'Moderate' | 'Sporadic' | 'Cold';
 
@@ -71,7 +72,7 @@ export const OfficeCard: React.FC<OfficeCardProps> = ({
           <div className="flex-1">
             <CardTitle className="text-lg font-semibold line-clamp-2 group-hover:text-primary transition-colors flex items-center gap-2">
               <Building2 className="w-4 h-4 text-muted-foreground" />
-              {office.name}
+              <SafeText>{office.name}</SafeText>
             </CardTitle>
           </div>
           <div className="flex gap-1">
@@ -115,7 +116,7 @@ export const OfficeCard: React.FC<OfficeCardProps> = ({
           {office.address && (
             <div className="flex items-start gap-2 text-muted-foreground">
               <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
-              <span className="line-clamp-2">{office.address}</span>
+              <SafeText className="line-clamp-2">{office.address}</SafeText>
             </div>
           )}
           
@@ -163,7 +164,7 @@ export const OfficeCard: React.FC<OfficeCardProps> = ({
           {office.notes && (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Clock className="w-4 h-4 flex-shrink-0" />
-              <span className="line-clamp-1">{office.notes}</span>
+              <SafeText className="line-clamp-1">{office.notes}</SafeText>
             </div>
           )}
         </div>
