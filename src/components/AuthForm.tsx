@@ -4,9 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
-import { Building2, Eye, EyeOff } from 'lucide-react';
+import { Building2, Eye, EyeOff, Check, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { sanitizeText, sanitizeEmail } from '@/lib/sanitize';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { signInSchema, signUpSchema, checkPasswordStrength, SignInFormData, SignUpFormData } from '@/lib/validationSchemas';
+import { Progress } from '@/components/ui/progress';
 
 interface AuthFormProps {
   embedded?: boolean;
@@ -14,18 +17,37 @@ interface AuthFormProps {
 
 export function AuthForm({ embedded = false }: AuthFormProps) {
   const [isSignUp, setIsSignUp] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
   const { signIn, signUp, isLocked, lockoutTimeRemaining, formatLockoutTime } = useAuth();
   const { toast } = useToast();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  // Form setup with validation
+  const signInForm = useForm<SignInFormData>({
+    resolver: zodResolver(signInSchema),
+    mode: 'onBlur',
+    defaultValues: {
+      email: '',
+      password: '',
+    },
+  });
+
+  const signUpForm = useForm<SignUpFormData>({
+    resolver: zodResolver(signUpSchema),
+    mode: 'onBlur',
+    defaultValues: {
+      firstName: '',
+      lastName: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+    },
+  });
+
+  const currentForm = isSignUp ? signUpForm : signInForm;
+  const watchedPassword = signUpForm.watch('password');
+  const passwordStrength = isSignUp ? checkPasswordStrength(watchedPassword || '') : null;
+
+  const handleSubmit = async (data: SignInFormData | SignUpFormData) => {
     if (isLocked && !isSignUp) {
       toast({
         title: "Account Locked",
@@ -34,40 +56,16 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
       });
       return;
     }
-    
-    setLoading(true);
-
-    // Sanitize all inputs before submission
-    const sanitizedEmail = sanitizeEmail(email);
-    const sanitizedFirstName = sanitizeText(firstName);
-    const sanitizedLastName = sanitizeText(lastName);
-    const sanitizedPassword = password; // Don't sanitize password as it may contain special chars
-
-    // Validate sanitized inputs
-    if (!sanitizedEmail) {
-      toast({
-        title: "Error",
-        description: "Please enter a valid email address",
-        variant: "destructive",
-      });
-      setLoading(false);
-      return;
-    }
-
-    if (isSignUp && (!sanitizedFirstName || !sanitizedLastName)) {
-      toast({
-        title: "Error", 
-        description: "First name and last name are required",
-        variant: "destructive",
-      });
-      setLoading(false);
-      return;
-    }
 
     try {
       const { error } = isSignUp 
-        ? await signUp(sanitizedEmail, sanitizedPassword, sanitizedFirstName, sanitizedLastName)
-        : await signIn(sanitizedEmail, sanitizedPassword);
+        ? await signUp(
+            (data as SignUpFormData).email, 
+            (data as SignUpFormData).password, 
+            (data as SignUpFormData).firstName, 
+            (data as SignUpFormData).lastName
+          )
+        : await signIn((data as SignInFormData).email, (data as SignInFormData).password);
 
       if (error) {
         toast({
@@ -81,6 +79,8 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
           description: "Please check your email to verify your account.",
           variant: "default",
         });
+        // Reset form after successful signup
+        signUpForm.reset();
       }
     } catch (error) {
       toast({
@@ -88,14 +88,42 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
         description: "An unexpected error occurred",
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
   };
 
+  const handleModeChange = () => {
+    setIsSignUp(!isSignUp);
+    // Reset both forms when switching modes
+    signInForm.reset();
+    signUpForm.reset();
+  };
+
+  // Password strength indicator component
+  const PasswordStrengthIndicator = ({ strength }: { strength: ReturnType<typeof checkPasswordStrength> }) => (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium">Password strength</span>
+        <span className={`text-xs font-medium text-${strength.color}-600`}>
+          {strength.score <= 2 ? 'Weak' : strength.score <= 4 ? 'Good' : 'Strong'}
+        </span>
+      </div>
+      <Progress value={(strength.score / 6) * 100} className="h-2" />
+      {strength.feedback.length > 0 && (
+        <ul className="text-xs text-muted-foreground space-y-1">
+          {strength.feedback.map((item, index) => (
+            <li key={index} className="flex items-center gap-1">
+              <X className="w-3 h-3 text-red-500" />
+              {item}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+
   if (embedded) {
     return (
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={currentForm.handleSubmit(handleSubmit)} className="space-y-6">
         {isSignUp && (
           <>
             <div className="space-y-2">
@@ -104,12 +132,12 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
                 id="firstName"
                 type="text"
                 placeholder="Enter your first name"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                required
-                autoComplete="given-name"
+                {...signUpForm.register('firstName')}
                 className="border-connection-primary/20 focus:border-connection-primary bg-white/50"
               />
+              {signUpForm.formState.errors.firstName && (
+                <p className="text-sm text-red-600">{signUpForm.formState.errors.firstName.message}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -118,12 +146,12 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
                 id="lastName"
                 type="text"
                 placeholder="Enter your last name"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                required
-                autoComplete="family-name"
+                {...signUpForm.register('lastName')}
                 className="border-connection-primary/20 focus:border-connection-primary bg-white/50"
               />
+              {signUpForm.formState.errors.lastName && (
+                <p className="text-sm text-red-600">{signUpForm.formState.errors.lastName.message}</p>
+              )}
             </div>
           </>
         )}
@@ -134,12 +162,14 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
             id="email"
             type="email"
             placeholder="Enter your email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            autoComplete="email"
+            {...(isSignUp ? signUpForm.register('email') : signInForm.register('email'))}
             className="border-connection-primary/20 focus:border-connection-primary bg-white/50"
           />
+          {(isSignUp ? signUpForm.formState.errors.email : signInForm.formState.errors.email) && (
+            <p className="text-sm text-red-600">
+              {(isSignUp ? signUpForm.formState.errors.email : signInForm.formState.errors.email)?.message}
+            </p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -149,10 +179,7 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
               id="password"
               type={showPassword ? 'text' : 'password'}
               placeholder="Enter your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete={isSignUp ? 'new-password' : 'current-password'}
+              {...(isSignUp ? signUpForm.register('password') : signInForm.register('password'))}
               className="border-connection-primary/20 focus:border-connection-primary bg-white/50"
             />
             <Button
@@ -165,7 +192,31 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </Button>
           </div>
+          {(isSignUp ? signUpForm.formState.errors.password : signInForm.formState.errors.password) && (
+            <p className="text-sm text-red-600">
+              {(isSignUp ? signUpForm.formState.errors.password : signInForm.formState.errors.password)?.message}
+            </p>
+          )}
+          {isSignUp && passwordStrength && watchedPassword && (
+            <PasswordStrengthIndicator strength={passwordStrength} />
+          )}
         </div>
+
+        {isSignUp && (
+          <div className="space-y-2">
+            <Label htmlFor="confirmPassword" className="text-connection-text">Confirm Password</Label>
+            <Input
+              id="confirmPassword"
+              type="password"
+              placeholder="Confirm your password"
+              {...signUpForm.register('confirmPassword')}
+              className="border-connection-primary/20 focus:border-connection-primary bg-white/50"
+            />
+            {signUpForm.formState.errors.confirmPassword && (
+              <p className="text-sm text-red-600">{signUpForm.formState.errors.confirmPassword.message}</p>
+            )}
+          </div>
+        )}
 
         {isLocked && !isSignUp && (
           <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-center">
@@ -179,16 +230,16 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
         <Button 
           type="submit" 
           className="w-full bg-connection-primary hover:bg-connection-primary/90 text-white shadow-elegant hover:shadow-glow transition-all" 
-          disabled={loading || (isLocked && !isSignUp)}
+          disabled={currentForm.formState.isSubmitting || (isLocked && !isSignUp)}
         >
-          {loading ? 'Loading...' : (isSignUp ? 'Create Account' : 'Sign In')}
+          {currentForm.formState.isSubmitting ? 'Loading...' : (isSignUp ? 'Create Account' : 'Sign In')}
         </Button>
 
         <div className="text-center">
           <Button
             type="button"
             variant="link"
-            onClick={() => setIsSignUp(!isSignUp)}
+            onClick={handleModeChange}
             className="text-sm text-connection-muted hover:text-connection-primary"
           >
             {isSignUp 
@@ -220,7 +271,7 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
         </CardHeader>
 
         <CardContent className="px-4 pb-6 sm:px-8 sm:pb-8">
-          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+          <form onSubmit={currentForm.handleSubmit(handleSubmit)} className="space-y-4 sm:space-y-6">
             {isSignUp && (
               <>
                 <div className="space-y-2">
@@ -229,12 +280,12 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
                     id="firstName"
                     type="text"
                     placeholder="Enter your first name"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    required
-                    autoComplete="given-name"
+                    {...signUpForm.register('firstName')}
                     className="h-12 sm:h-10 text-base sm:text-sm"
                   />
+                  {signUpForm.formState.errors.firstName && (
+                    <p className="text-sm text-red-600">{signUpForm.formState.errors.firstName.message}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -243,12 +294,12 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
                     id="lastName"
                     type="text"
                     placeholder="Enter your last name"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    required
-                    autoComplete="family-name"
+                    {...signUpForm.register('lastName')}
                     className="h-12 sm:h-10 text-base sm:text-sm"
                   />
+                  {signUpForm.formState.errors.lastName && (
+                    <p className="text-sm text-red-600">{signUpForm.formState.errors.lastName.message}</p>
+                  )}
                 </div>
               </>
             )}
@@ -259,12 +310,14 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
                 id="email"
                 type="email"
                 placeholder="Enter your email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="email"
+                {...(isSignUp ? signUpForm.register('email') : signInForm.register('email'))}
                 className="h-12 sm:h-10 text-base sm:text-sm"
               />
+              {(isSignUp ? signUpForm.formState.errors.email : signInForm.formState.errors.email) && (
+                <p className="text-sm text-red-600">
+                  {(isSignUp ? signUpForm.formState.errors.email : signInForm.formState.errors.email)?.message}
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -274,10 +327,7 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                  {...(isSignUp ? signUpForm.register('password') : signInForm.register('password'))}
                   className="h-12 sm:h-10 text-base sm:text-sm pr-12"
                 />
                 <Button
@@ -290,7 +340,31 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </Button>
               </div>
+              {(isSignUp ? signUpForm.formState.errors.password : signInForm.formState.errors.password) && (
+                <p className="text-sm text-red-600">
+                  {(isSignUp ? signUpForm.formState.errors.password : signInForm.formState.errors.password)?.message}
+                </p>
+              )}
+              {isSignUp && passwordStrength && watchedPassword && (
+                <PasswordStrengthIndicator strength={passwordStrength} />
+              )}
             </div>
+
+            {isSignUp && (
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword" className="text-sm font-medium">Confirm Password</Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  placeholder="Confirm your password"
+                  {...signUpForm.register('confirmPassword')}
+                  className="h-12 sm:h-10 text-base sm:text-sm"
+                />
+                {signUpForm.formState.errors.confirmPassword && (
+                  <p className="text-sm text-red-600">{signUpForm.formState.errors.confirmPassword.message}</p>
+                )}
+              </div>
+            )}
 
             {isLocked && !isSignUp && (
               <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-center mb-4">
@@ -305,16 +379,16 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
               type="submit" 
               variant="medical" 
               className="w-full h-12 sm:h-10 text-base sm:text-sm font-medium mt-6" 
-              disabled={loading || (isLocked && !isSignUp)}
+              disabled={currentForm.formState.isSubmitting || (isLocked && !isSignUp)}
             >
-              {loading ? 'Loading...' : (isSignUp ? 'Create Account' : 'Sign In')}
+              {currentForm.formState.isSubmitting ? 'Loading...' : (isSignUp ? 'Create Account' : 'Sign In')}
             </Button>
 
             <div className="text-center pt-2">
               <Button
                 type="button"
                 variant="link"
-                onClick={() => setIsSignUp(!isSignUp)}
+                onClick={handleModeChange}
                 className="text-sm text-muted-foreground hover:text-foreground h-auto p-0 min-h-[44px] flex items-center"
               >
                 {isSignUp 
