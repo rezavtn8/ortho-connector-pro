@@ -239,13 +239,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "discovered_offices_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "clinics"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "fk_discovered_offices_discovery_session_id"
             columns: ["discovery_session_id"]
             isOneToOne: false
@@ -460,27 +453,6 @@ export type Database = {
             referencedRelation: "patient_sources"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "marketing_visits_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "clinics"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "marketing_visits_office_id_fkey"
-            columns: ["office_id"]
-            isOneToOne: false
-            referencedRelation: "office_metrics"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "marketing_visits_office_id_fkey"
-            columns: ["office_id"]
-            isOneToOne: false
-            referencedRelation: "patient_sources"
-            referencedColumns: ["id"]
-          },
         ]
       }
       monthly_patients: {
@@ -520,13 +492,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "fk_monthly_patients_clinic"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "clinics"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "monthly_patients_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "clinics"
@@ -591,13 +556,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "fk_patient_changes_log_clinic"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "clinics"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "patient_changes_log_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "clinics"
@@ -697,13 +655,6 @@ export type Database = {
             referencedRelation: "clinics"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "patient_sources_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "clinics"
-            referencedColumns: ["id"]
-          },
         ]
       }
       rate_limit_log: {
@@ -773,15 +724,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "review_status_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "clinics"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       security_audit_log: {
         Row: {
@@ -850,13 +793,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "fk_source_tags_clinic"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "clinics"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "source_tags_clinic_id_fkey"
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "clinics"
@@ -982,13 +918,6 @@ export type Database = {
             referencedRelation: "clinics"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "user_profiles_clinic_id_fkey"
-            columns: ["clinic_id"]
-            isOneToOne: false
-            referencedRelation: "clinics"
-            referencedColumns: ["id"]
-          },
         ]
       }
     }
@@ -997,20 +926,7 @@ export type Database = {
         Row: {
           monthly_trends: Json | null
           source_groups: Json | null
-          summary_data: Json | null
           user_id: string | null
-        }
-        Insert: {
-          monthly_trends?: never
-          source_groups?: never
-          summary_data?: never
-          user_id?: string | null
-        }
-        Update: {
-          monthly_trends?: never
-          source_groups?: never
-          summary_data?: never
-          user_id?: string | null
         }
         Relationships: []
       }
@@ -1040,58 +956,6 @@ export type Database = {
           updated_at: string | null
           website: string | null
           yelp_rating: number | null
-        }
-        Insert: {
-          address?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          distance_miles?: number | null
-          email?: string | null
-          google_place_id?: string | null
-          google_rating?: number | null
-          id?: string | null
-          is_active?: boolean | null
-          l12?: never
-          last_updated_from_google?: string | null
-          latitude?: number | null
-          longitude?: number | null
-          mslr?: never
-          name?: string | null
-          notes?: string | null
-          opening_hours?: string | null
-          phone?: string | null
-          r3?: never
-          tier?: never
-          total_patients?: never
-          updated_at?: string | null
-          website?: string | null
-          yelp_rating?: number | null
-        }
-        Update: {
-          address?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          distance_miles?: number | null
-          email?: string | null
-          google_place_id?: string | null
-          google_rating?: number | null
-          id?: string | null
-          is_active?: boolean | null
-          l12?: never
-          last_updated_from_google?: string | null
-          latitude?: number | null
-          longitude?: number | null
-          mslr?: never
-          name?: string | null
-          notes?: string | null
-          opening_hours?: string | null
-          phone?: string | null
-          r3?: never
-          tier?: never
-          total_patients?: never
-          updated_at?: string | null
-          website?: string | null
-          yelp_rating?: number | null
         }
         Relationships: []
       }
