@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { useGoogleBusinessProfile } from '@/hooks/useGoogleBusinessProfile';
 
 interface ReviewReplyDialogProps {
   open: boolean;
@@ -35,12 +35,22 @@ export function ReviewReplyDialog({
 }: ReviewReplyDialogProps) {
   const [replyText, setReplyText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { replyToReview, isConnected } = useGoogleBusinessProfile();
 
   const handleSubmit = async () => {
     if (!replyText.trim()) {
       toast({
         title: 'Reply Required',
         description: 'Please enter a reply before submitting.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!isConnected) {
+      toast({
+        title: 'Authentication Required',
+        description: 'Please connect your Google My Business account first.',
         variant: 'destructive',
       });
       return;
@@ -58,34 +68,7 @@ export function ReviewReplyDialog({
     setIsSubmitting(true);
     
     try {
-      // Get stored access token (in a real implementation, this would be securely stored per user)
-      const accessToken = localStorage.getItem('google_business_access_token');
-      
-      if (!accessToken) {
-        toast({
-          title: 'Authentication Required',
-          description: 'Please authenticate with Google My Business first.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      const { data, error } = await supabase.functions.invoke('google-business-profile/reply', {
-        body: {
-          location_id: locationId,
-          review_id: review.google_review_id,
-          reply_text: replyText
-        },
-        headers: {
-          'Authorization': `Bearer ${accessToken}`
-        }
-      });
-
-      if (error) throw error;
-
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to post reply');
-      }
+      await replyToReview(locationId, review.google_review_id, replyText);
 
       toast({
         title: 'Reply Posted',
@@ -98,11 +81,7 @@ export function ReviewReplyDialog({
 
     } catch (error: any) {
       console.error('Error posting reply:', error);
-      toast({
-        title: 'Reply Failed',
-        description: error.message || 'Failed to post reply. Please try again.',
-        variant: 'destructive',
-      });
+      // Error handling is done in the hook
     } finally {
       setIsSubmitting(false);
     }
