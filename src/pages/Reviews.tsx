@@ -9,6 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useGoogleReviews } from '@/hooks/useGoogleMapsApi';
+import { useGoogleBusinessProfile } from '@/hooks/useGoogleBusinessProfile';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Star,
@@ -72,6 +73,7 @@ export function Reviews() {
   const [businessConnected, setBusinessConnected] = useState(false);
 
   const { fetchReviews: fetchGoogleReviews } = useGoogleReviews();
+  const { connectBusiness, fetchAllReviews, isConnected } = useGoogleBusinessProfile();
 
   useEffect(() => {
     loadUserPlaceId();
@@ -340,25 +342,14 @@ export function Reviews() {
 
   const handleConnectBusiness = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('google-business-profile/auth-url');
-      
-      if (error) throw error;
-      
-      if (data.auth_url) {
-        window.open(data.auth_url, '_blank', 'width=600,height=600');
-      }
+      await connectBusiness();
     } catch (error) {
-      console.error('Error getting auth URL:', error);
-      toast({
-        title: 'Setup Required',
-        description: 'Google OAuth credentials need to be configured in Supabase secrets.',
-        variant: 'destructive',
-      });
+      console.error('Error connecting business:', error);
     }
   };
 
   const loadAllReviews = async () => {
-    if (!businessConnected) {
+    if (!isConnected) {
       toast({
         title: 'Business Connection Required',
         description: 'Please connect your Google My Business account to load all reviews.',
@@ -367,11 +358,46 @@ export function Reviews() {
       return;
     }
     
-    // Implementation for loading all reviews via Google My Business API
-    toast({
-      title: 'Feature Coming Soon',
-      description: 'Loading all reviews via Google My Business API will be available once OAuth2 is set up.',
-    });
+    if (!placeId) {
+      toast({
+        title: 'Place ID Required',
+        description: 'Place ID is required to load reviews.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const allReviews = await fetchAllReviews(placeId);
+      
+      // Merge with existing status data
+      if (allReviews.reviews) {
+        const { data: reviewStatuses } = await supabase
+          .from('review_status')
+          .select('*')
+          .eq('place_id', placeId)
+          .eq('user_id', user?.id);
+
+        const reviewsWithStatus = allReviews.reviews.map((review: any) => {
+          const statusData = reviewStatuses?.find(
+            (status) => status.google_review_id === review.google_review_id
+          );
+          return { ...review, status_data: statusData };
+        });
+
+        setReviews(reviewsWithStatus);
+        
+        toast({
+          title: 'All Reviews Loaded',
+          description: `Successfully loaded ${allReviews.reviews.length} reviews from Google My Business.`,
+        });
+      }
+    } catch (error) {
+      console.error('Error loading all reviews:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -386,15 +412,15 @@ export function Reviews() {
           <Button 
             variant="outline" 
             onClick={handleConnectBusiness}
-            disabled={businessConnected}
+            disabled={isConnected}
           >
             <Settings className="h-4 w-4 mr-2" />
-            {businessConnected ? 'Business Connected' : 'Connect Business'}
+            {isConnected ? 'Business Connected' : 'Connect Business'}
           </Button>
           <Button 
             variant="outline" 
             onClick={loadAllReviews}
-            disabled={loading || !businessConnected}
+            disabled={loading || !isConnected}
           >
             <MessageSquare className="h-4 w-4 mr-2" />
             Load All Reviews
