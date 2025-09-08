@@ -483,23 +483,25 @@ export const Discover = () => {
       </div>
 
       {/* Main Content */}
-      {!currentSession ? (
-        <DiscoveryWizard
-          onDiscover={handleDiscover}
-          isLoading={isLoading}
-          weeklyUsage={weeklyUsage}
-          canDiscover={canDiscover}
-          nextRefreshDate={nextRefreshDate}
-        />
-      ) : (
-        <DiscoveryResults
-          offices={discoveredOffices}
-          session={currentSession}
-          onAddToNetwork={handleAddToNetwork}
-          onOfficeAdded={handleOfficeAdded}
-          isLoading={isLoading}
-        />
-      )}
+      <div className="animate-fade-in">
+        {!currentSession ? (
+          <DiscoveryWizard
+            onDiscover={handleDiscover}
+            isLoading={isLoading}
+            weeklyUsage={weeklyUsage}
+            canDiscover={canDiscover}
+            nextRefreshDate={nextRefreshDate}
+          />
+        ) : (
+          <DiscoveryResults
+            offices={discoveredOffices}
+            session={currentSession}
+            onAddToNetwork={handleAddToNetwork}
+            onOfficeAdded={handleOfficeAdded}
+            isLoading={isLoading}
+          />
+        )}
+      </div>
     </div>
   );
 };

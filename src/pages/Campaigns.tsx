@@ -70,8 +70,13 @@ export function Campaigns() {
     try {
       setLoading(true);
       
+      // Add timeout to prevent infinite loading
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timeout')), 10000)
+      );
+      
       // Fetch campaigns with office count
-      const { data: campaignsData, error: campaignsError } = await supabase
+      const campaignsPromise = supabase
         .from('campaigns')
         .select(`
           *,
@@ -83,6 +88,11 @@ export function Campaigns() {
         .eq('created_by', user.id)
         .order('created_at', { ascending: false });
 
+      const { data: campaignsData, error: campaignsError } = await Promise.race([
+        campaignsPromise,
+        timeoutPromise
+      ]) as any;
+
       if (campaignsError) throw campaignsError;
 
       // Process data to include counts
@@ -93,11 +103,13 @@ export function Campaigns() {
       })) || [];
 
       setCampaigns(processedCampaigns as Campaign[]);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching campaigns:', error);
       toast({
         title: "Error",
-        description: "Failed to load campaigns.",
+        description: error.message === 'Request timeout' 
+          ? "Request timed out. Please try again."
+          : "Failed to load campaigns.",
         variant: "destructive",
       });
     } finally {
@@ -145,17 +157,17 @@ export function Campaigns() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading campaigns...</p>
+      <div className="flex items-center justify-center min-h-[400px] animate-fade-in">
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-muted-foreground animate-pulse">Loading campaigns...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -164,7 +176,7 @@ export function Campaigns() {
             Plan, execute, and track physical outreach campaigns to dental offices.
           </p>
         </div>
-        <Button onClick={() => setCreateDialogOpen(true)} className="gap-2">
+        <Button onClick={() => setCreateDialogOpen(true)} className="gap-2 hover-scale transition-all duration-300">
           <Plus className="w-4 h-4" />
           Create Campaign
         </Button>
@@ -263,7 +275,7 @@ export function Campaigns() {
               {filteredCampaigns.map((campaign) => (
                 <Card 
                   key={campaign.id} 
-                  className="cursor-pointer hover:shadow-md transition-shadow duration-200"
+                  className="cursor-pointer hover:shadow-md hover-scale transition-all duration-300 animate-fade-in"
                   onClick={() => handleCampaignClick(campaign)}
                 >
                   <CardHeader>

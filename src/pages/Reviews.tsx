@@ -75,6 +75,26 @@ export function Reviews() {
     filterAndSortReviews();
   }, [reviews, searchQuery, filterStatus, sortBy]);
 
+  // Separate effect for stats calculation to prevent unnecessary recalculations
+  useEffect(() => {
+    if (reviews.length > 0) {
+      const needsAttention = reviews.filter(review => 
+        review.rating <= 3 || review.status_data?.needs_attention || 
+        review.status_data?.status === 'unreplied'
+      ).length;
+
+      const averageRating = reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length;
+
+      setStats({
+        total: reviews.length,
+        needsAttention,
+        averageRating: averageRating || 0
+      });
+    } else {
+      setStats({ total: 0, needsAttention: 0, averageRating: 0 });
+    }
+  }, [reviews]);
+
   const loadUserPlaceId = async () => {
     if (!user?.id) return;
 
@@ -165,26 +185,6 @@ export function Reviews() {
       });
 
       setReviews(reviewsWithStatus);
-
-      // Calculate stats
-      const needsAttention = reviewsWithStatus.filter(review => 
-        review.rating <= 3 || review.status_data?.needs_attention || 
-        review.status_data?.status === 'unreplied'
-      ).length;
-
-      const averageRating = reviewsWithStatus.reduce((sum, review) => sum + review.rating, 0) / reviewsWithStatus.length;
-
-      setStats({
-        total: reviewsWithStatus.length,
-        needsAttention,
-        averageRating: averageRating || 0
-      });
-      
-      console.log('Reviews: Statistics calculated:', {
-        total: reviewsWithStatus.length,
-        needsAttention,
-        averageRating: averageRating || 0
-      });
 
     } catch (error: any) {
       console.error('Reviews: Error fetching reviews:', error);
@@ -328,14 +328,14 @@ export function Reviews() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-foreground">Reviews</h2>
           <p className="text-muted-foreground">Manage and respond to Google reviews</p>
         </div>
-        <Button onClick={() => fetchReviews()} disabled={loading || !placeId}>
+        <Button onClick={() => fetchReviews()} disabled={loading || !placeId} className="hover-scale transition-all duration-300">
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
           Refresh Reviews
         </Button>
@@ -484,7 +484,7 @@ export function Reviews() {
       ) : (
         <div className="space-y-4">
           {filteredReviews.map((review) => (
-            <Card key={review.google_review_id} className="hover:shadow-md transition-shadow">
+            <Card key={review.google_review_id} className="hover:shadow-md hover-scale transition-all duration-300 animate-fade-in">
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex items-start space-x-4">
