@@ -9,7 +9,6 @@ import { Separator } from '@/components/ui/separator';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useGoogleReviews } from '@/hooks/useGoogleMapsApi';
-import { useGoogleBusinessProfile } from '@/hooks/useGoogleBusinessProfile';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Star,
@@ -23,11 +22,8 @@ import {
   MessageSquare,
   TrendingUp,
   Calendar,
-  User,
-  Reply,
-  Settings
+  User
 } from 'lucide-react';
-import { ReviewReplyDialog } from '@/components/ReviewReplyDialog';
 
 interface GoogleReview {
   google_review_id: string;
@@ -68,12 +64,8 @@ export function Reviews() {
     needsAttention: 0,
     averageRating: 0
   });
-  const [replyDialogOpen, setReplyDialogOpen] = useState(false);
-  const [selectedReview, setSelectedReview] = useState<ReviewWithStatus | null>(null);
-  const [businessConnected, setBusinessConnected] = useState(false);
 
   const { fetchReviews: fetchGoogleReviews } = useGoogleReviews();
-  const { connectBusiness, fetchAllReviews, isConnected } = useGoogleBusinessProfile();
 
   useEffect(() => {
     loadUserPlaceId();
@@ -335,71 +327,6 @@ export function Reviews() {
     }
   };
 
-  const handleReplyClick = (review: ReviewWithStatus) => {
-    setSelectedReview(review);
-    setReplyDialogOpen(true);
-  };
-
-  const handleConnectBusiness = async () => {
-    try {
-      await connectBusiness();
-    } catch (error) {
-      console.error('Error connecting business:', error);
-    }
-  };
-
-  const loadAllReviews = async () => {
-    if (!isConnected) {
-      toast({
-        title: 'Business Connection Required',
-        description: 'Please connect your Google My Business account to load all reviews.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
-    if (!placeId) {
-      toast({
-        title: 'Place ID Required',
-        description: 'Place ID is required to load reviews.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const allReviews = await fetchAllReviews(placeId);
-      
-      // Merge with existing status data
-      if (allReviews.reviews) {
-        const { data: reviewStatuses } = await supabase
-          .from('review_status')
-          .select('*')
-          .eq('place_id', placeId)
-          .eq('user_id', user?.id);
-
-        const reviewsWithStatus = allReviews.reviews.map((review: any) => {
-          const statusData = reviewStatuses?.find(
-            (status) => status.google_review_id === review.google_review_id
-          );
-          return { ...review, status_data: statusData };
-        });
-
-        setReviews(reviewsWithStatus);
-        
-        toast({
-          title: 'All Reviews Loaded',
-          description: `Successfully loaded ${allReviews.reviews.length} reviews from Google My Business.`,
-        });
-      }
-    } catch (error) {
-      console.error('Error loading all reviews:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -408,28 +335,10 @@ export function Reviews() {
           <h2 className="text-2xl font-bold text-foreground">Reviews</h2>
           <p className="text-muted-foreground">Manage and respond to Google reviews</p>
         </div>
-        <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            onClick={handleConnectBusiness}
-            disabled={isConnected}
-          >
-            <Settings className="h-4 w-4 mr-2" />
-            {isConnected ? 'Business Connected' : 'Connect Business'}
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={loadAllReviews}
-            disabled={loading || !isConnected}
-          >
-            <MessageSquare className="h-4 w-4 mr-2" />
-            Load All Reviews
-          </Button>
-          <Button onClick={() => fetchReviews()} disabled={loading || !placeId} className="hover-scale transition-all duration-300">
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh Reviews
-          </Button>
-        </div>
+        <Button onClick={() => fetchReviews()} disabled={loading || !placeId} className="hover-scale transition-all duration-300">
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          Refresh Reviews
+        </Button>
       </div>
 
       {/* API Limitation Notice */}
@@ -443,15 +352,12 @@ export function Reviews() {
         <CardContent>
           <div className="space-y-4">
             <p className="text-amber-700 dark:text-amber-300 text-sm">
-              <strong>Current Limitation:</strong> Google Places API only returns the 5 most helpful reviews. 
-              For comprehensive review management including all reviews and response capabilities, click "Connect Business" to set up Google My Business API integration.
+              <strong>Important:</strong> Google Places API only returns the 5 most helpful reviews. 
+              For comprehensive review management including all reviews, ratings analytics, and response capabilities, we're implementing Google My Business API integration with OAuth2 authentication in the next update.
             </p>
-            <div className="flex flex-wrap gap-2 text-amber-600 dark:text-amber-400 text-xs">
-              <span>✓ Reply to reviews directly</span>
-              <span>✓ Load all reviews (not just 5)</span>
-              <span>✓ Advanced analytics</span>
-              <span>✓ Business insights</span>
-            </div>
+            <p className="text-amber-600 dark:text-amber-400 text-xs">
+              Coming soon: Full business API access with proper OAuth2 flow and enhanced review management features.
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -604,24 +510,14 @@ export function Reviews() {
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     {getStatusBadge(review)}
-                    <div className="flex gap-1">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleReplyClick(review)}
-                      >
-                        <Reply className="h-3 w-3 mr-1" />
-                        Reply
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.open(`https://search.google.com/local/reviews?placeid=${placeId}`, '_blank')}
-                      >
-                        <ExternalLink className="h-3 w-3 mr-1" />
-                        View on Google
-                      </Button>
-                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(`https://search.google.com/local/reviews?placeid=${placeId}`, '_blank')}
+                    >
+                      <ExternalLink className="h-3 w-3 mr-1" />
+                      Reply on Google
+                    </Button>
                   </div>
                 </div>
               </CardHeader>
@@ -663,23 +559,6 @@ export function Reviews() {
             </Card>
           ))}
         </div>
-      )}
-
-      {/* Reply Dialog */}
-      {selectedReview && (
-        <ReviewReplyDialog
-          open={replyDialogOpen}
-          onOpenChange={setReplyDialogOpen}
-          review={selectedReview}
-          locationId={placeId}
-          onReplySuccess={() => {
-            toast({
-              title: 'Reply Posted',
-              description: 'Your reply has been posted successfully.',
-            });
-            fetchReviews(); // Refresh reviews to show the reply
-          }}
-        />
       )}
     </div>
   );
