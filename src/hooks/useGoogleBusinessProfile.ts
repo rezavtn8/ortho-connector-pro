@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -21,30 +21,11 @@ export function useGoogleBusinessProfile(): GoogleBusinessHook {
     setError(null);
 
     try {
-      console.log('useGoogleBusinessProfile: Attempting to connect business');
-      
       // Get auth URL from edge function
-      const response = await fetch('https://vqkzqwibbcvmdwgqladn.supabase.co/functions/v1/google-business-profile/auth-url', {
-        method: 'GET',
-        headers: {
-          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxa3pxd2liYmN2bWR3Z3FsYWRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM2MDAyMDQsImV4cCI6MjA2OTE3NjIwNH0.S6qvIFA1itxemVUTzfz4dDr2J9jz2z69NEv-fgb4gK4',
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('useGoogleBusinessProfile: HTTP error:', response.status, errorData);
-        throw new Error(errorData.error || `Server returned ${response.status} error`);
-      }
-
-      const data = await response.json();
+      const { data, error } = await supabase.functions.invoke('google-business-profile/auth-url');
       
-      if (data.error) {
-        console.error('useGoogleBusinessProfile: Function error:', data);
-        throw new Error(data.error);
-      }
-
+      if (error) throw error;
+      
       if (data.auth_url) {
         // Open popup window for OAuth
         const popup = window.open(
@@ -91,24 +72,13 @@ export function useGoogleBusinessProfile(): GoogleBusinessHook {
             }
           }
         }, 1000);
-      } else {
-        throw new Error('No auth URL received from server');
       }
     } catch (error: any) {
-      console.error('useGoogleBusinessProfile: Error connecting to Google My Business:', error);
+      console.error('Error connecting to Google My Business:', error);
       setError(error.message);
-      
-      let errorMessage = 'Failed to connect to Google My Business.';
-      
-      if (error.message?.includes('OAUTH_CLIENT_ID_MISSING') || error.message?.includes('OAUTH_CREDENTIALS_MISSING')) {
-        errorMessage = 'Google OAuth credentials need to be configured in Supabase secrets. Please contact your administrator.';
-      } else if (error.message?.includes('Edge Function returned a non-2xx status code')) {
-        errorMessage = 'Server configuration issue. Please check if Google OAuth credentials are properly set up.';
-      }
-      
       toast({
         title: 'Connection Failed',
-        description: errorMessage,
+        description: error.message || 'Failed to connect to Google My Business.',
         variant: 'destructive',
       });
     } finally {
@@ -197,10 +167,10 @@ export function useGoogleBusinessProfile(): GoogleBusinessHook {
   };
 
   // Check if already connected on hook initialization
-  React.useEffect(() => {
+  useState(() => {
     const token = localStorage.getItem('google_business_access_token');
     setIsConnected(!!token);
-  }, []);
+  });
 
   return {
     isLoading,

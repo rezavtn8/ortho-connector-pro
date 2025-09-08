@@ -32,26 +32,16 @@ Deno.serve(async (req) => {
 
     // OAuth2 authorization URL generation
     if (req.method === 'GET' && path.endsWith('/auth-url')) {
-      console.log(`google-business-profile: Generating auth URL [${requestId}]`)
-      
       const clientId = Deno.env.get('GOOGLE_OAUTH_CLIENT_ID')
       const redirectUri = Deno.env.get('GOOGLE_OAUTH_REDIRECT_URI') || 'https://vqkzqwibbcvmdwgqladn.supabase.co/functions/v1/google-business-profile/callback'
       
-      console.log(`google-business-profile: Environment check [${requestId}]:`, {
-        client_id_exists: !!clientId,
-        client_id_length: clientId?.length || 0,
-        redirect_uri: redirectUri
-      })
-      
-      if (!clientId || clientId.trim() === '' || clientId === 'your-google-client-id-here') {
-        console.error(`google-business-profile: Google OAuth Client ID not configured [${requestId}]`)
+      if (!clientId) {
         return new Response(
           JSON.stringify({
-            error: 'Google OAuth Client ID not configured. Please add your actual Google OAuth Client ID to the GOOGLE_OAUTH_CLIENT_ID secret in your Supabase project settings.',
+            error: 'Google OAuth Client ID not configured',
             code: 'OAUTH_CLIENT_ID_MISSING',
             success: false,
-            request_id: requestId,
-            help: 'Visit https://supabase.com/dashboard/project/vqkzqwibbcvmdwgqladn/settings/functions to add the secret'
+            request_id: requestId
           }),
           {
             status: 503,
@@ -63,8 +53,6 @@ Deno.serve(async (req) => {
       const scope = encodeURIComponent('https://www.googleapis.com/auth/business.manage')
       const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code&access_type=offline&prompt=consent`
 
-      console.log(`google-business-profile: Generated auth URL successfully [${requestId}]`)
-      
       return new Response(
         JSON.stringify({
           auth_url: authUrl,
