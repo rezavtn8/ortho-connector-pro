@@ -1,15 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PatientSource, MonthlyPatients, SOURCE_TYPE_CONFIG, getCurrentYearMonth, formatYearMonth } from '@/lib/database.types';
+import { PatientSource, MonthlyPatients, getCurrentYearMonth, formatYearMonth } from '@/lib/database.types';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, TrendingUp, Building2, Star, Users, Globe, MessageSquare, FileText, BarChart3, Loader2 } from 'lucide-react';
+import { TrendingUp, Building2, Users, Globe, MessageSquare, BarChart3 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { usePagination } from '@/hooks/usePagination';
 import { SkeletonCard } from '@/components/ui/skeleton-card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { withErrorHandling } from '@/utils/errorHandler';
+import { useOptimizedArray } from '@/hooks/useOptimizedState';
+import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
+import { useCleanup } from '@/hooks/useCleanup';
 import { 
   ResponsiveContainer, 
   LineChart, 
@@ -92,11 +94,20 @@ function PatientTrendChart({ monthlyData, sources }: PatientTrendChartProps) {
 }
 
 export function Dashboard() {
-  const [sources, setSources] = useState<PatientSource[]>([]);
-  const [monthlyData, setMonthlyData] = useState<MonthlyPatients[]>([]);
+  const { 
+    array: sources, 
+    replaceArray: setSources 
+  } = useOptimizedArray<PatientSource>();
+  
+  const { 
+    array: monthlyData, 
+    replaceArray: setMonthlyData 
+  } = useOptimizedArray<MonthlyPatients>();
+  
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { safeSetTimeout } = useCleanup();
   const currentMonth = getCurrentYearMonth();
 
   // Paginated recent activity
@@ -114,87 +125,34 @@ export function Dashboard() {
     filters: {}
   });
 
-  // Fix memory leaks in useEffect hooks
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  // Clean up realtime subscriptions
-  useEffect(() => {
-    loadData();
-    recentActivity.loadPage(0, true);
-    
-    // Set up real-time subscriptions with cleanup
-    const sourcesChannel = supabase
-      .channel('sources-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'patient_sources'
-        },
-        (payload) => {
-          console.log('Sources change:', payload);
-          loadData();
-          recentActivity.refresh();
-        }
-      )
-      .subscribe();
-
-    const monthlyChannel = supabase
-      .channel('monthly-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'monthly_patients'
-        },
-        (payload) => {
-          console.log('Monthly data change:', payload);
-          loadData();
-          recentActivity.refresh();
-        }
-      )
-      .subscribe();
-
-    // Cleanup subscriptions on unmount
-    return () => {
-      supabase.removeChannel(sourcesChannel);
-      supabase.removeChannel(monthlyChannel);
-    };
-  }, []);
-
-  const loadData = async () => {
+  // Optimized data loading with cleanup and realtime subscriptions
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       
-      // Load patient sources
-      const { data: sourcesData, error: sourcesError } = await supabase
-        .from('patient_sources')
-        .select('*')
-        .order('name');
+      // Use Promise.allSettled for better error handling
+      const [sourcesResult, monthlyResult, allMonthlyResult] = await Promise.allSettled([
+        supabase.from('patient_sources').select('*').order('name'),
+        supabase.from('monthly_patients').select('*').eq('year_month', currentMonth),
+        supabase.from('monthly_patients').select('*')
+      ]);
 
-      if (sourcesError) throw sourcesError;
+      // Handle sources data
+      if (sourcesResult.status === 'fulfilled' && !sourcesResult.value.error) {
+        setSources(sourcesResult.value.data || []);
+      } else if (sourcesResult.status === 'rejected' || sourcesResult.value.error) {
+        console.error('Sources error:', sourcesResult);
+        setSources([]);
+      }
 
-      // Load monthly data for current month
-      const { data: monthlyDataResult, error: monthlyError } = await supabase
-        .from('monthly_patients')
-        .select('*')
-        .eq('year_month', currentMonth);
+      // Handle monthly data
+      if (allMonthlyResult.status === 'fulfilled' && !allMonthlyResult.value.error) {
+        setMonthlyData(allMonthlyResult.value.data || []);
+      } else if (allMonthlyResult.status === 'rejected' || allMonthlyResult.value.error) {
+        console.error('Monthly data error:', allMonthlyResult);
+        setMonthlyData([]);
+      }
 
-      if (monthlyError) throw monthlyError;
-
-      // Load all-time monthly data for totals
-      const { data: allMonthlyData, error: allMonthlyError } = await supabase
-        .from('monthly_patients')
-        .select('*');
-
-      if (allMonthlyError) throw allMonthlyError;
-
-      setSources(sourcesData || []);
-      setMonthlyData(allMonthlyData || []);
     } catch (error: any) {
       console.error('Dashboard error:', error);
       toast({
@@ -202,15 +160,41 @@ export function Dashboard() {
         description: "Failed to load dashboard data",
         variant: "destructive",
       });
-      // Set empty data on error
       setSources([]);
       setMonthlyData([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentMonth, setSources, setMonthlyData, toast]);
 
-  const getSourceGroupData = (): SourceGroupData[] => {
+  // Handle realtime updates
+  const handleRealtimeUpdate = useCallback(() => {
+    console.log('Dashboard: Realtime update received');
+    safeSetTimeout(() => {
+      loadData();
+      recentActivity.refresh();
+    }, 100); // Debounce updates
+  }, [loadData, recentActivity, safeSetTimeout]);
+
+  // Set up realtime subscriptions
+  useRealtimeSubscription({
+    subscriptions: [
+      { table: 'patient_sources' },
+      { table: 'monthly_patients' }
+    ],
+    onUpdate: handleRealtimeUpdate,
+    channelName: 'dashboard-updates'
+  });
+
+  // Initial data load
+  useEffect(() => {
+    loadData();
+    recentActivity.loadPage(0, true);
+  }, [loadData]);
+
+
+  // Memoized calculations for better performance
+  const getSourceGroupData = useMemo((): SourceGroupData[] => {
     const groups = [
       {
         name: 'Dental Offices',
@@ -246,14 +230,17 @@ export function Dashboard() {
         thisMonth: thisMonthData.reduce((sum, m) => sum + m.patient_count, 0)
       };
     });
-  };
+  }, [sources, monthlyData, currentMonth]);
 
-  const totalSources = sources.length;
-  const activeSources = sources.filter(source => source.is_active).length;
-  const totalPatients = monthlyData.reduce((sum, m) => sum + m.patient_count, 0);
-  const thisMonthPatients = monthlyData
-    .filter(m => m.year_month === currentMonth)
-    .reduce((sum, m) => sum + m.patient_count, 0);
+  // Memoized stats calculations
+  const stats = useMemo(() => ({
+    totalSources: sources.length,
+    activeSources: sources.filter(source => source.is_active).length,
+    totalPatients: monthlyData.reduce((sum, m) => sum + m.patient_count, 0),
+    thisMonthPatients: monthlyData
+      .filter(m => m.year_month === currentMonth)
+      .reduce((sum, m) => sum + m.patient_count, 0)
+  }), [sources, monthlyData, currentMonth]);
 
   if (loading) {
     return (
@@ -352,11 +339,11 @@ export function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
-              <div className="text-xl sm:text-2xl font-bold">{totalSources}</div>
+              <div className="text-xl sm:text-2xl font-bold">{stats.totalSources}</div>
               <Building2 className="w-6 h-6 sm:w-8 sm:h-8 text-blue-500 opacity-20" />
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {activeSources} active
+              {stats.activeSources} active
             </p>
           </CardContent>
         </Card>
@@ -369,7 +356,7 @@ export function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
-              <div className="text-xl sm:text-2xl font-bold">{totalPatients}</div>
+              <div className="text-xl sm:text-2xl font-bold">{stats.totalPatients}</div>
               <Users className="w-6 h-6 sm:w-8 sm:h-8 text-green-500 opacity-20" />
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -386,7 +373,7 @@ export function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
-              <div className="text-xl sm:text-2xl font-bold">{thisMonthPatients}</div>
+              <div className="text-xl sm:text-2xl font-bold">{stats.thisMonthPatients}</div>
               <TrendingUp className="w-6 h-6 sm:w-8 sm:h-8 text-orange-500 opacity-20" />
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -421,7 +408,7 @@ export function Dashboard() {
         <h2 className="text-lg sm:text-xl font-semibold">Source Categories</h2>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-          {getSourceGroupData().map((group) => (
+          {getSourceGroupData.map((group) => (
             <Card 
               key={group.name}
               className="cursor-pointer hover:shadow-lg transition-all duration-200 border-l-4 border-l-transparent hover:border-l-current"
@@ -543,7 +530,7 @@ export function Dashboard() {
                   >
                     {recentActivity.loading ? (
                       <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                         Loading...
                       </>
                     ) : (

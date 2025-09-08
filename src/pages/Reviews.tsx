@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { useOptimizedArray } from '@/hooks/useOptimizedState';
 import { useGoogleReviews } from '@/hooks/useGoogleMapsApi';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -52,18 +53,17 @@ interface ReviewWithStatus extends GoogleReview {
 
 export function Reviews() {
   const { user } = useAuth();
-  const [reviews, setReviews] = useState<ReviewWithStatus[]>([]);
+  const { 
+    array: reviews, 
+    replaceArray: setReviews 
+  } = useOptimizedArray<ReviewWithStatus>();
+  
   const [filteredReviews, setFilteredReviews] = useState<ReviewWithStatus[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('newest');
   const [placeId, setPlaceId] = useState('');
-  const [stats, setStats] = useState({
-    total: 0,
-    needsAttention: 0,
-    averageRating: 0
-  });
 
   const { fetchReviews: fetchGoogleReviews } = useGoogleReviews();
 
@@ -75,24 +75,24 @@ export function Reviews() {
     filterAndSortReviews();
   }, [reviews, searchQuery, filterStatus, sortBy]);
 
-  // Separate effect for stats calculation to prevent unnecessary recalculations
-  useEffect(() => {
-    if (reviews.length > 0) {
-      const needsAttention = reviews.filter(review => 
-        review.rating <= 3 || review.status_data?.needs_attention || 
-        review.status_data?.status === 'unreplied'
-      ).length;
-
-      const averageRating = reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length;
-
-      setStats({
-        total: reviews.length,
-        needsAttention,
-        averageRating: averageRating || 0
-      });
-    } else {
-      setStats({ total: 0, needsAttention: 0, averageRating: 0 });
+  // Memoized stats calculation for better performance
+  const reviewStats = useMemo(() => {
+    if (reviews.length === 0) {
+      return { total: 0, needsAttention: 0, averageRating: 0 };
     }
+
+    const needsAttention = reviews.filter(review => 
+      review.rating <= 3 || review.status_data?.needs_attention || 
+      review.status_data?.status === 'unreplied'
+    ).length;
+
+    const averageRating = reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length;
+
+    return {
+      total: reviews.length,
+      needsAttention,
+      averageRating: averageRating || 0
+    };
   }, [reviews]);
 
   const loadUserPlaceId = async () => {
@@ -218,8 +218,8 @@ export function Reviews() {
 
       if (error) throw error;
 
-      // Update local state
-      setReviews(prev => prev.map(r => 
+      // Update local state optimally
+      setReviews(reviews.map(r => 
         r.google_review_id === reviewId 
           ? { ...r, status_data: { ...updateData, id: r.status_data?.id || '' } as ReviewStatus }
           : r
@@ -239,7 +239,7 @@ export function Reviews() {
     }
   };
 
-  const filterAndSortReviews = () => {
+  const filterAndSortReviews = useCallback(() => {
     let filtered = [...reviews];
 
     // Apply search filter
@@ -276,7 +276,7 @@ export function Reviews() {
     });
 
     setFilteredReviews(filtered);
-  };
+  }, [reviews, searchQuery, filterStatus, sortBy]);
 
   const renderStars = (rating: number) => {
     return Array.from({ length: 5 }, (_, i) => (
@@ -370,7 +370,7 @@ export function Reviews() {
               <MessageSquare className="h-8 w-8 text-blue-500" />
               <div className="ml-4">
                 <p className="text-sm font-medium text-muted-foreground">Total Reviews</p>
-                <p className="text-2xl font-bold">{stats.total}</p>
+                <p className="text-2xl font-bold">{reviewStats.total}</p>
               </div>
             </div>
           </CardContent>
@@ -382,7 +382,7 @@ export function Reviews() {
               <AlertTriangle className="h-8 w-8 text-red-500" />
               <div className="ml-4">
                 <p className="text-sm font-medium text-muted-foreground">Needs Attention</p>
-                <p className="text-2xl font-bold">{stats.needsAttention}</p>
+                <p className="text-2xl font-bold">{reviewStats.needsAttention}</p>
               </div>
             </div>
           </CardContent>
@@ -395,8 +395,8 @@ export function Reviews() {
               <div className="ml-4">
                 <p className="text-sm font-medium text-muted-foreground">Average Rating</p>
                 <div className="flex items-center">
-                  <p className="text-2xl font-bold mr-2">{stats.averageRating.toFixed(1)}</p>
-                  <div className="flex">{renderStars(Math.round(stats.averageRating))}</div>
+                  <p className="text-2xl font-bold mr-2">{reviewStats.averageRating.toFixed(1)}</p>
+                  <div className="flex">{renderStars(Math.round(reviewStats.averageRating))}</div>
                 </div>
               </div>
             </div>
