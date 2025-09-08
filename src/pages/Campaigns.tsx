@@ -107,7 +107,7 @@ export function Campaigns() {
     } finally {
       setLoading(false);
     }
-  }, [user, toast]);
+  }, [user]);
 
   useEffect(() => {
     fetchCampaigns();
@@ -139,7 +139,7 @@ export function Campaigns() {
       title: "Success",
       description: "Campaign created successfully.",
     });
-  }, [fetchCampaigns, toast]);
+  }, [fetchCampaigns]);
 
   const handleCampaignUpdated = useCallback(() => {
     fetchCampaigns();
@@ -147,7 +147,7 @@ export function Campaigns() {
       title: "Success",
       description: "Campaign updated successfully.",
     });
-  }, [fetchCampaigns, toast]);
+  }, [fetchCampaigns]);
 
   if (loading) {
     return (
