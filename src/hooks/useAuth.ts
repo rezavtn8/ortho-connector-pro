@@ -189,7 +189,8 @@ export function useAuth() {
         if (session) {
           resetFailedAttempts();
           // Initialize session timeout on login
-          window.setTimeout(() => refreshSession(), 0);
+          const now = Date.now();
+          setSessionActivity({ lastActivity: now, warningShown: false });
         } else {
           // Clear session timeout on logout
           clearSessionTimeouts();
@@ -206,12 +207,13 @@ export function useAuth() {
       
       // Initialize session timeout for existing session
       if (session) {
-        window.setTimeout(() => refreshSession(), 0);
+        const now = Date.now();
+        setSessionActivity({ lastActivity: now, warningShown: false });
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [refreshSession, clearSessionTimeouts]);
+  }, []);
 
   // Set up user activity listeners
   useEffect(() => {
