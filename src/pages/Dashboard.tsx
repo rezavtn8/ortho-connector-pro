@@ -167,47 +167,47 @@ export function Dashboard() {
   }, []);
 
   const loadData = async () => {
-    await withErrorHandling(
-      async () => {
-        setLoading(true);
-        
-        // Load patient sources
-        const { data: sourcesData, error: sourcesError } = await supabase
-          .from('patient_sources')
-          .select('*')
-          .order('name');
+    try {
+      setLoading(true);
+      
+      // Load patient sources
+      const { data: sourcesData, error: sourcesError } = await supabase
+        .from('patient_sources')
+        .select('*')
+        .order('name');
 
-        if (sourcesError) throw sourcesError;
+      if (sourcesError) throw sourcesError;
 
-        // Load monthly data for current month
-        const { data: monthlyDataResult, error: monthlyError } = await supabase
-          .from('monthly_patients')
-          .select('*')
-          .eq('year_month', currentMonth);
+      // Load monthly data for current month
+      const { data: monthlyDataResult, error: monthlyError } = await supabase
+        .from('monthly_patients')
+        .select('*')
+        .eq('year_month', currentMonth);
 
-        if (monthlyError) throw monthlyError;
+      if (monthlyError) throw monthlyError;
 
-        // Load all-time monthly data for totals
-        const { data: allMonthlyData, error: allMonthlyError } = await supabase
-          .from('monthly_patients')
-          .select('*');
+      // Load all-time monthly data for totals
+      const { data: allMonthlyData, error: allMonthlyError } = await supabase
+        .from('monthly_patients')
+        .select('*');
 
-        if (allMonthlyError) throw allMonthlyError;
+      if (allMonthlyError) throw allMonthlyError;
 
-        setSources(sourcesData || []);
-        setMonthlyData(allMonthlyData || []);
-      },
-      { 
-        component: 'Dashboard', 
-        action: 'loadData',
-        metadata: { 
-          currentMonth,
-          sourcesCount: sources.length 
-        }
-      }
-    ).finally(() => {
+      setSources(sourcesData || []);
+      setMonthlyData(allMonthlyData || []);
+    } catch (error: any) {
+      console.error('Dashboard error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load dashboard data",
+        variant: "destructive",
+      });
+      // Set empty data on error
+      setSources([]);
+      setMonthlyData([]);
+    } finally {
       setLoading(false);
-    });
+    }
   };
 
   const getSourceGroupData = (): SourceGroupData[] => {

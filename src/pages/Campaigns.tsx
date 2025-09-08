@@ -65,18 +65,16 @@ export function Campaigns() {
   const [typeFilter, setTypeFilter] = useState('all');
 
   const fetchCampaigns = async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
     try {
       setLoading(true);
       
-      // Add timeout to prevent infinite loading
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Request timeout')), 10000)
-      );
-      
       // Fetch campaigns with office count
-      const campaignsPromise = supabase
+      const { data: campaignsData, error: campaignsError } = await supabase
         .from('campaigns')
         .select(`
           *,
@@ -87,11 +85,6 @@ export function Campaigns() {
         `)
         .eq('created_by', user.id)
         .order('created_at', { ascending: false });
-
-      const { data: campaignsData, error: campaignsError } = await Promise.race([
-        campaignsPromise,
-        timeoutPromise
-      ]) as any;
 
       if (campaignsError) throw campaignsError;
 
@@ -107,11 +100,10 @@ export function Campaigns() {
       console.error('Error fetching campaigns:', error);
       toast({
         title: "Error",
-        description: error.message === 'Request timeout' 
-          ? "Request timed out. Please try again."
-          : "Failed to load campaigns.",
+        description: "Failed to load campaigns.",
         variant: "destructive",
       });
+      setCampaigns([]); // Set empty array on error
     } finally {
       setLoading(false);
     }

@@ -157,6 +157,10 @@ export function Analytics() {
         description: "Failed to load analytics data",
         variant: "destructive",
       });
+      // Set empty data on error
+      setSources([]);
+      setMonthlyData([]);
+      setAnalytics([]);
     } finally {
       setLoading(false);
     }

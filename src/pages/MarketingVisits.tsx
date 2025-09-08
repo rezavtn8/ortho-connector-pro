@@ -136,11 +136,13 @@ export function MarketingVisits() {
       if (officesError) throw officesError;
       setOffices(officesData || []);
     } catch (error: any) {
+      console.error('MarketingVisits error:', error);
       toast({
         title: "Error loading data",
         description: error.message,
         variant: "destructive",
       });
+      setOffices([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
