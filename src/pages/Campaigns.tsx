@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -64,7 +64,7 @@ export function Campaigns() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
 
-  const fetchCampaigns = async () => {
+  const fetchCampaigns = useCallback(async () => {
     if (!user) {
       setLoading(false);
       return;
@@ -107,45 +107,47 @@ export function Campaigns() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, toast]);
 
   useEffect(() => {
     fetchCampaigns();
-  }, [user]);
+  }, [fetchCampaigns]);
 
-  const filteredCampaigns = campaigns.filter(campaign => {
-    const matchesSearch = campaign.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || campaign.status === statusFilter;
-    const matchesType = typeFilter === 'all' || campaign.campaign_type === typeFilter;
-    
-    // Date range filtering
-    const plannedDate = campaign.planned_delivery_date ? new Date(campaign.planned_delivery_date) : null;
-    const matchesDateRange = (!dateRange?.from || !plannedDate || plannedDate >= dateRange.from) &&
-                            (!dateRange?.to || !plannedDate || plannedDate <= dateRange.to);
-    
-    return matchesSearch && matchesStatus && matchesType && matchesDateRange;
-  });
+  const filteredCampaigns = useMemo(() => {
+    return campaigns.filter(campaign => {
+      const matchesSearch = campaign.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStatus = statusFilter === 'all' || campaign.status === statusFilter;
+      const matchesType = typeFilter === 'all' || campaign.campaign_type === typeFilter;
+      
+      // Date range filtering
+      const plannedDate = campaign.planned_delivery_date ? new Date(campaign.planned_delivery_date) : null;
+      const matchesDateRange = (!dateRange?.from || !plannedDate || plannedDate >= dateRange.from) &&
+                              (!dateRange?.to || !plannedDate || plannedDate <= dateRange.to);
+      
+      return matchesSearch && matchesStatus && matchesType && matchesDateRange;
+    });
+  }, [campaigns, searchQuery, statusFilter, typeFilter, dateRange]);
 
   const handleCampaignClick = (campaign: Campaign) => {
     setSelectedCampaign(campaign);
     setDetailDialogOpen(true);
   };
 
-  const handleCampaignCreated = () => {
+  const handleCampaignCreated = useCallback(() => {
     fetchCampaigns();
     toast({
       title: "Success",
       description: "Campaign created successfully.",
     });
-  };
+  }, [fetchCampaigns, toast]);
 
-  const handleCampaignUpdated = () => {
+  const handleCampaignUpdated = useCallback(() => {
     fetchCampaigns();
     toast({
       title: "Success",
       description: "Campaign updated successfully.",
     });
-  };
+  }, [fetchCampaigns, toast]);
 
   if (loading) {
     return (
