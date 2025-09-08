@@ -25,10 +25,13 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PatientCountEditor } from '@/components/PatientCountEditor';
+import { SourceCard } from '@/components/SourceCard';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export function Sources() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [sources, setSources] = useState<PatientSource[]>([]);
   const [monthlyData, setMonthlyData] = useState<MonthlyPatients[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -294,6 +297,62 @@ export function Sources() {
 
     const selectedInTable = sources.filter(s => selectedSources.includes(s.id));
 
+    // Mobile card view
+    if (isMobile) {
+      return (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Icon className="w-5 h-5" />
+              {title} ({sources.length})
+            </h3>
+            {selectedInTable.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                  {selectedInTable.length} selected
+                </span>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => handleDeleteSources(selectedInTable.map(s => s.id))}
+                >
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Delete
+                </Button>
+              </div>
+            )}
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            {sources.map((source) => {
+              const { thisMonth, total } = getPatientCounts(source.id);
+              return (
+                <SourceCard
+                  key={source.id}
+                  source={source}
+                  thisMonth={thisMonth}
+                  total={total}
+                  isSelected={selectedSources.includes(source.id)}
+                  isEditing={editingSource === source.id}
+                  editForm={editForm}
+                  onSelect={(checked) => handleSelectSource(source.id, checked)}
+                  onEdit={() => handleEditSource(source)}
+                  onSaveEdit={handleSaveEdit}
+                  onCancelEdit={handleCancelEdit}
+                  onDelete={() => handleDeleteSources([source.id])}
+                  onToggleActive={(isActive) => handleToggleActive(source.id, isActive)}
+                  onEditFormChange={(updates) => setEditForm(prev => ({ ...prev, ...updates }))}
+                  onUpdatePatients={loadData}
+                  onView={() => navigate(`/source/${source.id}`)}
+                />
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    // Desktop table view (keep existing table implementation)
     return (
       <Card>
         <CardHeader>
@@ -320,169 +379,171 @@ export function Sources() {
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12">
-                  <Checkbox
-                    checked={isAllSelected}
-                    onCheckedChange={(checked) => handleSelectAll(sources, checked as boolean)}
-                    aria-label="Select all"
-                  />
-                </TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-center">This Month</TableHead>
-                <TableHead className="text-center">Total</TableHead>
-                <TableHead className="text-center">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sources.map((source) => {
-                const { thisMonth, total } = getPatientCounts(source.id);
-                const config = SOURCE_TYPE_CONFIG[source.source_type];
-                const isEditing = editingSource === source.id;
-                const isSelected = selectedSources.includes(source.id);
-                
-                return (
-                  <TableRow key={source.id} className={isSelected ? "bg-muted/50" : ""}>
-                    <TableCell>
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={(checked) => handleSelectSource(source.id, checked as boolean)}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      {isEditing ? (
-                        <div className="space-y-2">
-                          <Input
-                            value={editForm.name || ''}
-                            onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
-                            placeholder="Source name"
-                            className="text-sm"
-                          />
-                          {editForm.address !== undefined && (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={isAllSelected}
+                      onCheckedChange={(checked) => handleSelectAll(sources, checked as boolean)}
+                      aria-label="Select all"
+                    />
+                  </TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-center">This Month</TableHead>
+                  <TableHead className="text-center">Total</TableHead>
+                  <TableHead className="text-center">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sources.map((source) => {
+                  const { thisMonth, total } = getPatientCounts(source.id);
+                  const config = SOURCE_TYPE_CONFIG[source.source_type];
+                  const isEditing = editingSource === source.id;
+                  const isSelected = selectedSources.includes(source.id);
+                  
+                  return (
+                    <TableRow key={source.id} className={isSelected ? "bg-muted/50" : ""}>
+                      <TableCell>
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={(checked) => handleSelectSource(source.id, checked as boolean)}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        {isEditing ? (
+                          <div className="space-y-2">
                             <Input
-                              value={editForm.address || ''}
-                              onChange={(e) => setEditForm(prev => ({ ...prev, address: e.target.value }))}
-                              placeholder="Address"
+                              value={editForm.name || ''}
+                              onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                              placeholder="Source name"
                               className="text-sm"
                             />
-                          )}
-                        </div>
-                      ) : (
-                        <div>
-                          <div className="font-medium">{source.name}</div>
-                          {source.address && (
-                            <div className="text-sm text-muted-foreground truncate max-w-xs">
-                              {source.address}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {isEditing ? (
-                        <select
-                          value={editForm.source_type || source.source_type}
-                          onChange={(e) => setEditForm(prev => ({ ...prev, source_type: e.target.value as SourceType }))}
-                          className="text-sm border rounded px-2 py-1"
-                        >
-                          {Object.entries(SOURCE_TYPE_CONFIG).map(([key, config]) => (
-                            <option key={key} value={key}>
-                              {config.label}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <span>{config.icon}</span>
-                          <span className="text-sm">{config.label}</span>
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Badge variant={source.is_active ? "default" : "secondary"}>
-                          {source.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleToggleActive(source.id, !source.is_active)}
-                          title={source.is_active ? 'Deactivate' : 'Activate'}
-                        >
-                          <Power className={`w-3 h-3 ${source.is_active ? 'text-green-600' : 'text-gray-400'}`} />
-                        </Button>
-                      </div>
-                    </TableCell>
-                     <TableCell className="text-center">
-                       <PatientCountEditor
-                         sourceId={source.id}
-                         currentCount={thisMonth}
-                         onUpdate={loadData}
-                       />
-                     </TableCell>
-                    <TableCell className="text-center font-semibold">
-                      {total}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex justify-center gap-1">
-                        {isEditing ? (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={handleSaveEdit}
-                              title="Save changes"
-                            >
-                              <Check className="w-4 h-4 text-green-600" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={handleCancelEdit}
-                              title="Cancel"
-                            >
-                              <X className="w-4 h-4 text-red-600" />
-                            </Button>
-                          </>
+                            {editForm.address !== undefined && (
+                              <Input
+                                value={editForm.address || ''}
+                                onChange={(e) => setEditForm(prev => ({ ...prev, address: e.target.value }))}
+                                placeholder="Address"
+                                className="text-sm"
+                              />
+                            )}
+                          </div>
                         ) : (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => navigate(`/source/${source.id}`)}
-                              title="View details"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleEditSource(source)}
-                              title="Edit"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleDeleteSources([source.id])}
-                              title="Delete"
-                            >
-                              <Trash2 className="w-4 h-4 text-red-600" />
-                            </Button>
-                          </>
+                          <div>
+                            <div className="font-medium">{source.name}</div>
+                            {source.address && (
+                              <div className="text-sm text-muted-foreground truncate max-w-xs">
+                                {source.address}
+                              </div>
+                            )}
+                          </div>
                         )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                      </TableCell>
+                      <TableCell>
+                        {isEditing ? (
+                          <select
+                            value={editForm.source_type || source.source_type}
+                            onChange={(e) => setEditForm(prev => ({ ...prev, source_type: e.target.value as SourceType }))}
+                            className="text-sm border rounded px-2 py-1"
+                          >
+                            {Object.entries(SOURCE_TYPE_CONFIG).map(([key, config]) => (
+                              <option key={key} value={key}>
+                                {config.label}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span>{config.icon}</span>
+                            <span className="text-sm">{config.label}</span>
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={source.is_active ? "default" : "secondary"}>
+                            {source.is_active ? 'Active' : 'Inactive'}
+                          </Badge>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleToggleActive(source.id, !source.is_active)}
+                            title={source.is_active ? 'Deactivate' : 'Activate'}
+                          >
+                            <Power className={`w-3 h-3 ${source.is_active ? 'text-green-600' : 'text-gray-400'}`} />
+                          </Button>
+                        </div>
+                      </TableCell>
+                       <TableCell className="text-center">
+                         <PatientCountEditor
+                           sourceId={source.id}
+                           currentCount={thisMonth}
+                           onUpdate={loadData}
+                         />
+                       </TableCell>
+                      <TableCell className="text-center font-semibold">
+                        {total}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex justify-center gap-1">
+                          {isEditing ? (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={handleSaveEdit}
+                                title="Save changes"
+                              >
+                                <Check className="w-4 h-4 text-green-600" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={handleCancelEdit}
+                                title="Cancel"
+                              >
+                                <X className="w-4 h-4 text-red-600" />
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => navigate(`/source/${source.id}`)}
+                                title="View details"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleEditSource(source)}
+                                title="Edit"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleDeleteSources([source.id])}
+                                title="Delete"
+                              >
+                                <Trash2 className="w-4 h-4 text-red-600" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     );

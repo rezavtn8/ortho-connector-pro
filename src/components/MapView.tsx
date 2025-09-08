@@ -5,11 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { MapPin, RefreshCw, Building2, Users, TrendingUp, Calendar } from "lucide-react";
 import { useMapboxToken } from '@/hooks/useMapboxToken';
 import { useMapData } from '@/hooks/useMapData';
+import { useIsMobile } from '@/hooks/use-mobile';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 export function MapView({ height = "600px" }: { height?: string }) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
+  const isMobile = useIsMobile();
   
   const { token: mapboxToken, isLoading: tokenLoading } = useMapboxToken();
   const { offices, clinic, isLoading: dataLoading } = useMapData();
@@ -178,84 +180,84 @@ export function MapView({ height = "600px" }: { height?: string }) {
 
   return (
     <div className="space-y-6">
-      {/* Header Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="p-4">
+      {/* Mobile-optimized Header Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Card className="p-3 sm:p-4">
           <div className="flex items-center space-x-2">
-            <Building2 className="h-5 w-5 text-blue-600" />
+            <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
             <div>
-              <p className="text-2xl font-bold">{officeStats.total}</p>
-              <p className="text-sm text-muted-foreground">Total Offices</p>
+              <p className="text-lg sm:text-2xl font-bold">{officeStats.total}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Total Offices</p>
             </div>
           </div>
         </Card>
         
-        <Card className="p-4">
+        <Card className="p-3 sm:p-4">
           <div className="flex items-center space-x-2">
-            <Users className="h-5 w-5 text-green-600" />
+            <Users className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
             <div>
-              <p className="text-2xl font-bold">{officeStats.totalReferrals}</p>
-              <p className="text-sm text-muted-foreground">This Month</p>
+              <p className="text-lg sm:text-2xl font-bold">{officeStats.totalReferrals}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">This Month</p>
             </div>
           </div>
         </Card>
         
-        <Card className="p-4">
+        <Card className="p-3 sm:p-4">
           <div className="flex items-center space-x-2">
-            <TrendingUp className="h-5 w-5 text-orange-600" />
+            <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" />
             <div>
-              <p className="text-2xl font-bold">{officeStats.activeThisMonth}</p>
-              <p className="text-sm text-muted-foreground">Active Offices</p>
+              <p className="text-lg sm:text-2xl font-bold">{officeStats.activeThisMonth}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Active Offices</p>
             </div>
           </div>
         </Card>
         
-        <Card className="p-4">
+        <Card className="p-3 sm:p-4">
           <div className="flex items-center space-x-2">
-            <Calendar className="h-5 w-5 text-purple-600" />
+            <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
             <div>
-              <p className="text-2xl font-bold">{officeStats.vip + officeStats.strong}</p>
-              <p className="text-sm text-muted-foreground">Top Performers</p>
+              <p className="text-lg sm:text-2xl font-bold">{officeStats.vip + officeStats.strong}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Top Performers</p>
             </div>
           </div>
         </Card>
       </div>
 
-      {/* Map and Legend */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      {/* Mobile-optimized Map and Legend Layout */}
+      <div className="flex flex-col lg:grid lg:grid-cols-4 gap-4 lg:gap-6">
         {/* Map */}
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-3 order-1">
           <Card className="overflow-hidden">
             <div 
               ref={mapContainer} 
-              style={{ height }}
+              style={{ height: isMobile ? '400px' : height }}
               className="w-full"
             />
           </Card>
         </div>
 
-        {/* Legend */}
-        <div className="space-y-4">
-          <Card className="p-4">
-            <h3 className="font-semibold mb-4 flex items-center gap-2">
+        {/* Legend - appears above map on mobile */}
+        <div className="space-y-4 order-0 lg:order-2">
+          <Card className="p-3 sm:p-4">
+            <h3 className="font-semibold mb-3 sm:mb-4 flex items-center gap-2">
               <MapPin className="h-4 w-4" />
               Office Categories
             </h3>
             
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               {legendItems.map((item) => (
                 <div key={item.label} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-2 sm:space-x-3">
                     <div 
-                      className="w-4 h-4 rounded-full border-2 border-white shadow-sm"
+                      className="w-3 h-3 sm:w-4 sm:h-4 rounded-full border-2 border-white shadow-sm"
                       style={{ backgroundColor: item.color }}
                     />
                     <div>
-                      <p className="font-medium text-sm">{item.label}</p>
-                      <p className="text-xs text-muted-foreground">{item.description}</p>
+                      <p className="font-medium text-xs sm:text-sm">{item.label}</p>
+                      <p className="text-xs text-muted-foreground hidden sm:block">{item.description}</p>
                     </div>
                   </div>
-                  <Badge variant="secondary" className="ml-2">
+                  <Badge variant="secondary" className="ml-2 text-xs">
                     {item.count}
                   </Badge>
                 </div>
@@ -263,22 +265,22 @@ export function MapView({ height = "600px" }: { height?: string }) {
             </div>
           </Card>
 
-          <Card className="p-4">
-            <h3 className="font-semibold mb-3">Map Legend</h3>
-            <div className="space-y-2 text-sm">
+          <Card className="p-3 sm:p-4">
+            <h3 className="font-semibold mb-2 sm:mb-3 text-sm sm:text-base">Map Legend</h3>
+            <div className="space-y-2 text-xs sm:text-sm">
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 bg-blue-600 rounded-full border-2 border-white shadow-sm flex items-center justify-center">
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                <div className="w-5 h-5 sm:w-6 sm:h-6 bg-blue-600 rounded-full border-2 border-white shadow-sm flex items-center justify-center">
+                  <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-white rounded-full"></div>
                 </div>
                 <span>Your Clinic</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-gray-400 rounded-full border-2 border-white shadow-sm"></div>
+                <div className="w-3 h-3 sm:w-4 sm:h-4 bg-gray-400 rounded-full border-2 border-white shadow-sm"></div>
                 <span>Referring Offices</span>
               </div>
             </div>
             
-            <div className="mt-4 pt-3 border-t">
+            <div className="mt-3 sm:mt-4 pt-2 sm:pt-3 border-t">
               <p className="text-xs text-muted-foreground">
                 Click on any marker to view details about the office and referral history.
               </p>

@@ -342,18 +342,18 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* Overview Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Mobile-optimized Overview Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+          <CardHeader className="pb-2 sm:pb-3">
+            <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
               Total Sources
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
-              <div className="text-2xl font-bold">{totalSources}</div>
-              <Building2 className="w-8 h-8 text-blue-500 opacity-20" />
+              <div className="text-xl sm:text-2xl font-bold">{totalSources}</div>
+              <Building2 className="w-6 h-6 sm:w-8 sm:h-8 text-blue-500 opacity-20" />
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               {activeSources} active
@@ -362,15 +362,15 @@ export function Dashboard() {
         </Card>
 
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+          <CardHeader className="pb-2 sm:pb-3">
+            <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
               Total Patients
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
-              <div className="text-2xl font-bold">{totalPatients}</div>
-              <Users className="w-8 h-8 text-green-500 opacity-20" />
+              <div className="text-xl sm:text-2xl font-bold">{totalPatients}</div>
+              <Users className="w-6 h-6 sm:w-8 sm:h-8 text-green-500 opacity-20" />
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               All-time referrals
@@ -379,15 +379,15 @@ export function Dashboard() {
         </Card>
 
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+          <CardHeader className="pb-2 sm:pb-3">
+            <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
               This Month
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
-              <div className="text-2xl font-bold">{thisMonthPatients}</div>
-              <TrendingUp className="w-8 h-8 text-orange-500 opacity-20" />
+              <div className="text-xl sm:text-2xl font-bold">{thisMonthPatients}</div>
+              <TrendingUp className="w-6 h-6 sm:w-8 sm:h-8 text-orange-500 opacity-20" />
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Current month
@@ -399,15 +399,15 @@ export function Dashboard() {
           className="cursor-pointer hover:shadow-lg transition-all duration-200"
           onClick={() => navigate('/analytics')}
         >
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+          <CardHeader className="pb-2 sm:pb-3">
+            <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
               Reports
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
-              <div className="text-2xl font-bold">View</div>
-              <BarChart3 className="w-8 h-8 text-purple-500 opacity-20" />
+              <div className="text-xl sm:text-2xl font-bold">View</div>
+              <BarChart3 className="w-6 h-6 sm:w-8 sm:h-8 text-purple-500 opacity-20" />
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Analytics & insights
@@ -418,9 +418,9 @@ export function Dashboard() {
 
       {/* Source Categories */}
       <div className="space-y-4">
-        <h2 className="text-xl font-semibold">Source Categories</h2>
+        <h2 className="text-lg sm:text-xl font-semibold">Source Categories</h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {getSourceGroupData().map((group) => (
             <Card 
               key={group.name}
@@ -463,7 +463,7 @@ export function Dashboard() {
       {/* Analytics Overview */}
       <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <h2 className="text-xl font-semibold">Analytics Overview</h2>
+          <h2 className="text-lg sm:text-xl font-semibold">Analytics Overview</h2>
           <Button 
             variant="outline"
             onClick={() => navigate('/analytics')}
@@ -492,7 +492,7 @@ export function Dashboard() {
 
       {/* Recent Activity */}
       <div className="space-y-4">
-        <h2 className="text-xl font-semibold">Recent Activity</h2>
+        <h2 className="text-lg sm:text-xl font-semibold">Recent Activity</h2>
         
         <Card>
           <CardHeader>

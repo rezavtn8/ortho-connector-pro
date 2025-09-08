@@ -3,6 +3,7 @@ import React from 'react';
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from '@/components/AppSidebar';
 import { ErrorBoundary } from './ErrorBoundary';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -11,6 +12,8 @@ interface LayoutProps {
 }
 
 export function Layout({ children, currentPage, onPageChange }: LayoutProps) {
+  const isMobile = useIsMobile();
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-gradient-subtle">
@@ -23,19 +26,26 @@ export function Layout({ children, currentPage, onPageChange }: LayoutProps) {
         </ErrorBoundary>
         
         <main className="flex-1 flex flex-col">
-          {/* Header with trigger */}
+          {/* Mobile-optimized Header with trigger and title */}
           <ErrorBoundary level="component" fallback={
-            <header className="h-14 flex items-center border-b bg-card/50 backdrop-blur-sm px-4">
+            <header className="h-14 flex items-center border-b bg-card/50 backdrop-blur-sm px-3 sm:px-4">
               <div className="text-sm text-muted-foreground">Header unavailable</div>
             </header>
           }>
-            <header className="h-14 flex items-center border-b bg-card/50 backdrop-blur-sm px-4">
-              <SidebarTrigger />
+            <header className="h-14 flex items-center justify-between border-b bg-card/50 backdrop-blur-sm px-3 sm:px-4">
+              <div className="flex items-center gap-3">
+                <SidebarTrigger />
+                {isMobile && (
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-lg">Nexora</span>
+                  </div>
+                )}
+              </div>
             </header>
           </ErrorBoundary>
 
-          {/* Main Content */}
-          <div className="flex-1 p-6">
+          {/* Mobile-optimized Main Content with responsive padding */}
+          <div className="flex-1 p-3 sm:p-4 lg:p-6">
             <ErrorBoundary level="section">
               {children}
             </ErrorBoundary>

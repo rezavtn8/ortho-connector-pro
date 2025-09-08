@@ -31,6 +31,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { NexoraLogo } from '@/components/NexoraLogo';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface AppSidebarProps {
   currentPage: string;
@@ -60,7 +61,8 @@ const systemItems = [
 
 export function AppSidebar({ currentPage, onPageChange }: AppSidebarProps) {
   const { user, signOut } = useAuth();
-  const { state } = useSidebar();
+  const { state, setOpenMobile } = useSidebar();
+  const isMobile = useIsMobile();
 
   const isActive = (itemId: string) => currentPage === itemId;
 
@@ -69,6 +71,14 @@ export function AppSidebar({ currentPage, onPageChange }: AppSidebarProps) {
 
   const handleSignOut = async () => {
     await signOut();
+  };
+
+  const handlePageChange = (page: string) => {
+    onPageChange(page);
+    // Auto-close sidebar on mobile after navigation
+    if (isMobile) {
+      setOpenMobile(false);
+    }
   };
 
   const isCollapsed = state === "collapsed";
@@ -101,8 +111,8 @@ export function AppSidebar({ currentPage, onPageChange }: AppSidebarProps) {
                     className={getNavClass(item.id)}
                   >
                     <button 
-                      onClick={() => onPageChange(item.id)}
-                      className="flex items-center w-full"
+                      onClick={() => handlePageChange(item.id)}
+                      className="flex items-center w-full min-h-[44px]"
                     >
                       <item.icon className="mr-2 h-4 w-4" />
                       {!isCollapsed && <span>{item.title}</span>}
@@ -125,8 +135,8 @@ export function AppSidebar({ currentPage, onPageChange }: AppSidebarProps) {
                     className={getNavClass(item.id)}
                   >
                     <button 
-                      onClick={() => onPageChange(item.id)}
-                      className="flex items-center w-full"
+                      onClick={() => handlePageChange(item.id)}
+                      className="flex items-center w-full min-h-[44px]"
                     >
                       <item.icon className="mr-2 h-4 w-4" />
                       {!isCollapsed && <span>{item.title}</span>}
@@ -149,8 +159,8 @@ export function AppSidebar({ currentPage, onPageChange }: AppSidebarProps) {
                     className={getNavClass(item.id)}
                   >
                     <button 
-                      onClick={() => onPageChange(item.id)}
-                      className="flex items-center w-full"
+                      onClick={() => handlePageChange(item.id)}
+                      className="flex items-center w-full min-h-[44px]"
                     >
                       <item.icon className="mr-2 h-4 w-4" />
                       {!isCollapsed && <span>{item.title}</span>}
@@ -163,10 +173,10 @@ export function AppSidebar({ currentPage, onPageChange }: AppSidebarProps) {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t p-4">
+      <SidebarFooter className="border-t p-3 sm:p-4">
         <div className="flex items-center justify-between">
           {!isCollapsed && (
-            <div className="flex flex-col">
+            <div className="flex flex-col min-w-0 flex-1 mr-2">
               <span className="text-xs text-muted-foreground truncate">
                 {user?.email}
               </span>
@@ -176,7 +186,7 @@ export function AppSidebar({ currentPage, onPageChange }: AppSidebarProps) {
             variant="ghost" 
             size="sm" 
             onClick={handleSignOut}
-            className="gap-1"
+            className="gap-1 min-h-[44px] shrink-0"
           >
             <LogOut className="w-4 h-4" />
             {!isCollapsed && <span>Sign Out</span>}
