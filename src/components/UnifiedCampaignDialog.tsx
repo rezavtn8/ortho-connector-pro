@@ -62,46 +62,111 @@ export function UnifiedCampaignDialog({ open, onOpenChange, onCampaignCreated }:
 
       try {
         setLoadingOffices(true);
-        const { data, error } = await supabase
+        
+        // Load office sources only
+        const { data: sourcesData, error: sourcesError } = await supabase
           .from('patient_sources')
           .select('id, name, address, source_type')
           .eq('created_by', user.id)
           .eq('is_active', true)
+          .eq('source_type', 'Office')
           .order('name');
 
-        if (error) throw error;
+        if (sourcesError) throw sourcesError;
 
-        // Calculate referral tier for each office
-        const officesWithTiers = await Promise.all(
-          (data || []).map(async (office) => {
-            const { data: tierData, error: tierError } = await supabase
-              .rpc('calculate_source_score', { source_id_param: office.id });
+        // Load monthly data for the past 12 months
+        const { data: monthlyData, error: monthlyError } = await supabase
+          .from('monthly_patients')
+          .select('*')
+          .eq('user_id', user.id);
+
+        if (monthlyError) throw monthlyError;
+
+        // Calculate metrics for each office using the same logic as Offices page
+        const processedOffices = [];
+        const currentDate = new Date();
+        
+        for (const source of sourcesData || []) {
+          const sourceMonthlyData = monthlyData?.filter(m => m.source_id === source.id) || [];
+          
+          // Calculate L12 (last 12 months)
+          const l12 = sourceMonthlyData
+            .filter(m => {
+              const [year, month] = m.year_month.split('-').map(Number);
+              const dataDate = new Date(year, month - 1);
+              const twelveMonthsAgo = new Date(currentDate.getFullYear(), currentDate.getMonth() - 12);
+              return dataDate >= twelveMonthsAgo;
+            })
+            .reduce((sum, m) => sum + m.patient_count, 0);
+
+          // Calculate R3 (last 3 months)
+          const r3 = sourceMonthlyData
+            .filter(m => {
+              const [year, month] = m.year_month.split('-').map(Number);
+              const dataDate = new Date(year, month - 1);
+              const threeMonthsAgo = new Date(currentDate.getFullYear(), currentDate.getMonth() - 3);
+              return dataDate >= threeMonthsAgo;
+            })
+            .reduce((sum, m) => sum + m.patient_count, 0);
+
+          // Calculate MSLR (months since last referral)
+          const calculateMonthsSinceLastReferral = (monthlyData) => {
+            const currentDate = new Date();
+            const sortedData = monthlyData
+              .filter(data => data.patient_count > 0)
+              .sort((a, b) => b.year_month.localeCompare(a.year_month));
             
-            if (tierError) {
-              console.error('Error calculating tier for office:', office.id, tierError);
-            }
+            if (sortedData.length === 0) return 999;
+            
+            const lastReferralYearMonth = sortedData[0].year_month;
+            const [lastYear, lastMonth] = lastReferralYearMonth.split('-').map(Number);
+            const [currentYear, currentMonth] = [currentDate.getFullYear(), currentDate.getMonth() + 1];
+            
+            return (currentYear - lastYear) * 12 + (currentMonth - lastMonth);
+          };
 
-            // Get last referral date
-            const { data: lastReferralData } = await supabase
-              .from('monthly_patients')
-              .select('year_month')
-              .eq('source_id', office.id)
-              .eq('user_id', user.id)
-              .gt('patient_count', 0)
-              .order('year_month', { ascending: false })
-              .limit(1);
+          const mslr = calculateMonthsSinceLastReferral(sourceMonthlyData);
 
-            const lastReferralDate = lastReferralData?.[0]?.year_month 
-              ? new Date(lastReferralData[0].year_month + '-01').toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
-              : null;
+          processedOffices.push({
+            ...source,
+            l12,
+            r3,
+            mslr
+          });
+        }
 
-            return {
-              ...office,
-              referral_tier: tierData || 'Cold',
-              last_referral_date: lastReferralDate
-            };
-          })
-        );
+        // Calculate tiers using the same logic as Offices page
+        const calculateTier = (l12, r3, mslr, allOffices) => {
+          // Dormant: no referrals in last 12 months
+          if (l12 === 0) return 'Dormant';
+
+          // VIP: top 20% by L12
+          const sortedByL12 = allOffices.map(o => o.l12).sort((a, b) => b - a);
+          const vipThresholdIndex = Math.ceil(sortedByL12.length * 0.2) - 1;
+          const vipThreshold = sortedByL12[vipThresholdIndex] || 0;
+          
+          if (l12 >= vipThreshold && vipThreshold > 0) return 'VIP';
+
+          // Warm: ≥4 in last 12 months OR ≥1 in last 3 months (but not VIP)
+          if (l12 >= 4 || r3 >= 1) return 'Warm';
+
+          // Cold: everything else
+          return 'Cold';
+        };
+
+        const officesWithTiers = processedOffices.map(office => {
+          const sourceMonthlyData = monthlyData?.filter(m => m.source_id === office.id) || [];
+          return {
+            ...office,
+            referral_tier: calculateTier(office.l12, office.r3, office.mslr, processedOffices),
+            last_referral_date: sourceMonthlyData.filter(m => m.patient_count > 0)
+              .sort((a, b) => b.year_month.localeCompare(a.year_month))[0]?.year_month 
+              ? new Date(sourceMonthlyData.filter(m => m.patient_count > 0)
+                  .sort((a, b) => b.year_month.localeCompare(a.year_month))[0].year_month + '-01')
+                  .toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
+              : null
+          };
+        });
 
         setOffices(officesWithTiers);
       } catch (error) {
@@ -390,9 +455,9 @@ export function UnifiedCampaignDialog({ open, onOpenChange, onCampaignCreated }:
                               <Badge 
                                 variant="outline" 
                                 className={
-                                  office.referral_tier === 'Strong' ? 'border-green-500 text-green-700' :
-                                  office.referral_tier === 'Moderate' ? 'border-blue-500 text-blue-700' :
-                                  office.referral_tier === 'Sporadic' ? 'border-orange-500 text-orange-700' :
+                                  office.referral_tier === 'VIP' ? 'border-purple-500 text-purple-700' :
+                                  office.referral_tier === 'Warm' ? 'border-green-500 text-green-700' :
+                                  office.referral_tier === 'Cold' ? 'border-blue-500 text-blue-700' :
                                   'border-gray-500 text-gray-700'
                                 }
                               >

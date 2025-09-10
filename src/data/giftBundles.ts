@@ -61,8 +61,8 @@ export const GIFT_BUNDLES: GiftBundle[] = [
 
 export const OFFICE_TIER_FILTERS = [
   { value: 'all', label: 'All Offices' },
-  { value: 'Strong', label: 'VIP (Strong Referrals)' },
-  { value: 'Moderate', label: 'Active (Moderate Referrals)' },
-  { value: 'Sporadic', label: 'Occasional (Sporadic Referrals)' },
-  { value: 'Cold', label: 'Cold (No Recent Referrals)' }
+  { value: 'VIP', label: 'VIP (Strong Referrals)' },
+  { value: 'Warm', label: 'Warm (Active Referrals)' },
+  { value: 'Cold', label: 'Cold (Sporadic Referrals)' },
+  { value: 'Dormant', label: 'Dormant (No Recent Referrals)' }
 ];

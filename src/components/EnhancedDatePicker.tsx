@@ -123,6 +123,11 @@ export function EnhancedDatePicker({
               }}
               initialFocus
               className="p-3 pointer-events-auto"
+              formatters={{
+                formatCaption: (date) => {
+                  return format(date, 'MMMM yyyy');
+                }
+              }}
             />
             
             {withTime && (
