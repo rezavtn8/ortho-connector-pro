@@ -109,7 +109,7 @@ export function EnhancedDatePicker({
           {withTime && <Clock className="ml-auto h-4 w-4" />}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
+      <PopoverContent className="w-auto p-0 pointer-events-auto" align="start">
         <div className="flex">
           <div className="border-r">
             <Calendar
@@ -122,7 +122,7 @@ export function EnhancedDatePicker({
                 return false;
               }}
               initialFocus
-              className="pointer-events-auto"
+              className="p-3 pointer-events-auto"
             />
             
             {withTime && (

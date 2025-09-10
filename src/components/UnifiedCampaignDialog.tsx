@@ -223,9 +223,10 @@ export function UnifiedCampaignDialog({ open, onOpenChange, onCampaignCreated }:
 
     } catch (error) {
       console.error('Error creating campaign:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       toast({
-        title: "Error",
-        description: "Failed to create campaign.",
+        title: "Campaign Creation Failed",
+        description: `Error: ${errorMessage}. Please check your data and try again.`,
         variant: "destructive",
       });
     } finally {

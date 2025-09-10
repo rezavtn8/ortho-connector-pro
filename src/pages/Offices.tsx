@@ -189,7 +189,7 @@ export function Offices() {
         component: 'Offices', 
         action: 'loadOffices',
         metadata: { 
-          activeSourcesCount: allOffices.length 
+          timestamp: new Date().toISOString()
         }
       }
     ).finally(() => {
