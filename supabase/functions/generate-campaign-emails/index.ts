@@ -59,28 +59,38 @@ serve(async (req) => {
     console.log('User authenticated:', user.id);
 
     // Get user profile info for email generation
+    console.log('Fetching user profile for user:', user.id);
     const { data: userProfile, error: profileError } = await supabaseClient
       .from('user_profiles')
-      .select('first_name, last_name, phone, job_title, email, degrees, clinic_id')
+      .select('*')
       .eq('user_id', user.id)
       .maybeSingle();
 
     if (profileError) {
       console.error('Error fetching user profile:', profileError);
+      throw new Error(`Failed to fetch user profile: ${profileError.message}`);
     }
 
-    console.log('User profile fetched:', userProfile);
+    console.log('User profile fetched:', JSON.stringify(userProfile, null, 2));
 
     // Get clinic information if available
     let clinicInfo = null;
     if (userProfile?.clinic_id) {
-      const { data: clinic } = await supabaseClient
+      console.log('Fetching clinic info for clinic_id:', userProfile.clinic_id);
+      const { data: clinic, error: clinicError } = await supabaseClient
         .from('clinics')
-        .select('name, address')
+        .select('*')
         .eq('id', userProfile.clinic_id)
         .maybeSingle();
-      clinicInfo = clinic;
-      console.log('Clinic info fetched:', clinicInfo);
+      
+      if (clinicError) {
+        console.error('Error fetching clinic:', clinicError);
+      } else {
+        clinicInfo = clinic;
+        console.log('Clinic info fetched:', JSON.stringify(clinicInfo, null, 2));
+      }
+    } else {
+      console.log('No clinic_id found in user profile');
     }
 
     const requestData: EmailRequest = await req.json();
@@ -99,14 +109,24 @@ serve(async (req) => {
     }
 
     // Enhanced sender information from user profile
+    console.log('Building sender info from profile data...');
+    
+    // Handle case where profile might be missing
+    if (!userProfile) {
+      console.warn('No user profile found, using fallback data');
+    }
+    
     const firstName = userProfile?.first_name || '';
     const lastName = userProfile?.last_name || '';
     const fullName = firstName && lastName ? `${firstName} ${lastName}` : user_name || 'Healthcare Professional';
     
     // Format name with degrees if available
-    const nameWithDegrees = userProfile?.degrees 
-      ? `Dr. ${fullName}, ${userProfile.degrees}`
-      : userProfile?.first_name ? `Dr. ${fullName}` : fullName;
+    let nameWithDegrees = fullName;
+    if (userProfile?.degrees) {
+      nameWithDegrees = firstName ? `Dr. ${firstName} ${lastName}, ${userProfile.degrees}` : `Dr. ${fullName}, ${userProfile.degrees}`;
+    } else if (firstName) {
+      nameWithDegrees = `Dr. ${fullName}`;
+    }
     
     const jobTitle = userProfile?.job_title || 'Healthcare Professional';
     const clinicName = clinicInfo?.name || clinic_name || 'our practice';
@@ -115,70 +135,92 @@ serve(async (req) => {
 
     const senderInfo = {
       name: nameWithDegrees,
-      firstName: firstName,
+      firstName: firstName || 'Dr.',
       jobTitle: jobTitle,
       clinic: clinicName,
       phone: phone,
-      email: email
+      email: email,
+      hasFullProfile: !!(userProfile?.first_name && userProfile?.last_name && userProfile?.job_title)
     };
 
-    console.log('Sender info prepared:', senderInfo);
+    console.log('Final sender info:', JSON.stringify(senderInfo, null, 2));
 
     const generatedEmails = [];
 
     // Generate personalized email for each office
     for (const office of offices) {
-      const systemPrompt = `You are writing a professional, warm, and personalized email from ${senderInfo.name}, ${senderInfo.jobTitle} at ${senderInfo.clinic}.
+      console.log(`Generating email for office: ${office.name} with sender info:`, senderInfo);
+      
+      const systemPrompt = `You are an expert healthcare marketing professional writing personalized outreach emails. You must create professional, warm, and highly personalized emails that build genuine relationships.
 
-The email should be:
-- Professional yet warm in tone
-- Specifically tailored to each office and their referral history
-- Concise but engaging (2-3 paragraphs max)
-- Include a proper signature with sender's credentials and contact info
-- Focus on building relationships and partnership opportunities
-${gift_bundle ? '- Mention the gift bundle naturally as a token of appreciation' : ''}
-
-The subject line should be:
-- Personal and relationship-focused
-- Include the sender's first name for familiarity
-- Reference the practice name when relevant
-- Under 60 characters for optimal email client display
-
-Always return ONLY a valid JSON object with "subject" and "body" fields.`;
-
-      const userPrompt = `Generate a personalized email for:
-
-Office: ${office.name}
-${office.address ? `Address: ${office.address}` : ''}
-Referral Relationship: ${office.referral_tier || 'New Contact'}
-${office.last_referral_date ? `Last Referral: ${office.last_referral_date}` : ''}
-
-Campaign: ${campaign_name}
-
-Sender Information:
+SENDER PROFILE:
 - Name: ${senderInfo.name}
-- Title: ${senderInfo.jobTitle}
+- Position: ${senderInfo.jobTitle}
 - Practice: ${senderInfo.clinic}
-${senderInfo.phone ? `- Phone: ${senderInfo.phone}` : ''}
-- Email: ${senderInfo.email}
+- Has Complete Profile: ${senderInfo.hasFullProfile}
 
-${gift_bundle ? `Gift Being Delivered: ${gift_bundle.name} - ${gift_bundle.description}
-Items included: ${gift_bundle.items.join(', ')}` : 'This is a relationship-building outreach without physical gifts.'}
+WRITING GUIDELINES:
+- Use a conversational, professional tone that feels authentic and personal
+- Reference specific details about the recipient office when possible
+- Make the email feel like it's from a real person who cares about building relationships
+- Keep emails concise (2-3 paragraphs max) but warm and engaging
+- Always include a complete professional signature
+- Focus on mutual benefit and collaboration, not sales
+- Use natural language that sounds human, not corporate
+- Be specific about next steps or follow-up
 
-Create a professional email that:
-1. Has a personal, warm subject line including sender's first name
-2. Acknowledges any existing referral relationship
-3. ${gift_bundle ? 'Mentions the gift as a gesture of appreciation' : 'Focuses on partnership and collaboration opportunities'}
-4. Includes a complete professional signature with:
-   - Full name with degrees
-   - Job title
-   - Practice name
-   - Phone number (if provided)
-   - Email address
+PERSONALIZATION REQUIREMENTS:
+- Tailor content to the office's referral history/tier
+- Use the sender's first name in subject lines for familiarity
+- Reference the specific practice/clinic name naturally
+- Make each email feel individually crafted, not template-based
 
-Subject line examples: "${senderInfo.firstName} from ${senderInfo.clinic} - Partnership Opportunity" or "${senderInfo.firstName} - Thank You from ${senderInfo.clinic}"`;
+${gift_bundle ? `GIFT CONTEXT:
+This outreach includes delivering a thoughtful gift package as a gesture of appreciation and relationship building. Mention this naturally within the email context.` : `RELATIONSHIP FOCUS:
+This is purely relationship-building outreach. Focus on partnership opportunities, collaboration, and building professional connections.`}
 
-      console.log('Generating email for office:', office.name);
+OUTPUT FORMAT:
+Return ONLY a valid JSON object with exactly these fields:
+{
+  "subject": "Personal, engaging subject line under 60 characters",
+  "body": "Complete email body with proper signature including full credentials"
+}`;
+
+      const recipientContext = `
+RECIPIENT OFFICE: ${office.name}
+${office.address ? `Location: ${office.address}` : ''}
+Referral Relationship: ${office.referral_tier || 'New Contact'}
+${office.last_referral_date ? `Last Referral Date: ${office.last_referral_date}` : 'No previous referral history'}
+
+CAMPAIGN CONTEXT: ${campaign_name}
+
+${gift_bundle ? `GIFT BEING DELIVERED:
+- Package: ${gift_bundle.name}
+- Description: ${gift_bundle.description}
+- Contents: ${gift_bundle.items.join(', ')}
+- Purpose: Token of appreciation for partnership` : ''}
+
+REQUIRED SIGNATURE FORMAT:
+${senderInfo.name}
+${senderInfo.jobTitle}
+${senderInfo.clinic}
+${senderInfo.phone ? senderInfo.phone + '\n' : ''}${senderInfo.email}`;
+
+      const emailPrompt = `Create a personalized email for this healthcare office outreach. 
+
+${recipientContext}
+
+Write an email that:
+1. Has a warm, personal subject line that includes "${senderInfo.firstName}" 
+2. Opens with genuine connection and acknowledges any existing relationship
+3. ${gift_bundle ? 'Naturally mentions the gift delivery as a thoughtful gesture' : 'Focuses on building a strong professional partnership'}
+4. Suggests a specific next step (brief meeting, coffee, phone call)
+5. Includes the complete signature as specified above
+6. Feels authentic and personally written, not template-generated
+
+Make this email sound like it's from a real healthcare professional who genuinely wants to build a relationship with this office.`;
+
+      console.log('Sending prompt to OpenAI for:', office.name);
 
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -187,13 +229,13 @@ Subject line examples: "${senderInfo.firstName} from ${senderInfo.clinic} - Part
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
+          model: 'gpt-4o-mini', // Using more capable model for better personalization
           messages: [
             { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
+            { role: 'user', content: emailPrompt }
           ],
-          max_tokens: 500,
-          temperature: 0.7,
+          max_tokens: 800,
+          temperature: 0.8, // Higher creativity for more personalized content
         }),
       });
 
@@ -205,9 +247,11 @@ Subject line examples: "${senderInfo.firstName} from ${senderInfo.clinic} - Part
 
       const data = await response.json();
       let emailContent = data.choices[0].message.content;
+      
+      console.log('Raw AI response for', office.name, ':', emailContent);
 
-      // Try to parse as JSON, if it fails, create a structured response
-      let emailSubject = `${senderInfo.firstName} from ${senderInfo.clinic} - ${campaign_name}`;
+      // Parse and validate the AI response
+      let emailSubject = `${senderInfo.firstName} from ${senderInfo.clinic}`;
       let emailBody = emailContent;
 
       try {
@@ -215,10 +259,13 @@ Subject line examples: "${senderInfo.firstName} from ${senderInfo.clinic} - Part
         if (parsedEmail.subject && parsedEmail.body) {
           emailSubject = parsedEmail.subject;
           emailBody = parsedEmail.body;
+          console.log('Successfully parsed AI response for:', office.name);
+        } else {
+          console.warn('AI response missing required fields for:', office.name);
         }
       } catch (parseError) {
-        console.warn('Failed to parse AI response as JSON, using fallback');
-        // If parsing fails, ensure we have a proper signature
+        console.warn('Failed to parse AI response as JSON for:', office.name, parseError);
+        // Ensure we have a proper signature if parsing failed
         if (!emailContent.includes(senderInfo.name)) {
           emailBody += `\n\nBest regards,\n\n${senderInfo.name}\n${senderInfo.jobTitle}\n${senderInfo.clinic}`;
           if (senderInfo.phone) emailBody += `\n${senderInfo.phone}`;
@@ -233,6 +280,8 @@ Subject line examples: "${senderInfo.firstName} from ${senderInfo.clinic} - Part
         body: emailBody,
         referral_tier: office.referral_tier || 'New Contact'
       });
+
+      console.log(`Email generated for ${office.name}:`, { subject: emailSubject, bodyLength: emailBody.length });
     }
 
     console.log(`Generated ${generatedEmails.length} emails successfully`);
