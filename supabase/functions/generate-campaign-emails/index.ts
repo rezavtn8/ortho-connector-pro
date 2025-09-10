@@ -48,22 +48,7 @@ serve(async (req) => {
       throw new Error("User not authenticated");
     }
 
-    // Check rate limiting
-    const { data: rateLimitCheck, error: rateLimitError } = await supabaseClient
-      .rpc('check_rate_limit', {
-        p_endpoint: 'generate-campaign-emails',
-        p_max_requests: 10,
-        p_window_minutes: 60
-      });
-
-    if (rateLimitError) {
-      console.error('Rate limit check error:', rateLimitError);
-      throw new Error("Error checking rate limit");
-    }
-
-    if (rateLimitCheck === false) {
-      throw new Error("Rate limit exceeded. Please try again later.");
-    }
+    console.log('User authenticated:', user.id);
 
     const requestData: EmailRequest = await req.json();
     const { offices, gift_bundle, campaign_name, user_name, clinic_name } = requestData;
