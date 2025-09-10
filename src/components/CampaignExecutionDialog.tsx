@@ -293,6 +293,15 @@ export function CampaignExecutionDialog({
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-6xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Gift className="w-5 h-5" />
+              {campaign.name}
+            </DialogTitle>
+            <DialogDescription>
+              Loading campaign details...
+            </DialogDescription>
+          </DialogHeader>
           <div className="flex items-center justify-center py-8">
             <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
           </div>
