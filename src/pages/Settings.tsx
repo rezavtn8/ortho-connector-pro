@@ -32,7 +32,8 @@ import {
   Lock,
   Eye,
   EyeOff,
-  Loader2
+  Loader2,
+  Edit
 } from 'lucide-react';
 
 type UserRole = 'Front Desk' | 'Marketing Rep' | 'Manager';
@@ -247,7 +248,7 @@ export function Settings() {
         .from('user_profiles')
         .select('clinic_id')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       let clinicId = profile?.clinic_id;
 
@@ -311,6 +312,8 @@ export function Settings() {
     setEditingClinic(false);
     // Reload clinic settings
     loadSettings();
+  };
+
   const saveNotificationSettings = async () => {
     // Store notification settings in localStorage for now
     localStorage.setItem('notification_settings', JSON.stringify(notifications));
@@ -319,128 +322,6 @@ export function Settings() {
       title: 'Success',
       description: 'Notification preferences saved',
     });
-  };
-
-  const inviteTeamMember = async () => {
-    if (!user?.id || !newMemberEmail || !newMemberRole) return;
-
-    try {
-      // Get user's clinic_id first
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('clinic_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile?.clinic_id) {
-        toast({
-          title: 'Error',
-          description: 'No clinic found for user',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('user_invitations')
-        .insert({
-          email: newMemberEmail,
-          role: newMemberRole,
-          invited_by: user.id,
-          clinic_id: profile.clinic_id,
-          status: 'pending'
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setNewMemberEmail('');
-      setNewMemberRole('Front Desk');
-      
-      toast({
-        title: 'Success',
-        description: 'Team invitation sent successfully',
-      });
-
-      loadSettings(); // Reload team members
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to send invitation',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const updatePassword = async () => {
-    if (!newPassword) return;
-
-    try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword
-      });
-
-      if (error) throw error;
-
-      setNewPassword('');
-      toast({
-        title: 'Success',
-        description: 'Password updated successfully',
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to update password',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const exportData = async () => {
-    if (!user?.id) return;
-
-    try {
-      const { data: sources } = await supabase
-        .from('patient_sources')
-        .select('*')
-        .eq('created_by', user.id);
-
-      const { data: visits } = await supabase
-        .from('marketing_visits')
-        .select('*')
-        .eq('user_id', user.id);
-
-      const exportData = {
-        sources: sources || [],
-        visits: visits || [],
-        exported_at: new Date().toISOString()
-      };
-
-      const dataStr = JSON.stringify(exportData, null, 2);
-      const dataBlob = new Blob([dataStr], { type: 'application/json' });
-      const url = URL.createObjectURL(dataBlob);
-      
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `referral-data-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      URL.revokeObjectURL(url);
-      
-      toast({
-        title: 'Success',
-        description: 'Data exported successfully',
-      });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to export data',
-        variant: 'destructive',
-      });
-    }
   };
 
   if (loading) {
@@ -488,10 +369,6 @@ export function Settings() {
                   <MapPin className="w-4 h-4 mr-3" />
                   Clinic Information
                 </TabsTrigger>
-                <TabsTrigger value="team" className="w-full justify-start px-3 py-3 text-left">
-                  <Users className="w-4 h-4 mr-3" />
-                  Team Management
-                </TabsTrigger>
               </div>
 
               {/* System Settings */}
@@ -499,10 +376,6 @@ export function Settings() {
                 <div className="text-xs font-medium text-muted-foreground px-3 py-2 uppercase tracking-wider border-t pt-4">
                   System
                 </div>
-                <TabsTrigger value="data" className="w-full justify-start px-3 py-3 text-left">
-                  <Database className="w-4 h-4 mr-3" />
-                  Data Management
-                </TabsTrigger>
                 <TabsTrigger value="security" className="w-full justify-start px-3 py-3 text-left">
                   <Shield className="w-4 h-4 mr-3" />
                   Security & Privacy
@@ -524,7 +397,7 @@ export function Settings() {
                       </div>
                       {!editingProfile ? (
                         <Button variant="outline" size="sm" onClick={() => setEditingProfile(true)}>
-                          <Eye className="h-4 w-4 mr-2" />
+                          <Edit className="h-4 w-4 mr-2" />
                           Edit
                         </Button>
                       ) : (
@@ -638,6 +511,7 @@ export function Settings() {
                 </Card>
               </TabsContent>
 
+              {/* Clinic Settings */}
               <TabsContent value="clinic" className="mt-0">
                 <Card>
                   <CardHeader>
@@ -648,7 +522,7 @@ export function Settings() {
                       </div>
                       {!editingClinic ? (
                         <Button variant="outline" size="sm" onClick={() => setEditingClinic(true)}>
-                          <Eye className="h-4 w-4 mr-2" />
+                          <Edit className="h-4 w-4 mr-2" />
                           Edit
                         </Button>
                       ) : (
@@ -768,199 +642,17 @@ export function Settings() {
                       <div className="flex items-center justify-between">
                         <div>
                           <Label className="text-sm font-medium">Email Notifications</Label>
-                          <p className="text-xs text-muted-foreground">Receive important updates via email</p>
+                          <p className="text-xs text-muted-foreground">Receive email updates about important events</p>
                         </div>
                         <Switch
                           checked={notifications.email_notifications}
                           onCheckedChange={(checked) => setNotifications(prev => ({ ...prev, email_notifications: checked }))}
                         />
                       </div>
-
-                      <Separator />
-
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label className="text-sm font-medium">Weekly Reports</Label>
-                          <p className="text-xs text-muted-foreground">Weekly summary of referrals and performance</p>
-                        </div>
-                        <Switch
-                          checked={notifications.weekly_reports}
-                          onCheckedChange={(checked) => setNotifications(prev => ({ ...prev, weekly_reports: checked }))}
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label className="text-sm font-medium">Monthly Reports</Label>
-                          <p className="text-xs text-muted-foreground">Monthly analytics and insights</p>
-                        </div>
-                        <Switch
-                          checked={notifications.monthly_reports}
-                          onCheckedChange={(checked) => setNotifications(prev => ({ ...prev, monthly_reports: checked }))}
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label className="text-sm font-medium">New Referral Alerts</Label>
-                          <p className="text-xs text-muted-foreground">Get notified when referrals are added</p>
-                        </div>
-                        <Switch
-                          checked={notifications.referral_alerts}
-                          onCheckedChange={(checked) => setNotifications(prev => ({ ...prev, referral_alerts: checked }))}
-                        />
-                      </div>
                       
                       <Button onClick={saveNotificationSettings} className="w-full">
                         Save Notification Settings
                       </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* Team Management */}
-              <TabsContent value="team" className="mt-0">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Users className="h-5 w-5" />
-                      Team Management
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="grid md:grid-cols-2 gap-6">
-                      <div className="space-y-4">
-                        <Label className="text-sm font-medium">Invite Team Member</Label>
-                        <div className="space-y-3">
-                          <Input
-                            placeholder="Email address"
-                            value={newMemberEmail}
-                            onChange={(e) => setNewMemberEmail(e.target.value)}
-                          />
-                          <Select value={newMemberRole} onValueChange={(value) => setNewMemberRole(value as UserRole)}>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Front Desk">Front Desk</SelectItem>
-                              <SelectItem value="Marketing Rep">Marketing Rep</SelectItem>
-                              <SelectItem value="Manager">Manager</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Button onClick={inviteTeamMember} className="w-full gap-2">
-                            <UserPlus className="h-4 w-4" />
-                            Send Invitation
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <Label className="text-sm font-medium">Team Members</Label>
-                        <div className="space-y-2 max-h-64 overflow-auto">
-                          {teamMembers.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">No team members yet</p>
-                          ) : (
-                            teamMembers.map((member) => (
-                              <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg">
-                                <div>
-                                  <p className="text-sm font-medium">{member.email}</p>
-                                  <div className="flex items-center gap-2">
-                                    <Badge variant="secondary">{member.role}</Badge>
-                                    <Badge variant={member.status === 'accepted' ? 'default' : 'outline'}>
-                                      {member.status}
-                                    </Badge>
-                                  </div>
-                                </div>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* Data Management */}
-              <TabsContent value="data" className="mt-0">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Database className="h-5 w-5" />
-                      Data Management
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="grid md:grid-cols-2 gap-6">
-                      <Card className="p-4">
-                        <div className="space-y-3">
-                          <h4 className="font-medium flex items-center gap-2">
-                            <Download className="h-4 w-4" />
-                            Export Data
-                          </h4>
-                          <p className="text-sm text-muted-foreground">
-                            Download all your referral data in JSON format
-                          </p>
-                          <Button onClick={exportData} variant="outline" className="w-full">
-                            Export All Data
-                          </Button>
-                        </div>
-                      </Card>
-
-                      <Card className="p-4">
-                        <div className="space-y-3">
-                          <h4 className="font-medium flex items-center gap-2">
-                            <Upload className="h-4 w-4" />
-                            Import Data
-                          </h4>
-                          <p className="text-sm text-muted-foreground">
-                            Import referral data from CSV or other systems
-                          </p>
-                          <Button variant="outline" className="w-full" disabled>
-                            Coming Soon
-                          </Button>
-                        </div>
-                      </Card>
-                    </div>
-
-                    <Separator />
-
-                    <div className="space-y-4">
-                      <h4 className="font-medium text-destructive flex items-center gap-2">
-                        <AlertCircle className="h-4 w-4" />
-                        Danger Zone
-                      </h4>
-                      <div className="border border-destructive/20 rounded-lg p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">Delete All Data</p>
-                            <p className="text-sm text-muted-foreground">Permanently delete all referral data. This cannot be undone.</p>
-                          </div>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="destructive" size="sm">
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete Data
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This action cannot be undone. This will permanently delete all your referral data, sources, and analytics.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction className="bg-destructive text-destructive-foreground">
-                                  Delete Everything
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -978,7 +670,3 @@ export function Settings() {
     </div>
   );
 }
-
-}
-
-export default Settings;
