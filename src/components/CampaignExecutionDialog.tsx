@@ -119,6 +119,7 @@ export function CampaignExecutionDialog({
         description: "Failed to load campaign deliveries.",
         variant: "destructive",
       });
+      setDeliveries([]); // Ensure empty array on error
     } finally {
       setLoading(false);
     }
@@ -450,8 +451,29 @@ export function CampaignExecutionDialog({
         </Card>
 
         {/* Office Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {deliveries.map((delivery) => (
+        {deliveries.length === 0 ? (
+          <Card className="col-span-full">
+            <CardContent className="text-center py-8">
+              <div className="space-y-4">
+                <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto">
+                  <Gift className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">No Offices Selected</h3>
+                  <p className="text-muted-foreground mb-4">
+                    This campaign doesn't have any offices selected yet. 
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    For unified campaigns, offices should be selected during creation. 
+                    You may need to recreate this campaign with office selections.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {deliveries.map((delivery) => (
             <Card key={delivery.id} className="relative">
               <CardHeader>
                 <div className="flex items-start justify-between">
@@ -605,8 +627,9 @@ export function CampaignExecutionDialog({
                 )}
               </CardContent>
             </Card>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -346,6 +346,25 @@ export function CampaignDetailDialog({ campaign, open, onOpenChange, onCampaignU
                 <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
                 <p className="text-muted-foreground">Loading deliveries...</p>
               </div>
+            ) : deliveries.length === 0 ? (
+              <Card className="text-center py-12">
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto">
+                      <Truck className="w-8 h-8 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold mb-2">No Deliveries Found</h3>
+                      <p className="text-muted-foreground mb-4">
+                        This campaign doesn't have any deliveries created yet.
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Traditional campaigns need offices to be manually added to create deliveries.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             ) : (
               <div className="space-y-4">
                 {deliveries.map((delivery) => (
