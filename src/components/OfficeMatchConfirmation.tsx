@@ -45,6 +45,7 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
   const [searchingOfficeId, setSearchingOfficeId] = useState<string | null>(null);
   const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
   const [googleMapsError, setGoogleMapsError] = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false); // Prevent multiple searches
   // Session-level tracking to prevent duplicates within this import session
   const [sessionOffices, setSessionOffices] = useState<Map<string, string>>(new Map()); // normalizedName -> officeId
   // Track mapping from original CSV source names to database source IDs
@@ -405,7 +406,7 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
     }
   };
 
-  // Enhanced field comparison - only fill empty fields
+  // Enhanced field comparison - only fill empty fields, preserve CSV data
   const createSafeUpdateData = (existingOffice: any, googleMatch: GooglePlaceMatch) => {
     const safeUpdates: any = {};
     const fieldUpdates: any = {};
@@ -419,8 +420,11 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
              (typeof value === 'number' && isNaN(value));
     };
 
-    // Always preserve the name - NEVER change it
+    // CRITICAL: Always preserve the original imported name - NEVER change it
     safeUpdates.name = existingOffice.name;
+    console.log(`[DEBUG] Preserving original name: "${existingOffice.name}" (Google suggested: "${googleMatch.name}")`);
+
+    // CRITICAL: Preserve all existing data, only fill truly empty fields
 
     // Only fill empty fields, never overwrite existing data
     if (isEmpty(existingOffice.address) && googleMatch.formatted_address) {
@@ -521,12 +525,12 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
     setPlaceIdConflicts(conflicts);
   };
 
-  // Search for matches once Google Maps is loaded
+  // Search for matches once Google Maps is loaded (run only once)
   useEffect(() => {
-    if (googleMapsLoaded && importedOffices.length > 0) {
+    if (googleMapsLoaded && importedOffices.length > 0 && !hasSearched) {
       searchForMatches();
     }
-  }, [googleMapsLoaded, importedOffices]);
+  }, [googleMapsLoaded, importedOffices, hasSearched]);
 
   const searchForMatches = async () => {
     if (!window.google) {
@@ -538,16 +542,26 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
       return;
     }
 
+    if (hasSearched) {
+      console.log('[DEBUG] Search already completed, skipping...');
+      return;
+    }
+
+    console.log('[DEBUG] Starting Google Places search for', importedOffices.length, 'offices');
     setLoading(true);
+    setHasSearched(true); // Mark as searched to prevent re-runs
+    
     const service = new window.google.maps.places.PlacesService(document.createElement('div'));
     const newMatches = new Map<string, GooglePlaceMatch | null>();
 
     for (const office of importedOffices) {
       setSearchingOfficeId(office.id);
+      console.log(`[DEBUG] Searching for: "${office.name}"`);
       
       try {
         const match = await searchOffice(service, office.name);
         newMatches.set(office.id, match);
+        console.log(`[DEBUG] Search result for "${office.name}":`, match ? match.name : 'No match');
         await new Promise(resolve => setTimeout(resolve, 100)); // Rate limiting
       } catch (error) {
         console.error(`Error searching for ${office.name}:`, error);
@@ -558,6 +572,7 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
     setMatches(newMatches);
     setSearchingOfficeId(null);
     setLoading(false);
+    console.log('[DEBUG] Google Places search completed');
   };
 
   const searchOffice = (service: google.maps.places.PlacesService, officeName: string): Promise<GooglePlaceMatch | null> => {
@@ -733,9 +748,9 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
         console.log(`[DEBUG] Processed existing office: ${importedOffice.name} -> ${existingOffice.id}`);
         
       } else {
-        // Step 7: Create new office with imported data + Google Places data for empty fields
+        // Step 7: Create new office with PRESERVED CSV name + Google Places data for empty fields
         const newOfficeData = {
-          name: importedOffice.name, // Always use imported name
+          name: importedOffice.name, // CRITICAL: Always use imported CSV name, never Google name
           address: importedOffice.address || match.formatted_address,
           phone: importedOffice.phone || match.formatted_phone_number,
           website: importedOffice.website || match.website,
@@ -748,6 +763,8 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
           is_active: true,
           created_by: user.id,
         };
+
+        console.log(`[DEBUG] Creating new office with preserved CSV name: "${importedOffice.name}" (Google suggested: "${match.name}")`);
 
         const { data: newOffice, error } = await supabase
           .from('patient_sources')
@@ -768,12 +785,16 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
         }
         
         if (newOffice) {
-          // Log the creation
+          // Log the creation with preserved CSV name
           await logGooglePlacesAction(
             newOffice.id,
             match.place_id,
             'confirmed',
-            { created: true },
+            { 
+              created: true, 
+              preserved_csv_name: importedOffice.name,
+              google_suggested_name: match.name 
+            },
             {},
             newOfficeData
           );
@@ -803,7 +824,7 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
           
           toast({
             title: "Office Created",
-            description: `${importedOffice.name} has been added with Google Places data.`,
+            description: `"${importedOffice.name}" created with Google Places data (address, phone, rating filled).`,
           });
         }
       }
@@ -979,13 +1000,24 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
         </div>
       )}
 
-      {/* Search Progress */}
-      {googleMapsLoaded && loading && searchingOfficeId && (
+      {/* Search Progress - Show completion status */}
+      {googleMapsLoaded && (loading || hasSearched) && (
         <div className="flex items-center justify-center p-4 bg-muted/50 rounded-lg">
-          <Loader2 className="w-4 h-4 animate-spin mr-2" />
-          <span className="text-sm text-muted-foreground">
-            Searching for matches... ({importedOffices.findIndex(o => o.id === searchingOfficeId) + 1} of {importedOffices.length})
-          </span>
+          {loading && searchingOfficeId ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              <span className="text-sm text-muted-foreground">
+                Searching for matches... ({importedOffices.findIndex(o => o.id === searchingOfficeId) + 1} of {importedOffices.length})
+              </span>
+            </>
+          ) : hasSearched && !loading ? (
+            <>
+              <Check className="w-4 h-4 text-green-600 mr-2" />
+              <span className="text-sm text-muted-foreground">
+                Search completed - Review matches below ({confirmedOffices.size + skippedOffices.size} of {importedOffices.length} processed)
+              </span>
+            </>
+          ) : null}
         </div>
       )}
 
