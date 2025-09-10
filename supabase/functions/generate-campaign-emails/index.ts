@@ -58,10 +58,10 @@ serve(async (req) => {
 
     console.log('User authenticated:', user.id);
 
-      // Get user profile info for email generation
+    // Get user profile info for email generation
       const { data: userProfile, error: profileError } = await supabaseClient
         .from('user_profiles')
-        .select('first_name, last_name, phone, job_title, email')
+        .select('first_name, last_name, phone, job_title, email, degrees, clinic_id')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -81,15 +81,31 @@ serve(async (req) => {
       throw new Error('OpenAI API key not configured');
     }
 
+    // Get clinic information if available
+    let clinicInfo = null;
+    if (userProfile?.clinic_id) {
+      const { data: clinic } = await supabaseClient
+        .from('clinics')
+        .select('name')
+        .eq('id', userProfile.clinic_id)
+        .maybeSingle();
+      clinicInfo = clinic;
+    }
+
     // Enhanced sender information from user profile
     const fullName = userProfile?.first_name && userProfile?.last_name 
       ? `${userProfile.first_name} ${userProfile.last_name}`
       : user_name || 'the sender';
     
+    // Format name with degrees if available
+    const formattedName = userProfile?.degrees 
+      ? `Dr. ${fullName}, ${userProfile.degrees}`
+      : fullName;
+    
     const senderInfo = userProfile ? {
-      name: fullName,
+      name: formattedName,
       jobTitle: userProfile.job_title || 'Healthcare Professional',
-      clinic: clinic_name || 'our clinic',
+      clinic: clinicInfo?.name || clinic_name || 'our clinic',
       phone: userProfile.phone || '',
       email: userProfile.email || user.email
     } : {

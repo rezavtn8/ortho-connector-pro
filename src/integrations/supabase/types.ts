@@ -959,6 +959,7 @@ export type Database = {
         Row: {
           clinic_id: string | null
           created_at: string
+          degrees: string | null
           email: string
           first_name: string | null
           full_name: string | null
@@ -974,6 +975,7 @@ export type Database = {
         Insert: {
           clinic_id?: string | null
           created_at?: string
+          degrees?: string | null
           email: string
           first_name?: string | null
           full_name?: string | null
@@ -989,6 +991,7 @@ export type Database = {
         Update: {
           clinic_id?: string | null
           created_at?: string
+          degrees?: string | null
           email?: string
           first_name?: string | null
           full_name?: string | null

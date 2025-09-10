@@ -101,7 +101,7 @@ export function Settings() {
       // Load user profile data
       supabase
         .from('user_profiles')
-        .select('first_name, last_name, phone, job_title, email')
+        .select('first_name, last_name, phone, job_title, email, degrees')
         .eq('user_id', user.id)
         .maybeSingle()
         .then(({ data }) => {
@@ -184,6 +184,7 @@ export function Settings() {
           last_name: profile.last_name,
           phone: profile.phone,
           job_title: profile.job_title,
+          degrees: profile.degrees,
           updated_at: new Date().toISOString()
         })
         .eq('user_id', user.id);
@@ -211,7 +212,7 @@ export function Settings() {
     if (user?.id) {
       supabase
         .from('user_profiles')
-        .select('first_name, last_name, phone, job_title, email')
+        .select('first_name, last_name, phone, job_title, email, degrees')
         .eq('user_id', user.id)
         .maybeSingle()
         .then(({ data }) => {
@@ -440,6 +441,11 @@ export function Settings() {
                           </div>
 
                           <div className="space-y-1">
+                            <Label className="text-sm font-medium text-muted-foreground">Degrees</Label>
+                            <p className="text-base font-medium">{profile?.degrees || 'Not set'}</p>
+                          </div>
+
+                          <div className="space-y-1">
                             <Label className="text-sm font-medium text-muted-foreground">Email Address</Label>
                             <p className="text-base font-medium">{user?.email}</p>
                             <p className="text-xs text-muted-foreground">Email cannot be changed. Contact support if needed.</p>
@@ -489,6 +495,16 @@ export function Settings() {
                               value={profile?.job_title || ''}
                               onChange={(e) => setProfile(prev => ({ ...prev, job_title: e.target.value }))}
                               placeholder="e.g., Dentist, Office Manager, etc."
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="degrees">Degrees</Label>
+                            <Input
+                              id="degrees"
+                              value={profile?.degrees || ''}
+                              onChange={(e) => setProfile(prev => ({ ...prev, degrees: e.target.value }))}
+                              placeholder="e.g., DDS, MS, MDS"
                             />
                           </div>
 

@@ -39,6 +39,7 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
       lastName: '',
       phone: '',
       jobTitle: '',
+      degrees: '',
       email: '',
       password: '',
       confirmPassword: '',
@@ -67,7 +68,8 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
             (data as SignUpFormData).firstName, 
             (data as SignUpFormData).lastName,
             (data as SignUpFormData).phone,
-            (data as SignUpFormData).jobTitle
+            (data as SignUpFormData).jobTitle,
+            (data as SignUpFormData).degrees
           )
         : await signIn((data as SignInFormData).email, (data as SignInFormData).password);
 
@@ -204,6 +206,20 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
                   />
                   {signUpForm.formState.errors.jobTitle && (
                     <p className="text-sm text-red-600">{signUpForm.formState.errors.jobTitle.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="degrees" className="text-connection-text">Degrees (Optional)</Label>
+                  <Input
+                    id="degrees"
+                    type="text"
+                    placeholder="e.g., DDS, MS, MDS" 
+                    {...signUpForm.register('degrees')}
+                    className="border-connection-primary/20 focus:border-connection-primary bg-white/50"
+                  />
+                  {signUpForm.formState.errors.degrees && (
+                    <p className="text-sm text-red-600">{signUpForm.formState.errors.degrees.message}</p>
                   )}
                 </div>
 
@@ -404,6 +420,20 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
                   />
                   {signUpForm.formState.errors.jobTitle && (
                     <p className="text-sm text-red-600">{signUpForm.formState.errors.jobTitle.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="degrees" className="text-sm font-medium">Degrees (Optional)</Label>
+                  <Input
+                    id="degrees"
+                    type="text"
+                    placeholder="e.g., DDS, MS, MDS"
+                    {...signUpForm.register('degrees')}
+                    className="h-12 sm:h-10 text-base sm:text-sm"
+                  />
+                  {signUpForm.formState.errors.degrees && (
+                    <p className="text-sm text-red-600">{signUpForm.formState.errors.degrees.message}</p>
                   )}
                 </div>
 

@@ -51,6 +51,9 @@ export const signUpSchema = z.object({
   jobTitle: z.string()
     .min(1, 'Job title is required')
     .max(100, 'Job title must be less than 100 characters'),
+  degrees: z.string()
+    .max(100, 'Degrees must be less than 100 characters')
+    .optional(),
   email: emailSchema,
   password: passwordSchema,
   confirmPassword: z.string().min(1, 'Please confirm your password'),
