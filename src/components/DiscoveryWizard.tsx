@@ -10,6 +10,10 @@ interface DiscoveryParams {
   distance: number;
   zipCode?: string;
   officeType?: string;
+  minRating?: number;
+  searchStrategy?: string;
+  includeSpecialties?: boolean;
+  requireWebsite?: boolean;
 }
 
 interface DiscoveryWizardProps {
@@ -22,17 +26,37 @@ interface DiscoveryWizardProps {
 
 const DISTANCE_OPTIONS = [
   { value: 1, label: '1 mile', description: 'Walking Distance' },
+  { value: 3, label: '3 miles', description: 'Nearby Area' },
   { value: 5, label: '5 miles', description: 'Local Area' },
   { value: 10, label: '10 miles', description: 'Extended Area' },
   { value: 15, label: '15 miles', description: 'Wide Network' },
   { value: 25, label: '25 miles', description: 'Regional Network' },
+  { value: 50, label: '50 miles', description: 'Metropolitan Area' },
 ];
 
 const OFFICE_TYPES = [
   { value: 'all', label: 'All Types' },
   { value: 'General Dentist', label: 'General Dentist' },
-  { value: 'Pediatric', label: 'Pediatric' },
+  { value: 'Pediatric', label: 'Pediatric Dentistry' },
+  { value: 'Orthodontics', label: 'Orthodontics' },
+  { value: 'Oral Surgery', label: 'Oral Surgery' },
+  { value: 'Endodontics', label: 'Endodontics' },
+  { value: 'Periodontics', label: 'Periodontics' },
   { value: 'Multi-specialty', label: 'Multi-specialty' },
+];
+
+const SEARCH_STRATEGIES = [
+  { value: 'comprehensive', label: 'Comprehensive Search', description: 'Finds all dental practices using multiple search methods' },
+  { value: 'nearby', label: 'Nearby Search', description: 'Quick search for offices in immediate vicinity' },
+  { value: 'specialty', label: 'Specialty Focus', description: 'Targets specialized dental practices' },
+  { value: 'high_rated', label: 'High-Rated Only', description: 'Focuses on highly-rated practices' },
+];
+
+const RATING_OPTIONS = [
+  { value: 0, label: 'Any Rating' },
+  { value: 3.5, label: '3.5+ Stars' },
+  { value: 4.0, label: '4.0+ Stars' },
+  { value: 4.5, label: '4.5+ Stars' },
 ];
 
 export const DiscoveryWizard: React.FC<DiscoveryWizardProps> = ({
@@ -46,11 +70,15 @@ export const DiscoveryWizard: React.FC<DiscoveryWizardProps> = ({
   const [params, setParams] = useState<DiscoveryParams>({
     distance: 5,
     zipCode: '',
-    officeType: 'all'
+    officeType: 'all',
+    minRating: 0,
+    searchStrategy: 'comprehensive',
+    includeSpecialties: true,
+    requireWebsite: false
   });
 
   const handleNext = () => {
-    if (currentStep < 3) {
+    if (currentStep < 4) {
       setCurrentStep(currentStep + 1);
     }
   };
@@ -82,7 +110,7 @@ export const DiscoveryWizard: React.FC<DiscoveryWizardProps> = ({
             🔍 Discovery Assistant
           </CardTitle>
           <Badge variant="outline" className="text-sm">
-            Step {currentStep} of 3
+            Step {currentStep} of 4
           </Badge>
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -94,7 +122,7 @@ export const DiscoveryWizard: React.FC<DiscoveryWizardProps> = ({
       <CardContent className="space-y-6">
         {/* Progress Bar */}
         <div className="flex items-center gap-2">
-          {[1, 2, 3].map((step) => (
+          {[1, 2, 3, 4].map((step) => (
             <div key={step} className="flex items-center">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
                 step <= currentStep 
@@ -103,8 +131,8 @@ export const DiscoveryWizard: React.FC<DiscoveryWizardProps> = ({
               }`}>
                 {step}
               </div>
-              {step < 3 && (
-                <div className={`h-0.5 w-8 ${
+              {step < 4 && (
+                <div className={`h-0.5 w-6 ${
                   step < currentStep ? 'bg-primary' : 'bg-muted'
                 }`} />
               )}
@@ -184,8 +212,89 @@ export const DiscoveryWizard: React.FC<DiscoveryWizardProps> = ({
           </div>
         )}
 
-        {/* Step 3: Office Type Filter */}
+        {/* Step 3: Search Strategy */}
         {currentStep === 3 && (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                <Search className="w-5 h-5 text-primary" />
+                Search Strategy
+              </h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Choose how comprehensive you want the search to be
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {SEARCH_STRATEGIES.map((strategy) => (
+                <button
+                  key={strategy.value}
+                  onClick={() => setParams(prev => ({ ...prev, searchStrategy: strategy.value }))}
+                  className={`p-4 rounded-lg border-2 transition-all text-left hover:shadow-md ${
+                    params.searchStrategy === strategy.value
+                      ? 'border-primary bg-primary/5 shadow-md'
+                      : 'border-muted hover:border-primary/50'
+                  }`}
+                >
+                  <div className="font-medium">{strategy.label}</div>
+                  <div className="text-sm text-muted-foreground">{strategy.description}</div>
+                </button>
+              ))}
+            </div>
+
+            <div className="space-y-4 mt-6">
+              <div className="space-y-3">
+                <label className="text-sm font-medium">Minimum Rating</label>
+                <Select
+                  value={params.minRating?.toString()}
+                  onValueChange={(value) => setParams(prev => ({ ...prev, minRating: parseFloat(value) }))}
+                >
+                  <SelectTrigger className="w-full max-w-xs">
+                    <SelectValue placeholder="Select minimum rating..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border shadow-lg z-50">
+                    {RATING_OPTIONS.map((rating) => (
+                      <SelectItem key={rating.value} value={rating.value.toString()}>
+                        {rating.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="includeSpecialties"
+                    checked={params.includeSpecialties}
+                    onChange={(e) => setParams(prev => ({ ...prev, includeSpecialties: e.target.checked }))}
+                    className="rounded border-muted"
+                  />
+                  <label htmlFor="includeSpecialties" className="text-sm font-medium">
+                    Include specialty practices (orthodontics, oral surgery, etc.)
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="requireWebsite"
+                    checked={params.requireWebsite}
+                    onChange={(e) => setParams(prev => ({ ...prev, requireWebsite: e.target.checked }))}
+                    className="rounded border-muted"
+                  />
+                  <label htmlFor="requireWebsite" className="text-sm font-medium">
+                    Only practices with websites
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: Office Type Filter */}
+        {currentStep === 4 && (
           <div className="space-y-4">
             <div>
               <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
@@ -251,7 +360,7 @@ export const DiscoveryWizard: React.FC<DiscoveryWizardProps> = ({
             Back
           </Button>
 
-          {currentStep < 3 ? (
+          {currentStep < 4 ? (
             <Button
               onClick={handleNext}
               className="flex items-center gap-2 bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-600/90"

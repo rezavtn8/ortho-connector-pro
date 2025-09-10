@@ -45,6 +45,10 @@ interface DiscoveryParams {
   distance: number;
   zipCode?: string;
   officeType?: string;
+  minRating?: number;
+  searchStrategy?: string;
+  includeSpecialties?: boolean;
+  requireWebsite?: boolean;
 }
 
 interface UserProfile {
@@ -260,7 +264,11 @@ export const Discover = () => {
         search_lat: clinicLocation.lat,
         search_lng: clinicLocation.lng,
         office_type_filter: params.officeType === 'all' ? null : params.officeType,
-        zip_code_override: params.zipCode || null
+        zip_code_override: params.zipCode || null,
+        min_rating: params.minRating || 0,
+        search_strategy: params.searchStrategy || 'comprehensive',
+        include_specialties: params.includeSpecialties ?? true,
+        require_website: params.requireWebsite ?? false
       };
 
       console.log('📤 callGooglePlacesAPI: Sending request:', requestBody);

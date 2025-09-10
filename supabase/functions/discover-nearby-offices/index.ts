@@ -39,7 +39,11 @@ serve(async (req) => {
       search_lat, 
       search_lng, 
       office_type_filter = null,
-      zip_code_override = null 
+      zip_code_override = null,
+      min_rating = 0,
+      search_strategy = 'comprehensive',
+      include_specialties = true,
+      require_website = false
     } = await req.json();
     
     if (!clinic_id) {
@@ -122,14 +126,90 @@ serve(async (req) => {
     }
 
     const radiusMeters = distance * 1609.34; // Convert miles to meters
-    const type = 'dentist';
     
-    console.log(`Searching for dentists within ${distance} miles (${radiusMeters}m) of ${searchLatitude}, ${searchLongitude}`);
+    console.log(`Using ${search_strategy} search strategy within ${distance} miles (${radiusMeters}m) of ${searchLatitude}, ${searchLongitude}`);
     
-    const placesUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${searchLatitude},${searchLongitude}&radius=${radiusMeters}&type=${type}&key=${googleApiKey}`;
+    // Perform multiple searches based on strategy
+    let allResults = [];
     
-    const placesResponse = await fetch(placesUrl);
-    const placesData = await placesResponse.json();
+    // 1. Primary dentist search
+    const dentistUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${searchLatitude},${searchLongitude}&radius=${radiusMeters}&type=dentist&key=${googleApiKey}`;
+    console.log('Searching for dentists...');
+    const dentistResponse = await fetch(dentistUrl);
+    const dentistData = await dentistResponse.json();
+    
+    if (dentistData.status === 'OK' && dentistData.results) {
+      allResults.push(...dentistData.results);
+      console.log(`Found ${dentistData.results.length} dentists`);
+    }
+    
+    // 2. Text-based searches for comprehensive strategy
+    if (search_strategy === 'comprehensive' || search_strategy === 'specialty') {
+      const searchTerms = [
+        'dental office',
+        'dental clinic',
+        'family dentistry',
+        'cosmetic dentistry'
+      ];
+      
+      if (include_specialties || search_strategy === 'specialty') {
+        searchTerms.push(
+          'orthodontics',
+          'oral surgery',
+          'endodontics', 
+          'periodontics',
+          'pediatric dentistry',
+          'oral surgeon',
+          'orthodontist'
+        );
+      }
+      
+      for (const term of searchTerms) {
+        try {
+          const textSearchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(term + ' near me')}&location=${searchLatitude},${searchLongitude}&radius=${radiusMeters}&key=${googleApiKey}`;
+          console.log(`Searching for: ${term}`);
+          const textResponse = await fetch(textSearchUrl);
+          const textData = await textResponse.json();
+          
+          if (textData.status === 'OK' && textData.results) {
+            // Filter for dental-related results
+            const dentalResults = textData.results.filter(place => {
+              const name = place.name.toLowerCase();
+              const types = place.types || [];
+              return name.includes('dental') || name.includes('dentist') || 
+                     name.includes('orthodont') || name.includes('oral') ||
+                     types.includes('dentist') || types.includes('doctor');
+            });
+            allResults.push(...dentalResults);
+            console.log(`Found ${dentalResults.length} results for ${term}`);
+          }
+          
+          // Rate limiting - small delay between requests
+          await new Promise(resolve => setTimeout(resolve, 100));
+        } catch (error) {
+          console.error(`Error searching for ${term}:`, error);
+        }
+      }
+    }
+    
+    // Remove duplicates by place_id
+    const uniqueResults = [];
+    const seenPlaceIds = new Set();
+    
+    for (const place of allResults) {
+      if (place.place_id && !seenPlaceIds.has(place.place_id)) {
+        seenPlaceIds.add(place.place_id);
+        uniqueResults.push(place);
+      }
+    }
+    
+    console.log(`Total unique places found: ${uniqueResults.length}`);
+    
+    // Create a mock response object for compatibility
+    const placesData = {
+      status: uniqueResults.length > 0 ? 'OK' : 'ZERO_RESULTS',
+      results: uniqueResults
+    };
 
     if (placesData.status !== 'OK' && placesData.status !== 'ZERO_RESULTS') {
       console.error('Google Places API error:', placesData);
@@ -207,8 +287,25 @@ serve(async (req) => {
             }
           }
 
+          // Apply filters
+          if (min_rating > 0 && (!place.rating || place.rating < min_rating)) {
+            console.log(`Skipping ${place.name} - rating ${place.rating} below minimum ${min_rating}`);
+            continue;
+          }
+          
+          if (require_website && !website) {
+            console.log(`Skipping ${place.name} - no website found`);
+            continue;
+          }
+
           // Infer office type from name and Google categories
           const inferredType = inferOfficeType(place.name, place.types || []);
+          
+          // Apply specialty filter
+          if (!include_specialties && inferredType !== 'General Dentist' && inferredType !== 'Pediatric') {
+            console.log(`Skipping ${place.name} - specialty practice excluded`);
+            continue;
+          }
 
           const office = {
             place_id: place.place_id,
@@ -330,10 +427,31 @@ function inferOfficeType(name: string, types: string[]): string {
     return 'Pediatric';
   }
   
-  // Check for specialty indicators
-  if (nameUpper.includes('ENDODONTIC') || nameUpper.includes('ORAL SURGERY') || 
-      nameUpper.includes('ORTHODONTIC') || nameUpper.includes('PERIODONTIC') ||
-      nameUpper.includes('PROSTHODONTIC') || nameUpper.includes('MAXILLOFACIAL')) {
+  // Check for orthodontics
+  if (nameUpper.includes('ORTHODONT') || types.includes('orthodontist')) {
+    return 'Orthodontics';
+  }
+  
+  // Check for oral surgery
+  if (nameUpper.includes('ORAL SURGERY') || nameUpper.includes('ORAL SURGEON') || 
+      nameUpper.includes('MAXILLOFACIAL') || types.includes('oral_surgeon')) {
+    return 'Oral Surgery';
+  }
+  
+  // Check for endodontics
+  if (nameUpper.includes('ENDODONTIC') || nameUpper.includes('ROOT CANAL')) {
+    return 'Endodontics';
+  }
+  
+  // Check for periodontics
+  if (nameUpper.includes('PERIODONTIC') || nameUpper.includes('GUM') || 
+      types.includes('periodontist')) {
+    return 'Periodontics';
+  }
+  
+  // Check for other specialties
+  if (nameUpper.includes('PROSTHODONTIC') || nameUpper.includes('IMPLANT') ||
+      nameUpper.includes('COSMETIC')) {
     return 'Multi-specialty';
   }
   
