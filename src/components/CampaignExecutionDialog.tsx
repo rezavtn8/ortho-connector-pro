@@ -169,13 +169,16 @@ export function CampaignExecutionDialog({
 
       console.log('Generating emails for offices:', officesData);
 
-      // Call edge function to generate emails
-      const { data, error } = await supabase.functions.invoke('generate-campaign-emails', {
+      // Call unified AI service for comprehensive email generation
+      const { data, error } = await supabase.functions.invoke('unified-ai-service', {
         body: {
-          offices: officesData,
-          gift_bundle: campaign.selected_gift_bundle,
-          campaign_name: campaign.name,
-          user_name: profile ? `${profile.first_name} ${profile.last_name}` : undefined,
+          task: 'generate_emails',
+          data: {
+            offices: officesData,
+            gift_bundle: campaign.selected_gift_bundle,
+            campaign_name: campaign.name,
+            user_name: profile ? `${profile.first_name} ${profile.last_name}` : undefined
+          }
         }
       });
 
