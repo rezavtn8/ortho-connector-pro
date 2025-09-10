@@ -66,7 +66,7 @@ export function Logs() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Fetch logs with source names (using left join to preserve logs even if source is deleted)
+      // Fetch all logs with source names (keep forever - no limit)
       const { data: logsData, error } = await supabase
         .from('patient_changes_log')
         .select(`
@@ -74,8 +74,7 @@ export function Logs() {
           patient_sources(name)
         `)
         .eq('user_id', user.id)
-        .order('changed_at', { ascending: false })
-        .limit(500);
+        .order('changed_at', { ascending: false });
 
       if (error) throw error;
 
@@ -218,173 +217,125 @@ export function Logs() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
+    <div className="space-y-3 animate-fade-in">
+      {/* Compact Header with inline filters */}
+      <div className="flex items-center justify-between gap-4 bg-muted/30 p-3 rounded-lg">
         <div>
-          <h1 className="text-3xl font-bold">Activity Logs</h1>
-          <p className="text-muted-foreground">Track all patient count changes and system activities</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Clock className="w-5 h-5 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">
+          <h1 className="text-xl font-bold">Activity Logs</h1>
+          <span className="text-xs text-muted-foreground">
             {filteredLogs.length} of {logs.length} records
           </span>
         </div>
+        
+        {/* Inline Filters */}
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="w-3 h-3 absolute left-2 top-2.5 text-muted-foreground" />
+            <Input
+              placeholder="Search..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-7 h-8 w-40 text-xs"
+            />
+          </div>
+          
+          <Select value={changeTypeFilter} onValueChange={setChangeTypeFilter}>
+            <SelectTrigger className="h-8 w-32 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="increment">↑ Increase</SelectItem>
+              <SelectItem value="decrement">↓ Decrease</SelectItem>
+              <SelectItem value="manual_edit">✏️ Edit</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={dateFilter} onValueChange={setDateFilter}>
+            <SelectTrigger className="h-8 w-28 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Time</SelectItem>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="week">7 Days</SelectItem>
+              <SelectItem value="month">30 Days</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Button variant="outline" size="sm" onClick={clearFilters} className="h-8 px-2 text-xs">
+            Clear
+          </Button>
+        </div>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="w-5 h-5" />
-            Filters
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Search</label>
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
-                <Input
-                  placeholder="Source name, reason, month..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Change Type</label>
-              <Select value={changeTypeFilter} onValueChange={setChangeTypeFilter}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="increment">Increments</SelectItem>
-                  <SelectItem value="decrement">Decrements</SelectItem>
-                  <SelectItem value="manual_edit">Manual Edits</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Date Range</label>
-              <Select value={dateFilter} onValueChange={setDateFilter}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Time</SelectItem>
-                  <SelectItem value="today">Today</SelectItem>
-                  <SelectItem value="week">Last 7 Days</SelectItem>
-                  <SelectItem value="month">Last 30 Days</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Actions</label>
-              <Button variant="outline" onClick={clearFilters} className="w-full">
-                Clear Filters
-              </Button>
-            </div>
+      {/* Compact Excel-style Table */}
+      <div className="border rounded-lg bg-card overflow-hidden">
+        {filteredLogs.length === 0 ? (
+          <div className="text-center py-8">
+            <FileText className="w-8 h-8 mx-auto mb-2 text-muted-foreground opacity-50" />
+            <p className="text-sm text-muted-foreground">
+              {logs.length === 0 ? "No activity logs found" : "No logs match filters"}
+            </p>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Logs Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="w-5 h-5" />
-            Recent Activity
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {filteredLogs.length === 0 ? (
-            <div className="text-center py-8">
-              <FileText className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <p className="text-muted-foreground">
-                {logs.length === 0 
-                  ? "No activity logs found" 
-                  : "No logs match your current filters"
-                }
-              </p>
-              {logs.length > 0 && (
-                <Button variant="outline" onClick={clearFilters} className="mt-4">
-                  Clear Filters
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Time</TableHead>
-                    <TableHead>Source</TableHead>
-                    <TableHead>Change</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Month</TableHead>
-                    <TableHead>Reason</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredLogs.map((log) => (
-                    <TableRow key={log.id} className="animate-fade-in">
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="font-medium text-sm">
-                            {format(new Date(log.changed_at), 'MMM d, yyyy')}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {format(new Date(log.changed_at), 'h:mm a')}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {formatDistanceToNow(new Date(log.changed_at), { addSuffix: true })}
-                          </div>
-                        </div>
-                      </TableCell>
-                      
-                      <TableCell>
-                        <div className="font-medium">{log.source_name}</div>
-                      </TableCell>
-                      
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          {getChangeIcon(log.change_type, log.old_count, log.new_count)}
-                          {getChangeBadge(log.change_type, log.old_count, log.new_count)}
-                        </div>
-                      </TableCell>
-                      
-                      <TableCell>
-                        <div className="text-sm">
-                          {formatChangeDescription(log)}
-                        </div>
-                      </TableCell>
-                      
-                      <TableCell>
-                        <Badge variant="outline">
-                          {format(new Date(log.year_month + '-01'), 'MMM yyyy')}
-                        </Badge>
-                      </TableCell>
-                      
-                      <TableCell>
-                        <div className="text-sm text-muted-foreground">
-                          {log.reason || 'No reason provided'}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="px-2 py-1.5 text-left font-medium text-muted-foreground w-24">Date</th>
+                  <th className="px-2 py-1.5 text-left font-medium text-muted-foreground w-20">Time</th>
+                  <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">Source</th>
+                  <th className="px-2 py-1.5 text-center font-medium text-muted-foreground w-16">Change</th>
+                  <th className="px-2 py-1.5 text-center font-medium text-muted-foreground w-20">From</th>
+                  <th className="px-2 py-1.5 text-center font-medium text-muted-foreground w-20">To</th>
+                  <th className="px-2 py-1.5 text-center font-medium text-muted-foreground w-20">Month</th>
+                  <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">Reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredLogs.map((log, index) => (
+                  <tr 
+                    key={log.id} 
+                    className={`border-b hover:bg-muted/30 transition-colors ${
+                      index % 2 === 0 ? 'bg-background' : 'bg-muted/20'
+                    }`}
+                  >
+                    <td className="px-2 py-1.5 font-mono text-xs">
+                      {format(new Date(log.changed_at), 'MM/dd/yy')}
+                    </td>
+                    <td className="px-2 py-1.5 font-mono text-xs text-muted-foreground">
+                      {format(new Date(log.changed_at), 'HH:mm')}
+                    </td>
+                    <td className="px-2 py-1.5 font-medium truncate max-w-32" title={log.source_name}>
+                      {log.source_name}
+                    </td>
+                    <td className="px-2 py-1.5 text-center">
+                      <div className="flex items-center justify-center">
+                        {getChangeIcon(log.change_type, log.old_count, log.new_count)}
+                      </div>
+                    </td>
+                    <td className="px-2 py-1.5 text-center font-mono">
+                      {log.old_count}
+                    </td>
+                    <td className="px-2 py-1.5 text-center font-mono font-medium">
+                      {log.new_count}
+                    </td>
+                    <td className="px-2 py-1.5 text-center">
+                      <span className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono">
+                        {format(new Date(log.year_month + '-01'), 'MM/yy')}
+                      </span>
+                    </td>
+                    <td className="px-2 py-1.5 text-muted-foreground truncate max-w-40" title={log.reason || 'No reason provided'}>
+                      {log.reason || '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
