@@ -235,7 +235,7 @@ export function UnifiedCampaignDialog({ open, onOpenChange, onCampaignCreated }:
         .from('campaigns')
         .insert({
           name: sanitizedName,
-          campaign_type: 'Unified Outreach',
+          campaign_type: 'Monthly Promo Pack',
           campaign_mode: 'unified',
           delivery_method: 'Multiple',
           selected_gift_bundle: selectedGiftBundle ? {
