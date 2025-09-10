@@ -130,6 +130,27 @@ export function CampaignExecutionDialog({
     try {
       setGeneratingEmails(true);
 
+      // Validate we have deliveries with office data
+      if (!deliveries || deliveries.length === 0) {
+        toast({
+          title: "No Offices Selected",
+          description: "Please select at least one office for the campaign before generating emails.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Check that all deliveries have office data
+      const invalidDeliveries = deliveries.filter(d => !d.office || !d.office.name);
+      if (invalidDeliveries.length > 0) {
+        toast({
+          title: "Missing Office Data",
+          description: "Some selected offices are missing required information. Please refresh and try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       // Get user profile for personalization
       const { data: profile } = await supabase
         .from('user_profiles')
@@ -141,10 +162,12 @@ export function CampaignExecutionDialog({
       const officesData = deliveries.map(delivery => ({
         id: delivery.office_id,
         name: delivery.office.name,
-        address: delivery.office.address,
-        source_type: delivery.office.source_type,
-        referral_tier: delivery.referral_tier
+        address: delivery.office.address || '',
+        source_type: delivery.office.source_type || 'Office',
+        referral_tier: delivery.referral_tier || 'New Contact'
       }));
+
+      console.log('Generating emails for offices:', officesData);
 
       // Call edge function to generate emails
       const { data, error } = await supabase.functions.invoke('generate-campaign-emails', {
@@ -156,7 +179,10 @@ export function CampaignExecutionDialog({
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Edge function error:', error);
+        throw error;
+      }
 
       if (!data.success) {
         throw new Error(data.error || 'Failed to generate emails');
@@ -195,9 +221,23 @@ export function CampaignExecutionDialog({
 
     } catch (error) {
       console.error('Error generating emails:', error);
+      
+      let errorMessage = "Failed to generate emails";
+      
+      // Provide more specific error messages
+      if (error instanceof Error) {
+        if (error.message.includes("non-2xx status code")) {
+          errorMessage = "Email service is temporarily unavailable. Please try again in a moment.";
+        } else if (error.message.includes("At least one office is required")) {
+          errorMessage = "No offices selected for email generation. Please select offices first.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to generate emails",
+        title: "Email Generation Failed",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

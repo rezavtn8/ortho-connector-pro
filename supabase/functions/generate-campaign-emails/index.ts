@@ -73,8 +73,11 @@ serve(async (req) => {
     const { offices, gift_bundle, campaign_name, user_name, clinic_name } = requestData;
 
     if (!offices || offices.length === 0) {
+      console.error('No offices provided to generate-campaign-emails function');
       throw new Error("At least one office is required");
     }
+
+    console.log(`Generating emails for ${offices.length} offices:`, offices.map(o => o.name));
 
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAIApiKey) {
