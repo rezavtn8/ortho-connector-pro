@@ -1052,128 +1052,171 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
                           </Alert>
                         )}
 
-                        {/* Field-by-Field Comparison */}
-                        <div className="space-y-3">
+                        {/* Side-by-Side Comparison */}
+                        <div className="space-y-4">
                           <h4 className="font-semibold text-foreground mb-3 flex items-center gap-2">
                             <Info className="w-4 h-4 text-blue-500" />
-                            Field Comparison - What Will Happen:
+                            Compare Data Sources:
                           </h4>
                           
-                          <div className="grid gap-3 p-4 bg-muted/30 rounded-lg">
-                            {/* Name Field */}
-                            <div className="flex items-center justify-between p-2 bg-background rounded border">
-                              <div className="flex items-center gap-2">
-                                <Building2 className="w-4 h-4 text-muted-foreground" />
-                                <span className="font-medium">Name:</span>
+                          <div className="grid grid-cols-2 gap-4">
+                            {/* Your CSV Data */}
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-2 text-sm font-medium text-blue-600">
+                                <Shield className="w-4 h-4" />
+                                Your CSV Data (Will Be Preserved)
                               </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm">{office.name}</span>
-                                <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                                  <Shield className="w-3 h-3 mr-1" />
-                                  Preserved
-                                </Badge>
-                              </div>
-                            </div>
-
-                            {/* Address Field */}
-                            <div className="flex items-center justify-between p-2 bg-background rounded border">
-                              <div className="flex items-center gap-2">
-                                <MapPin className="w-4 h-4 text-muted-foreground" />
-                                <span className="font-medium">Address:</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {office.address ? (
-                                  <>
-                                    <span className="text-sm max-w-xs truncate">{office.address}</span>
-                                    <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                                      <Shield className="w-3 h-3 mr-1" />
-                                      Preserved
-                                    </Badge>
-                                  </>
-                                ) : match.formatted_address ? (
-                                  <>
-                                    <span className="text-sm max-w-xs truncate">{match.formatted_address}</span>
-                                    <Badge variant="outline" className="bg-green-50 text-green-700">
-                                      Will Fill Empty
-                                    </Badge>
-                                  </>
-                                ) : (
-                                  <span className="text-sm text-muted-foreground">No data available</span>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Phone Field */}
-                            <div className="flex items-center justify-between p-2 bg-background rounded border">
-                              <div className="flex items-center gap-2">
-                                <Phone className="w-4 h-4 text-muted-foreground" />
-                                <span className="font-medium">Phone:</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {office.phone ? (
-                                  <>
-                                    <span className="text-sm">{office.phone}</span>
-                                    <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                                      <Shield className="w-3 h-3 mr-1" />
-                                      Preserved
-                                    </Badge>
-                                  </>
-                                ) : match.formatted_phone_number ? (
-                                  <>
-                                    <span className="text-sm">{match.formatted_phone_number}</span>
-                                    <Badge variant="outline" className="bg-green-50 text-green-700">
-                                      Will Fill Empty
-                                    </Badge>
-                                  </>
-                                ) : (
-                                  <span className="text-sm text-muted-foreground">No data available</span>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Website Field */}
-                            <div className="flex items-center justify-between p-2 bg-background rounded border">
-                              <div className="flex items-center gap-2">
-                                <Globe className="w-4 h-4 text-muted-foreground" />
-                                <span className="font-medium">Website:</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {office.website ? (
-                                  <>
-                                    <span className="text-sm max-w-xs truncate">{office.website}</span>
-                                    <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                                      <Shield className="w-3 h-3 mr-1" />
-                                      Preserved
-                                    </Badge>
-                                  </>
-                                ) : match.website ? (
-                                  <>
-                                    <span className="text-sm max-w-xs truncate">{match.website}</span>
-                                    <Badge variant="outline" className="bg-green-50 text-green-700">
-                                      Will Fill Empty
-                                    </Badge>
-                                  </>
-                                ) : (
-                                  <span className="text-sm text-muted-foreground">No data available</span>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Google Rating */}
-                            {match.rating && (
-                              <div className="flex items-center justify-between p-2 bg-background rounded border">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-yellow-500">⭐</span>
-                                  <span className="font-medium">Rating:</span>
+                              
+                              <div className="p-4 bg-blue-50/50 border border-blue-200 rounded-lg space-y-3">
+                                <div>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                                    <Building2 className="w-3 h-3" />
+                                    Business Name
+                                  </div>
+                                  <div className="font-medium text-sm">{office.name}</div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm">{match.rating} ({match.user_ratings_total} reviews)</span>
-                                  <Badge variant="outline" className="bg-green-50 text-green-700">
-                                    Will Add
-                                  </Badge>
+
+                                <div>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                                    <MapPin className="w-3 h-3" />
+                                    Address
+                                  </div>
+                                  <div className="text-sm">
+                                    {office.address || <span className="text-muted-foreground italic">Not provided</span>}
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                                    <Phone className="w-3 h-3" />
+                                    Phone
+                                  </div>
+                                  <div className="text-sm">
+                                    {office.phone || <span className="text-muted-foreground italic">Not provided</span>}
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                                    <Globe className="w-3 h-3" />
+                                    Website
+                                  </div>
+                                  <div className="text-sm">
+                                    {office.website || <span className="text-muted-foreground italic">Not provided</span>}
+                                  </div>
                                 </div>
                               </div>
-                            )}
+                            </div>
+
+                            {/* Google Places Data */}
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-2 text-sm font-medium text-green-600">
+                                <span className="text-yellow-500">⭐</span>
+                                Google Places Data (To Fill Missing Fields)
+                              </div>
+                              
+                              <div className="p-4 bg-green-50/50 border border-green-200 rounded-lg space-y-3">
+                                <div>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                                    <Building2 className="w-3 h-3" />
+                                    Business Name
+                                  </div>
+                                  <div className="font-medium text-sm text-muted-foreground">
+                                    {match.name} 
+                                    <span className="text-xs ml-2 text-orange-600">(will not replace your name)</span>
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                                    <MapPin className="w-3 h-3" />
+                                    Address
+                                  </div>
+                                  <div className="text-sm">
+                                    {match.formatted_address ? (
+                                      <div>
+                                        {match.formatted_address}
+                                        {!office.address && (
+                                          <Badge variant="outline" className="ml-2 bg-green-100 text-green-700 text-xs">
+                                            Will fill empty
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <span className="text-muted-foreground italic">Not available</span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                                    <Phone className="w-3 h-3" />
+                                    Phone
+                                  </div>
+                                  <div className="text-sm">
+                                    {match.formatted_phone_number ? (
+                                      <div>
+                                        {match.formatted_phone_number}
+                                        {!office.phone && (
+                                          <Badge variant="outline" className="ml-2 bg-green-100 text-green-700 text-xs">
+                                            Will fill empty
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <span className="text-muted-foreground italic">Not available</span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                                    <Globe className="w-3 h-3" />
+                                    Website
+                                  </div>
+                                  <div className="text-sm">
+                                    {match.website ? (
+                                      <div>
+                                        <span className="truncate block max-w-full">{match.website}</span>
+                                        {!office.website && (
+                                          <Badge variant="outline" className="mt-1 bg-green-100 text-green-700 text-xs">
+                                            Will fill empty
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <span className="text-muted-foreground italic">Not available</span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {match.rating && (
+                                  <div>
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                                      <span className="text-yellow-500">⭐</span>
+                                      Google Rating
+                                    </div>
+                                    <div className="text-sm">
+                                      {match.rating} stars ({match.user_ratings_total} reviews)
+                                      <Badge variant="outline" className="ml-2 bg-green-100 text-green-700 text-xs">
+                                        Will add
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Summary of what will happen */}
+                          <div className="p-3 bg-muted/30 rounded-lg">
+                            <div className="text-sm font-medium mb-2">What happens when you confirm:</div>
+                            <ul className="text-xs text-muted-foreground space-y-1">
+                              <li>✓ Your CSV business name "{office.name}" will be preserved</li>
+                              <li>✓ Patient count data will be imported to this business</li>
+                              <li>✓ Empty fields (address, phone, website) will be filled from Google Places</li>
+                              <li>✓ Google rating and location will be added</li>
+                            </ul>
                           </div>
                         </div>
 
