@@ -103,6 +103,71 @@ serve(async (req) => {
 
     console.log(`Generating emails for ${offices.length} offices:`, offices.map(o => o.name));
 
+    // Fetch comprehensive relationship data for each office
+    const officesWithData = await Promise.all(offices.map(async (office) => {
+      console.log(`Fetching comprehensive data for office: ${office.name}`);
+      
+      // Get patient referral history from monthly_patients
+      const { data: referralHistory } = await supabaseClient
+        .from('monthly_patients')
+        .select('year_month, patient_count')
+        .eq('source_id', office.id)
+        .eq('user_id', user.id)
+        .order('year_month', { ascending: false });
+
+      // Get office details from patient_sources
+      const { data: officeDetails } = await supabaseClient
+        .from('patient_sources')
+        .select('*')
+        .eq('id', office.id)
+        .eq('created_by', user.id)
+        .maybeSingle();
+
+      // Get previous campaign history
+      const { data: campaignHistory } = await supabaseClient
+        .from('campaign_deliveries')
+        .select('delivered_at, delivery_status, campaign_id, campaigns(name)')
+        .eq('office_id', office.id)
+        .eq('created_by', user.id)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      // Calculate referral statistics
+      const totalReferrals = referralHistory?.reduce((sum, record) => sum + (record.patient_count || 0), 0) || 0;
+      const recentReferrals = referralHistory?.slice(0, 6).reduce((sum, record) => sum + (record.patient_count || 0), 0) || 0;
+      const lastReferralMonth = referralHistory?.find(r => r.patient_count > 0)?.year_month;
+      
+      // Determine relationship strength
+      let relationshipStrength = 'New';
+      if (totalReferrals > 20) relationshipStrength = 'Strong Partner';
+      else if (totalReferrals > 10) relationshipStrength = 'Active Partner';
+      else if (totalReferrals > 5) relationshipStrength = 'Growing Partner';
+      else if (totalReferrals > 0) relationshipStrength = 'Occasional Partner';
+
+      console.log(`Office ${office.name} stats:`, {
+        totalReferrals,
+        recentReferrals,
+        lastReferralMonth,
+        relationshipStrength,
+        campaignCount: campaignHistory?.length || 0
+      });
+
+      return {
+        ...office,
+        officeDetails,
+        referralHistory: referralHistory || [],
+        campaignHistory: campaignHistory || [],
+        stats: {
+          totalReferrals,
+          recentReferrals,
+          lastReferralMonth,
+          relationshipStrength,
+          monthsActive: referralHistory?.filter(r => r.patient_count > 0).length || 0,
+          averageMonthlyReferrals: referralHistory?.length > 0 ? Math.round(totalReferrals / referralHistory.length * 10) / 10 : 0
+        }
+      };
+    }));
+
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAIApiKey) {
       throw new Error('OpenAI API key not configured');
@@ -147,11 +212,12 @@ serve(async (req) => {
 
     const generatedEmails = [];
 
-    // Generate personalized email for each office
-    for (const office of offices) {
-      console.log(`Generating email for office: ${office.name} with sender info:`, senderInfo);
+    // Generate personalized email for each office with comprehensive data
+    for (const office of officesWithData) {
+      console.log(`Generating email for office: ${office.name} with complete relationship data`);
+      console.log(`Office stats:`, office.stats);
       
-      const systemPrompt = `You are an expert healthcare marketing professional writing personalized outreach emails. You must create professional, warm, and highly personalized emails that build genuine relationships.
+      const systemPrompt = `You are an expert healthcare marketing professional writing personalized outreach emails. You have access to comprehensive patient referral data and relationship history. You must create professional, warm, and highly personalized emails that demonstrate deep understanding of the business relationship.
 
 SENDER PROFILE:
 - Name: ${senderInfo.name}
@@ -159,38 +225,46 @@ SENDER PROFILE:
 - Practice: ${senderInfo.clinic}
 - Has Complete Profile: ${senderInfo.hasFullProfile}
 
-WRITING GUIDELINES:
-- Use a conversational, professional tone that feels authentic and personal
-- Reference specific details about the recipient office when possible
-- Make the email feel like it's from a real person who cares about building relationships
-- Keep emails concise (2-3 paragraphs max) but warm and engaging
-- Always include a complete professional signature
-- Focus on mutual benefit and collaboration, not sales
-- Use natural language that sounds human, not corporate
-- Be specific about next steps or follow-up
+CRITICAL WRITING GUIDELINES:
+- Use specific referral data and relationship history to demonstrate genuine knowledge of the partnership
+- Reference actual patient numbers, trends, and collaboration patterns when appropriate
+- Write with the tone of someone who actively manages and values this professional relationship
+- Be authentic about appreciation for past referrals and optimistic about future collaboration
+- Keep emails concise (2-3 paragraphs max) but data-informed and warm
+- Always include a complete professional signature with credentials
+- Focus on mutual success and patient care outcomes
+- Use natural, professional language that reflects expertise and genuine partnership
 
-PERSONALIZATION REQUIREMENTS:
-- Tailor content to the office's referral history/tier
-- Use the sender's first name in subject lines for familiarity
-- Reference the specific practice/clinic name naturally
-- Make each email feel individually crafted, not template-based
+RELATIONSHIP DATA USAGE:
+- Reference specific referral patterns when relevant (e.g., "the 15 patients you've referred over the past year")
+- Acknowledge relationship strength appropriately (new contact vs established partner)
+- Mention growth trends or partnership milestones when applicable
+- Show understanding of their contribution to patient care
 
 ${gift_bundle ? `GIFT CONTEXT:
-This outreach includes delivering a thoughtful gift package as a gesture of appreciation and relationship building. Mention this naturally within the email context.` : `RELATIONSHIP FOCUS:
-This is purely relationship-building outreach. Focus on partnership opportunities, collaboration, and building professional connections.`}
+This outreach includes delivering a thoughtful gift package as a gesture of appreciation for the ongoing professional partnership and patient referrals. Reference their specific contribution when appropriate.` : `RELATIONSHIP FOCUS:
+This is relationship-building outreach focused on strengthening professional partnerships and acknowledging mutual success in patient care.`}
 
 OUTPUT FORMAT:
 Return ONLY a valid JSON object with exactly these fields:
 {
-  "subject": "Personal, engaging subject line under 60 characters",
-  "body": "Complete email body with proper signature including full credentials"
+  "subject": "Personal, relationship-aware subject line under 60 characters",
+  "body": "Complete email body with data-informed content and proper signature"
 }`;
 
-      const recipientContext = `
+      const comprehensiveContext = `
 RECIPIENT OFFICE: ${office.name}
 ${office.address ? `Location: ${office.address}` : ''}
-Referral Relationship: ${office.referral_tier || 'New Contact'}
-${office.last_referral_date ? `Last Referral Date: ${office.last_referral_date}` : 'No previous referral history'}
+Office Type: ${office.officeDetails?.source_type || 'Healthcare Office'}
+
+REFERRAL RELATIONSHIP DATA:
+- Relationship Strength: ${office.stats.relationshipStrength}
+- Total Patients Referred: ${office.stats.totalReferrals}
+- Recent Referrals (6 months): ${office.stats.recentReferrals}
+- Months Active: ${office.stats.monthsActive}
+- Average Monthly Referrals: ${office.stats.averageMonthlyReferrals}
+- Last Referral Month: ${office.stats.lastReferralMonth || 'No previous referrals'}
+- Previous Campaign Interactions: ${office.campaignHistory.length}
 
 CAMPAIGN CONTEXT: ${campaign_name}
 
@@ -198,7 +272,7 @@ ${gift_bundle ? `GIFT BEING DELIVERED:
 - Package: ${gift_bundle.name}
 - Description: ${gift_bundle.description}
 - Contents: ${gift_bundle.items.join(', ')}
-- Purpose: Token of appreciation for partnership` : ''}
+- Purpose: Token of appreciation for partnership and referrals` : ''}
 
 REQUIRED SIGNATURE FORMAT:
 ${senderInfo.name}
@@ -206,19 +280,27 @@ ${senderInfo.jobTitle}
 ${senderInfo.clinic}
 ${senderInfo.phone ? senderInfo.phone + '\n' : ''}${senderInfo.email}`;
 
-      const emailPrompt = `Create a personalized email for this healthcare office outreach. 
+      const intelligentPrompt = `Create a highly personalized, data-informed email for this healthcare office. Use the comprehensive referral relationship data to write an authentic, professional message.
 
-${recipientContext}
+${comprehensiveContext}
 
 Write an email that:
-1. Has a warm, personal subject line that includes "${senderInfo.firstName}" 
-2. Opens with genuine connection and acknowledges any existing relationship
-3. ${gift_bundle ? 'Naturally mentions the gift delivery as a thoughtful gesture' : 'Focuses on building a strong professional partnership'}
-4. Suggests a specific next step (brief meeting, coffee, phone call)
-5. Includes the complete signature as specified above
-6. Feels authentic and personally written, not template-generated
+1. Has a warm, personal subject line including "${senderInfo.firstName}" that reflects the relationship level
+2. Opens with genuine acknowledgment of the specific professional relationship and referral history
+3. ${office.stats.totalReferrals > 0 ? `References their ${office.stats.totalReferrals} patient referrals and expresses genuine appreciation` : 'Introduces your practice and expresses interest in building a referral relationship'}
+4. ${gift_bundle ? `Mentions the gift delivery as appreciation for their ${office.stats.relationshipStrength.toLowerCase()} partnership` : `Focuses on strengthening the professional partnership and collaboration opportunities`}
+5. Suggests a specific, appropriate next step based on relationship level (${office.stats.relationshipStrength})
+6. Includes the complete signature as specified above
+7. Demonstrates understanding of their role in patient care and outcomes
 
-Make this email sound like it's from a real healthcare professional who genuinely wants to build a relationship with this office.`;
+RELATIONSHIP-SPECIFIC APPROACH:
+${office.stats.relationshipStrength === 'Strong Partner' ? '- Write as a valued, established partner expressing continued appreciation' :
+  office.stats.relationshipStrength === 'Active Partner' ? '- Write as an appreciative colleague acknowledging growing partnership' :
+  office.stats.relationshipStrength === 'Growing Partner' ? '- Write as someone who values the developing relationship' :
+  office.stats.relationshipStrength === 'Occasional Partner' ? '- Write to encourage more regular collaboration' :
+  '- Write as a professional introduction seeking to establish a referral relationship'}
+
+Make this email sound like it comes from someone who genuinely understands and values this specific professional relationship.`;
 
       console.log('Sending prompt to OpenAI for:', office.name);
 
@@ -229,13 +311,13 @@ Make this email sound like it's from a real healthcare professional who genuinel
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini', // Using more capable model for better personalization
+          model: 'gpt-4o-mini',
           messages: [
             { role: 'system', content: systemPrompt },
-            { role: 'user', content: emailPrompt }
+            { role: 'user', content: intelligentPrompt }
           ],
-          max_tokens: 800,
-          temperature: 0.8, // Higher creativity for more personalized content
+          max_tokens: 1000,
+          temperature: 0.7,
         }),
       });
 
