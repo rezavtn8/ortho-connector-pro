@@ -58,12 +58,12 @@ serve(async (req) => {
 
     console.log('User authenticated:', user.id);
 
-    // Get user profile information
-    const { data: userProfile, error: profileError } = await supabaseClient
-      .from('user_profiles')
-      .select('first_name, last_name, phone, job_title, company_name, email')
-      .eq('user_id', user.id)
-      .single();
+      // Get user profile info for email generation
+      const { data: userProfile, error: profileError } = await supabaseClient
+        .from('user_profiles')
+        .select('first_name, last_name, phone, job_title, email')
+        .eq('user_id', user.id)
+        .maybeSingle();
 
     if (profileError) {
       console.error('Error fetching user profile:', profileError);
@@ -89,7 +89,7 @@ serve(async (req) => {
     const senderInfo = userProfile ? {
       name: fullName,
       jobTitle: userProfile.job_title || 'Healthcare Professional',
-      clinic: userProfile.company_name || clinic_name || 'our clinic',
+      clinic: clinic_name || 'our clinic',
       phone: userProfile.phone || '',
       email: userProfile.email || user.email
     } : {

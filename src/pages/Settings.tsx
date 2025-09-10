@@ -94,6 +94,18 @@ export function Settings() {
   useEffect(() => {
     if (user?.id) {
       loadSettings();
+      
+      // Load user profile data
+      supabase
+        .from('user_profiles')
+        .select('first_name, last_name, phone, job_title, email')
+        .eq('user_id', user.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) {
+            setProfile(data);
+          }
+        });
     }
     
     // Load notification settings from localStorage
@@ -111,9 +123,9 @@ export function Settings() {
       // Load user profile and clinic info
       const { data: profile } = await supabase
         .from('user_profiles')
-        .select('clinic_id, clinic_name, clinic_address')
+        .select('clinic_id')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
       
       if (profile?.clinic_id) {
         // Load full clinic details
@@ -121,7 +133,7 @@ export function Settings() {
           .from('clinics')
           .select('*')
           .eq('id', profile.clinic_id)
-          .single();
+          .maybeSingle();
         
         if (clinic) {
           setClinicSettings({
@@ -134,17 +146,6 @@ export function Settings() {
             google_place_id: clinic.google_place_id || ''
           });
         }
-      } else if (profile) {
-        // Fallback to profile data
-        setClinicSettings({
-          clinic_name: profile.clinic_name || '',
-          clinic_phone: '',
-          clinic_address: profile.clinic_address || '',
-          clinic_city: '',
-          clinic_state: '',
-          clinic_zip: '',
-          google_place_id: ''
-        });
       }
 
       // Load team invitations (using existing user_invitations table)
@@ -180,7 +181,6 @@ export function Settings() {
           last_name: profile.last_name,
           phone: profile.phone,
           job_title: profile.job_title,
-          company_name: profile.company_name,
           updated_at: new Date().toISOString()
         })
         .eq('user_id', user.id);
@@ -266,8 +266,6 @@ export function Settings() {
         .from('user_profiles')
         .update({ 
           clinic_id: clinicId,
-          clinic_name: clinicSettings.clinic_name,
-          clinic_address: clinicSettings.clinic_address,
           updated_at: new Date().toISOString()
         })
         .eq('user_id', user.id);
@@ -541,16 +539,6 @@ export function Settings() {
                             value={profile?.job_title || ''}
                             onChange={(e) => setProfile(prev => ({ ...prev, job_title: e.target.value }))}
                             placeholder="e.g., Dentist, Office Manager, etc."
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="company_name">Company/Clinic Name</Label>
-                          <Input
-                            id="company_name"
-                            value={profile?.company_name || ''}
-                            onChange={(e) => setProfile(prev => ({ ...prev, company_name: e.target.value }))}
-                            placeholder="Enter your company or clinic name..."
                           />
                         </div>
 

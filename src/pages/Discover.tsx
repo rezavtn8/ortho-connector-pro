@@ -113,18 +113,24 @@ export const Discover = () => {
     try {
       const { data: profile, error } = await supabase
         .from('user_profiles')
-        .select('clinic_id, clinic_latitude, clinic_longitude')
+        .select('clinic_id')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (error || !profile?.clinic_id) {
         return;
       }
 
-      if (profile.clinic_latitude && profile.clinic_longitude) {
+      const { data: clinic } = await supabase
+        .from('clinics')
+        .select('latitude, longitude')
+        .eq('id', profile.clinic_id)
+        .maybeSingle();
+
+      if (clinic?.latitude && clinic?.longitude) {
         setClinicLocation({ 
-          lat: profile.clinic_latitude, 
-          lng: profile.clinic_longitude 
+          lat: clinic.latitude, 
+          lng: clinic.longitude 
         });
       }
     } catch (error) {

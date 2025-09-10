@@ -133,9 +133,9 @@ export function CampaignExecutionDialog({
       // Get user profile for personalization
       const { data: profile } = await supabase
         .from('user_profiles')
-        .select('first_name, last_name, clinic_name')
+        .select('first_name, last_name')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       // Prepare offices data for email generation
       const officesData = deliveries.map(delivery => ({
@@ -153,7 +153,6 @@ export function CampaignExecutionDialog({
           gift_bundle: campaign.selected_gift_bundle,
           campaign_name: campaign.name,
           user_name: profile ? `${profile.first_name} ${profile.last_name}` : undefined,
-          clinic_name: profile?.clinic_name
         }
       });
 

@@ -39,7 +39,6 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
       lastName: '',
       phone: '',
       jobTitle: '',
-      companyName: '',
       email: '',
       password: '',
       confirmPassword: '',
@@ -68,8 +67,7 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
             (data as SignUpFormData).firstName, 
             (data as SignUpFormData).lastName,
             (data as SignUpFormData).phone,
-            (data as SignUpFormData).jobTitle,
-            (data as SignUpFormData).companyName
+            (data as SignUpFormData).jobTitle
           )
         : await signIn((data as SignInFormData).email, (data as SignInFormData).password);
 
@@ -209,19 +207,6 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="companyName" className="text-connection-text">Clinic/Company Name</Label>
-                  <Input
-                    id="companyName"
-                    type="text"
-                    placeholder="Enter your clinic or company name"
-                    {...signUpForm.register('companyName')}
-                    className="border-connection-primary/20 focus:border-connection-primary bg-white/50"
-                  />
-                  {signUpForm.formState.errors.companyName && (
-                    <p className="text-sm text-red-600">{signUpForm.formState.errors.companyName.message}</p>
-                  )}
-                </div>
               </>
             )}
 
@@ -422,19 +407,6 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="companyName" className="text-sm font-medium">Clinic/Company Name</Label>
-                  <Input
-                    id="companyName"
-                    type="text"
-                    placeholder="Enter your clinic or company name"
-                    {...signUpForm.register('companyName')}
-                    className="h-12 sm:h-10 text-base sm:text-sm"
-                  />
-                  {signUpForm.formState.errors.companyName && (
-                    <p className="text-sm text-red-600">{signUpForm.formState.errors.companyName.message}</p>
-                  )}
-                </div>
               </>
             )}
 

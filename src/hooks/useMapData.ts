@@ -43,18 +43,26 @@ export function useMapData() {
       // Load clinic data
       const { data: profile } = await supabase
         .from('user_profiles')
-        .select('clinic_id, clinic_name, clinic_address, clinic_latitude, clinic_longitude')
+        .select('clinic_id')
         .eq('user_id', user.id)
         .maybeSingle();
 
-      if (profile?.clinic_latitude && profile?.clinic_longitude) {
-        setClinic({
-          id: profile.clinic_id || 'clinic',
-          name: profile.clinic_name || 'My Clinic',
-          address: profile.clinic_address || '',
-          latitude: profile.clinic_latitude,
-          longitude: profile.clinic_longitude
-        });
+      if (profile?.clinic_id) {
+        const { data: clinic } = await supabase
+          .from('clinics')
+          .select('id, name, address, latitude, longitude')
+          .eq('id', profile.clinic_id)
+          .maybeSingle();
+
+        if (clinic?.latitude && clinic?.longitude) {
+          setClinic({
+            id: clinic.id,
+            name: clinic.name || 'My Clinic',
+            address: clinic.address || '',
+            latitude: clinic.latitude,
+            longitude: clinic.longitude
+          });
+        }
       }
 
       // Load offices data
