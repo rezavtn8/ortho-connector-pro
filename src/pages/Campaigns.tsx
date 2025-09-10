@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Filter, Users, Calendar, Truck } from 'lucide-react';
 import { CreateCampaignDialog } from '@/components/CreateCampaignDialog';
 import { CampaignDetailDialog } from '@/components/CampaignDetailDialog';
+import { UnifiedCampaignDialog } from '@/components/UnifiedCampaignDialog';
+import { CampaignExecutionDialog } from '@/components/CampaignExecutionDialog';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { DateRange } from 'react-day-picker';
@@ -20,9 +22,12 @@ interface Campaign {
   id: string;
   name: string;
   campaign_type: string;
+  campaign_mode?: string;
   delivery_method: string;
   assigned_rep_id: string | null;
   materials_checklist: string[] | null;
+  selected_gift_bundle?: any;
+  email_settings?: any;
   planned_delivery_date: string | null;
   notes: string | null;
   status: 'Draft' | 'Scheduled' | 'In Progress' | 'Completed';
@@ -38,7 +43,8 @@ const campaignTypeColors: Record<string, string> = {
   'CE Invite Pack': 'bg-orange-100 text-orange-800',
   'Monthly Promo Pack': 'bg-indigo-100 text-indigo-800',
   'Holiday Card Drop': 'bg-red-100 text-red-800',
-  'Educational Material Drop': 'bg-teal-100 text-teal-800'
+  'Educational Material Drop': 'bg-teal-100 text-teal-800',
+  'Unified Outreach': 'bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800'
 };
 
 const statusColors: Record<string, string> = {
@@ -54,8 +60,10 @@ export function Campaigns() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [unifiedCampaignOpen, setUnifiedCampaignOpen] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [executionDialogOpen, setExecutionDialogOpen] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [activeTab, setActiveTab] = useState('grid');
   
@@ -130,7 +138,11 @@ export function Campaigns() {
 
   const handleCampaignClick = (campaign: Campaign) => {
     setSelectedCampaign(campaign);
-    setDetailDialogOpen(true);
+    if (campaign.campaign_mode === 'unified') {
+      setExecutionDialogOpen(true);
+    } else {
+      setDetailDialogOpen(true);
+    }
   };
 
   const handleCampaignCreated = useCallback(() => {
@@ -170,10 +182,16 @@ export function Campaigns() {
             Plan, execute, and track physical outreach campaigns to dental offices.
           </p>
         </div>
-        <Button onClick={() => setCreateDialogOpen(true)} className="gap-2 hover-scale transition-all duration-300">
-          <Plus className="w-4 h-4" />
-          Create Campaign
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => setUnifiedCampaignOpen(true)} className="gap-2 hover-scale transition-all duration-300">
+            <Plus className="w-4 h-4" />
+            Create Unified Campaign
+          </Button>
+          <Button variant="outline" onClick={() => setCreateDialogOpen(true)} className="gap-2 hover-scale transition-all duration-300">
+            <Plus className="w-4 h-4" />
+            Traditional Campaign
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -276,12 +294,19 @@ export function Campaigns() {
                     <div className="flex items-start justify-between">
                       <div className="space-y-2">
                         <h3 className="font-semibold text-lg leading-tight">{campaign.name}</h3>
-                        <Badge 
-                          variant="secondary" 
-                          className={campaignTypeColors[campaign.campaign_type] || 'bg-gray-100 text-gray-800'}
-                        >
-                          {campaign.campaign_type}
-                        </Badge>
+                        <div className="flex gap-2">
+                          <Badge 
+                            variant="secondary" 
+                            className={campaignTypeColors[campaign.campaign_type] || 'bg-gray-100 text-gray-800'}
+                          >
+                            {campaign.campaign_type}
+                          </Badge>
+                          {campaign.campaign_mode === 'unified' && (
+                            <Badge variant="secondary" className="bg-gradient-to-r from-blue-100 to-purple-100 text-blue-800">
+                              AI + Gifts
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                       <Badge 
                         variant="secondary"
@@ -346,7 +371,14 @@ export function Campaigns() {
         </TabsContent>
       </Tabs>
 
-      {/* Create Campaign Dialog */}
+      {/* Create Unified Campaign Dialog */}
+      <UnifiedCampaignDialog
+        open={unifiedCampaignOpen}
+        onOpenChange={setUnifiedCampaignOpen}
+        onCampaignCreated={handleCampaignCreated}
+      />
+
+      {/* Create Traditional Campaign Dialog */}
       <CreateCampaignDialog
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
@@ -359,6 +391,16 @@ export function Campaigns() {
           campaign={selectedCampaign}
           open={detailDialogOpen}
           onOpenChange={setDetailDialogOpen}
+          onCampaignUpdated={handleCampaignUpdated}
+        />
+      )}
+
+      {/* Campaign Execution Dialog */}
+      {selectedCampaign && (
+        <CampaignExecutionDialog
+          campaign={selectedCampaign}
+          open={executionDialogOpen}
+          onOpenChange={setExecutionDialogOpen}
           onCampaignUpdated={handleCampaignUpdated}
         />
       )}

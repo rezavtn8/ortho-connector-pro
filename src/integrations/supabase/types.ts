@@ -16,39 +16,63 @@ export type Database = {
     Tables: {
       campaign_deliveries: {
         Row: {
+          action_mode: string | null
           campaign_id: string
           created_at: string
           created_by: string
           delivered_at: string | null
           delivery_notes: string | null
           delivery_status: string
+          email_body: string | null
+          email_copied_at: string | null
+          email_sent_at: string | null
+          email_status: string | null
+          email_subject: string | null
+          gift_status: string | null
           id: string
           office_id: string
           photo_url: string | null
+          referral_tier: string | null
           updated_at: string
         }
         Insert: {
+          action_mode?: string | null
           campaign_id: string
           created_at?: string
           created_by: string
           delivered_at?: string | null
           delivery_notes?: string | null
           delivery_status?: string
+          email_body?: string | null
+          email_copied_at?: string | null
+          email_sent_at?: string | null
+          email_status?: string | null
+          email_subject?: string | null
+          gift_status?: string | null
           id?: string
           office_id: string
           photo_url?: string | null
+          referral_tier?: string | null
           updated_at?: string
         }
         Update: {
+          action_mode?: string | null
           campaign_id?: string
           created_at?: string
           created_by?: string
           delivered_at?: string | null
           delivery_notes?: string | null
           delivery_status?: string
+          email_body?: string | null
+          email_copied_at?: string | null
+          email_sent_at?: string | null
+          email_status?: string | null
+          email_subject?: string | null
+          gift_status?: string | null
           id?: string
           office_id?: string
           photo_url?: string | null
+          referral_tier?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -78,46 +102,55 @@ export type Database = {
       campaigns: {
         Row: {
           assigned_rep_id: string | null
+          campaign_mode: string | null
           campaign_type: string
           clinic_id: string | null
           created_at: string
           created_by: string
           delivery_method: string
+          email_settings: Json | null
           id: string
           materials_checklist: string[] | null
           name: string
           notes: string | null
           planned_delivery_date: string | null
+          selected_gift_bundle: Json | null
           status: string
           updated_at: string
         }
         Insert: {
           assigned_rep_id?: string | null
+          campaign_mode?: string | null
           campaign_type: string
           clinic_id?: string | null
           created_at?: string
           created_by: string
           delivery_method: string
+          email_settings?: Json | null
           id?: string
           materials_checklist?: string[] | null
           name: string
           notes?: string | null
           planned_delivery_date?: string | null
+          selected_gift_bundle?: Json | null
           status?: string
           updated_at?: string
         }
         Update: {
           assigned_rep_id?: string | null
+          campaign_mode?: string | null
           campaign_type?: string
           clinic_id?: string | null
           created_at?: string
           created_by?: string
           delivery_method?: string
+          email_settings?: Json | null
           id?: string
           materials_checklist?: string[] | null
           name?: string
           notes?: string | null
           planned_delivery_date?: string | null
+          selected_gift_bundle?: Json | null
           status?: string
           updated_at?: string
         }
