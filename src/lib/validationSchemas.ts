@@ -47,6 +47,13 @@ export const signUpSchema = z.object({
     .min(1, 'Last name is required')
     .max(50, 'Last name must be less than 50 characters')
     .regex(/^[a-zA-Z\s\-']+$/, 'Last name can only contain letters, spaces, hyphens, and apostrophes'),
+  phone: phoneSchema,
+  jobTitle: z.string()
+    .min(1, 'Job title is required')
+    .max(100, 'Job title must be less than 100 characters'),
+  companyName: z.string()
+    .min(1, 'Company/clinic name is required')
+    .max(100, 'Company name must be less than 100 characters'),
   email: emailSchema,
   password: passwordSchema,
   confirmPassword: z.string().min(1, 'Please confirm your password'),

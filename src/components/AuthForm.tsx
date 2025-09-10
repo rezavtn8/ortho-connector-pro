@@ -37,6 +37,9 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
     defaultValues: {
       firstName: '',
       lastName: '',
+      phone: '',
+      jobTitle: '',
+      companyName: '',
       email: '',
       password: '',
       confirmPassword: '',
@@ -63,7 +66,10 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
             (data as SignUpFormData).email, 
             (data as SignUpFormData).password, 
             (data as SignUpFormData).firstName, 
-            (data as SignUpFormData).lastName
+            (data as SignUpFormData).lastName,
+            (data as SignUpFormData).phone,
+            (data as SignUpFormData).jobTitle,
+            (data as SignUpFormData).companyName
           )
         : await signIn((data as SignInFormData).email, (data as SignInFormData).password);
 
@@ -143,37 +149,81 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
   if (embedded) {
     return (
       <form onSubmit={currentForm.handleSubmit(handleSubmit)} className="space-y-6">
-        {isSignUp && (
-          <>
-            <div className="space-y-2">
-              <Label htmlFor="firstName" className="text-connection-text">First Name</Label>
-              <Input
-                id="firstName"
-                type="text"
-                placeholder="Enter your first name"
-                {...signUpForm.register('firstName')}
-                className="border-connection-primary/20 focus:border-connection-primary bg-white/50"
-              />
-              {signUpForm.formState.errors.firstName && (
-                <p className="text-sm text-red-600">{signUpForm.formState.errors.firstName.message}</p>
-              )}
-            </div>
+            {isSignUp && (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName" className="text-connection-text">First Name</Label>
+                    <Input
+                      id="firstName"
+                      type="text"
+                      placeholder="Enter your first name"
+                      {...signUpForm.register('firstName')}
+                      className="border-connection-primary/20 focus:border-connection-primary bg-white/50"
+                    />
+                    {signUpForm.formState.errors.firstName && (
+                      <p className="text-sm text-red-600">{signUpForm.formState.errors.firstName.message}</p>
+                    )}
+                  </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="lastName" className="text-connection-text">Last Name</Label>
-              <Input
-                id="lastName"
-                type="text"
-                placeholder="Enter your last name"
-                {...signUpForm.register('lastName')}
-                className="border-connection-primary/20 focus:border-connection-primary bg-white/50"
-              />
-              {signUpForm.formState.errors.lastName && (
-                <p className="text-sm text-red-600">{signUpForm.formState.errors.lastName.message}</p>
-              )}
-            </div>
-          </>
-        )}
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName" className="text-connection-text">Last Name</Label>
+                    <Input
+                      id="lastName"
+                      type="text"
+                      placeholder="Enter your last name"
+                      {...signUpForm.register('lastName')}
+                      className="border-connection-primary/20 focus:border-connection-primary bg-white/50"
+                    />
+                    {signUpForm.formState.errors.lastName && (
+                      <p className="text-sm text-red-600">{signUpForm.formState.errors.lastName.message}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="phone" className="text-connection-text">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="Enter your phone number"
+                    {...signUpForm.register('phone')}
+                    className="border-connection-primary/20 focus:border-connection-primary bg-white/50"
+                  />
+                  {signUpForm.formState.errors.phone && (
+                    <p className="text-sm text-red-600">{signUpForm.formState.errors.phone.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="jobTitle" className="text-connection-text">Job Title</Label>
+                  <Input
+                    id="jobTitle"
+                    type="text"
+                    placeholder="e.g., Dentist, Office Manager, etc."
+                    {...signUpForm.register('jobTitle')}
+                    className="border-connection-primary/20 focus:border-connection-primary bg-white/50"
+                  />
+                  {signUpForm.formState.errors.jobTitle && (
+                    <p className="text-sm text-red-600">{signUpForm.formState.errors.jobTitle.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="companyName" className="text-connection-text">Clinic/Company Name</Label>
+                  <Input
+                    id="companyName"
+                    type="text"
+                    placeholder="Enter your clinic or company name"
+                    {...signUpForm.register('companyName')}
+                    className="border-connection-primary/20 focus:border-connection-primary bg-white/50"
+                  />
+                  {signUpForm.formState.errors.companyName && (
+                    <p className="text-sm text-red-600">{signUpForm.formState.errors.companyName.message}</p>
+                  )}
+                </div>
+              </>
+            )}
 
         <div className="space-y-2">
           <Label htmlFor="email" className="text-connection-text">Email</Label>
@@ -314,31 +364,75 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
           <form onSubmit={currentForm.handleSubmit(handleSubmit)} className="space-y-4 sm:space-y-6">
             {isSignUp && (
               <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName" className="text-sm font-medium">First Name</Label>
+                    <Input
+                      id="firstName"
+                      type="text"
+                      placeholder="Enter your first name"
+                      {...signUpForm.register('firstName')}
+                      className="h-12 sm:h-10 text-base sm:text-sm"
+                    />
+                    {signUpForm.formState.errors.firstName && (
+                      <p className="text-sm text-red-600">{signUpForm.formState.errors.firstName.message}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName" className="text-sm font-medium">Last Name</Label>
+                    <Input
+                      id="lastName"
+                      type="text"
+                      placeholder="Enter your last name"
+                      {...signUpForm.register('lastName')}
+                      className="h-12 sm:h-10 text-base sm:text-sm"
+                    />
+                    {signUpForm.formState.errors.lastName && (
+                      <p className="text-sm text-red-600">{signUpForm.formState.errors.lastName.message}</p>
+                    )}
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="firstName" className="text-sm font-medium">First Name</Label>
+                  <Label htmlFor="phone" className="text-sm font-medium">Phone Number</Label>
                   <Input
-                    id="firstName"
-                    type="text"
-                    placeholder="Enter your first name"
-                    {...signUpForm.register('firstName')}
+                    id="phone"
+                    type="tel"
+                    placeholder="Enter your phone number"
+                    {...signUpForm.register('phone')}
                     className="h-12 sm:h-10 text-base sm:text-sm"
                   />
-                  {signUpForm.formState.errors.firstName && (
-                    <p className="text-sm text-red-600">{signUpForm.formState.errors.firstName.message}</p>
+                  {signUpForm.formState.errors.phone && (
+                    <p className="text-sm text-red-600">{signUpForm.formState.errors.phone.message}</p>
                   )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="lastName" className="text-sm font-medium">Last Name</Label>
+                  <Label htmlFor="jobTitle" className="text-sm font-medium">Job Title</Label>
                   <Input
-                    id="lastName"
+                    id="jobTitle"
                     type="text"
-                    placeholder="Enter your last name"
-                    {...signUpForm.register('lastName')}
+                    placeholder="e.g., Dentist, Office Manager, etc."
+                    {...signUpForm.register('jobTitle')}
                     className="h-12 sm:h-10 text-base sm:text-sm"
                   />
-                  {signUpForm.formState.errors.lastName && (
-                    <p className="text-sm text-red-600">{signUpForm.formState.errors.lastName.message}</p>
+                  {signUpForm.formState.errors.jobTitle && (
+                    <p className="text-sm text-red-600">{signUpForm.formState.errors.jobTitle.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="companyName" className="text-sm font-medium">Clinic/Company Name</Label>
+                  <Input
+                    id="companyName"
+                    type="text"
+                    placeholder="Enter your clinic or company name"
+                    {...signUpForm.register('companyName')}
+                    className="h-12 sm:h-10 text-base sm:text-sm"
+                  />
+                  {signUpForm.formState.errors.companyName && (
+                    <p className="text-sm text-red-600">{signUpForm.formState.errors.companyName.message}</p>
                   )}
                 </div>
               </>
