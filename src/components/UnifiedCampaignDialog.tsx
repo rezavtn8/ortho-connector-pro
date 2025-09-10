@@ -237,7 +237,7 @@ export function UnifiedCampaignDialog({ open, onOpenChange, onCampaignCreated }:
           name: sanitizedName,
           campaign_type: 'Monthly Promo Pack',
           campaign_mode: 'unified',
-          delivery_method: 'Multiple',
+          delivery_method: 'USPS',
           selected_gift_bundle: selectedGiftBundle ? {
             id: selectedGiftBundle.id,
             name: selectedGiftBundle.name,
