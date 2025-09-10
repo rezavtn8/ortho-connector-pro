@@ -90,6 +90,8 @@ export function Settings() {
   const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [editingClinic, setEditingClinic] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -187,6 +189,7 @@ export function Settings() {
 
       if (error) throw error;
 
+      setEditingProfile(false);
       toast({
         title: 'Success',
         description: 'Profile settings saved successfully',
@@ -198,6 +201,23 @@ export function Settings() {
         description: 'Failed to save profile settings',
         variant: 'destructive',
       });
+    }
+  };
+
+  const cancelProfileEdit = () => {
+    setEditingProfile(false);
+    // Reload profile data to reset any changes
+    if (user?.id) {
+      supabase
+        .from('user_profiles')
+        .select('first_name, last_name, phone, job_title, email')
+        .eq('user_id', user.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) {
+            setProfile(data);
+          }
+        });
     }
   };
 
@@ -272,6 +292,7 @@ export function Settings() {
 
       if (profileError) throw profileError;
 
+      setEditingClinic(false);
       toast({
         title: 'Success',
         description: 'Clinic settings saved successfully',
@@ -286,6 +307,10 @@ export function Settings() {
     }
   };
 
+  const cancelClinicEdit = () => {
+    setEditingClinic(false);
+    // Reload clinic settings
+    loadSettings();
   const saveNotificationSettings = async () => {
     // Store notification settings in localStorage for now
     localStorage.setItem('notification_settings', JSON.stringify(notifications));
@@ -492,150 +517,239 @@ export function Settings() {
               <TabsContent value="profile" className="mt-0">
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <User className="h-5 w-5" />
-                      User Profile
+                    <CardTitle className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <User className="h-5 w-5" />
+                        User Profile
+                      </div>
+                      {!editingProfile ? (
+                        <Button variant="outline" size="sm" onClick={() => setEditingProfile(true)}>
+                          <Eye className="h-4 w-4 mr-2" />
+                          Edit
+                        </Button>
+                      ) : (
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" onClick={cancelProfileEdit}>
+                            Cancel
+                          </Button>
+                          <Button size="sm" onClick={saveProfileSettings}>
+                            Save
+                          </Button>
+                        </div>
+                      )}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    <div className="grid md:grid-cols-2 gap-6">
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="first_name">First Name *</Label>
-                          <Input
-                            id="first_name"
-                            value={profile?.first_name || ''}
-                            onChange={(e) => setProfile(prev => ({ ...prev, first_name: e.target.value }))}
-                            placeholder="Enter your first name..."
-                          />
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label htmlFor="last_name">Last Name *</Label>
-                          <Input
-                            id="last_name"
-                            value={profile?.last_name || ''}
-                            onChange={(e) => setProfile(prev => ({ ...prev, last_name: e.target.value }))}
-                            placeholder="Enter your last name..."
-                          />
+                    {!editingProfile ? (
+                      /* Display Mode */
+                      <div className="grid md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                          <div className="space-y-1">
+                            <Label className="text-sm font-medium text-muted-foreground">First Name</Label>
+                            <p className="text-base font-medium">{profile?.first_name || 'Not set'}</p>
+                          </div>
+                          
+                          <div className="space-y-1">
+                            <Label className="text-sm font-medium text-muted-foreground">Last Name</Label>
+                            <p className="text-base font-medium">{profile?.last_name || 'Not set'}</p>
+                          </div>
+
+                          <div className="space-y-1">
+                            <Label className="text-sm font-medium text-muted-foreground">Phone Number</Label>
+                            <p className="text-base font-medium">{profile?.phone || 'Not set'}</p>
+                          </div>
                         </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor="phone">Phone Number</Label>
-                          <Input
-                            id="phone"
-                            value={profile?.phone || ''}
-                            onChange={(e) => setProfile(prev => ({ ...prev, phone: e.target.value }))}
-                            placeholder="(555) 123-4567"
-                          />
+                        <div className="space-y-4">
+                          <div className="space-y-1">
+                            <Label className="text-sm font-medium text-muted-foreground">Job Title</Label>
+                            <p className="text-base font-medium">{profile?.job_title || 'Not set'}</p>
+                          </div>
+
+                          <div className="space-y-1">
+                            <Label className="text-sm font-medium text-muted-foreground">Email Address</Label>
+                            <p className="text-base font-medium">{user?.email}</p>
+                            <p className="text-xs text-muted-foreground">Email cannot be changed. Contact support if needed.</p>
+                          </div>
                         </div>
                       </div>
+                    ) : (
+                      /* Edit Mode */
+                      <div className="grid md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="first_name">First Name *</Label>
+                            <Input
+                              id="first_name"
+                              value={profile?.first_name || ''}
+                              onChange={(e) => setProfile(prev => ({ ...prev, first_name: e.target.value }))}
+                              placeholder="Enter your first name..."
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="last_name">Last Name *</Label>
+                            <Input
+                              id="last_name"
+                              value={profile?.last_name || ''}
+                              onChange={(e) => setProfile(prev => ({ ...prev, last_name: e.target.value }))}
+                              placeholder="Enter your last name..."
+                            />
+                          </div>
 
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="job_title">Job Title</Label>
-                          <Input
-                            id="job_title"
-                            value={profile?.job_title || ''}
-                            onChange={(e) => setProfile(prev => ({ ...prev, job_title: e.target.value }))}
-                            placeholder="e.g., Dentist, Office Manager, etc."
-                          />
+                          <div className="space-y-2">
+                            <Label htmlFor="phone">Phone Number</Label>
+                            <Input
+                              id="phone"
+                              value={profile?.phone || ''}
+                              onChange={(e) => setProfile(prev => ({ ...prev, phone: e.target.value }))}
+                              placeholder="(555) 123-4567"
+                            />
+                          </div>
                         </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor="email">Email Address</Label>
-                          <Input
-                            id="email"
-                            value={user?.email || ''}
-                            disabled
-                            className="bg-muted"
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Email address cannot be changed. Contact support if you need to update this.
-                          </p>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="job_title">Job Title</Label>
+                            <Input
+                              id="job_title"
+                              value={profile?.job_title || ''}
+                              onChange={(e) => setProfile(prev => ({ ...prev, job_title: e.target.value }))}
+                              placeholder="e.g., Dentist, Office Manager, etc."
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="email">Email Address</Label>
+                            <Input
+                              id="email"
+                              value={user?.email || ''}
+                              disabled
+                              className="bg-muted"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Email address cannot be changed. Contact support if you need to update this.
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-
-                    <div className="pt-4">
-                      <Button onClick={saveProfileSettings} className="w-full md:w-auto">
-                        Save Profile Settings
-                      </Button>
-                    </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
 
-              {/* Clinic Settings */}
               <TabsContent value="clinic" className="mt-0">
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <MapPin className="h-5 w-5" />
-                      Clinic Information
+                    <CardTitle className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-5 w-5" />
+                        Clinic Information
+                      </div>
+                      {!editingClinic ? (
+                        <Button variant="outline" size="sm" onClick={() => setEditingClinic(true)}>
+                          <Eye className="h-4 w-4 mr-2" />
+                          Edit
+                        </Button>
+                      ) : (
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" onClick={cancelClinicEdit}>
+                            Cancel
+                          </Button>
+                          <Button size="sm" onClick={saveClinicSettings}>
+                            Save
+                          </Button>
+                        </div>
+                      )}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    <div className="grid md:grid-cols-2 gap-6">
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="clinic_name">Clinic Name *</Label>
-                          <Input
-                            id="clinic_name"
-                            value={clinicSettings.clinic_name}
-                            onChange={(e) => setClinicSettings(prev => ({ ...prev, clinic_name: e.target.value }))}
-                            placeholder="Enter your clinic name..."
-                          />
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label htmlFor="clinic_phone">Phone Number</Label>
-                          <Input
-                            id="clinic_phone"
-                            value={clinicSettings.clinic_phone}
-                            onChange={(e) => setClinicSettings(prev => ({ ...prev, clinic_phone: e.target.value }))}
-                            placeholder="(555) 123-4567"
-                          />
-                        </div>
+                    {!editingClinic ? (
+                      /* Display Mode */
+                      <div className="grid md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                          <div className="space-y-1">
+                            <Label className="text-sm font-medium text-muted-foreground">Clinic Name</Label>
+                            <p className="text-base font-medium">{clinicSettings.clinic_name || 'Not set'}</p>
+                          </div>
+                          
+                          <div className="space-y-1">
+                            <Label className="text-sm font-medium text-muted-foreground">Phone Number</Label>
+                            <p className="text-base font-medium">{clinicSettings.clinic_phone || 'Not set'}</p>
+                          </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor="clinic_address">Address</Label>
-                          <ClinicAddressSearch
-                            value={clinicSettings.clinic_address}
-                            onSelect={(place) => {
-                              if (place) {
-                                setClinicSettings(prev => ({
-                                  ...prev,
-                                  clinic_address: place.address || '',
-                                  google_place_id: place.google_place_id || ''
-                                }));
-                              }
-                            }}
-                            placeholder="Search for your clinic address..."
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Search for your clinic to automatically get the Google Place ID for reviews
-                          </p>
+                          <div className="space-y-1">
+                            <Label className="text-sm font-medium text-muted-foreground">Address</Label>
+                            <p className="text-base font-medium">{clinicSettings.clinic_address || 'Not set'}</p>
+                          </div>
+                          
+                          <div className="space-y-1">
+                            <Label className="text-sm font-medium text-muted-foreground">Google Place ID</Label>
+                            <p className="text-base font-medium text-xs font-mono bg-muted px-2 py-1 rounded">
+                              {clinicSettings.google_place_id || 'Not set'}
+                            </p>
+                          </div>
                         </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="google_place_id">Google Place ID</Label>
-                          <Input
-                            id="google_place_id"
-                            value={clinicSettings.google_place_id}
-                            onChange={(e) => setClinicSettings(prev => ({ ...prev, google_place_id: e.target.value }))}
-                            placeholder="ChIJN1t_tDeuEmsRUsoyG83frY4"
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Automatically filled when using address search above, or enter manually
-                          </p>
-                        </div>
-
-                        <Button onClick={saveClinicSettings} className="w-full">
-                          Save Clinic Settings
-                        </Button>
                       </div>
-                    </div>
+                    ) : (
+                      /* Edit Mode */
+                      <div className="grid md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="clinic_name">Clinic Name *</Label>
+                            <Input
+                              id="clinic_name"
+                              value={clinicSettings.clinic_name}
+                              onChange={(e) => setClinicSettings(prev => ({ ...prev, clinic_name: e.target.value }))}
+                              placeholder="Enter your clinic name..."
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="clinic_phone">Phone Number</Label>
+                            <Input
+                              id="clinic_phone"
+                              value={clinicSettings.clinic_phone}
+                              onChange={(e) => setClinicSettings(prev => ({ ...prev, clinic_phone: e.target.value }))}
+                              placeholder="(555) 123-4567"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="clinic_address">Address</Label>
+                            <ClinicAddressSearch
+                              value={clinicSettings.clinic_address}
+                              onSelect={(place) => {
+                                if (place) {
+                                  setClinicSettings(prev => ({
+                                    ...prev,
+                                    clinic_address: place.address || '',
+                                    google_place_id: place.google_place_id || ''
+                                  }));
+                                }
+                              }}
+                              placeholder="Search for your clinic address..."
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Search for your clinic to automatically get the Google Place ID for reviews
+                            </p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="google_place_id">Google Place ID</Label>
+                            <Input
+                              id="google_place_id"
+                              value={clinicSettings.google_place_id}
+                              onChange={(e) => setClinicSettings(prev => ({ ...prev, google_place_id: e.target.value }))}
+                              placeholder="ChIJN1t_tDeuEmsRUsoyG83frY4"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Automatically filled when using address search above, or enter manually
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -864,3 +978,7 @@ export function Settings() {
     </div>
   );
 }
+
+}
+
+export default Settings;
