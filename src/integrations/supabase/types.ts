@@ -962,12 +962,15 @@ export type Database = {
           clinic_latitude: number | null
           clinic_longitude: number | null
           clinic_name: string | null
+          company_name: string | null
           created_at: string
           email: string
           first_name: string | null
           full_name: string | null
           id: string
+          job_title: string | null
           last_name: string | null
+          phone: string | null
           pin_code: string | null
           role: Database["public"]["Enums"]["user_role"]
           updated_at: string
@@ -979,12 +982,15 @@ export type Database = {
           clinic_latitude?: number | null
           clinic_longitude?: number | null
           clinic_name?: string | null
+          company_name?: string | null
           created_at?: string
           email: string
           first_name?: string | null
           full_name?: string | null
           id?: string
+          job_title?: string | null
           last_name?: string | null
+          phone?: string | null
           pin_code?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
@@ -996,12 +1002,15 @@ export type Database = {
           clinic_latitude?: number | null
           clinic_longitude?: number | null
           clinic_name?: string | null
+          company_name?: string | null
           created_at?: string
           email?: string
           first_name?: string | null
           full_name?: string | null
           id?: string
+          job_title?: string | null
           last_name?: string | null
+          phone?: string | null
           pin_code?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
