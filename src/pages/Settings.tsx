@@ -83,6 +83,7 @@ export function Settings() {
   const [activeTab, setActiveTab] = useState('profile');
   const [clinicSettings, setClinicSettings] = useState<ClinicSettings>(initialClinicSettings);
   const [notifications, setNotifications] = useState<NotificationSettings>(initialNotificationSettings);
+  const [profile, setProfile] = useState<any>(null);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [newMemberRole, setNewMemberRole] = useState<UserRole>('Front Desk');
@@ -165,6 +166,38 @@ export function Settings() {
       console.error('Error loading settings:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const saveProfileSettings = async () => {
+    if (!user?.id || !profile) return;
+
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          first_name: profile.first_name,
+          last_name: profile.last_name,
+          phone: profile.phone,
+          job_title: profile.job_title,
+          company_name: profile.company_name,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Profile settings saved successfully',
+      });
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save profile settings',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -467,19 +500,79 @@ export function Settings() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="email">Email Address</Label>
-                        <Input
-                          id="email"
-                          value={user?.email || ''}
-                          disabled
-                          className="bg-muted"
-                        />
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="first_name">First Name *</Label>
+                          <Input
+                            id="first_name"
+                            value={profile?.first_name || ''}
+                            onChange={(e) => setProfile(prev => ({ ...prev, first_name: e.target.value }))}
+                            placeholder="Enter your first name..."
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="last_name">Last Name *</Label>
+                          <Input
+                            id="last_name"
+                            value={profile?.last_name || ''}
+                            onChange={(e) => setProfile(prev => ({ ...prev, last_name: e.target.value }))}
+                            placeholder="Enter your last name..."
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="phone">Phone Number</Label>
+                          <Input
+                            id="phone"
+                            value={profile?.phone || ''}
+                            onChange={(e) => setProfile(prev => ({ ...prev, phone: e.target.value }))}
+                            placeholder="(555) 123-4567"
+                          />
+                        </div>
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        Email address cannot be changed. Contact support if you need to update this.
-                      </p>
+
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="job_title">Job Title</Label>
+                          <Input
+                            id="job_title"
+                            value={profile?.job_title || ''}
+                            onChange={(e) => setProfile(prev => ({ ...prev, job_title: e.target.value }))}
+                            placeholder="e.g., Dentist, Office Manager, etc."
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="company_name">Company/Clinic Name</Label>
+                          <Input
+                            id="company_name"
+                            value={profile?.company_name || ''}
+                            onChange={(e) => setProfile(prev => ({ ...prev, company_name: e.target.value }))}
+                            placeholder="Enter your company or clinic name..."
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="email">Email Address</Label>
+                          <Input
+                            id="email"
+                            value={user?.email || ''}
+                            disabled
+                            className="bg-muted"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Email address cannot be changed. Contact support if you need to update this.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-4">
+                      <Button onClick={saveProfileSettings} className="w-full md:w-auto">
+                        Save Profile Settings
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>

@@ -24,6 +24,14 @@ interface EmailRequest {
   campaign_name: string;
   user_name?: string;
   clinic_name?: string;
+  user_profile?: {
+    first_name?: string;
+    last_name?: string;
+    phone?: string;
+    job_title?: string;
+    company_name?: string;
+    email?: string;
+  };
 }
 
 serve(async (req) => {
@@ -50,6 +58,17 @@ serve(async (req) => {
 
     console.log('User authenticated:', user.id);
 
+    // Get user profile information
+    const { data: userProfile, error: profileError } = await supabaseClient
+      .from('user_profiles')
+      .select('first_name, last_name, phone, job_title, company_name, email')
+      .eq('user_id', user.id)
+      .single();
+
+    if (profileError) {
+      console.error('Error fetching user profile:', profileError);
+    }
+
     const requestData: EmailRequest = await req.json();
     const { offices, gift_bundle, campaign_name, user_name, clinic_name } = requestData;
 
@@ -62,17 +81,40 @@ serve(async (req) => {
       throw new Error('OpenAI API key not configured');
     }
 
+    // Enhanced sender information from user profile
+    const fullName = userProfile?.first_name && userProfile?.last_name 
+      ? `${userProfile.first_name} ${userProfile.last_name}`
+      : user_name || 'the sender';
+    
+    const senderInfo = userProfile ? {
+      name: fullName,
+      jobTitle: userProfile.job_title || 'Healthcare Professional',
+      clinic: userProfile.company_name || clinic_name || 'our clinic',
+      phone: userProfile.phone || '',
+      email: userProfile.email || user.email
+    } : {
+      name: user_name || 'the sender',
+      jobTitle: 'Healthcare Professional',
+      clinic: clinic_name || 'our clinic',
+      phone: '',
+      email: user.email
+    };
+
     const generatedEmails = [];
 
     // Generate personalized email for each office
     for (const office of offices) {
-      const systemPrompt = `You are a professional dental practice outreach specialist. Generate a personalized, respectful, and professional email for outreach to dental offices. The email should be:
-- Short and concise (2-3 paragraphs max)
-- Professional but warm in tone  
-- Focused on building relationships, not being salesy
-- Specific to the office and referral history
-- Include mention of gift if provided
-- Always end with a clear but soft call-to-action`;
+      const systemPrompt = `You are writing a professional, warm, and personalized email from ${senderInfo.name}${senderInfo.jobTitle ? `, ${senderInfo.jobTitle}` : ''} at ${senderInfo.clinic}.
+
+The email should be:
+- Professional yet warm in tone
+- Specifically tailored to each office
+- Concise but engaging (2-3 paragraphs max)
+- Include relevant contact information in the signature
+- Focus on building relationships, not being salesy
+${gift_bundle ? '- Mention the gift bundle naturally in the content' : ''}
+
+Always return ONLY a valid JSON object with "subject" and "body" fields.`;
 
       const userPrompt = `Generate a personalized email for:
 
@@ -82,13 +124,18 @@ Referral Tier: ${office.referral_tier || 'New Contact'}
 ${office.last_referral_date ? `Last Referral: ${office.last_referral_date}` : ''}
 
 Campaign: ${campaign_name}
-${user_name ? `From: ${user_name}` : ''}
-${clinic_name ? `Clinic: ${clinic_name}` : ''}
+
+Sender Information:
+- Name: ${senderInfo.name}
+- Title: ${senderInfo.jobTitle}
+- Clinic/Company: ${senderInfo.clinic}
+${senderInfo.phone ? `- Phone: ${senderInfo.phone}` : ''}
+- Email: ${senderInfo.email}
 
 ${gift_bundle ? `Gift Bundle: ${gift_bundle.name} - ${gift_bundle.description}
 Items included: ${gift_bundle.items.join(', ')}` : 'No physical gift included.'}
 
-Create a professional email that acknowledges their referral history (if any), mentions the gift (if included), and focuses on relationship building. Keep it under 150 words.`;
+Create a professional email that acknowledges their referral history (if any), mentions the gift (if included), and focuses on relationship building. Include a proper signature with the sender's contact information.`;
 
       console.log('Generating email for office:', office.name);
 
@@ -104,7 +151,7 @@ Create a professional email that acknowledges their referral history (if any), m
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }
           ],
-          max_tokens: 300,
+          max_tokens: 400,
           temperature: 0.7,
         }),
       });
@@ -116,43 +163,54 @@ Create a professional email that acknowledges their referral history (if any), m
       }
 
       const data = await response.json();
-      const generatedEmail = data.choices[0].message.content;
+      let emailContent = data.choices[0].message.content;
 
-      // Generate subject line
-      const subjectResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openAIApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            { 
-              role: 'system', 
-              content: 'Generate a professional, concise email subject line (under 60 characters) for a dental office outreach email. Focus on relationship building, not sales.' 
-            },
-            { 
-              role: 'user', 
-              content: `Office: ${office.name}, Campaign: ${campaign_name}, Has Gift: ${!!gift_bundle}` 
-            }
-          ],
-          max_tokens: 50,
-          temperature: 0.5,
-        }),
-      });
-
+      // Try to parse as JSON, if it fails, create a structured response
       let emailSubject = `Partnership Opportunity - ${campaign_name}`;
-      if (subjectResponse.ok) {
-        const subjectData = await subjectResponse.json();
-        emailSubject = subjectData.choices[0].message.content.replace(/"/g, '').trim();
+      let emailBody = emailContent;
+
+      try {
+        const parsedEmail = JSON.parse(emailContent);
+        if (parsedEmail.subject && parsedEmail.body) {
+          emailSubject = parsedEmail.subject;
+          emailBody = parsedEmail.body;
+        }
+      } catch (parseError) {
+        // If parsing fails, generate a subject line separately
+        const subjectResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openAIApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              { 
+                role: 'system', 
+                content: 'Generate a professional, concise email subject line (under 60 characters) for a dental office outreach email. Focus on relationship building, not sales.' 
+              },
+              { 
+                role: 'user', 
+                content: `Office: ${office.name}, Campaign: ${campaign_name}, Has Gift: ${!!gift_bundle}` 
+              }
+            ],
+            max_tokens: 50,
+            temperature: 0.5,
+          }),
+        });
+
+        if (subjectResponse.ok) {
+          const subjectData = await subjectResponse.json();
+          emailSubject = subjectData.choices[0].message.content.replace(/"/g, '').trim();
+        }
       }
 
       generatedEmails.push({
         office_id: office.id,
         office_name: office.name,
         subject: emailSubject,
-        body: generatedEmail,
+        body: emailBody,
         referral_tier: office.referral_tier || 'New Contact'
       });
     }
