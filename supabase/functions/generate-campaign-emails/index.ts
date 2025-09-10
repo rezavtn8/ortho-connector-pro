@@ -52,11 +52,16 @@ serve(async (req) => {
     const { data: rateLimitCheck, error: rateLimitError } = await supabaseClient
       .rpc('check_rate_limit', {
         p_endpoint: 'generate-campaign-emails',
-        p_max_requests: 50,
+        p_max_requests: 10,
         p_window_minutes: 60
       });
 
-    if (rateLimitError || !rateLimitCheck) {
+    if (rateLimitError) {
+      console.error('Rate limit check error:', rateLimitError);
+      throw new Error("Error checking rate limit");
+    }
+
+    if (rateLimitCheck === false) {
       throw new Error("Rate limit exceeded. Please try again later.");
     }
 
