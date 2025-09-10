@@ -82,10 +82,15 @@ export function CampaignExecutionDialog({
   }, [open, campaign]);
 
   const fetchDeliveries = async () => {
-    if (!campaign || !user) return;
+    if (!campaign || !user) {
+      console.log('Missing campaign or user:', { campaign: !!campaign, user: !!user });
+      setLoading(false);
+      return;
+    }
 
     try {
       setLoading(true);
+      console.log('Fetching deliveries for campaign:', campaign.id);
       const { data, error } = await supabase
         .from('campaign_deliveries')
         .select(`
@@ -100,7 +105,12 @@ export function CampaignExecutionDialog({
         .eq('created_by', user.id)
         .order('created_at');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+      
+      console.log('Deliveries fetched:', data?.length || 0);
       setDeliveries(data || []);
     } catch (error) {
       console.error('Error fetching deliveries:', error);
