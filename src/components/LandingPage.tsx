@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { AuthForm } from './AuthForm';
-import { Building2, BarChart3, Users, Search, ArrowRight, CheckCircle, Globe, MessageSquare, MapPin, Star, TrendingUp } from 'lucide-react';
+import { Building2, BarChart3, Users, Search, ArrowRight, CheckCircle, Globe, MessageSquare, MapPin, Star, TrendingUp, Brain, Bot } from 'lucide-react';
 import { NexoraLogo } from '@/components/NexoraLogo';
 import { AnimatedNexoraLogo } from '@/components/AnimatedNexoraLogo';
 
@@ -14,24 +14,24 @@ interface LandingPageProps {
 export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth = false }) => {
   const features = [
     {
-      icon: <Globe className="w-8 h-8" />,
-      title: "Patient Source Intelligence",
-      description: "Track Google, Yelp, referrals, and walk-ins. Organize sources into dental offices, online platforms, and other channels."
+      icon: <MapPin className="w-8 h-8" />,
+      title: "Smart Discovery & Reviews",
+      description: "Find 100+ offices within 50 miles, filter by ratings and specialties. Monitor all Google reviews in one place and track competitor performance."
     },
     {
-      icon: <Building2 className="w-8 h-8" />,
-      title: "Partner Office Network", 
-      description: "Manage relationships with referring practices, specialists, and other dental professionals in your network."
+      icon: <Bot className="w-8 h-8" />,
+      title: "AI-Powered Insights",
+      description: "AI analyzes relationship health, identifies outreach priorities, provides competitive intelligence, and generates actionable practice growth recommendations."
+    },
+    {
+      icon: <Globe className="w-8 h-8" />,
+      title: "Patient Source Intelligence",
+      description: "Track Google, Yelp, referrals, and walk-ins with multi-channel integration. Organize by dental offices, online platforms, and referral sources."
     },
     {
       icon: <BarChart3 className="w-8 h-8" />,
-      title: "Growth Analytics",
-      description: "Visual reports and trend analysis to understand which sources drive the most valuable patients to your practice."
-    },
-    {
-      icon: <MapPin className="w-8 h-8" />,
-      title: "Discovery & Outreach",
-      description: "Find nearby practices, plan outreach visits, run targeted campaigns, and monitor online reviews."
+      title: "Growth Analytics & Campaigns",
+      description: "Visual reports, trend analysis, and automated campaign management. Run targeted outreach and measure ROI from every patient source."
     }
   ];
 
@@ -78,7 +78,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
               </h1>
               
               <p className="text-lg md:text-xl text-connection-muted mb-12 max-w-3xl mx-auto leading-relaxed animate-fade-in" style={{ animationDelay: '1.1s', animationFillMode: 'both' }}>
-                Track referrals, measure patient sources, and grow your dental practice with intelligent network insights that drive organic growth.
+                AI-powered practice growth platform with Google Reviews management, office discovery, and intelligent insights that drive measurable results.
               </p>
               
               {!showAuth && (
@@ -148,22 +148,22 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                         <li className="flex items-start space-x-4">
                           <CheckCircle className="w-6 h-6 text-connection-primary flex-shrink-0 mt-1" />
                           <div>
-                            <h4 className="font-semibold text-connection-text mb-2">Multi-Channel Tracking</h4>
-                            <p className="text-connection-muted">Track patients from Google, Yelp, referrals, walk-ins, and more. Organize by dental offices, online sources, and other channels.</p>
+                            <h4 className="font-semibold text-connection-text mb-2">AI-Driven Practice Analysis</h4>
+                            <p className="text-connection-muted">AI Assistant analyzes relationship health, identifies growth opportunities, and provides automated insights for better decision making.</p>
                           </div>
                         </li>
                         <li className="flex items-start space-x-4">
                           <CheckCircle className="w-6 h-6 text-connection-primary flex-shrink-0 mt-1" />
                           <div>
-                            <h4 className="font-semibold text-connection-text mb-2">Partner Network Management</h4>
-                            <p className="text-connection-muted">Manage relationships with referring specialists, general dentists, and other practices in your professional network.</p>
+                            <h4 className="font-semibold text-connection-text mb-2">Google Reviews & Reputation</h4>
+                            <p className="text-connection-muted">Monitor all Google reviews across your network, track competitor ratings, and get alerts for new reviews requiring attention.</p>
                           </div>
                         </li>
                         <li className="flex items-start space-x-4">
                           <CheckCircle className="w-6 h-6 text-connection-primary flex-shrink-0 mt-1" />
                           <div>
-                            <h4 className="font-semibold text-connection-text mb-2">Outreach Campaigns</h4>
-                            <p className="text-connection-muted">Plan visits, run targeted campaigns, discover nearby practices, and monitor your online reputation—all in one platform.</p>
+                            <h4 className="font-semibold text-connection-text mb-2">Advanced Office Discovery</h4>
+                            <p className="text-connection-muted">Find offices within 50 miles, filter by specialties and ratings, import discovered data, and plan strategic outreach campaigns.</p>
                           </div>
                         </li>
                       </ul>
@@ -171,9 +171,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                     <div className="relative">
                       <div className="w-full h-64 bg-gradient-glow rounded-2xl flex items-center justify-center relative overflow-hidden border border-connection-primary/20">
                         <div className="flex items-center space-x-4">
-                          <Building2 className="w-12 h-12 text-connection-primary opacity-80" />
-                          <TrendingUp className="w-16 h-16 text-connection-primary" />
-                          <Star className="w-10 h-10 text-connection-primary opacity-60" />
+                          <Bot className="w-12 h-12 text-connection-primary opacity-80" />
+                          <Star className="w-16 h-16 text-connection-primary" />
+                          <Building2 className="w-10 h-10 text-connection-primary opacity-60" />
                         </div>
                       </div>
                     </div>
@@ -232,12 +232,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                     {/* Product */}
                     <div>
                       <h3 className="font-semibold text-lg mb-6">Product</h3>
-                      <ul className="space-y-4">
-                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Features</Button></li>
-                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Analytics</Button></li>
-                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Discovery</Button></li>
-                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Network Management</Button></li>
-                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Campaigns</Button></li>
+                       <ul className="space-y-4">
+                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">AI Assistant</Button></li>
+                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Google Reviews</Button></li>
+                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Office Discovery</Button></li>
+                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Competitive Intelligence</Button></li>
+                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Growth Analytics</Button></li>
                       </ul>
                     </div>
 
