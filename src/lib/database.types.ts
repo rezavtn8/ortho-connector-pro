@@ -140,13 +140,7 @@ export interface SourceWithStats extends PatientSource {
   monthlyData?: MonthlyPatients[];
 }
 
-// Utility function to get current year-month
-export function getCurrentYearMonth(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = (now.getMonth() + 1).toString().padStart(2, '0');
-  return `${year}-${month}`;
-}
+import { dateTime, getCurrentYearMonth } from '@/lib/dateSync';
 
 // Utility function to format year-month for display
 export function formatYearMonth(yearMonth: string): string {

@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { CalendarIcon, Clock } from 'lucide-react';
 import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { now, today } from '@/lib/dateSync';
 
 interface EnhancedDatePickerProps {
   value?: Date | null;
@@ -20,12 +21,12 @@ interface EnhancedDatePickerProps {
 }
 
 const DATE_PRESETS = [
-  { label: 'Today', value: () => new Date() },
-  { label: 'Tomorrow', value: () => addDays(new Date(), 1) },
-  { label: 'In 3 days', value: () => addDays(new Date(), 3) },
-  { label: 'Next week', value: () => addDays(new Date(), 7) },
-  { label: 'In 2 weeks', value: () => addDays(new Date(), 14) },
-  { label: 'End of month', value: () => endOfMonth(new Date()) },
+  { label: 'Today', value: () => today() },
+  { label: 'Tomorrow', value: () => addDays(today(), 1) },
+  { label: 'In 3 days', value: () => addDays(today(), 3) },
+  { label: 'Next week', value: () => addDays(today(), 7) },
+  { label: 'In 2 weeks', value: () => addDays(today(), 14) },
+  { label: 'End of month', value: () => endOfMonth(today()) },
 ];
 
 export function EnhancedDatePicker({

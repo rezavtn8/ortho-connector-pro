@@ -13,6 +13,7 @@ import {
   formatYearMonth
 } from '@/lib/database.types';
 import { supabase } from '@/integrations/supabase/client';
+import { nowPostgres } from '@/lib/dateSync';
 import {
   Activity,
   TrendingUp,
@@ -281,7 +282,7 @@ export function Analytics() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `analytics-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `analytics-${nowPostgres()}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
   };

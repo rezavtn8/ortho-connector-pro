@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { SourceType } from '@/lib/database.types';
 import { AddressSearch } from '@/components/AddressSearch';
 import { sanitizeText, sanitizeEmail, sanitizeURL, sanitizePhone } from '@/lib/sanitize';
+import { nowISO } from '@/lib/dateSync';
 
 interface SelectedOffice {
   id?: string;
@@ -209,7 +210,7 @@ export const AddOfficeDialog: React.FC<AddOfficeDialogProps> = ({ onOfficeAdded 
         }
         if (selectedOffice.google_place_id) {
           sourceData.google_place_id = selectedOffice.google_place_id;
-          sourceData.last_updated_from_google = new Date().toISOString();
+          sourceData.last_updated_from_google = nowISO();
         }
         if (selectedOffice.opening_hours) {
           sourceData.opening_hours = selectedOffice.opening_hours;

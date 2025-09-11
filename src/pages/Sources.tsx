@@ -15,7 +15,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Search, Edit, Eye, Building2, Globe, MessageSquare, Star, Trash2, Check, X, Power } from 'lucide-react';
 // Navigation is handled internally, no need for React Router
 import { ImportDataDialog } from '@/components/ImportDataDialog';
-import { PatientSource, MonthlyPatients, SOURCE_TYPE_CONFIG, getCurrentYearMonth, SourceType } from '@/lib/database.types';
+import { PatientSource, MonthlyPatients, SOURCE_TYPE_CONFIG, SourceType } from '@/lib/database.types';
+import { getCurrentYearMonth, nowISO } from '@/lib/dateSync';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';

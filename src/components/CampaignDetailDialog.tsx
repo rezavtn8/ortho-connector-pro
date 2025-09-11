@@ -29,6 +29,7 @@ import {
   X
 } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
+import { nowISO } from '@/lib/dateSync';
 import { useToast } from '@/hooks/use-toast';
 
 interface Campaign {

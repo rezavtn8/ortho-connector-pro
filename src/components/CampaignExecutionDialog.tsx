@@ -28,6 +28,7 @@ import {
   DollarSign
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { nowISO } from '@/lib/dateSync';
 
 interface Campaign {
   id: string;
@@ -255,7 +256,7 @@ export function CampaignExecutionDialog({
       // Update copied timestamp
       await supabase
         .from('campaign_deliveries')
-        .update({ email_copied_at: new Date().toISOString() })
+        .update({ email_copied_at: nowISO() })
         .eq('id', delivery.id);
 
       toast({
@@ -289,7 +290,7 @@ export function CampaignExecutionDialog({
       const updateData: any = { [field]: value };
       
       if (field === 'email_status' && value === 'sent') {
-        updateData.email_sent_at = new Date().toISOString();
+        updateData.email_sent_at = nowISO();
       }
 
       await supabase

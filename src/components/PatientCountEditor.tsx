@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Plus, Minus, Check, X, Edit3, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { getCurrentYearMonth } from '@/lib/database.types';
+import { getCurrentYearMonth } from '@/lib/dateSync';
 
 interface PatientCountEditorProps {
   sourceId: string;

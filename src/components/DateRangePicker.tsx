@@ -6,6 +6,7 @@ import { CalendarIcon } from 'lucide-react';
 import { format, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { cn } from '@/lib/utils';
+import { today } from '@/lib/dateSync';
 
 interface DateRangePickerProps {
   value?: DateRange;
@@ -20,57 +21,57 @@ const RANGE_PRESETS = [
   {
     label: 'Today',
     value: () => ({
-      from: new Date(),
-      to: new Date()
+      from: today(),
+      to: today()
     })
   },
   {
     label: 'Yesterday',
     value: () => ({
-      from: subDays(new Date(), 1),
-      to: subDays(new Date(), 1)
+      from: subDays(today(), 1),
+      to: subDays(today(), 1)
     })
   },
   {
     label: 'Last 7 days',
     value: () => ({
-      from: subDays(new Date(), 6),
-      to: new Date()
+      from: subDays(today(), 6),
+      to: today()
     })
   },
   {
     label: 'Last 30 days',
     value: () => ({
-      from: subDays(new Date(), 29),
-      to: new Date()
+      from: subDays(today(), 29),
+      to: today()
     })
   },
   {
     label: 'This week',
     value: () => ({
-      from: startOfWeek(new Date(), { weekStartsOn: 1 }),
-      to: endOfWeek(new Date(), { weekStartsOn: 1 })
+      from: startOfWeek(today(), { weekStartsOn: 1 }),
+      to: endOfWeek(today(), { weekStartsOn: 1 })
     })
   },
   {
     label: 'This month',
     value: () => ({
-      from: startOfMonth(new Date()),
-      to: endOfMonth(new Date())
+      from: startOfMonth(today()),
+      to: endOfMonth(today())
     })
   },
   {
     label: 'Next 7 days',
     value: () => ({
-      from: new Date(),
-      to: addDays(new Date(), 6)
+      from: today(),
+      to: addDays(today(), 6)
     })
   },
   {
     label: 'Next 30 days',
     value: () => ({
-      from: new Date(),
-      to: addDays(new Date(), 29)
+      from: today(),
+      to: addDays(today(), 29)
     })
   }
 ];

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { timestamp } from '@/lib/dateSync';
 import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 interface SubscriptionConfig {
@@ -44,7 +45,7 @@ export function useRealtimeSubscription({
     }
 
     // Create new channel
-    const channel = supabase.channel(`${channelName}-${Date.now()}`);
+    const channel = supabase.channel(`${channelName}-${timestamp()}`);
 
     // Add all subscriptions to the channel
     subscriptions.forEach(({ table, event = '*', schema = 'public', filter }) => {

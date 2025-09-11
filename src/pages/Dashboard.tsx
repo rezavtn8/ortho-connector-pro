@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PatientSource, MonthlyPatients, getCurrentYearMonth, formatYearMonth } from '@/lib/database.types';
+import { PatientSource, MonthlyPatients, formatYearMonth } from '@/lib/database.types';
+import { getCurrentYearMonth, now, nowISO } from '@/lib/dateSync';
 import { supabase } from '@/integrations/supabase/client';
 import { TrendingUp, Building2, Users, Globe, MessageSquare, BarChart3 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';

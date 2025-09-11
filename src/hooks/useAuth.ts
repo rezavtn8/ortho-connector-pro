@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { nowISO, timestamp } from '@/lib/dateSync';
 
 interface RateLimitData {
   attempts: number;
@@ -50,7 +51,7 @@ export function useAuth() {
 
   const checkLockoutStatus = () => {
     const data = getRateLimitData();
-    const now = Date.now();
+    const now = timestamp();
     
     if (data.lockoutUntil && now < data.lockoutUntil) {
       const remaining = Math.ceil((data.lockoutUntil - now) / 1000);
@@ -68,7 +69,7 @@ export function useAuth() {
 
   const recordFailedAttempt = () => {
     const data = getRateLimitData();
-    const now = Date.now();
+    const now = timestamp();
     const newAttempts = data.attempts + 1;
     
     if (newAttempts >= MAX_ATTEMPTS) {
@@ -99,7 +100,7 @@ export function useAuth() {
   const getSessionActivity = (): SessionTimeoutData => {
     const stored = localStorage.getItem(SESSION_ACTIVITY_KEY);
     if (!stored) {
-      return { lastActivity: Date.now(), warningShown: false };
+      return { lastActivity: timestamp(), warningShown: false };
     }
     return JSON.parse(stored);
   };
@@ -154,7 +155,7 @@ export function useAuth() {
   }, [handleSessionTimeout]);
 
   const refreshSession = useCallback(() => {
-    const now = Date.now();
+    const now = timestamp();
     setSessionActivity({ lastActivity: now, warningShown: false });
     clearSessionTimeouts();
     
@@ -189,7 +190,7 @@ export function useAuth() {
         if (session) {
           resetFailedAttempts();
           // Initialize session timeout on login
-          const now = Date.now();
+          const now = timestamp();
           setSessionActivity({ lastActivity: now, warningShown: false });
         } else {
           // Clear session timeout on logout
@@ -207,7 +208,7 @@ export function useAuth() {
       
       // Initialize session timeout for existing session
       if (session) {
-        const now = Date.now();
+        const now = timestamp();
         setSessionActivity({ lastActivity: now, warningShown: false });
       }
     });

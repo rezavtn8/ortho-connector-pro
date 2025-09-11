@@ -19,6 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Checkbox } from '@/components/ui/checkbox';
 import { CalendarIcon, X, Users } from 'lucide-react';
 import { format } from 'date-fns';
+import { today } from '@/lib/dateSync';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { sanitizeText } from '@/lib/sanitize';
@@ -282,11 +283,11 @@ export function CreateCampaignDialog({ open, onOpenChange, onCampaignCreated }: 
             {/* Planned Delivery Date */}
             <div className="space-y-2">
               <Label>Planned Delivery Date</Label>
-              <EnhancedDatePicker
-                value={formData.planned_delivery_date}
-                onChange={(date) => handleInputChange('planned_delivery_date', date)}
-                placeholder="Select delivery date"
-                minDate={new Date()}
+          <EnhancedDatePicker
+            value={formData.planned_delivery_date}
+            onChange={(date) => handleInputChange('planned_delivery_date', date)}
+            placeholder="Select delivery date"
+            minDate={today()}
                 withTime={false}
                 presets={true}
               />

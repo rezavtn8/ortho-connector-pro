@@ -23,8 +23,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
+import { timestamp } from '@/lib/dateSync';
 import { useToast } from '@/hooks/use-toast';
 import DOMPurify from 'dompurify';
+import { timestamp } from '@/lib/dateSync';
 
 interface InsightCard {
   title: string;
@@ -156,7 +158,7 @@ export function AIAssistant() {
     if (!question.trim() || isLoading) return;
 
     const userMessage: ChatMessage = {
-      id: Date.now().toString() + '-question',
+      id: getTimestamp().toString() + '-question',
       type: 'question',
       content: question,
       timestamp: new Date()
@@ -174,7 +176,7 @@ export function AIAssistant() {
       if (error) throw error;
 
       const aiMessage: ChatMessage = {
-        id: Date.now().toString() + '-answer',
+        id: getTimestamp().toString() + '-answer',
         type: 'answer',
         content: data.response,
         timestamp: new Date()

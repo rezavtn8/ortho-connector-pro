@@ -20,9 +20,9 @@ import {
   MonthlyPatients,
   PatientChangeLog,
   SOURCE_TYPE_CONFIG,
-  getCurrentYearMonth,
   formatYearMonth
 } from '@/lib/database.types';
+import { getCurrentYearMonth, nowISO } from '@/lib/dateSync';
 import { supabase } from '@/integrations/supabase/client';
 import {
   ArrowLeft,

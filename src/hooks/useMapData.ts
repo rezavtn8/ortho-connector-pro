@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from "@/integrations/supabase/client";
+import { getCurrentYearMonth } from '@/lib/dateSync';
 
 export interface Office {
   id: string;
@@ -75,7 +76,7 @@ export function useMapData() {
         .not('longitude', 'is', null);
 
       if (sources?.length) {
-        const currentMonth = new Date().toISOString().slice(0, 7);
+        const currentMonth = getCurrentYearMonth();
         const sourceIds = sources.map(s => s.id);
         
         // Load monthly data
