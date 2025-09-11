@@ -209,27 +209,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                 </div>
               </section>
 
-              {/* CTA Section */}
-              <section className="px-6 py-24 bg-connection-bg/30">
-                <div className="max-w-4xl mx-auto text-center">
-                  <h2 className="text-4xl md:text-5xl font-bold text-connection-text mb-6">
-                    Ready to Grow Your Practice?
-                  </h2>
-                  <p className="text-lg text-connection-muted mb-12 max-w-2xl mx-auto">
-                    Join dental practices that are already tracking their patient sources, nurturing professional relationships, 
-                    and growing through intelligent network insights.
-                  </p>
-                  
-                  <Button 
-                    size="lg"
-                    onClick={onGetStarted}
-                    className="bg-connection-primary hover:bg-connection-primary/90 text-white px-12 py-6 text-xl shadow-elegant hover:shadow-glow transition-all group rounded-xl"
-                  >
-                    Start Your Growth Journey
-                    <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-1 transition-transform" />
-                  </Button>
-                </div>
-              </section>
 
               {/* Pricing Section */}
               <section id="pricing-section" className="px-6 py-24 bg-white/60 backdrop-blur-sm">
