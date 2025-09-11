@@ -6,14 +6,6 @@ import { Building2, BarChart3, Users, Search, ArrowRight, CheckCircle, Globe, Me
 import { NexoraLogo } from '@/components/NexoraLogo';
 import { AnimatedNexoraLogo } from '@/components/AnimatedNexoraLogo';
 
-// Feature images
-import featureDiscovery from '@/assets/feature-discovery.jpg';
-import featureReviews from '@/assets/feature-reviews.jpg';
-import featureAiInsights from '@/assets/feature-ai-insights.jpg';
-import featurePatientSources from '@/assets/feature-patient-sources.jpg';
-import featureAnalytics from '@/assets/feature-analytics.jpg';
-import featureCampaigns from '@/assets/feature-campaigns.jpg';
-
 interface LandingPageProps {
   onGetStarted: () => void;
   showAuth?: boolean;
@@ -191,116 +183,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                           <Building2 className="w-10 h-10 text-connection-primary opacity-60" />
                         </div>
                       </div>
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-              {/* Minimal Feature Explainer */}
-              <section className="py-16 px-6">
-                <div className="max-w-4xl mx-auto">
-                  {/* Feature 1 - Discovery */}
-                  <div className="flex flex-col lg:flex-row items-center gap-8 mb-12">
-                    <div className="lg:w-1/2">
-                      <img 
-                        src={featureDiscovery} 
-                        alt="Office Discovery Dashboard" 
-                        className="w-full h-64 object-cover rounded-lg"
-                      />
-                    </div>
-                    <div className="lg:w-1/2">
-                      <h3 className="text-2xl font-medium text-connection-primary mb-4">Smart Office Discovery</h3>
-                      <p className="text-connection-muted text-lg leading-relaxed">Find 100+ dental offices within 50 miles using advanced search filters and intelligent matching.</p>
-                    </div>
-                  </div>
-
-                  {/* Connecting Line */}
-                  <div className="w-px h-8 bg-connection-primary/20 mx-auto mb-12"></div>
-
-                  {/* Feature 2 - Reviews (Right aligned) */}
-                  <div className="flex flex-col lg:flex-row-reverse items-center gap-8 mb-12">
-                    <div className="lg:w-1/2">
-                      <img 
-                        src={featureReviews} 
-                        alt="Google Reviews Dashboard" 
-                        className="w-full h-64 object-cover rounded-lg"
-                      />
-                    </div>
-                    <div className="lg:w-1/2">
-                      <h3 className="text-2xl font-medium text-connection-primary mb-4">Google Reviews Management</h3>
-                      <p className="text-connection-muted text-lg leading-relaxed">Monitor reviews across your network with automated alerts and sentiment analysis tracking.</p>
-                    </div>
-                  </div>
-
-                  {/* Connecting Line */}
-                  <div className="w-px h-8 bg-connection-primary/20 mx-auto mb-12"></div>
-
-                  {/* Feature 3 - AI Insights */}
-                  <div className="flex flex-col lg:flex-row items-center gap-8 mb-12">
-                    <div className="lg:w-1/2">
-                      <img 
-                        src={featureAiInsights} 
-                        alt="AI Insights Dashboard" 
-                        className="w-full h-64 object-cover rounded-lg"
-                      />
-                    </div>
-                    <div className="lg:w-1/2">
-                      <h3 className="text-2xl font-medium text-connection-primary mb-4">AI-Powered Intelligence</h3>
-                      <p className="text-connection-muted text-lg leading-relaxed">Get actionable insights and growth recommendations powered by advanced AI analysis.</p>
-                    </div>
-                  </div>
-
-                  {/* Connecting Line */}
-                  <div className="w-px h-8 bg-connection-primary/20 mx-auto mb-12"></div>
-
-                  {/* Feature 4 - Patient Sources (Right aligned) */}
-                  <div className="flex flex-col lg:flex-row-reverse items-center gap-8 mb-12">
-                    <div className="lg:w-1/2">
-                      <img 
-                        src={featurePatientSources} 
-                        alt="Patient Sources Tracking" 
-                        className="w-full h-64 object-cover rounded-lg"
-                      />
-                    </div>
-                    <div className="lg:w-1/2">
-                      <h3 className="text-2xl font-medium text-connection-primary mb-4">Patient Source Intelligence</h3>
-                      <p className="text-connection-muted text-lg leading-relaxed">Track and analyze patient acquisition from Google, Yelp, referrals, and walk-ins in one place.</p>
-                    </div>
-                  </div>
-
-                  {/* Connecting Line */}
-                  <div className="w-px h-8 bg-connection-primary/20 mx-auto mb-12"></div>
-
-                  {/* Feature 5 - Analytics */}
-                  <div className="flex flex-col lg:flex-row items-center gap-8 mb-12">
-                    <div className="lg:w-1/2">
-                      <img 
-                        src={featureAnalytics} 
-                        alt="Growth Analytics Dashboard" 
-                        className="w-full h-64 object-cover rounded-lg"
-                      />
-                    </div>
-                    <div className="lg:w-1/2">
-                      <h3 className="text-2xl font-medium text-connection-primary mb-4">Growth Analytics</h3>
-                      <p className="text-connection-muted text-lg leading-relaxed">Visualize performance trends and track ROI with comprehensive analytics dashboards.</p>
-                    </div>
-                  </div>
-
-                  {/* Connecting Line */}
-                  <div className="w-px h-8 bg-connection-primary/20 mx-auto mb-12"></div>
-
-                  {/* Feature 6 - Campaigns (Right aligned) */}
-                  <div className="flex flex-col lg:flex-row-reverse items-center gap-8">
-                    <div className="lg:w-1/2">
-                      <img 
-                        src={featureCampaigns} 
-                        alt="Campaign Management Interface" 
-                        className="w-full h-64 object-cover rounded-lg"
-                      />
-                    </div>
-                    <div className="lg:w-1/2">
-                      <h3 className="text-2xl font-medium text-connection-primary mb-4">Campaign Management</h3>
-                      <p className="text-connection-muted text-lg leading-relaxed">Run targeted outreach campaigns with automated follow-ups and engagement tracking.</p>
                     </div>
                   </div>
                 </div>
