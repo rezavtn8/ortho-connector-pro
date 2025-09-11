@@ -14,9 +14,14 @@ interface LandingPageProps {
 export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth = false }) => {
   const features = [
     {
-      icon: <MapPin className="w-8 h-8" />,
-      title: "Smart Discovery & Reviews",
-      description: "Find 100+ offices within 50 miles, filter by ratings and specialties. Monitor all Google reviews in one place and track competitor performance."
+      icon: <Search className="w-8 h-8" />,
+      title: "Smart Office Discovery",
+      description: "Find 100+ dental offices within 50 miles using advanced filters. Search by specialties, ratings, patient volume, and practice types with our discovery wizard."
+    },
+    {
+      icon: <Star className="w-8 h-8" />,
+      title: "Google Reviews Management",
+      description: "Monitor all Google reviews across your network in one dashboard. Track competitor ratings, get new review alerts, and analyze review sentiment trends."
     },
     {
       icon: <Bot className="w-8 h-8" />,
@@ -30,8 +35,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
     },
     {
       icon: <BarChart3 className="w-8 h-8" />,
-      title: "Growth Analytics & Campaigns",
-      description: "Visual reports, trend analysis, and automated campaign management. Run targeted outreach and measure ROI from every patient source."
+      title: "Growth Analytics",
+      description: "Visual reports, trend analysis, and performance dashboards. Track patient acquisition metrics, source effectiveness, and relationship ROI."
+    },
+    {
+      icon: <MessageSquare className="w-8 h-8" />,
+      title: "Campaign Management",
+      description: "Run targeted outreach campaigns with automated follow-ups. Track engagement rates, measure campaign ROI, and optimize your marketing efforts."
     }
   ];
 
@@ -110,7 +120,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                     </p>
                   </div>
 
-                  <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                     {features.map((feature, index) => (
                       <Card key={index} className="group hover:shadow-elegant transition-all duration-300 border-connection-primary/20 hover:border-connection-primary/40 bg-gradient-card">
                         <CardContent className="p-8 text-center">
