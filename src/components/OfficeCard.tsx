@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MapPin, Phone, Mail, Globe, Star, TrendingUp, TrendingDown, Users, ExternalLink, Edit2, Clock, Building2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+// Navigation is handled internally, no need for React Router
 import { PatientSource, SourceTag } from '@/lib/database.types';
 import { SafeText } from '@/components/SafeText';
 
@@ -17,6 +17,7 @@ interface OfficeCardProps {
   recentReferrals?: number;
   onViewDetails?: () => void;
   onEdit?: () => void;
+  onNavigateToSource?: (sourceId: string) => void;
 }
 
 export const OfficeCard: React.FC<OfficeCardProps> = ({
@@ -26,9 +27,12 @@ export const OfficeCard: React.FC<OfficeCardProps> = ({
   totalReferrals = 0,
   recentReferrals = 0,
   onViewDetails,
-  onEdit
+  onEdit,
+  onNavigateToSource
 }) => {
-  const navigate = useNavigate();
+  const handleCardClick = () => {
+    onNavigateToSource?.(office.id);
+  };
 
   const scoreColors = {
     'Strong': 'bg-green-100 text-green-800 border-green-200',
@@ -45,10 +49,6 @@ export const OfficeCard: React.FC<OfficeCardProps> = ({
   };
 
   const ScoreIcon = scoreIcons[score];
-
-  const handleCardClick = () => {
-    navigate(`/source/${office.id}`);
-  };
 
   const formatPhone = (phone: string) => {
     const cleaned = phone.replace(/\D/g, '');

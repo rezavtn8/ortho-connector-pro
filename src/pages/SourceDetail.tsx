@@ -46,16 +46,19 @@ import {
   Building
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useParams, useNavigate } from 'react-router-dom';
+// Navigation is handled internally, no need for React Router
 import { format, subMonths } from 'date-fns';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { AddressSearch } from '@/components/AddressSearch';
 
-export function SourceDetail() {
-  const { id: sourceId } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const onBack = () => navigate(-1);
+interface SourceDetailProps {
+  onPageChange?: (page: string) => void;
+  sourceId?: string;
+}
+
+export function SourceDetail({ onPageChange, sourceId }: SourceDetailProps = {}) {
+  const onBack = () => onPageChange?.('sources');
   const [source, setSource] = useState<PatientSource | null>(null);
   const [tags, setTags] = useState<SourceTag[]>([]);
   const [monthlyData, setMonthlyData] = useState<MonthlyPatients[]>([]);

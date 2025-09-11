@@ -5,7 +5,7 @@ import { PatientSource, MonthlyPatients, getCurrentYearMonth, formatYearMonth } 
 import { supabase } from '@/integrations/supabase/client';
 import { TrendingUp, Building2, Users, Globe, MessageSquare, BarChart3 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useNavigate } from 'react-router-dom';
+// Navigation is handled internally, no need for React Router
 import { usePagination } from '@/hooks/usePagination';
 import { SkeletonCard } from '@/components/ui/skeleton-card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -93,7 +93,12 @@ function PatientTrendChart({ monthlyData, sources }: PatientTrendChartProps) {
   );
 }
 
-export function Dashboard() {
+interface DashboardProps {
+  onPageChange?: (page: string) => void;
+  onSourceSelect?: (sourceId: string) => void;
+}
+
+export function Dashboard({ onPageChange }: DashboardProps = {}) {
   const { 
     array: sources, 
     replaceArray: setSources 
@@ -106,7 +111,6 @@ export function Dashboard() {
   
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  const navigate = useNavigate();
   const { safeSetTimeout } = useCleanup();
   const currentMonth = getCurrentYearMonth();
 
@@ -384,7 +388,7 @@ export function Dashboard() {
 
         <Card 
           className="cursor-pointer hover:shadow-lg transition-all duration-200"
-          onClick={() => navigate('/analytics')}
+          onClick={() => onPageChange?.('analytics')}
         >
           <CardHeader className="pb-2 sm:pb-3">
             <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
@@ -414,9 +418,9 @@ export function Dashboard() {
               className="cursor-pointer hover:shadow-lg transition-all duration-200 border-l-4 border-l-transparent hover:border-l-current"
               onClick={() => {
                 if (group.name === 'Dental Offices') {
-                  navigate('/offices');
+                  onPageChange?.('offices');
                 } else {
-                  navigate('/sources');
+                  onPageChange?.('sources');
                 }
               }}
             >
@@ -453,7 +457,7 @@ export function Dashboard() {
           <h2 className="text-lg sm:text-xl font-semibold">Analytics Overview</h2>
           <Button 
             variant="outline"
-            onClick={() => navigate('/analytics')}
+            onClick={() => onPageChange?.('analytics')}
             className="gap-2"
           >
             <BarChart3 className="w-4 h-4" />

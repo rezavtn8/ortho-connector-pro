@@ -46,7 +46,7 @@ const Index = () => {
     if (currentPage === 'source-detail' && selectedSourceId) {
       return (
         <ErrorBoundary level="component">
-          <SourceDetail />
+          <SourceDetail onPageChange={setCurrentPage} sourceId={selectedSourceId} />
         </ErrorBoundary>
       );
     }
@@ -70,7 +70,10 @@ const Index = () => {
 
     return (
       <ErrorBoundary level="component">
-        <PageComponent />
+        <PageComponent 
+          onPageChange={setCurrentPage} 
+          onSourceSelect={setSelectedSourceId}
+        />
       </ErrorBoundary>
     );
   };

@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Search, Edit, Eye, Building2, Globe, MessageSquare, Star, Trash2, Check, X, Power } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+// Navigation is handled internally, no need for React Router
 import { ImportDataDialog } from '@/components/ImportDataDialog';
 import { PatientSource, MonthlyPatients, SOURCE_TYPE_CONFIG, getCurrentYearMonth, SourceType } from '@/lib/database.types';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,9 +28,18 @@ import { PatientCountEditor } from '@/components/PatientCountEditor';
 import { SourceCard } from '@/components/SourceCard';
 import { useIsMobile } from '@/hooks/use-mobile';
 
-export function Sources() {
-  const navigate = useNavigate();
+interface SourcesProps {
+  onPageChange?: (page: string) => void;
+  onSourceSelect?: (sourceId: string) => void;
+}
+
+export function Sources({ onPageChange, onSourceSelect }: SourcesProps = {}) {
   const { toast } = useToast();
+  
+  const handleViewSource = (sourceId: string) => {
+    onSourceSelect?.(sourceId);
+    onPageChange?.('source-detail');
+  };
   const isMobile = useIsMobile();
   const [sources, setSources] = useState<PatientSource[]>([]);
   const [monthlyData, setMonthlyData] = useState<MonthlyPatients[]>([]);
@@ -343,7 +352,7 @@ export function Sources() {
                   onToggleActive={(isActive) => handleToggleActive(source.id, isActive)}
                   onEditFormChange={(updates) => setEditForm(prev => ({ ...prev, ...updates }))}
                   onUpdatePatients={loadData}
-                  onView={() => navigate(`/source/${source.id}`)}
+                  onView={() => handleViewSource(source.id)}
                 />
               );
             })}
@@ -513,7 +522,7 @@ export function Sources() {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => navigate(`/source/${source.id}`)}
+                                onClick={() => handleViewSource(source.id)}
                                 title="View details"
                               >
                                 <Eye className="w-4 h-4" />
