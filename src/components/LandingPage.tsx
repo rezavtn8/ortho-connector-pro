@@ -5,6 +5,12 @@ import { AuthForm } from './AuthForm';
 import { Building2, BarChart3, Users, Search, ArrowRight, CheckCircle, Globe, MessageSquare, MapPin, Star, TrendingUp, Brain, Bot } from 'lucide-react';
 import { NexoraLogo } from '@/components/NexoraLogo';
 import { AnimatedNexoraLogo } from '@/components/AnimatedNexoraLogo';
+import featureDiscovery from '@/assets/feature-discovery.jpg';
+import featureReviews from '@/assets/feature-reviews.jpg';
+import featureAIInsights from '@/assets/feature-ai-insights.jpg';
+import featurePatientSources from '@/assets/feature-patient-sources.jpg';
+import featureAnalytics from '@/assets/feature-analytics.jpg';
+import featureCampaigns from '@/assets/feature-campaigns.jpg';
 
 interface LandingPageProps {
   onGetStarted: () => void;
@@ -14,34 +20,34 @@ interface LandingPageProps {
 export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth = false }) => {
   const features = [
     {
-      icon: <Search className="w-8 h-8" />,
+      image: featureDiscovery,
       title: "Smart Office Discovery",
-      description: "Find 100+ dental offices within 50 miles using advanced filters. Search by specialties, ratings, patient volume, and practice types with our discovery wizard."
+      description: "Find 100+ dental offices within 50 miles using advanced filters and discovery wizard."
     },
     {
-      icon: <Star className="w-8 h-8" />,
+      image: featureReviews,
       title: "Google Reviews Management",
-      description: "Monitor all Google reviews across your network in one dashboard. Track competitor ratings, get new review alerts, and analyze review sentiment trends."
+      description: "Monitor all Google reviews across your network in one dashboard with sentiment analysis."
     },
     {
-      icon: <Bot className="w-8 h-8" />,
+      image: featureAIInsights,
       title: "AI-Powered Insights",
-      description: "AI analyzes relationship health, identifies outreach priorities, provides competitive intelligence, and generates actionable practice growth recommendations."
+      description: "AI analyzes relationship health and provides actionable practice growth recommendations."
     },
     {
-      icon: <Globe className="w-8 h-8" />,
+      image: featurePatientSources,
       title: "Patient Source Intelligence",
-      description: "Track Google, Yelp, referrals, and walk-ins with multi-channel integration. Organize by dental offices, online platforms, and referral sources."
+      description: "Track Google, Yelp, referrals, and walk-ins with multi-channel integration."
     },
     {
-      icon: <BarChart3 className="w-8 h-8" />,
+      image: featureAnalytics,
       title: "Growth Analytics",
-      description: "Visual reports, trend analysis, and performance dashboards. Track patient acquisition metrics, source effectiveness, and relationship ROI."
+      description: "Visual reports, trend analysis, and performance dashboards for optimization."
     },
     {
-      icon: <MessageSquare className="w-8 h-8" />,
+      image: featureCampaigns,
       title: "Campaign Management",
-      description: "Run targeted outreach campaigns with automated follow-ups. Track engagement rates, measure campaign ROI, and optimize your marketing efforts."
+      description: "Run targeted outreach campaigns with automated follow-ups and ROI tracking."
     }
   ];
 
@@ -109,29 +115,46 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
           {!showAuth && (
             <>
               {/* Features Section */}
-              <section className="px-6 py-24 bg-white/60 backdrop-blur-sm">
-                <div className="max-w-6xl mx-auto">
-                  <div className="text-center mb-16">
+              <section className="px-6 py-32">
+                <div className="max-w-5xl mx-auto">
+                  <div className="text-center mb-20">
                     <p className="text-2xl md:text-3xl text-connection-text max-w-4xl mx-auto leading-relaxed" style={{ fontFamily: '"Dancing Script", cursive', fontWeight: 400 }}>
                       "From discovering offices to managing reviews, leveraging AI insights to tracking patient sources - we bring everything together in one intelligent platform."
                     </p>
                   </div>
 
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  <div className="space-y-32">
                     {features.map((feature, index) => (
-                      <Card key={index} className="group hover:shadow-elegant transition-all duration-300 border-connection-primary/20 hover:border-connection-primary/40 bg-gradient-card">
-                        <CardContent className="p-8 text-center">
-                          <div className="w-16 h-16 mx-auto mb-6 rounded-xl bg-connection-bg flex items-center justify-center text-connection-primary group-hover:bg-connection-primary group-hover:text-white transition-all duration-300 shadow-sm">
-                            {feature.icon}
+                      <div key={index} className="relative">
+                        {/* Connecting line */}
+                        {index < features.length - 1 && (
+                          <div className="absolute -bottom-16 left-1/2 transform -translate-x-1/2 w-px h-16 bg-gradient-to-b from-connection-primary/20 to-transparent" />
+                        )}
+                        
+                        {/* Feature content */}
+                        <div className={`flex flex-col ${index % 2 === 0 ? 'lg:flex-row' : 'lg:flex-row-reverse'} items-center gap-16`}>
+                          {/* Image */}
+                          <div className="w-full lg:w-1/2">
+                            <div className="relative overflow-hidden rounded-2xl aspect-video">
+                              <img 
+                                src={feature.image} 
+                                alt={feature.title}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
                           </div>
-                          <h3 className="text-xl font-semibold text-connection-text mb-4">
-                            {feature.title}
-                          </h3>
-                          <p className="text-connection-muted leading-relaxed">
-                            {feature.description}
-                          </p>
-                        </CardContent>
-                      </Card>
+                          
+                          {/* Content */}
+                          <div className="w-full lg:w-1/2 text-center lg:text-left">
+                            <h3 className="text-3xl md:text-4xl font-bold text-connection-text mb-6">
+                              {feature.title}
+                            </h3>
+                            <p className="text-xl text-connection-muted leading-relaxed">
+                              {feature.description}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
