@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_log: {
+        Row: {
+          action_type: string
+          created_at: string
+          details: Json | null
+          id: string
+          resource_id: string | null
+          resource_name: string | null
+          resource_type: string
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          resource_id?: string | null
+          resource_name?: string | null
+          resource_type: string
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          resource_id?: string | null
+          resource_name?: string | null
+          resource_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       campaign_deliveries: {
         Row: {
           action_mode: string | null
@@ -1229,6 +1262,16 @@ export type Database = {
       }
       get_user_role: {
         Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      log_activity: {
+        Args: {
+          p_action_type: string
+          p_details?: Json
+          p_resource_id?: string
+          p_resource_name?: string
+          p_resource_type: string
+        }
         Returns: string
       }
       log_application_error: {

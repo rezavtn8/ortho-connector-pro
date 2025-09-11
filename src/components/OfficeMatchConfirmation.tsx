@@ -799,6 +799,21 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
             newOfficeData
           );
 
+          // Log general activity
+          await supabase.rpc('log_activity', {
+            p_action_type: 'source_created',
+            p_resource_type: 'source',
+            p_resource_id: newOffice.id,
+            p_resource_name: importedOffice.name,
+            p_details: {
+              method: 'import_csv_with_google_places',
+              preserved_csv_name: importedOffice.name,
+              google_suggested_name: match.name,
+              google_place_id: match.place_id,
+              has_google_data: true
+            }
+          });
+
           // Track all name variations in session
           const allVariations = [
             ...generateNameVariations(importedOffice.name),
@@ -896,6 +911,19 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
         
         // Track ALL name variations in session
         if (newOffice) {
+          // Log general activity
+          await supabase.rpc('log_activity', {
+            p_action_type: 'source_created',
+            p_resource_type: 'source',
+            p_resource_id: newOffice.id,
+            p_resource_name: importedOffice.name,
+            p_details: {
+              method: 'import_csv_skip_google',
+              source_type: 'Office',
+              has_google_data: false
+            }
+          });
+
           const allVariations = [
             ...generateNameVariations(importedOffice.name),
             importedOffice.name // Always include exact original name

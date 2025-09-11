@@ -207,13 +207,35 @@ export function Sources({ onPageChange, onSourceSelect }: SourcesProps = {}) {
 
       if (logsError) throw logsError;
 
+      // Get source names before deletion for logging
+      const { data: sourcesToDelete } = await supabase
+        .from('patient_sources')
+        .select('id, name')
+        .in('id', sourceIds);
+
       // Finally delete sources
       const { error: sourcesError } = await supabase
-        .from('patient_sources')
+        .from('patient_sources')  
         .delete()
         .in('id', sourceIds);
 
       if (sourcesError) throw sourcesError;
+
+      // Log each deletion
+      if (sourcesToDelete) {
+        for (const source of sourcesToDelete) {
+          await supabase.rpc('log_activity', {
+            p_action_type: 'source_deleted',
+            p_resource_type: 'source',
+            p_resource_id: source.id,
+            p_resource_name: source.name,
+            p_details: {
+              method: 'bulk_delete',
+              total_deleted: sourceIds.length
+            }
+          });
+        }
+      }
 
       toast({
         title: "Success",

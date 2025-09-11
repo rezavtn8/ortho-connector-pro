@@ -44,28 +44,13 @@ interface ActivityLog {
   created_at: string;
 }
 
-interface PatientChangeLog {
-  id: string;
-  source_id: string;
-  year_month: string;
-  old_count: number;
-  new_count: number;
-  change_type: string;
-  reason: string | null;
-  changed_at: string;
-  changed_by: string;
-  user_id: string;
-  source_name?: string;
-}
-
-export function Logs() {
-  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
-  const [patientLogs, setPatientLogs] = useState<PatientChangeLog[]>([]);
-  const [allLogs, setAllLogs] = useState<any[]>([]);
-  const [filteredLogs, setFilteredLogs] = useState<any[]>([]);
+export function ActivityLogs() {
+  const [logs, setLogs] = useState<ActivityLog[]>([]);
+  const [filteredLogs, setFilteredLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [actionTypeFilter, setActionTypeFilter] = useState('all');
+  const [resourceTypeFilter, setResourceTypeFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
   const { toast } = useToast();
 
@@ -75,7 +60,7 @@ export function Logs() {
 
   useEffect(() => {
     applyFilters();
-  }, [allLogs, searchTerm, actionTypeFilter, dateFilter]);
+  }, [logs, searchTerm, actionTypeFilter, resourceTypeFilter, dateFilter]);
 
   const loadLogs = async () => {
     try {
@@ -85,53 +70,18 @@ export function Logs() {
       if (!user) throw new Error('User not authenticated');
 
       // Fetch activity logs
-      const { data: activityData, error: activityError } = await supabase
+      const { data: activityData, error } = await supabase
         .from('activity_log')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
-        .limit(300);
+        .limit(500); // Keep last 500 activities
 
-      if (activityError) throw activityError;
+      if (error) throw error;
 
-      // Fetch patient change logs with source names
-      const { data: patientData, error: patientError } = await supabase
-        .from('patient_changes_log')
-        .select(`
-          *,
-          patient_sources(name)
-        `)
-        .eq('user_id', user.id)
-        .order('changed_at', { ascending: false })
-        .limit(200);
-
-      if (patientError) throw patientError;
-
-      const processedPatientLogs = patientData?.map(log => ({
-        ...log,
-        source_name: log.patient_sources?.name || '[Deleted Source]'
-      })) || [];
-
-      setActivityLogs(activityData || []);
-      setPatientLogs(processedPatientLogs);
-
-      // Combine and sort all logs
-      const combined = [
-        ...(activityData || []).map(log => ({
-          ...log,
-          type: 'activity',
-          timestamp: log.created_at
-        })),
-        ...processedPatientLogs.map(log => ({
-          ...log,
-          type: 'patient_change',
-          timestamp: log.changed_at
-        }))
-      ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-
-      setAllLogs(combined);
+      setLogs(activityData || []);
     } catch (error) {
-      console.error('Error loading logs:', error);
+      console.error('Error loading activity logs:', error);
       toast({
         title: "Error",
         description: "Failed to load activity logs",
@@ -143,37 +93,25 @@ export function Logs() {
   };
 
   const applyFilters = () => {
-    let filtered = [...allLogs];
+    let filtered = [...logs];
 
     // Search filter
     if (searchTerm) {
-      filtered = filtered.filter(log => {
-        const searchText = searchTerm.toLowerCase();
-        if (log.type === 'activity') {
-          return (
-            log.resource_name?.toLowerCase().includes(searchText) ||
-            log.action_type.toLowerCase().includes(searchText) ||
-            JSON.stringify(log.details || {}).toLowerCase().includes(searchText)
-          );
-        } else {
-          return (
-            log.source_name?.toLowerCase().includes(searchText) ||
-            log.reason?.toLowerCase().includes(searchText) ||
-            log.year_month.includes(searchText)
-          );
-        }
-      });
+      filtered = filtered.filter(log =>
+        log.resource_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        log.action_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        JSON.stringify(log.details || {}).toLowerCase().includes(searchTerm.toLowerCase())
+      );
     }
 
     // Action type filter
     if (actionTypeFilter !== 'all') {
-      if (actionTypeFilter === 'patient_changes') {
-        filtered = filtered.filter(log => log.type === 'patient_change');
-      } else {
-        filtered = filtered.filter(log => 
-          log.type === 'activity' && log.action_type === actionTypeFilter
-        );
-      }
+      filtered = filtered.filter(log => log.action_type === actionTypeFilter);
+    }
+
+    // Resource type filter
+    if (resourceTypeFilter !== 'all') {
+      filtered = filtered.filter(log => log.resource_type === resourceTypeFilter);
     }
 
     // Date filter
@@ -184,15 +122,15 @@ export function Logs() {
       switch (dateFilter) {
         case 'today':
           filterDate.setHours(0, 0, 0, 0);
-          filtered = filtered.filter(log => new Date(log.timestamp) >= filterDate);
+          filtered = filtered.filter(log => new Date(log.created_at) >= filterDate);
           break;
         case 'week':
           filterDate.setDate(now.getDate() - 7);
-          filtered = filtered.filter(log => new Date(log.timestamp) >= filterDate);
+          filtered = filtered.filter(log => new Date(log.created_at) >= filterDate);
           break;
         case 'month':
           filterDate.setMonth(now.getMonth() - 1);
-          filtered = filtered.filter(log => new Date(log.timestamp) >= filterDate);
+          filtered = filtered.filter(log => new Date(log.created_at) >= filterDate);
           break;
       }
     }
@@ -200,21 +138,8 @@ export function Logs() {
     setFilteredLogs(filtered);
   };
 
-  const getActionIcon = (log: any) => {
-    if (log.type === 'patient_change') {
-      switch (log.change_type) {
-        case 'increment':
-          return <TrendingUp className="w-4 h-4 text-green-600" />;
-        case 'decrement':
-          return <TrendingDown className="w-4 h-4 text-red-600" />;
-        case 'manual_edit':
-          return <Edit3 className="w-4 h-4 text-blue-600" />;
-        default:
-          return <Activity className="w-4 h-4 text-muted-foreground" />;
-      }
-    }
-
-    switch (log.action_type) {
+  const getActionIcon = (actionType: string) => {
+    switch (actionType) {
       case 'source_created':
         return <Plus className="w-4 h-4 text-green-600" />;
       case 'source_deleted':
@@ -225,6 +150,12 @@ export function Logs() {
         return <Tag className="w-4 h-4 text-green-600" />;
       case 'tag_removed':
         return <Trash2 className="w-4 h-4 text-red-600" />;
+      case 'patient_count_increased':
+        return <TrendingUp className="w-4 h-4 text-green-600" />;
+      case 'patient_count_decreased':
+        return <TrendingDown className="w-4 h-4 text-red-600" />;
+      case 'patient_count_updated':
+        return <Edit3 className="w-4 h-4 text-blue-600" />;
       case 'import_completed':
         return <Upload className="w-4 h-4 text-purple-600" />;
       default:
@@ -232,20 +163,27 @@ export function Logs() {
     }
   };
 
-  const formatLogDescription = (log: any) => {
-    if (log.type === 'patient_change') {
-      const diff = log.new_count - log.old_count;
-      const monthYear = format(new Date(log.year_month + '-01'), 'MMM yyyy');
-      
-      if (diff > 0) {
-        return `Increased patient count for ${log.source_name} (${monthYear}) from ${log.old_count} to ${log.new_count}`;
-      } else if (diff < 0) {
-        return `Decreased patient count for ${log.source_name} (${monthYear}) from ${log.old_count} to ${log.new_count}`;
-      } else {
-        return `Updated patient count for ${log.source_name} (${monthYear}) to ${log.new_count}`;
-      }
-    }
+  const getActionBadge = (actionType: string) => {
+    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+      'source_created': 'default',
+      'source_deleted': 'destructive',
+      'source_updated': 'secondary',
+      'tag_added': 'default',
+      'tag_removed': 'destructive',
+      'patient_count_increased': 'default',
+      'patient_count_decreased': 'destructive',
+      'patient_count_updated': 'secondary',
+      'import_completed': 'outline'
+    };
 
+    return (
+      <Badge variant={variants[actionType] || 'secondary'} className="text-xs">
+        {actionType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+      </Badge>
+    );
+  };
+
+  const formatActionDescription = (log: ActivityLog) => {
     const details = log.details || {};
     
     switch (log.action_type) {
@@ -280,6 +218,7 @@ export function Logs() {
   const clearFilters = () => {
     setSearchTerm('');
     setActionTypeFilter('all');
+    setResourceTypeFilter('all');
     setDateFilter('all');
   };
 
@@ -289,7 +228,7 @@ export function Logs() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Activity Logs</h1>
-            <p className="text-muted-foreground">Track all patient count changes and system activities</p>
+            <p className="text-muted-foreground">Track all system activities and changes</p>
           </div>
         </div>
         <Card>
@@ -311,7 +250,7 @@ export function Logs() {
         <div>
           <h1 className="text-xl font-bold">All Activity</h1>
           <span className="text-xs text-muted-foreground">
-            {filteredLogs.length} of {allLogs.length} activities
+            {filteredLogs.length} of {logs.length} activities
           </span>
         </div>
         
@@ -328,17 +267,30 @@ export function Logs() {
           </div>
           
           <Select value={actionTypeFilter} onValueChange={setActionTypeFilter}>
-            <SelectTrigger className="h-8 w-36 text-xs">
+            <SelectTrigger className="h-8 w-32 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Activities</SelectItem>
-              <SelectItem value="source_created">✨ Created</SelectItem>
-              <SelectItem value="source_deleted">🗑️ Deleted</SelectItem>
-              <SelectItem value="source_updated">✏️ Updated</SelectItem>
-              <SelectItem value="tag_added">🏷️ Tag Added</SelectItem>
-              <SelectItem value="tag_removed">🗑️ Tag Removed</SelectItem>
-              <SelectItem value="patient_changes">📊 Patient Changes</SelectItem>
+              <SelectItem value="all">All Actions</SelectItem>
+              <SelectItem value="source_created">Created</SelectItem>
+              <SelectItem value="source_deleted">Deleted</SelectItem>
+              <SelectItem value="source_updated">Updated</SelectItem>
+              <SelectItem value="tag_added">Tag Added</SelectItem>
+              <SelectItem value="tag_removed">Tag Removed</SelectItem>
+              <SelectItem value="import_completed">Imported</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={resourceTypeFilter} onValueChange={setResourceTypeFilter}>
+            <SelectTrigger className="h-8 w-28 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="source">Sources</SelectItem>
+              <SelectItem value="tag">Tags</SelectItem>
+              <SelectItem value="patient_count">Patients</SelectItem>
+              <SelectItem value="import">Imports</SelectItem>
             </SelectContent>
           </Select>
 
@@ -366,7 +318,7 @@ export function Logs() {
           <div className="text-center py-8">
             <FileText className="w-8 h-8 mx-auto mb-2 text-muted-foreground opacity-50" />
             <p className="text-sm text-muted-foreground">
-              {allLogs.length === 0 ? "No activity logs found" : "No activities match filters"}
+              {logs.length === 0 ? "No activity logs found" : "No activities match filters"}
             </p>
           </div>
         ) : (
@@ -377,30 +329,36 @@ export function Logs() {
                   <th className="px-2 py-1.5 text-left font-medium text-muted-foreground w-24">Date</th>
                   <th className="px-2 py-1.5 text-left font-medium text-muted-foreground w-20">Time</th>
                   <th className="px-2 py-1.5 text-center font-medium text-muted-foreground w-16">Action</th>
+                  <th className="px-2 py-1.5 text-left font-medium text-muted-foreground w-20">Type</th>
                   <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">Description</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredLogs.map((log, index) => (
                   <tr 
-                    key={`${log.type}-${log.id}`} 
+                    key={log.id} 
                     className={`border-b hover:bg-muted/30 transition-colors ${
                       index % 2 === 0 ? 'bg-background' : 'bg-muted/20'
                     }`}
                   >
                     <td className="px-2 py-1.5 font-mono text-xs">
-                      {format(new Date(log.timestamp), 'MM/dd/yy')}
+                      {format(new Date(log.created_at), 'MM/dd/yy')}
                     </td>
                     <td className="px-2 py-1.5 font-mono text-xs text-muted-foreground">
-                      {format(new Date(log.timestamp), 'HH:mm')}
+                      {format(new Date(log.created_at), 'HH:mm')}
                     </td>
                     <td className="px-2 py-1.5 text-center">
                       <div className="flex items-center justify-center">
-                        {getActionIcon(log)}
+                        {getActionIcon(log.action_type)}
                       </div>
                     </td>
+                    <td className="px-2 py-1.5">
+                      <span className="text-xs bg-muted px-1.5 py-0.5 rounded capitalize">
+                        {log.resource_type}
+                      </span>
+                    </td>
                     <td className="px-2 py-1.5 text-muted-foreground">
-                      {formatLogDescription(log)}
+                      {formatActionDescription(log)}
                     </td>
                   </tr>
                 ))}

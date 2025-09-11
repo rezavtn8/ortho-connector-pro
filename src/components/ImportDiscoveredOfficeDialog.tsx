@@ -111,6 +111,22 @@ export const ImportDiscoveredOfficeDialog: React.FC<ImportDiscoveredOfficeDialog
         return;
       }
 
+      // Log the activity
+      await supabase.rpc('log_activity', {
+        p_action_type: 'source_created',
+        p_resource_type: 'source',
+        p_resource_id: data.id,
+        p_resource_name: sanitizedName,
+        p_details: {
+          source_type: formData.source_type,
+          method: 'import_discovered',
+          address: sanitizedAddress,
+          phone: sanitizedPhone,
+          email: sanitizedEmail,
+          website: sanitizedWebsite
+        }
+      });
+
       toast({
         title: "Success",
         description: `${formData.name} has been added to your referring sources!`

@@ -233,6 +233,20 @@ export function SourceDetail({ onPageChange, sourceId }: SourceDetailProps = {})
 
       if (error) throw error;
 
+
+      // Log the activity
+      await supabase.rpc('log_activity', {
+        p_action_type: 'tag_added',
+        p_resource_type: 'tag',
+        p_resource_id: null,
+        p_resource_name: newTag.trim(),
+        p_details: {
+          source_id: sourceId,
+          source_name: source?.name,
+          tag_name: newTag.trim()
+        }
+      });
+
       setNewTag('');
       await loadSourceData();
 
@@ -258,6 +272,19 @@ export function SourceDetail({ onPageChange, sourceId }: SourceDetailProps = {})
         .eq('id', tagId);
 
       if (error) throw error;
+
+      // Log the activity
+      await supabase.rpc('log_activity', {
+        p_action_type: 'tag_removed',
+        p_resource_type: 'tag',
+        p_resource_id: null,
+        p_resource_name: 'Source Tag',
+        p_details: {
+          source_id: sourceId,
+          source_name: source?.name,
+          tag_id: tagId
+        }
+      });
 
       await loadSourceData();
 
@@ -350,6 +377,24 @@ export function SourceDetail({ onPageChange, sourceId }: SourceDetailProps = {})
         .eq('id', sourceId);
 
       if (error) throw error;
+
+      // Log the activity
+      await supabase.rpc('log_activity', {
+        p_action_type: 'source_updated',
+        p_resource_type: 'source',
+        p_resource_id: sourceId,
+        p_resource_name: editForm.name,
+        p_details: {
+          updated_fields: {
+            name: editForm.name !== source?.name,
+            address: editForm.address !== source?.address,
+            phone: editForm.phone !== source?.phone,
+            email: editForm.email !== source?.email,
+            website: editForm.website !== source?.website,
+            notes: editForm.notes !== source?.notes
+          }
+        }
+      });
 
       setIsEditing(false);
       await loadSourceData();
