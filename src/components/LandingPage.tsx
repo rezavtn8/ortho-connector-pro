@@ -112,7 +112,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
               <section className="px-6 py-24 bg-white/60 backdrop-blur-sm">
                 <div className="max-w-6xl mx-auto">
                   <div className="text-center mb-16">
-                    <p className="text-2xl md:text-3xl text-connection-text max-w-4xl mx-auto leading-relaxed" style={{ fontFamily: '"Kalam", "Caveat", cursive', fontWeight: 400 }}>
+                    <p className="text-2xl md:text-3xl text-connection-text max-w-4xl mx-auto leading-relaxed" style={{ fontFamily: '"Dancing Script", cursive', fontWeight: 400 }}>
                       "From discovering offices to managing reviews, leveraging AI insights to tracking patient sources - we bring everything together in one intelligent platform."
                     </p>
                   </div>
