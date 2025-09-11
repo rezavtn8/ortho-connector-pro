@@ -197,10 +197,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
               </section>
 
               {/* Minimal Feature Explainer */}
-              <section className="py-32 px-6">
+              <section className="py-16 px-6">
                 <div className="max-w-4xl mx-auto">
                   {/* Feature 1 - Discovery */}
-                  <div className="flex flex-col lg:flex-row items-center gap-16 mb-24">
+                  <div className="flex flex-col lg:flex-row items-center gap-8 mb-12">
                     <div className="lg:w-1/2">
                       <img 
                         src={featureDiscovery} 
@@ -215,10 +215,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                   </div>
 
                   {/* Connecting Line */}
-                  <div className="w-px h-16 bg-connection-primary/20 mx-auto mb-24"></div>
+                  <div className="w-px h-8 bg-connection-primary/20 mx-auto mb-12"></div>
 
                   {/* Feature 2 - Reviews (Right aligned) */}
-                  <div className="flex flex-col lg:flex-row-reverse items-center gap-16 mb-24">
+                  <div className="flex flex-col lg:flex-row-reverse items-center gap-8 mb-12">
                     <div className="lg:w-1/2">
                       <img 
                         src={featureReviews} 
@@ -233,10 +233,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                   </div>
 
                   {/* Connecting Line */}
-                  <div className="w-px h-16 bg-connection-primary/20 mx-auto mb-24"></div>
+                  <div className="w-px h-8 bg-connection-primary/20 mx-auto mb-12"></div>
 
                   {/* Feature 3 - AI Insights */}
-                  <div className="flex flex-col lg:flex-row items-center gap-16 mb-24">
+                  <div className="flex flex-col lg:flex-row items-center gap-8 mb-12">
                     <div className="lg:w-1/2">
                       <img 
                         src={featureAiInsights} 
@@ -251,10 +251,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                   </div>
 
                   {/* Connecting Line */}
-                  <div className="w-px h-16 bg-connection-primary/20 mx-auto mb-24"></div>
+                  <div className="w-px h-8 bg-connection-primary/20 mx-auto mb-12"></div>
 
                   {/* Feature 4 - Patient Sources (Right aligned) */}
-                  <div className="flex flex-col lg:flex-row-reverse items-center gap-16 mb-24">
+                  <div className="flex flex-col lg:flex-row-reverse items-center gap-8 mb-12">
                     <div className="lg:w-1/2">
                       <img 
                         src={featurePatientSources} 
@@ -269,10 +269,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                   </div>
 
                   {/* Connecting Line */}
-                  <div className="w-px h-16 bg-connection-primary/20 mx-auto mb-24"></div>
+                  <div className="w-px h-8 bg-connection-primary/20 mx-auto mb-12"></div>
 
                   {/* Feature 5 - Analytics */}
-                  <div className="flex flex-col lg:flex-row items-center gap-16 mb-24">
+                  <div className="flex flex-col lg:flex-row items-center gap-8 mb-12">
                     <div className="lg:w-1/2">
                       <img 
                         src={featureAnalytics} 
@@ -287,10 +287,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                   </div>
 
                   {/* Connecting Line */}
-                  <div className="w-px h-16 bg-connection-primary/20 mx-auto mb-24"></div>
+                  <div className="w-px h-8 bg-connection-primary/20 mx-auto mb-12"></div>
 
                   {/* Feature 6 - Campaigns (Right aligned) */}
-                  <div className="flex flex-col lg:flex-row-reverse items-center gap-16">
+                  <div className="flex flex-col lg:flex-row-reverse items-center gap-8">
                     <div className="lg:w-1/2">
                       <img 
                         src={featureCampaigns} 
