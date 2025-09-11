@@ -106,6 +106,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                     <Button 
                       variant="outline"
                       size="lg"
+                      onClick={() => document.getElementById('pricing-section')?.scrollIntoView({ behavior: 'smooth' })}
                       className="border-connection-muted/40 text-connection-muted hover:bg-connection-muted/10 px-6 py-3 text-lg rounded-xl transition-all hover-scale"
                     >
                       Pricing
@@ -227,6 +228,121 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                     Start Your Growth Journey
                     <ArrowRight className="ml-3 w-6 h-6 group-hover:translate-x-1 transition-transform" />
                   </Button>
+                </div>
+              </section>
+
+              {/* Pricing Section */}
+              <section id="pricing-section" className="px-6 py-24 bg-white/60 backdrop-blur-sm">
+                <div className="max-w-6xl mx-auto">
+                  <div className="text-center mb-16">
+                    <h2 className="text-4xl md:text-5xl font-bold text-connection-text mb-6">
+                      Choose Your Growth Plan
+                    </h2>
+                    <p className="text-lg text-connection-muted max-w-2xl mx-auto">
+                      Select the perfect plan to scale your practice and strengthen your professional network.
+                    </p>
+                  </div>
+
+                  <div className="grid lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
+                    {/* Solo Practice Plan */}
+                    <Card className="group hover:shadow-elegant transition-all duration-300 border-connection-primary/20 hover:border-connection-primary/40 bg-gradient-card">
+                      <CardContent className="p-8">
+                        <div className="text-center mb-8">
+                          <h3 className="text-2xl font-bold text-connection-text mb-2">Solo Practice</h3>
+                          <p className="text-connection-muted mb-4">Up to 50 referring offices</p>
+                          <div className="mb-6">
+                            <span className="text-4xl font-bold text-connection-primary">$149</span>
+                            <span className="text-connection-muted">/month</span>
+                          </div>
+                        </div>
+                        <ul className="space-y-4 mb-8">
+                          <li className="flex items-center space-x-3">
+                            <CheckCircle className="w-5 h-5 text-connection-primary flex-shrink-0" />
+                            <span className="text-connection-text">1 user account</span>
+                          </li>
+                          <li className="flex items-center space-x-3">
+                            <CheckCircle className="w-5 h-5 text-connection-primary flex-shrink-0" />
+                            <span className="text-connection-text">Basic features + email campaigns</span>
+                          </li>
+                        </ul>
+                        <Button className="w-full bg-connection-primary/10 text-connection-primary hover:bg-connection-primary hover:text-white transition-all">
+                          Get Started
+                        </Button>
+                      </CardContent>
+                    </Card>
+
+                    {/* Group Practice Plan - Most Popular */}
+                    <Card className="group hover:shadow-elegant transition-all duration-300 border-connection-primary/40 hover:border-connection-primary bg-gradient-card relative scale-105">
+                      <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                        <div className="bg-connection-primary text-white px-4 py-1 rounded-full text-sm font-medium flex items-center space-x-1">
+                          <span>⭐</span>
+                          <span>Most Popular</span>
+                        </div>
+                      </div>
+                      <CardContent className="p-8">
+                        <div className="text-center mb-8">
+                          <h3 className="text-2xl font-bold text-connection-text mb-2">Group Practice</h3>
+                          <p className="text-connection-muted mb-4">Up to 200 referring offices</p>
+                          <div className="mb-6">
+                            <span className="text-4xl font-bold text-connection-primary">$399</span>
+                            <span className="text-connection-muted">/month</span>
+                          </div>
+                        </div>
+                        <ul className="space-y-4 mb-8">
+                          <li className="flex items-center space-x-3">
+                            <CheckCircle className="w-5 h-5 text-connection-primary flex-shrink-0" />
+                            <span className="text-connection-text">10 user accounts</span>
+                          </li>
+                          <li className="flex items-center space-x-3">
+                            <CheckCircle className="w-5 h-5 text-connection-primary flex-shrink-0" />
+                            <span className="text-connection-text">AI Review Writer + Direct Google Reply</span>
+                          </li>
+                          <li className="flex items-center space-x-3">
+                            <CheckCircle className="w-5 h-5 text-connection-primary flex-shrink-0" />
+                            <span className="text-connection-text">Advanced analytics & automation</span>
+                          </li>
+                        </ul>
+                        <Button className="w-full bg-connection-primary text-white hover:bg-connection-primary/90 transition-all">
+                          Get Started
+                        </Button>
+                      </CardContent>
+                    </Card>
+
+                    {/* Multi-Location Plan */}
+                    <Card className="group hover:shadow-elegant transition-all duration-300 border-connection-primary/20 hover:border-connection-primary/40 bg-gradient-card">
+                      <CardContent className="p-8">
+                        <div className="text-center mb-8">
+                          <h3 className="text-2xl font-bold text-connection-text mb-2">Multi-Location</h3>
+                          <p className="text-connection-muted mb-4">Unlimited referring offices</p>
+                          <div className="mb-6">
+                            <span className="text-4xl font-bold text-connection-primary">$799</span>
+                            <span className="text-connection-muted">/month</span>
+                          </div>
+                        </div>
+                        <ul className="space-y-4 mb-8">
+                          <li className="flex items-center space-x-3">
+                            <CheckCircle className="w-5 h-5 text-connection-primary flex-shrink-0" />
+                            <span className="text-connection-text">Unlimited users</span>
+                          </li>
+                          <li className="flex items-center space-x-3">
+                            <CheckCircle className="w-5 h-5 text-connection-primary flex-shrink-0" />
+                            <span className="text-connection-text">Unlimited offices and locations</span>
+                          </li>
+                          <li className="flex items-center space-x-3">
+                            <CheckCircle className="w-5 h-5 text-connection-primary flex-shrink-0" />
+                            <span className="text-connection-text">Everything in Group + API access</span>
+                          </li>
+                          <li className="flex items-center space-x-3">
+                            <CheckCircle className="w-5 h-5 text-connection-primary flex-shrink-0" />
+                            <span className="text-connection-text">Dedicated success manager</span>
+                          </li>
+                        </ul>
+                        <Button className="w-full bg-connection-primary/10 text-connection-primary hover:bg-connection-primary hover:text-white transition-all">
+                          Get Started
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </div>
                 </div>
               </section>
 
