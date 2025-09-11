@@ -112,8 +112,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
               <section className="px-6 py-24 bg-white/60 backdrop-blur-sm">
                 <div className="max-w-6xl mx-auto">
                   <div className="text-center mb-16">
-                    <p className="text-2xl md:text-3xl text-connection-text max-w-4xl mx-auto leading-relaxed" style={{ fontFamily: '"Kalam", "Caveat", cursive', fontWeight: 400 }}>
-                      "From discovering offices to managing reviews, leveraging AI insights to tracking patient sources - we bring everything together in one intelligent platform."
+                    <h2 className="text-4xl md:text-5xl font-bold text-connection-text mb-6">
+                      Complete Practice Growth Platform
+                    </h2>
+                    <p className="text-lg text-connection-muted max-w-2xl mx-auto">
+                      Everything you need to understand, track, and optimize your patient acquisition and referral network.
                     </p>
                   </div>
 
