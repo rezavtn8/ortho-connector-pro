@@ -117,7 +117,7 @@ export function DateRangePicker({
           {formatRange(value)}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
+      <PopoverContent className="w-auto p-0 pointer-events-auto" align="start">
         <div className="flex">
           <div className="border-r">
             <Calendar
