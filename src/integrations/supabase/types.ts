@@ -970,7 +970,7 @@ export type Database = {
           pin_code: string | null
           role: Database["public"]["Enums"]["user_role"]
           updated_at: string
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           clinic_id?: string | null
@@ -986,7 +986,7 @@ export type Database = {
           pin_code?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           clinic_id?: string | null
@@ -1002,7 +1002,7 @@ export type Database = {
           pin_code?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: [
           {
