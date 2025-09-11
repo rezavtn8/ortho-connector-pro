@@ -92,13 +92,33 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
               </p>
               
               {!showAuth && (
-                <div className="flex flex-col sm:flex-row gap-4 justify-center items-center animate-fade-in" style={{ animationDelay: '1.4s', animationFillMode: 'both' }}>
+                <div className="flex flex-col gap-4 justify-center items-center animate-fade-in" style={{ animationDelay: '1.4s', animationFillMode: 'both' }}>
+                  {/* Navigation buttons row */}
+                  <div className="flex gap-4 justify-center">
+                    <Button 
+                      variant="outline"
+                      size="lg"
+                      onClick={() => document.getElementById('features-section')?.scrollIntoView({ behavior: 'smooth' })}
+                      className="border-connection-muted/40 text-connection-muted hover:bg-connection-muted/10 px-6 py-3 text-lg rounded-xl transition-all hover-scale"
+                    >
+                      Features
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      size="lg"
+                      className="border-connection-muted/40 text-connection-muted hover:bg-connection-muted/10 px-6 py-3 text-lg rounded-xl transition-all hover-scale"
+                    >
+                      Pricing
+                    </Button>
+                  </div>
+                  
+                  {/* Primary CTA button */}
                   <Button 
                     size="lg"
                     onClick={onGetStarted}
                     className="bg-connection-primary hover:bg-connection-primary/90 text-white px-8 py-4 text-lg rounded-xl shadow-elegant hover:shadow-glow transition-all group hover-scale"
                   >
-                    Start Growing Today
+                    Sign In / Sign Up
                     <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </Button>
                 </div>
@@ -109,7 +129,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
           {!showAuth && (
             <>
               {/* Features Section */}
-              <section className="px-6 py-24 bg-white/60 backdrop-blur-sm">
+              <section id="features-section" className="px-6 py-24 bg-white/60 backdrop-blur-sm">
                 <div className="max-w-6xl mx-auto">
                   <div className="text-center mb-16">
                     <p className="text-2xl md:text-3xl text-connection-text max-w-4xl mx-auto leading-relaxed" style={{ fontFamily: '"Dancing Script", cursive', fontWeight: 400 }}>
