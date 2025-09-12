@@ -222,26 +222,26 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                     </p>
                   </div>
 
-                  <div className="grid lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
+                  <div className="grid lg:grid-cols-3 gap-6 max-w-4xl mx-auto">
                     {/* Solo Practice Plan */}
                     <Card className="group hover:shadow-elegant transition-all duration-300 border-connection-primary/20 hover:border-connection-primary/40 bg-gradient-card">
-                      <CardContent className="p-8">
-                        <div className="text-center mb-8">
-                          <h3 className="text-2xl font-bold text-connection-text mb-2">Solo Practice</h3>
-                          <p className="text-connection-muted mb-4">Up to 50 referring offices</p>
-                          <div className="mb-6">
-                            <span className="text-4xl font-bold text-connection-primary">$149</span>
-                            <span className="text-connection-muted">/month</span>
+                      <CardContent className="p-6">
+                        <div className="text-center mb-6">
+                          <h3 className="text-xl font-bold text-connection-text mb-2">Solo Practice</h3>
+                          <p className="text-sm text-connection-muted mb-3">Up to 50 referring offices</p>
+                          <div className="mb-4">
+                            <span className="text-3xl font-bold text-connection-primary">$149</span>
+                            <span className="text-sm text-connection-muted">/month</span>
                           </div>
                         </div>
-                        <ul className="space-y-4 mb-8">
-                          <li className="flex items-center space-x-3">
-                            <CheckCircle className="w-5 h-5 text-connection-primary flex-shrink-0" />
-                            <span className="text-connection-text">1 user account</span>
+                        <ul className="space-y-3 mb-6">
+                          <li className="flex items-center space-x-2">
+                            <CheckCircle className="w-4 h-4 text-connection-primary flex-shrink-0" />
+                            <span className="text-sm text-connection-text">1 user account</span>
                           </li>
-                          <li className="flex items-center space-x-3">
-                            <CheckCircle className="w-5 h-5 text-connection-primary flex-shrink-0" />
-                            <span className="text-connection-text">Basic features + email campaigns</span>
+                          <li className="flex items-center space-x-2">
+                            <CheckCircle className="w-4 h-4 text-connection-primary flex-shrink-0" />
+                            <span className="text-sm text-connection-text">Basic features + email campaigns</span>
                           </li>
                         </ul>
                         <Button className="w-full bg-connection-primary/10 text-connection-primary hover:bg-connection-primary hover:text-white transition-all">
@@ -252,33 +252,33 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
 
                     {/* Group Practice Plan - Most Popular */}
                     <Card className="group hover:shadow-elegant transition-all duration-300 border-connection-primary/40 hover:border-connection-primary bg-gradient-card relative scale-105">
-                      <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                        <div className="bg-connection-primary text-white px-4 py-1 rounded-full text-sm font-medium flex items-center space-x-1">
+                      <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
+                        <div className="bg-connection-primary text-white px-3 py-1 rounded-full text-xs font-medium flex items-center space-x-1">
                           <span>⭐</span>
                           <span>Most Popular</span>
                         </div>
                       </div>
-                      <CardContent className="p-8">
-                        <div className="text-center mb-8">
-                          <h3 className="text-2xl font-bold text-connection-text mb-2">Group Practice</h3>
-                          <p className="text-connection-muted mb-4">Up to 200 referring offices</p>
-                          <div className="mb-6">
-                            <span className="text-4xl font-bold text-connection-primary">$399</span>
-                            <span className="text-connection-muted">/month</span>
+                      <CardContent className="p-6">
+                        <div className="text-center mb-6">
+                          <h3 className="text-xl font-bold text-connection-text mb-2">Group Practice</h3>
+                          <p className="text-sm text-connection-muted mb-3">Up to 200 referring offices</p>
+                          <div className="mb-4">
+                            <span className="text-3xl font-bold text-connection-primary">$399</span>
+                            <span className="text-sm text-connection-muted">/month</span>
                           </div>
                         </div>
-                        <ul className="space-y-4 mb-8">
-                          <li className="flex items-center space-x-3">
-                            <CheckCircle className="w-5 h-5 text-connection-primary flex-shrink-0" />
-                            <span className="text-connection-text">10 user accounts</span>
+                        <ul className="space-y-3 mb-6">
+                          <li className="flex items-center space-x-2">
+                            <CheckCircle className="w-4 h-4 text-connection-primary flex-shrink-0" />
+                            <span className="text-sm text-connection-text">10 user accounts</span>
                           </li>
-                          <li className="flex items-center space-x-3">
-                            <CheckCircle className="w-5 h-5 text-connection-primary flex-shrink-0" />
-                            <span className="text-connection-text">AI Review Writer + Direct Google Reply</span>
+                          <li className="flex items-center space-x-2">
+                            <CheckCircle className="w-4 h-4 text-connection-primary flex-shrink-0" />
+                            <span className="text-sm text-connection-text">AI Review Writer + Direct Google Reply</span>
                           </li>
-                          <li className="flex items-center space-x-3">
-                            <CheckCircle className="w-5 h-5 text-connection-primary flex-shrink-0" />
-                            <span className="text-connection-text">Advanced analytics & automation</span>
+                          <li className="flex items-center space-x-2">
+                            <CheckCircle className="w-4 h-4 text-connection-primary flex-shrink-0" />
+                            <span className="text-sm text-connection-text">Advanced analytics & automation</span>
                           </li>
                         </ul>
                         <Button className="w-full bg-connection-primary text-white hover:bg-connection-primary/90 transition-all">
@@ -289,31 +289,31 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
 
                     {/* Multi-Location Plan */}
                     <Card className="group hover:shadow-elegant transition-all duration-300 border-connection-primary/20 hover:border-connection-primary/40 bg-gradient-card">
-                      <CardContent className="p-8">
-                        <div className="text-center mb-8">
-                          <h3 className="text-2xl font-bold text-connection-text mb-2">Multi-Location</h3>
-                          <p className="text-connection-muted mb-4">Unlimited referring offices</p>
-                          <div className="mb-6">
-                            <span className="text-4xl font-bold text-connection-primary">$799</span>
-                            <span className="text-connection-muted">/month</span>
+                      <CardContent className="p-6">
+                        <div className="text-center mb-6">
+                          <h3 className="text-xl font-bold text-connection-text mb-2">Multi-Location</h3>
+                          <p className="text-sm text-connection-muted mb-3">Unlimited referring offices</p>
+                          <div className="mb-4">
+                            <span className="text-3xl font-bold text-connection-primary">$799</span>
+                            <span className="text-sm text-connection-muted">/month</span>
                           </div>
                         </div>
-                        <ul className="space-y-4 mb-8">
-                          <li className="flex items-center space-x-3">
-                            <CheckCircle className="w-5 h-5 text-connection-primary flex-shrink-0" />
-                            <span className="text-connection-text">Unlimited users</span>
+                        <ul className="space-y-3 mb-6">
+                          <li className="flex items-center space-x-2">
+                            <CheckCircle className="w-4 h-4 text-connection-primary flex-shrink-0" />
+                            <span className="text-sm text-connection-text">Unlimited users</span>
                           </li>
-                          <li className="flex items-center space-x-3">
-                            <CheckCircle className="w-5 h-5 text-connection-primary flex-shrink-0" />
-                            <span className="text-connection-text">Unlimited offices and locations</span>
+                          <li className="flex items-center space-x-2">
+                            <CheckCircle className="w-4 h-4 text-connection-primary flex-shrink-0" />
+                            <span className="text-sm text-connection-text">Unlimited offices and locations</span>
                           </li>
-                          <li className="flex items-center space-x-3">
-                            <CheckCircle className="w-5 h-5 text-connection-primary flex-shrink-0" />
-                            <span className="text-connection-text">Everything in Group + API access</span>
+                          <li className="flex items-center space-x-2">
+                            <CheckCircle className="w-4 h-4 text-connection-primary flex-shrink-0" />
+                            <span className="text-sm text-connection-text">Everything in Group + API access</span>
                           </li>
-                          <li className="flex items-center space-x-3">
-                            <CheckCircle className="w-5 h-5 text-connection-primary flex-shrink-0" />
-                            <span className="text-connection-text">Dedicated success manager</span>
+                          <li className="flex items-center space-x-2">
+                            <CheckCircle className="w-4 h-4 text-connection-primary flex-shrink-0" />
+                            <span className="text-sm text-connection-text">Dedicated success manager</span>
                           </li>
                         </ul>
                         <Button className="w-full bg-connection-primary/10 text-connection-primary hover:bg-connection-primary hover:text-white transition-all">

@@ -26,7 +26,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { timestamp } from '@/lib/dateSync';
 import { useToast } from '@/hooks/use-toast';
 import DOMPurify from 'dompurify';
-import { timestamp } from '@/lib/dateSync';
 
 interface InsightCard {
   title: string;
@@ -158,7 +157,7 @@ export function AIAssistant() {
     if (!question.trim() || isLoading) return;
 
     const userMessage: ChatMessage = {
-      id: getTimestamp().toString() + '-question',
+      id: timestamp().toString() + '-question',
       type: 'question',
       content: question,
       timestamp: new Date()
@@ -176,7 +175,7 @@ export function AIAssistant() {
       if (error) throw error;
 
       const aiMessage: ChatMessage = {
-        id: getTimestamp().toString() + '-answer',
+        id: timestamp().toString() + '-answer',
         type: 'answer',
         content: data.response,
         timestamp: new Date()
