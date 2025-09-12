@@ -47,6 +47,189 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_business_profiles: {
+        Row: {
+          brand_voice: Json | null
+          business_persona: Json
+          clinic_id: string | null
+          communication_style: string | null
+          competitive_advantages: string[] | null
+          created_at: string | null
+          id: string
+          last_updated: string | null
+          practice_values: string[] | null
+          specialties: string[] | null
+          target_audience: string | null
+          templates: Json | null
+          user_id: string
+        }
+        Insert: {
+          brand_voice?: Json | null
+          business_persona?: Json
+          clinic_id?: string | null
+          communication_style?: string | null
+          competitive_advantages?: string[] | null
+          created_at?: string | null
+          id?: string
+          last_updated?: string | null
+          practice_values?: string[] | null
+          specialties?: string[] | null
+          target_audience?: string | null
+          templates?: Json | null
+          user_id: string
+        }
+        Update: {
+          brand_voice?: Json | null
+          business_persona?: Json
+          clinic_id?: string | null
+          communication_style?: string | null
+          competitive_advantages?: string[] | null
+          created_at?: string | null
+          id?: string
+          last_updated?: string | null
+          practice_values?: string[] | null
+          specialties?: string[] | null
+          target_audience?: string | null
+          templates?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ai_generated_content: {
+        Row: {
+          content_type: string
+          created_at: string | null
+          feedback: string | null
+          generated_text: string
+          id: string
+          metadata: Json | null
+          quality_score: number | null
+          reference_id: string | null
+          status: string | null
+          updated_at: string | null
+          used: boolean | null
+          user_id: string
+        }
+        Insert: {
+          content_type: string
+          created_at?: string | null
+          feedback?: string | null
+          generated_text: string
+          id?: string
+          metadata?: Json | null
+          quality_score?: number | null
+          reference_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          used?: boolean | null
+          user_id: string
+        }
+        Update: {
+          content_type?: string
+          created_at?: string | null
+          feedback?: string | null
+          generated_text?: string
+          id?: string
+          metadata?: Json | null
+          quality_score?: number | null
+          reference_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          used?: boolean | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ai_response_templates: {
+        Row: {
+          created_at: string | null
+          effectiveness_score: number | null
+          id: string
+          is_active: boolean | null
+          template_name: string
+          template_text: string
+          template_type: string
+          updated_at: string | null
+          usage_count: number | null
+          user_id: string
+          variables: Json | null
+        }
+        Insert: {
+          created_at?: string | null
+          effectiveness_score?: number | null
+          id?: string
+          is_active?: boolean | null
+          template_name: string
+          template_text: string
+          template_type: string
+          updated_at?: string | null
+          usage_count?: number | null
+          user_id: string
+          variables?: Json | null
+        }
+        Update: {
+          created_at?: string | null
+          effectiveness_score?: number | null
+          id?: string
+          is_active?: boolean | null
+          template_name?: string
+          template_text?: string
+          template_type?: string
+          updated_at?: string | null
+          usage_count?: number | null
+          user_id?: string
+          variables?: Json | null
+        }
+        Relationships: []
+      }
+      ai_usage_tracking: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          estimated_cost: number | null
+          execution_time_ms: number | null
+          id: string
+          model_used: string | null
+          quality_rating: number | null
+          request_data: Json | null
+          response_data: Json | null
+          success: boolean | null
+          task_type: string
+          tokens_used: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          estimated_cost?: number | null
+          execution_time_ms?: number | null
+          id?: string
+          model_used?: string | null
+          quality_rating?: number | null
+          request_data?: Json | null
+          response_data?: Json | null
+          success?: boolean | null
+          task_type: string
+          tokens_used?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          estimated_cost?: number | null
+          execution_time_ms?: number | null
+          id?: string
+          model_used?: string | null
+          quality_rating?: number | null
+          request_data?: Json | null
+          response_data?: Json | null
+          success?: boolean | null
+          task_type?: string
+          tokens_used?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       campaign_deliveries: {
         Row: {
           action_mode: string | null

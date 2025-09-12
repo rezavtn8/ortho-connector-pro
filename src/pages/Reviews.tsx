@@ -23,7 +23,9 @@ import {
   MessageSquare,
   TrendingUp,
   Calendar,
-  User
+  User,
+  Bot,
+  Sparkles
 } from 'lucide-react';
 
 interface GoogleReview {
@@ -191,6 +193,52 @@ export function Reviews() {
       // Error handling is already done in the useGoogleReviews hook
     } finally {
       setLoading(false);
+    }
+  };
+
+  const generateAIResponse = async (reviewId: string) => {
+    if (!user?.id) return;
+
+    const review = reviews.find(r => r.google_review_id === reviewId);
+    if (!review) return;
+
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-assistant', {
+        body: {
+          task_type: 'review_response',
+          context: {
+            google_review_id: reviewId,
+            reviewer_name: review.author_name,
+            rating: review.rating,
+            review_text: review.text,
+            review_date: review.relative_time_description,
+          },
+          parameters: {
+            tone: 'professional and appreciative',
+          }
+        },
+        headers: {
+          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+
+      // Show generated response in a dialog or modal
+      // For now, we'll show it in a toast
+      toast({
+        title: 'AI Response Generated',
+        description: data.content.substring(0, 100) + '...',
+      });
+
+      return data.content;
+    } catch (error: any) {
+      console.error('Error generating AI response:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to generate AI response',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -528,6 +576,16 @@ export function Reviews() {
                 <Separator className="my-4" />
                 
                 <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => generateAIResponse(review.google_review_id)}
+                    className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
+                  >
+                    <Sparkles className="h-3 w-3 mr-1" />
+                    AI Response
+                  </Button>
+
                   <Button
                     variant={review.status_data?.status === 'handled' ? 'default' : 'outline'}
                     size="sm"
