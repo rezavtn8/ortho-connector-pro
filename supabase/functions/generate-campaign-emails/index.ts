@@ -185,26 +185,20 @@ serve(async (req) => {
     const lastName = userProfile?.last_name || '';
     const fullName = firstName && lastName ? `${firstName} ${lastName}` : user_name || 'Healthcare Professional';
     
-    // Format name with degrees if available
-    let nameWithDegrees = fullName;
-    if (userProfile?.degrees) {
-      nameWithDegrees = firstName ? `Dr. ${firstName} ${lastName}, ${userProfile.degrees}` : `Dr. ${fullName}, ${userProfile.degrees}`;
-    } else if (firstName) {
-      nameWithDegrees = `Dr. ${fullName}`;
-    }
-    
     const jobTitle = userProfile?.job_title || 'Healthcare Professional';
     const clinicName = clinicInfo?.name || clinic_name || 'our practice';
     const phone = userProfile?.phone || '';
     const email = userProfile?.email || user.email || '';
 
     const senderInfo = {
-      name: nameWithDegrees,
-      firstName: firstName || 'Dr.',
+      name: fullName,
+      firstName: firstName,
+      lastName: lastName,
       jobTitle: jobTitle,
       clinic: clinicName,
       phone: phone,
       email: email,
+      degrees: userProfile?.degrees || '',
       hasFullProfile: !!(userProfile?.first_name && userProfile?.last_name && userProfile?.job_title)
     };
 
@@ -222,13 +216,13 @@ serve(async (req) => {
 Write a warm and appreciative email that feels personal, not robotic. Keep it 2-4 short paragraphs.
 
 SENDER PROFILE:
-- Owner Name: ${senderInfo.firstName} ${senderInfo.lastName || ''}
-- Degrees: ${userProfile?.degrees || 'DDS'}
+- Owner Name: ${senderInfo.firstName} ${senderInfo.lastName}
+- Degrees: ${senderInfo.degrees || 'DDS'}
 - Role: ${senderInfo.jobTitle}
 - Practice: ${senderInfo.clinic}
 
 EMAIL STRUCTURE RULES:
-1. SALUTATION: Address by name only (no degrees). Example: "Dear Dr. ${senderInfo.firstName},"
+1. SALUTATION: Address recipient by last name only (no degrees). Extract likely owner name from office name. Example: "Dear Dr. [LastName],"
 2. BODY: Mention their role naturally if relevant. Tailor tone based on office type:
    - VIP/Warm Office (high referrals): Express sincere gratitude, highlight past year referrals, invite feedback
    - Stable Office: Acknowledge steady collaboration, thank for reliability, offer continued partnership  
@@ -236,7 +230,7 @@ EMAIL STRUCTURE RULES:
    - Cold Office: Keep polite/professional, introduce practice value, offer resources, extend collaboration invitation
 3. Use referral stats naturally, don't overload with numbers
 4. Maintain warm professional tone (formal but friendly with gratitude)
-5. SIGNATURE: Always include your full name WITH degrees, role, practice name, end with their office name
+5. SIGNATURE: Always include sender's full name WITH degrees, role, practice name, and end with mention of recipient office name
 
 ${gift_bundle ? `GIFT CONTEXT: Mention the thoughtful gift delivery as appreciation for partnership.` : `RELATIONSHIP FOCUS: Focus on strengthening professional partnerships.`}
 
@@ -302,7 +296,7 @@ EMAIL REQUIREMENTS:
    - Use referral data naturally (don't overwhelm with numbers)
    - ${gift_bundle ? 'Mention gift delivery as appreciation' : 'Focus on partnership strengthening'}
 3. Signature: 
-   ${nameWithDegrees}
+   ${senderInfo.name}${senderInfo.degrees ? ', ' + senderInfo.degrees : ''}
    ${senderInfo.jobTitle}
    ${senderInfo.clinic}
    ${senderInfo.phone ? senderInfo.phone : ''}
@@ -321,13 +315,12 @@ Write this as a polished, personal letter for this specific office. Avoid generi
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
+          model: 'gpt-5-2025-08-07',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: intelligentPrompt }
           ],
-          max_tokens: 1000,
-          temperature: 0.7,
+          max_completion_tokens: 1000,
         }),
       });
 
@@ -359,9 +352,10 @@ Write this as a polished, personal letter for this specific office. Avoid generi
         console.warn('Failed to parse AI response as JSON for:', office.name, parseError);
         // Ensure we have a proper signature if parsing failed
         if (!emailContent.includes(senderInfo.name)) {
-          emailBody += `\n\nBest regards,\n\n${senderInfo.name}\n${senderInfo.jobTitle}\n${senderInfo.clinic}`;
+          emailBody += `\n\nBest regards,\n\n${senderInfo.name}${senderInfo.degrees ? ', ' + senderInfo.degrees : ''}\n${senderInfo.jobTitle}\n${senderInfo.clinic}`;
           if (senderInfo.phone) emailBody += `\n${senderInfo.phone}`;
           emailBody += `\n${senderInfo.email}`;
+          emailBody += `\n\nWe look forward to continuing our partnership with ${office.name}.`;
         }
       }
 

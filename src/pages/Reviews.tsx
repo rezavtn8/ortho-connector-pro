@@ -202,19 +202,29 @@ export function Reviews() {
     const review = reviews.find(r => r.google_review_id === reviewId);
     if (!review) return;
 
+    toast({
+      title: 'Generating AI Response...',
+      description: 'Please wait while we craft a professional response.',
+    });
+
     try {
       const { data, error } = await supabase.functions.invoke('ai-assistant', {
         body: {
           task_type: 'review_response',
           context: {
+            reference_id: reviewId,
             google_review_id: reviewId,
             reviewer_name: review.author_name,
             rating: review.rating,
             review_text: review.text,
             review_date: review.relative_time_description,
+            review_time: new Date(review.time * 1000).toISOString(),
+            author_url: review.author_url,
+            profile_photo_url: review.profile_photo_url,
           },
           parameters: {
             tone: 'professional and appreciative',
+            length: 'short',
           }
         },
         headers: {
@@ -222,21 +232,41 @@ export function Reviews() {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('AI Assistant Error:', error);
+        
+        // Handle specific business profile missing error
+        if (error.message?.includes('Business profile not found')) {
+          toast({
+            title: 'Business Context Missing',
+            description: 'Building your business profile automatically...',
+          });
+          
+          // Try again - the function should auto-build now
+          return generateAIResponse(reviewId);
+        }
+        
+        throw error;
+      }
 
-      // Show generated response in a dialog or modal
-      // For now, we'll show it in a toast
+      // Show generated response with full content
       toast({
-        title: 'AI Response Generated',
-        description: data.content.substring(0, 100) + '...',
+        title: 'AI Response Generated ✨',
+        description: data.content,
+        duration: 8000,
       });
 
       return data.content;
     } catch (error: any) {
       console.error('Error generating AI response:', error);
+      
+      const errorMessage = error.message?.includes('Business profile') 
+        ? 'Please complete your business setup first.'
+        : error.message || 'Failed to generate AI response';
+        
       toast({
         title: 'Error',
-        description: 'Failed to generate AI response',
+        description: errorMessage,
         variant: 'destructive',
       });
     }
