@@ -63,33 +63,16 @@ const handler = async (req: Request): Promise<Response> => {
       .single();
 
     if (!businessProfile) {
-      console.log('No business profile found, building one automatically...');
-      
-      // Auto-build business context
-      const { data: buildResponse, error: buildError } = await supabase.functions.invoke('ai-business-context', {
-        body: { action: 'build' },
-        headers: {
-          Authorization: req.headers.get('Authorization')!,
-        },
+      return new Response(JSON.stringify({ 
+        error: 'Business profile not found. Please build your business context first.' 
+      }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
-
-      if (buildError || !buildResponse?.profile) {
-        return new Response(JSON.stringify({ 
-          error: 'Business profile not found and failed to auto-build. Please set up your business context.' 
-        }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        });
-      }
-
-      // Use the newly built profile
-      const newBusinessProfile = buildResponse.profile;
-      console.log('Auto-built business profile successfully');
     }
 
-    // Build system prompt based on business context (use auto-built if needed)
-    const activeProfile = businessProfile || buildResponse?.profile;
-    const systemPrompt = buildSystemPrompt(activeProfile, task_type);
+    // Build system prompt based on business context
+    const systemPrompt = buildSystemPrompt(businessProfile, task_type);
     
     // Build user prompt based on task type
     const userPrompt = buildUserPrompt(task_type, context, prompt, parameters);
@@ -104,12 +87,13 @@ const handler = async (req: Request): Promise<Response> => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-2025-08-07',
+        model: 'gpt-4.1-2025-04-14',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        max_completion_tokens: 1000,
+        max_tokens: 1000,
+        temperature: 0.7,
       }),
     });
 
@@ -121,7 +105,7 @@ const handler = async (req: Request): Promise<Response> => {
     const data = await response.json();
     const generatedContent = data.choices[0].message.content;
     const tokensUsed = data.usage?.total_tokens || 0;
-    const estimatedCost = calculateCost(tokensUsed, 'gpt-5-2025-08-07');
+    const estimatedCost = calculateCost(tokensUsed, 'gpt-4.1-2025-04-14');
 
     // Track usage
     await supabase
@@ -132,7 +116,7 @@ const handler = async (req: Request): Promise<Response> => {
         tokens_used: tokensUsed,
         estimated_cost: estimatedCost,
         execution_time_ms: Date.now() - startTime,
-        model_used: 'gpt-5-2025-08-07',
+        model_used: 'gpt-4.1-2025-04-14',
         request_data: { task_type, context, prompt, parameters },
         response_data: { content: generatedContent },
         success: true,
