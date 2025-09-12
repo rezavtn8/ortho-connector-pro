@@ -217,39 +217,34 @@ serve(async (req) => {
       console.log(`Generating email for office: ${office.name} with complete relationship data`);
       console.log(`Office stats:`, office.stats);
       
-      const systemPrompt = `You are an expert healthcare marketing professional writing personalized outreach emails. You have access to comprehensive patient referral data and relationship history. You must create professional, warm, and highly personalized emails that demonstrate deep understanding of the business relationship.
+      const systemPrompt = `You are an expert healthcare professional writing formal, professional, and respectful emails to referring offices. 
+
+Write a warm and appreciative email that feels personal, not robotic. Keep it 2-4 short paragraphs.
 
 SENDER PROFILE:
-- Name: ${senderInfo.name}
-- Position: ${senderInfo.jobTitle}
+- Owner Name: ${senderInfo.firstName} ${senderInfo.lastName || ''}
+- Degrees: ${userProfile?.degrees || 'DDS'}
+- Role: ${senderInfo.jobTitle}
 - Practice: ${senderInfo.clinic}
-- Has Complete Profile: ${senderInfo.hasFullProfile}
 
-CRITICAL WRITING GUIDELINES:
-- Use specific referral data and relationship history to demonstrate genuine knowledge of the partnership
-- Reference actual patient numbers, trends, and collaboration patterns when appropriate
-- Write with the tone of someone who actively manages and values this professional relationship
-- Be authentic about appreciation for past referrals and optimistic about future collaboration
-- Keep emails concise (2-3 paragraphs max) but data-informed and warm
-- Always include a complete professional signature with credentials
-- Focus on mutual success and patient care outcomes
-- Use natural, professional language that reflects expertise and genuine partnership
+EMAIL STRUCTURE RULES:
+1. SALUTATION: Address by name only (no degrees). Example: "Dear Dr. ${senderInfo.firstName},"
+2. BODY: Mention their role naturally if relevant. Tailor tone based on office type:
+   - VIP/Warm Office (high referrals): Express sincere gratitude, highlight past year referrals, invite feedback
+   - Stable Office: Acknowledge steady collaboration, thank for reliability, offer continued partnership  
+   - Declining Office: Gently note change without negativity, reassure support, invite discussion
+   - Cold Office: Keep polite/professional, introduce practice value, offer resources, extend collaboration invitation
+3. Use referral stats naturally, don't overload with numbers
+4. Maintain warm professional tone (formal but friendly with gratitude)
+5. SIGNATURE: Always include your full name WITH degrees, role, practice name, end with their office name
 
-RELATIONSHIP DATA USAGE:
-- Reference specific referral patterns when relevant (e.g., "the 15 patients you've referred over the past year")
-- Acknowledge relationship strength appropriately (new contact vs established partner)
-- Mention growth trends or partnership milestones when applicable
-- Show understanding of their contribution to patient care
-
-${gift_bundle ? `GIFT CONTEXT:
-This outreach includes delivering a thoughtful gift package as a gesture of appreciation for the ongoing professional partnership and patient referrals. Reference their specific contribution when appropriate.` : `RELATIONSHIP FOCUS:
-This is relationship-building outreach focused on strengthening professional partnerships and acknowledging mutual success in patient care.`}
+${gift_bundle ? `GIFT CONTEXT: Mention the thoughtful gift delivery as appreciation for partnership.` : `RELATIONSHIP FOCUS: Focus on strengthening professional partnerships.`}
 
 OUTPUT FORMAT:
-Return ONLY a valid JSON object with exactly these fields:
+Return ONLY a valid JSON object:
 {
-  "subject": "Personal, relationship-aware subject line under 60 characters",
-  "body": "Complete email body with data-informed content and proper signature"
+  "subject": "Professional subject line under 60 characters",
+  "body": "Complete email with proper salutation and signature"
 }`;
 
       const comprehensiveContext = `
@@ -280,27 +275,42 @@ ${senderInfo.jobTitle}
 ${senderInfo.clinic}
 ${senderInfo.phone ? senderInfo.phone + '\n' : ''}${senderInfo.email}`;
 
-      const intelligentPrompt = `Create a highly personalized, data-informed email for this healthcare office. Use the comprehensive referral relationship data to write an authentic, professional message.
+      const intelligentPrompt = `Create a formal, professional, and respectful email following the exact structure specified.
 
-${comprehensiveContext}
+RECIPIENT OFFICE DETAILS:
+- Office Name: ${office.name}
+- Owner/Contact: [Determine from office name - extract likely owner name]
+- Office Type: ${office.stats.relationshipStrength}
+- Total Referrals: ${office.stats.totalReferrals}
+- Recent Referrals (6 months): ${office.stats.recentReferrals}
+- Last Referral: ${office.stats.lastReferralMonth || 'No recent referrals'}
+${office.address ? `- Location: ${office.address}` : ''}
 
-Write an email that:
-1. Has a warm, personal subject line including "${senderInfo.firstName}" that reflects the relationship level
-2. Opens with genuine acknowledgment of the specific professional relationship and referral history
-3. ${office.stats.totalReferrals > 0 ? `References their ${office.stats.totalReferrals} patient referrals and expresses genuine appreciation` : 'Introduces your practice and expresses interest in building a referral relationship'}
-4. ${gift_bundle ? `Mentions the gift delivery as appreciation for their ${office.stats.relationshipStrength.toLowerCase()} partnership` : `Focuses on strengthening the professional partnership and collaboration opportunities`}
-5. Suggests a specific, appropriate next step based on relationship level (${office.stats.relationshipStrength})
-6. Includes the complete signature as specified above
-7. Demonstrates understanding of their role in patient care and outcomes
+CAMPAIGN: ${campaign_name}
+${gift_bundle ? `GIFT DELIVERY: ${gift_bundle.name} - ${gift_bundle.description}` : ''}
 
-RELATIONSHIP-SPECIFIC APPROACH:
-${office.stats.relationshipStrength === 'Strong Partner' ? '- Write as a valued, established partner expressing continued appreciation' :
-  office.stats.relationshipStrength === 'Active Partner' ? '- Write as an appreciative colleague acknowledging growing partnership' :
-  office.stats.relationshipStrength === 'Growing Partner' ? '- Write as someone who values the developing relationship' :
-  office.stats.relationshipStrength === 'Occasional Partner' ? '- Write to encourage more regular collaboration' :
-  '- Write as a professional introduction seeking to establish a referral relationship'}
+EMAIL REQUIREMENTS:
+1. Salutation: "Dear Dr. [LastName]," (name only, no degrees)
+2. Body (2-4 short paragraphs):
+   ${office.stats.relationshipStrength === 'Strong Partner' || office.stats.relationshipStrength === 'Active Partner' ? 
+     '- Express sincere gratitude for their ' + office.stats.totalReferrals + ' referrals' :
+   office.stats.relationshipStrength === 'Growing Partner' ? 
+     '- Acknowledge steady collaboration and reliability' :
+   office.stats.relationshipStrength === 'Occasional Partner' ? 
+     '- Gently note change in referral pattern, offer support' :
+     '- Professional introduction, offer practice value and resources'}
+   - Use referral data naturally (don't overwhelm with numbers)
+   - ${gift_bundle ? 'Mention gift delivery as appreciation' : 'Focus on partnership strengthening'}
+3. Signature: 
+   ${nameWithDegrees}
+   ${senderInfo.jobTitle}
+   ${senderInfo.clinic}
+   ${senderInfo.phone ? senderInfo.phone : ''}
+   ${senderInfo.email}
+   
+   "We look forward to continuing our partnership with ${office.name}."
 
-Make this email sound like it comes from someone who genuinely understands and values this specific professional relationship.`;
+Write this as a polished, personal letter for this specific office. Avoid generic phrasing.`;
 
       console.log('Sending prompt to OpenAI for:', office.name);
 
