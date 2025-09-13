@@ -55,20 +55,55 @@ const handler = async (req: Request): Promise<Response> => {
 
     const { task_type, context, prompt, parameters }: AIRequest = await req.json();
 
-    // Get business context for user
-    const { data: businessProfile } = await supabase
+    // Get business context for user - auto-build if missing
+    let { data: businessProfile } = await supabase
       .from('ai_business_profiles')
       .select('*')
       .eq('user_id', user.id)
       .single();
 
     if (!businessProfile) {
-      return new Response(JSON.stringify({ 
-        error: 'Business profile not found. Please build your business context first.' 
-      }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
+      console.log('No business profile found, auto-building from available data...');
+      
+      // Auto-build business profile from available data
+      const { data: userProfile } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      const { data: clinic } = await supabase
+        .from('clinics')
+        .select('*')
+        .eq('owner_id', user.id)
+        .maybeSingle();
+
+      // Create a basic business profile
+      const autoProfile = {
+        user_id: user.id,
+        business_persona: {
+          practice_name: clinic?.name || userProfile?.clinic_name || 'Healthcare Practice',
+          owner_name: `${userProfile?.first_name || ''} ${userProfile?.last_name || ''}`.trim() || 'Doctor',
+          owner_title: userProfile?.job_title || 'Healthcare Professional',
+          degrees: userProfile?.degrees || 'DDS',
+          location: clinic?.address || 'Healthcare Location'
+        },
+        communication_style: 'professional',
+        brand_voice: {
+          tone: 'professional',
+          values: ['patient care', 'excellence', 'trust']
+        }
+      };
+
+      // Insert the auto-built profile
+      const { data: newProfile } = await supabase
+        .from('ai_business_profiles')
+        .insert(autoProfile)
+        .select()
+        .single();
+
+      businessProfile = newProfile || autoProfile;
+      console.log('Auto-built business profile:', businessProfile);
     }
 
     // Build system prompt based on business context
@@ -86,15 +121,14 @@ const handler = async (req: Request): Promise<Response> => {
         'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: 'gpt-4.1-2025-04-14',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        max_tokens: 1000,
-        temperature: 0.7,
-      }),
+        body: JSON.stringify({
+          model: 'gpt-5-2025-08-07',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          max_completion_tokens: 1500,
+        }),
     });
 
     if (!response.ok) {
@@ -116,7 +150,7 @@ const handler = async (req: Request): Promise<Response> => {
         tokens_used: tokensUsed,
         estimated_cost: estimatedCost,
         execution_time_ms: Date.now() - startTime,
-        model_used: 'gpt-4.1-2025-04-14',
+        model_used: 'gpt-5-2025-08-07',
         request_data: { task_type, context, prompt, parameters },
         response_data: { content: generatedContent },
         success: true,
