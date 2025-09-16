@@ -242,21 +242,46 @@ IMPORTANT: Always maintain a ${brand_voice.tone} tone that reflects the practice
 
   switch (taskType) {
     case 'email_generation':
-      return basePrompt + `
+      return `You are a GPT-powered assistant writing **formal, professional, and personalized emails** for ${business_persona.practice_name}'s Partnering Offices platform.
 
-TASK: Generate professional referral relationship emails.
+You are given live referral data and relationship metadata for a dental or medical office that has referred patients to our practice (e.g. an endodontic or surgical center).
 
-REQUIREMENTS:
-1. Address recipient by name only (no degrees) in salutation
-2. Include degrees only in your signature
-3. Tailor tone based on referral relationship strength
-4. Use referral data naturally, don't overload with numbers
-5. Always end with the referring office's business name
-6. Keep to 2-4 short paragraphs
-7. Sound warm and appreciative, not robotic
+### OBJECTIVE
+Generate an editable email draft addressed to the office owner, tailored to their actual referral activity. This email will be sent by the owner of the specialty clinic. It should:
 
-SIGNATURE FORMAT:
-Best regards,
+- Match the appropriate tone based on the **RelationshipScore**
+- Use referral data thoughtfully (don't be robotic or over-numeric)
+- Highlight the owner's name and role (e.g., Dr. John Smith, General Dentist)
+- Mention the business name (both in opening and end)
+- End with: "Respectfully," followed by our sender's info
+- Leave a bit of room for manual additions
+
+### STRUCTURE
+1. **Greeting** (e.g., "Dear Dr. Smith,")
+2. **Intro Paragraph** – Varies based on their relationship score:
+   - VIP → Express deep appreciation and reinforce collaboration
+   - Warm → Thank them sincerely, offer support, ask if they need anything
+   - Sporadic → Mention recent activity and invite feedback
+   - Cold → Reintroduce our clinic, remind them of how we can help their patients
+3. **Referral Data Summary** – Gently reference:
+   - Number of referrals in the past year (rounded / described naturally)
+   - Treatment types (e.g., root canals, implants, trauma cases)
+   - Timing of most recent referral (e.g., "a few months ago," "earlier this year")
+4. **Call to Action** – One of:
+   - Invite feedback
+   - Ask if they'd like updated referral forms or CE events
+   - Invite them to reach out with any patient needs
+5. **Closing** – Always end with gratitude and mention the business name again
+
+### REQUIREMENTS
+- Never include degrees at the **start of the name**. Instead: "Dr. John Smith, DDS – General Dentist"
+- Include both contact person's name/role and business name in the first and last part of the email
+- Tone must be official, warm, and tailored to the situation. Slight variation between outputs is encouraged
+- If referral count is very low, avoid shame. Gently offer support or reconnection
+- Include {{ExtraNotes}} as an optional add-on at the end (if any)
+
+### SIGNATURE FORMAT:
+Respectfully,  
 ${business_persona.owner_name}, ${business_persona.degrees}
 ${business_persona.owner_title}
 ${business_persona.practice_name}`;
@@ -297,24 +322,25 @@ TASK: Provide professional assistance with healthcare practice communications.`;
 function buildUserPrompt(taskType: string, context: any, prompt?: string, parameters?: any): string {
   switch (taskType) {
     case 'email_generation':
-      return `Generate a professional referral relationship email with the following context:
+      return `Generate a professional referral relationship email using this structured data:
 
-RECIPIENT INFORMATION:
-- Owner Name: ${context.owner_name}
-- Owner Role: ${context.owner_role}
-- Office Name: ${context.office_name}
-- Office Type: ${context.office_type}
+OfficeName: ${context.office_name}
+OwnerName: ${context.owner_name || context.extracted_owner_name || 'Dr. [Owner]'}
+OwnerRole: ${context.owner_role || context.office_type || 'Healthcare Professional'}
+OwnerDegrees: ${context.owner_degrees || 'DDS'}
+ReferralCountPast12Months: ${context.recent_referrals_6months || 0}
+ReferralFrequency: ${context.referral_frequency || (context.average_monthly_referrals > 2 ? 'High' : context.average_monthly_referrals > 1 ? 'Moderate' : 'Low')}
+TreatmentTypesReferred: ${context.treatment_types || 'various dental procedures'}
+LastReferralDate: ${context.last_referral_month ? new Date(context.last_referral_month + '-01').toLocaleDateString() : 'N/A'}
+RelationshipScore: ${context.relationship_strength === 'VIP Partner' ? 'VIP' : 
+                   context.relationship_strength === 'Strong Partner' ? 'Warm' :
+                   context.relationship_strength === 'Active Partner' ? 'Warm' :
+                   context.relationship_strength === 'Growing Partner' ? 'Sporadic' : 'Cold'}
+ExtraNotes: ${context.office_notes || context.additional_info || ''}
 
-REFERRAL DATA:
-- Patients referred in last year: ${context.last_year_referrals}
-- Total lifetime referrals: ${context.total_referrals}
-- Last referral date: ${context.last_referral_date}
-- Referral trend: ${context.referral_trend}
+Generate the email following the established structure and requirements. Return ONLY the email content, no JSON wrapper.
 
-ADDITIONAL CONTEXT:
-${context.additional_info || 'N/A'}
-
-${prompt || 'Generate an appropriate email for this referral relationship.'}`;
+${prompt || ''}`;
 
     case 'review_response':
       return `Generate a professional response to this Google review:

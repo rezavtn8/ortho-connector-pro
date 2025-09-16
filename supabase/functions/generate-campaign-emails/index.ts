@@ -185,16 +185,94 @@ serve(async (req) => {
     for (const office of comprehensiveOfficeData) {
       console.log(`Generating AI email for: ${office.name} with complete platform data`);
 
-      // Extract owner name from office name (smart parsing)
-      const ownerMatch = office.name.match(/:\s*([A-Za-z\s]+?)(?:\s*,|$)/);
-      const extractedOwner = ownerMatch ? ownerMatch[1].trim() : office.name.split(':')[0];
+      // Smart owner name extraction with AI parsing if needed
+      let extractedOwner = 'Doctor';
+      let ownerRole = 'Healthcare Professional';
+      let ownerDegrees = 'DDS';
       
-      // Build comprehensive context for AI
+      // Try multiple parsing approaches
+      const colonSplit = office.name.includes(':') ? office.name.split(':') : [];
+      if (colonSplit.length > 1) {
+        // Format like "Practice Name: Dr. John Smith"
+        const afterColon = colonSplit[1].trim();
+        const drMatch = afterColon.match(/Dr\.?\s*([A-Za-z\s]+)/i);
+        if (drMatch) {
+          extractedOwner = `Dr. ${drMatch[1].trim()}`;
+        } else {
+          extractedOwner = afterColon;
+        }
+      } else {
+        // Try to extract from practice name patterns
+        const drMatch = office.name.match(/Dr\.?\s*([A-Za-z\s]+)/i);
+        if (drMatch) {
+          extractedOwner = `Dr. ${drMatch[1].trim()}`;
+        } else {
+          // Use first part of office name
+          extractedOwner = office.name.split(/[,&-]/)[0].trim();
+        }
+      }
+      
+      // Determine role from office type
+      if (office.officeSource?.source_type) {
+        const sourceType = office.officeSource.source_type.toLowerCase();
+        if (sourceType.includes('general') || sourceType.includes('family')) {
+          ownerRole = 'General Dentist';
+        } else if (sourceType.includes('ortho')) {
+          ownerRole = 'Orthodontist';
+          ownerDegrees = 'DDS, MS';
+        } else if (sourceType.includes('oral') || sourceType.includes('surgeon')) {
+          ownerRole = 'Oral Surgeon';
+          ownerDegrees = 'DDS, MD';
+        } else if (sourceType.includes('perio')) {
+          ownerRole = 'Periodontist';
+          ownerDegrees = 'DDS, MS';
+        } else if (sourceType.includes('endo')) {
+          ownerRole = 'Endodontist';
+          ownerDegrees = 'DDS, MS';
+        } else if (sourceType.includes('pediatric')) {
+          ownerRole = 'Pediatric Dentist';
+          ownerDegrees = 'DDS, MS';
+        } else {
+          ownerRole = 'Healthcare Professional';
+        }
+      }
+      
+      // Calculate treatment types from referral patterns
+      let treatmentTypes = 'various procedures';
+      if (office.officeSource?.source_type?.toLowerCase().includes('general')) {
+        treatmentTypes = 'endodontic cases, complex restorations';
+      } else if (office.officeSource?.source_type?.toLowerCase().includes('ortho')) {
+        treatmentTypes = 'pre-orthodontic endodontics';
+      }
+      
+      // Calculate referral frequency
+      let referralFrequency = 'Low';
+      if (office.stats.averageMonthly >= 3) referralFrequency = 'High';
+      else if (office.stats.averageMonthly >= 1.5) referralFrequency = 'Moderate';
+      
+      // Map relationship strength to user's classification
+      let mappedRelationship = 'Cold';
+      if (office.stats.relationshipStrength.includes('VIP')) mappedRelationship = 'VIP';
+      else if (office.stats.relationshipStrength.includes('Strong') || office.stats.relationshipStrength.includes('Active')) mappedRelationship = 'Warm';
+      else if (office.stats.relationshipStrength.includes('Growing') || office.stats.relationshipStrength.includes('Occasional')) mappedRelationship = 'Sporadic';
+      
+      // Build structured context matching user's specification
       const comprehensiveContext = {
         task_type: 'email_generation',
         context: {
-          // Recipient Information
+          // Structured Input Fields (matching user specification)
           office_name: office.name,
+          owner_name: extractedOwner,
+          owner_role: ownerRole,
+          owner_degrees: ownerDegrees,
+          referral_count_past_12_months: office.stats.totalReferrals,
+          referral_frequency: referralFrequency,
+          treatment_types_referred: treatmentTypes,
+          last_referral_date: office.stats.lastReferralMonth,
+          relationship_score: mappedRelationship,
+          extra_notes: office.officeSource?.notes || '',
+          
+          // Supporting Data for Context
           office_address: office.address,
           office_type: office.officeSource?.source_type || 'Healthcare Office',
           extracted_owner_name: extractedOwner,
@@ -205,7 +283,7 @@ serve(async (req) => {
           last_referral_month: office.stats.lastReferralMonth,
           months_active: office.stats.monthsActive,
           average_monthly_referrals: office.stats.averageMonthly,
-          relationship_strength: office.stats.relationshipStrength,
+          relationship_strength: mappedRelationship,
           
           // Visit History Context
           total_visits: office.stats.visitCount,
@@ -214,18 +292,6 @@ serve(async (req) => {
           
           // Campaign History
           previous_campaigns: office.stats.campaignCount,
-          campaign_details: office.campaignHistory.map(c => ({
-            name: c.name,
-            date: c.created_at,
-            status: c.status
-          })),
-          
-          // Office Details
-          office_phone: office.officeSource?.phone,
-          office_email: office.officeSource?.email,
-          office_website: office.officeSource?.website,
-          google_rating: office.officeSource?.google_rating,
-          office_notes: office.officeSource?.notes,
           
           // Current Campaign Context
           current_campaign: campaign_name,
@@ -236,25 +302,9 @@ serve(async (req) => {
           sender_degrees: userProfile?.degrees,
           sender_title: userProfile?.job_title,
           practice_name: clinic?.name || userProfile?.clinic_name || 'Healthcare Practice',
-          practice_address: clinic?.address,
-          practice_phone: userProfile?.phone,
-          practice_email: userProfile?.email,
-          
-          // Business Profile Context
-          communication_style: businessProfile?.communication_style || 'professional',
-          brand_voice: businessProfile?.brand_voice || { tone: 'professional' },
-          specialties: businessProfile?.specialties || [],
-          practice_values: businessProfile?.practice_values || [],
-          
-          // Platform Statistics for Context
-          total_practice_sources: allSources?.length || 0,
-          total_practice_referrals: allReferralHistory?.reduce((sum, r) => sum + (r.patient_count || 0), 0) || 0,
-          active_referral_relationships: allSources?.filter(s => 
-            allReferralHistory?.some(r => r.source_id === s.id && r.patient_count > 0)
-          ).length || 0
         },
         parameters: {
-          tone: office.stats.relationshipStrength.includes('VIP') || office.stats.relationshipStrength.includes('Strong') 
+          tone: mappedRelationship === 'VIP' || mappedRelationship === 'Warm' 
             ? 'warm_appreciative' : 'professional_welcoming',
           style: 'personalized',
           include_data: true
