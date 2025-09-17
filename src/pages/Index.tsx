@@ -62,6 +62,7 @@ const Index = () => {
       'map-view': MapView,
       'analytics': Analytics,
       'ai-assistant': AIAssistant,
+      'creator': (props: any) => <AIAssistant {...props} defaultTab="creator" />,
       'logs': Logs,
       'settings': Settings,
     };

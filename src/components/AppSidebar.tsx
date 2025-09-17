@@ -13,7 +13,8 @@ import {
   BarChart3,
   MessageSquare,
   Search,
-  Bot
+  Bot,
+  Palette
 } from 'lucide-react';
 import {
   Sidebar,
@@ -44,6 +45,7 @@ const mainNavItems = [
   { id: 'offices', title: 'Partner Offices', icon: Building },
   { id: 'analytics', title: 'Reports', icon: TrendingUp },
   { id: 'ai-assistant', title: 'AI Assistant', icon: Bot },
+  { id: 'creator', title: 'Creator', icon: Palette },
 ];
 
 const managementItems = [

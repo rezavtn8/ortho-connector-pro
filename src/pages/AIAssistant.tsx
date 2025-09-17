@@ -9,8 +9,12 @@ import { Bot, MessageSquare, Mail, FileText, BarChart3, Settings, Activity, Buil
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 
-export function AIAssistant() {
-  const [activeTab, setActiveTab] = useState('overview');
+interface AIAssistantProps {
+  defaultTab?: string;
+}
+
+export function AIAssistant({ defaultTab = 'overview' }: AIAssistantProps = {}) {
+  const [activeTab, setActiveTab] = useState(defaultTab);
   const [businessProfile, setBusinessProfile] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
