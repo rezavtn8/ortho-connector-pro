@@ -19,6 +19,7 @@ import { Reviews } from '@/pages/Reviews';
 import { Discover } from '@/pages/Discover';
 import { Logs } from '@/pages/Logs';
 import { AIAssistant } from '@/pages/AIAssistant';
+import { Creator } from '@/pages/Creator';
 
 const Index = () => {
   const { user, loading } = useAuth();
@@ -62,7 +63,7 @@ const Index = () => {
       'map-view': MapView,
       'analytics': Analytics,
       'ai-assistant': AIAssistant,
-      'creator': (props: any) => <AIAssistant {...props} defaultTab="creator" />,
+      'creator': Creator,
       'logs': Logs,
       'settings': Settings,
     };
