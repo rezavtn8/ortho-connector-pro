@@ -1,13 +1,44 @@
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { 
-  CustomError, 
-  NetworkError, 
-  ValidationError, 
-  AuthenticationError,
-  getErrorMessage,
-  getErrorCode 
-} from "./errorUtils";
+// Error classes inline
+class CustomError extends Error {
+  constructor(message: string, public code?: string) {
+    super(message);
+    this.name = 'CustomError';
+  }
+}
+
+class NetworkError extends CustomError {
+  constructor(message: string) {
+    super(message, 'NETWORK_ERROR');
+    this.name = 'NetworkError';
+  }
+}
+
+class ValidationError extends CustomError {
+  constructor(message: string) {
+    super(message, 'VALIDATION_ERROR');
+    this.name = 'ValidationError';
+  }
+}
+
+class AuthenticationError extends CustomError {
+  constructor(message: string) {
+    super(message, 'AUTH_ERROR');
+    this.name = 'AuthenticationError';
+  }
+}
+
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  return 'An unknown error occurred';
+};
+
+const getErrorCode = (error: unknown): string => {
+  if (error instanceof CustomError && error.code) return error.code;
+  return 'UNKNOWN_ERROR';
+};
 
 interface ErrorContext {
   component?: string;

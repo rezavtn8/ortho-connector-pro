@@ -21,7 +21,42 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, Gift, Mail, Crown, DollarSign } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { sanitizeText } from '@/lib/sanitize';
-import { GIFT_BUNDLES, OFFICE_TIER_FILTERS, GiftBundle } from '@/data/giftBundles';
+// Gift bundle data inline
+interface GiftBundle {
+  id: string;
+  name: string;
+  description: string;
+  items: string[];
+  cost: number;
+  is_premium: boolean;
+}
+
+const GIFT_BUNDLES: GiftBundle[] = [
+  {
+    id: 'basic',
+    name: 'Basic Appreciation',
+    description: 'Simple thank you package',
+    items: ['Thank you card', 'Branded pen'],
+    cost: 15,
+    is_premium: false
+  },
+  {
+    id: 'premium',
+    name: 'Premium Package',
+    description: 'Comprehensive appreciation package',
+    items: ['Thank you card', 'Branded items', 'Gift card'],
+    cost: 50,
+    is_premium: true
+  }
+];
+
+const OFFICE_TIER_FILTERS = [
+  { label: 'All Tiers', value: 'all' },
+  { label: 'VIP', value: 'VIP' },
+  { label: 'Warm', value: 'Warm' },
+  { label: 'Cold', value: 'Cold' },
+  { label: 'Dormant', value: 'Dormant' }
+];
 
 interface Office {
   id: string;
