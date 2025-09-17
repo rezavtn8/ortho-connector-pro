@@ -19,11 +19,10 @@ export function AIAssistant() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="setup">Business Setup</TabsTrigger>
           <TabsTrigger value="usage">Usage Dashboard</TabsTrigger>
-          <TabsTrigger value="templates">Templates</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -127,26 +126,6 @@ export function AIAssistant() {
 
         <TabsContent value="usage">
           <AIUsageDashboard />
-        </TabsContent>
-
-        <TabsContent value="templates">
-          <Card>
-            <CardHeader>
-              <CardTitle>AI Templates</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Manage and customize AI response templates for different scenarios.
-              </p>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-12">
-                <Bot className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">Templates Coming Soon</h3>
-                <p className="text-muted-foreground">
-                  Customize AI response templates for emails, reviews, and content creation.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
     </div>
