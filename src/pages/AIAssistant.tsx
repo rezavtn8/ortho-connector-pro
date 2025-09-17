@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AIBusinessSetup } from '@/components/AIBusinessSetup';
 import { AIUsageDashboard } from '@/components/AIUsageDashboard';
-import { Bot, MessageSquare, Mail, FileText, BarChart3, Settings, Activity, Building2, User, Network } from 'lucide-react';
+import { AIContentCreator } from '@/components/AIContentCreator';
+import { Bot, MessageSquare, Mail, FileText, BarChart3, Settings, Activity, Building2, User, Network, Palette } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -50,8 +51,9 @@ export function AIAssistant() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="creator">Creator</TabsTrigger>
           <TabsTrigger value="setup">Business Setup</TabsTrigger>
           <TabsTrigger value="usage">Usage Dashboard</TabsTrigger>
         </TabsList>
@@ -143,8 +145,8 @@ export function AIAssistant() {
                 <p className="text-sm text-muted-foreground mb-4">
                   Create marketing materials and practice communications with your brand voice.
                 </p>
-                <Button className="w-full" variant="outline">
-                  <FileText className="h-4 w-4 mr-2" />
+                <Button className="w-full" variant="outline" onClick={() => setActiveTab('creator')}>
+                  <Palette className="h-4 w-4 mr-2" />
                   Create Content
                 </Button>
               </CardContent>
@@ -186,6 +188,10 @@ export function AIAssistant() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="creator">
+          <AIContentCreator businessProfile={businessProfile} />
         </TabsContent>
 
         <TabsContent value="setup">
