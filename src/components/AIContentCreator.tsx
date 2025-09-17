@@ -59,8 +59,8 @@ const templates: Template[] = [
     type: 'thank-you',
     thumbnail: '💝',
     content: {
-      headline: 'Thank You!',
-      subheading: 'Your trust means everything to us',
+      headline: 'Thank You',
+      subheading: 'for your trust',
       body: 'We appreciate your confidence in {{practice_name}}. It has been our privilege to care for you and your family.',
       callToAction: 'Refer a friend and help us grow our family'
     }
@@ -221,29 +221,60 @@ export function AIContentCreator({ businessProfile }: AIContentCreatorProps) {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold mb-2">Template Gallery</h3>
-        <p className="text-sm text-muted-foreground">Choose a template to customize for your practice</p>
+    <div className="space-y-8 animate-fade-in">
+      <div className="text-center space-y-4">
+        <div className="space-y-2">
+          <h3 className="text-3xl font-playfair font-bold text-gray-800">Template Gallery</h3>
+          <div className="w-24 h-1 bg-gradient-primary mx-auto rounded-full"></div>
+        </div>
+        <p className="text-base font-inter text-muted-foreground max-w-2xl mx-auto">
+          Choose from our professionally designed templates and customize them with your practice details. Each template is optimized for print and digital use.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
         {templates.map((template) => (
-          <Card key={template.id} className="hover:shadow-lg transition-shadow cursor-pointer">
-            <CardHeader className="text-center pb-4">
-              <div className="flex justify-center mb-2">
-                <div className="text-4xl">{template.thumbnail}</div>
+          <Card key={template.id} className="hover:shadow-lg transition-all duration-300 cursor-pointer group border-2 hover:border-primary/20">
+            <CardHeader className="text-center pb-4 bg-gradient-to-br from-gray-50 to-white">
+              <div className="flex justify-center mb-3">
+                <div className="text-5xl group-hover:scale-110 transition-transform duration-300">{template.thumbnail}</div>
               </div>
-              <CardTitle className="text-lg">{template.title}</CardTitle>
+              <CardTitle className="text-xl font-playfair">{template.title}</CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4 min-h-[3rem]">
+            <CardContent className="pt-2">
+              <div className="mb-4 p-4 bg-gray-50 rounded-lg min-h-[80px] flex items-center justify-center">
+                <div className="text-center">
+                  {template.type === 'thank-you' ? (
+                    <div className="space-y-1">
+                      <div className="text-lg font-inter font-light tracking-wider text-gray-700 uppercase">THANK</div>
+                      <div className="text-2xl font-script text-gray-600">You</div>
+                      <div className="text-xs font-inter text-gray-500 mt-1">FOR YOUR TRUST</div>
+                    </div>
+                  ) : template.type === 'welcome' ? (
+                    <div className="space-y-1">
+                      <div className="text-sm font-playfair text-gray-700">Welcome to</div>
+                      <div className="text-lg font-script text-primary">Your Practice</div>
+                    </div>
+                  ) : template.type === 'brochure' ? (
+                    <div className="space-y-1">
+                      <div className="text-lg font-playfair font-bold text-gray-700">Practice Name</div>
+                      <div className="text-sm font-inter text-primary">Excellence in Care</div>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <div className="text-lg font-playfair text-gray-700">Announcement</div>
+                      <div className="text-sm font-inter text-primary">New Achievement</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4 min-h-[3rem] font-inter">
                 {template.description}
               </p>
               <Sheet open={isCustomizing && selectedTemplate?.id === template.id} onOpenChange={setIsCustomizing}>
                 <SheetTrigger asChild>
                   <Button 
-                    className="w-full" 
+                    className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors font-inter" 
                     onClick={() => handleCustomize(template)}
                   >
                     <Palette className="h-4 w-4 mr-2" />
@@ -353,34 +384,95 @@ export function AIContentCreator({ businessProfile }: AIContentCreatorProps) {
                             </DialogDescription>
                           </DialogHeader>
                           
-                          <div className="bg-white p-8 border rounded-lg shadow-sm print:shadow-none">
-                            <div className="text-center space-y-4">
-                              <h1 className="text-3xl font-bold text-gray-800">
-                                {generatedContent?.headline || selectedTemplate?.content.headline}
-                              </h1>
-                              <h2 className="text-xl text-gray-600">
-                                {generatedContent?.subheading || selectedTemplate?.content.subheading}
-                              </h2>
-                              <div className="border-t border-gray-200 pt-4">
-                                <p className="text-gray-700 leading-relaxed mb-4">
-                                  {generatedContent?.body || selectedTemplate?.content.body}
-                                </p>
-                                <div className="bg-primary/5 p-4 rounded-lg">
-                                  <p className="font-medium text-primary">
-                                    {generatedContent?.callToAction || selectedTemplate?.content.callToAction}
-                                  </p>
-                                </div>
-                                {formData.contactInfo && (
-                                  <div className="mt-4 pt-4 border-t border-gray-200">
-                                    <p className="text-sm text-gray-600">{formData.contactInfo}</p>
-                                    {formData.address && (
-                                      <p className="text-sm text-gray-600">{formData.address}</p>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
+          <div className="bg-white border-2 border-gray-200 shadow-elegant rounded-lg overflow-hidden print:shadow-none max-w-md mx-auto">
+            <div className="p-12 text-center space-y-6 min-h-[400px] flex flex-col justify-center">
+              {selectedTemplate?.type === 'thank-you' ? (
+                <>
+                  <div className="space-y-3">
+                    <h1 className="text-4xl font-inter font-light tracking-wider text-gray-800 uppercase">
+                      THANK
+                    </h1>
+                    <h2 className="text-5xl font-script text-gray-700 -mt-2">
+                      {generatedContent?.headline?.includes('You') ? 'You' : 'You'}
+                    </h2>
+                  </div>
+                  <div className="space-y-4 pt-4">
+                    <p className="text-sm font-inter font-medium text-gray-600 tracking-widest uppercase">
+                      {generatedContent?.subheading?.replace(/['"]/g, '') || 'FOR YOUR TRUST'}
+                    </p>
+                    <p className="text-xs font-inter text-gray-500 tracking-wider">
+                      @{formData.practiceName.replace(/\s+/g, '').toLowerCase() || 'yourpractice'}
+                    </p>
+                  </div>
+                </>
+              ) : selectedTemplate?.type === 'welcome' ? (
+                <>
+                  <div className="space-y-4">
+                    <h1 className="text-3xl font-playfair font-semibold text-gray-800">
+                      Welcome to
+                    </h1>
+                    <h2 className="text-4xl font-script text-primary">
+                      {formData.practiceName || '{{practice_name}}'}
+                    </h2>
+                  </div>
+                  <div className="space-y-3 pt-4 border-t border-gray-200">
+                    <p className="text-sm font-inter text-gray-600 leading-relaxed">
+                      {generatedContent?.body?.replace(/['"]/g, '\"') || selectedTemplate?.content.body}
+                    </p>
+                  </div>
+                </>
+              ) : selectedTemplate?.type === 'brochure' ? (
+                <>
+                  <div className="space-y-4">
+                    <h1 className="text-4xl font-playfair font-bold text-gray-800">
+                      {formData.practiceName || '{{practice_name}}'}
+                    </h1>
+                    <h2 className="text-xl font-inter font-light text-primary tracking-wide">
+                      {generatedContent?.subheading?.replace(/['"]/g, '\"') || 'Excellence in Dental Care'}
+                    </h2>
+                  </div>
+                  <div className="space-y-4 pt-4">
+                    <p className="text-sm font-inter text-gray-700 leading-relaxed">
+                      {generatedContent?.body?.replace(/['"]/g, '\"') || selectedTemplate?.content.body}
+                    </p>
+                    <div className="bg-primary/5 p-4 rounded-lg">
+                      <p className="text-sm font-inter font-medium text-primary">
+                        {generatedContent?.callToAction?.replace(/['"]/g, '\"') || selectedTemplate?.content.callToAction}
+                      </p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="space-y-4">
+                    <h1 className="text-3xl font-playfair font-semibold text-gray-800">
+                      {generatedContent?.headline?.replace(/['"]/g, '\"') || selectedTemplate?.content.headline}
+                    </h1>
+                    <h2 className="text-xl font-script text-primary">
+                      {generatedContent?.subheading?.replace(/['"]/g, '\"') || selectedTemplate?.content.subheading}
+                    </h2>
+                  </div>
+                  <div className="space-y-4 pt-4 border-t border-gray-200">
+                    <p className="text-sm font-inter text-gray-700 leading-relaxed">
+                      {generatedContent?.body?.replace(/['"]/g, '\"') || selectedTemplate?.content.body}
+                    </p>
+                    <p className="text-sm font-inter font-medium text-primary">
+                      {generatedContent?.callToAction?.replace(/['"]/g, '\"') || selectedTemplate?.content.callToAction}
+                    </p>
+                  </div>
+                </>
+              )}
+              
+              {formData.contactInfo && (
+                <div className="pt-6 border-t border-gray-100 mt-8">
+                  <p className="text-xs font-inter text-gray-500 leading-relaxed">{formData.contactInfo}</p>
+                  {formData.address && (
+                    <p className="text-xs font-inter text-gray-500 mt-1">{formData.address}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
                           
                           <div className="flex justify-end">
                             <Button onClick={handleDownloadPDF}>
