@@ -113,6 +113,8 @@ const handler = async (req: Request): Promise<Response> => {
     const userPrompt = buildUserPrompt(task_type, context, prompt, parameters);
 
     console.log('AI Request:', { task_type, user_id: user.id });
+    console.log('System Prompt:', systemPrompt);
+    console.log('User Prompt:', userPrompt);
 
     // Make OpenAI API call
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -131,13 +133,17 @@ const handler = async (req: Request): Promise<Response> => {
         }),
     });
 
+    console.log('OpenAI Response Status:', response.status);
+
     if (!response.ok) {
       const errorData = await response.json();
+      console.error('OpenAI API Error:', errorData);
       throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`);
     }
 
     const data = await response.json();
     const generatedContent = data.choices[0].message.content;
+    console.log('Generated Content:', generatedContent);
     const tokensUsed = data.usage?.total_tokens || 0;
     const estimatedCost = calculateCost(tokensUsed, 'gpt-4.1-2025-04-14');
 

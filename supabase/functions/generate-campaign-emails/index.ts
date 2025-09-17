@@ -318,6 +318,8 @@ serve(async (req) => {
         body: comprehensiveContext
       });
 
+      console.log('AI Response for', office.name, ':', aiResponse);
+
       if (aiResponse.error) {
         console.error(`AI Assistant error for ${office.name}:`, aiResponse.error);
         throw new Error(`AI generation failed for ${office.name}: ${aiResponse.error.message}`);
@@ -325,7 +327,8 @@ serve(async (req) => {
 
       const aiContent = aiResponse.data?.content;
       if (!aiContent) {
-        throw new Error(`No content generated for ${office.name}`);
+        console.error(`No content in AI response for ${office.name}. Full response:`, JSON.stringify(aiResponse, null, 2));
+        throw new Error(`No content generated for ${office.name}. AI response: ${JSON.stringify(aiResponse.data)}`);
       }
 
       console.log(`AI generated content for ${office.name}:`, aiContent.substring(0, 200) + '...');
