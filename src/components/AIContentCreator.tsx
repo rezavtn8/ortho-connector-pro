@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,10 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Palette, FileText, Heart, GraduationCap, Eye, Download, Loader2, Wand2 } from 'lucide-react';
+import { Palette, FileText, Heart, GraduationCap, Eye, Download, Loader2, Wand2, Send, Bot, User, Sparkles, MessageSquare } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface Template {
   id: string;
@@ -91,6 +92,15 @@ interface FormData {
   logo: File | null;
 }
 
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+  suggestions?: string[];
+  template?: Template;
+}
+
 interface AIContentCreatorProps {
   businessProfile?: any;
 }
@@ -101,6 +111,11 @@ export function AIContentCreator({ businessProfile }: AIContentCreatorProps) {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<any>(null);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [userInput, setUserInput] = useState('');
+  const [isAIMode, setIsAIMode] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   
   const [formData, setFormData] = useState<FormData>({
@@ -128,6 +143,127 @@ export function AIContentCreator({ businessProfile }: AIContentCreatorProps) {
       }));
     }
   }, [businessProfile]);
+
+  // Scroll to bottom when new messages are added
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
+
+  // Initialize with welcome message
+  useEffect(() => {
+    if (chatMessages.length === 0) {
+      setChatMessages([{
+        id: '1',
+        role: 'assistant',
+        content: `Hi! I'm your AI content creator assistant. I can help you create professional marketing materials for your practice. What would you like to create today?`,
+        timestamp: new Date(),
+        suggestions: [
+          'Create a thank you card for patients',
+          'Design a practice brochure',
+          'Make a welcome card for new patients',
+          'Announce a new service or achievement'
+        ]
+      }]);
+    }
+  }, []);
+
+  const handleSendMessage = async () => {
+    if (!userInput.trim()) return;
+
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: userInput,
+      timestamp: new Date()
+    };
+
+    setChatMessages(prev => [...prev, userMessage]);
+    setUserInput('');
+    setIsTyping(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-assistant', {
+        body: {
+          prompt: `You are a helpful AI assistant that helps create marketing materials for medical practices. The user said: "${userInput}". 
+          
+          Based on their request, either:
+          1. Suggest a specific template from: brochure, welcome card, thank you card, or announcement
+          2. Ask clarifying questions about their practice
+          3. Provide helpful suggestions for content creation
+          
+          Be conversational, helpful, and professional. If you suggest a template, mention why it would be good for their needs.
+          
+          Practice info: ${formData.practiceName ? `Practice: ${formData.practiceName}` : 'No practice info yet'}
+          ${formData.specialty ? `Specialty: ${formData.specialty}` : ''}`,
+          context: 'content_creation_chat'
+        },
+        headers: {
+          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+
+      const aiResponse = data.content || data.response || "I'd be happy to help you create marketing materials! What type of content are you looking for?";
+      
+      // Determine if AI suggests a template
+      let suggestedTemplate = null;
+      let suggestions = [];
+      
+      if (aiResponse.toLowerCase().includes('thank you')) {
+        suggestedTemplate = templates.find(t => t.type === 'thank-you');
+        suggestions = ['Customize this template', 'Show me other options', 'Tell me more about thank you cards'];
+      } else if (aiResponse.toLowerCase().includes('welcome')) {
+        suggestedTemplate = templates.find(t => t.type === 'welcome');
+        suggestions = ['Customize this template', 'Show me other options', 'Tell me more about welcome cards'];
+      } else if (aiResponse.toLowerCase().includes('brochure')) {
+        suggestedTemplate = templates.find(t => t.type === 'brochure');
+        suggestions = ['Customize this template', 'Show me other options', 'Tell me more about brochures'];
+      } else if (aiResponse.toLowerCase().includes('announcement')) {
+        suggestedTemplate = templates.find(t => t.type === 'announcement');
+        suggestions = ['Customize this template', 'Show me other options', 'Tell me more about announcements'];
+      } else {
+        suggestions = [
+          'Create a thank you card',
+          'Design a welcome card', 
+          'Make a practice brochure',
+          'Announce something new'
+        ];
+      }
+
+      const assistantMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: aiResponse,
+        timestamp: new Date(),
+        suggestions,
+        template: suggestedTemplate || undefined
+      };
+
+      setChatMessages(prev => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      const errorMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: "I'm sorry, I'm having trouble responding right now. But I can still help you create great content! What would you like to make?",
+        timestamp: new Date(),
+        suggestions: [
+          'Create a thank you card',
+          'Design a welcome card', 
+          'Make a practice brochure'
+        ]
+      };
+      setChatMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setUserInput(suggestion);
+    handleSendMessage();
+  };
 
   const handleCustomize = (template: Template) => {
     setSelectedTemplate(template);
@@ -222,12 +358,151 @@ export function AIContentCreator({ businessProfile }: AIContentCreatorProps) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold mb-2">Template Gallery</h3>
-        <p className="text-sm text-muted-foreground">Choose a template to customize for your practice</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold mb-2">AI Content Creator</h3>
+          <p className="text-sm text-muted-foreground">Chat with AI to create personalized marketing materials</p>
+        </div>
+        <div className="flex gap-2">
+          <Button 
+            variant={isAIMode ? "default" : "outline"} 
+            onClick={() => setIsAIMode(true)}
+            className="flex items-center gap-2"
+          >
+            <Bot className="h-4 w-4" />
+            AI Chat
+          </Button>
+          <Button 
+            variant={!isAIMode ? "default" : "outline"} 
+            onClick={() => setIsAIMode(false)}
+            className="flex items-center gap-2"
+          >
+            <Palette className="h-4 w-4" />
+            Templates
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
+      {isAIMode ? (
+        <Card className="h-[600px] flex flex-col">
+          <CardHeader className="border-b bg-gradient-to-r from-primary/5 to-primary/10">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center bg-primary rounded-full">
+                <Sparkles className="h-5 w-5 text-primary-foreground" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">AI Creative Assistant</CardTitle>
+                <p className="text-sm text-muted-foreground">Tell me what you want to create, and I'll help you design it!</p>
+              </div>
+            </div>
+          </CardHeader>
+          
+          <CardContent className="flex-1 flex flex-col p-0">
+            <ScrollArea className="flex-1 p-4">
+              <div className="space-y-4">
+                {chatMessages.map((message) => (
+                  <div key={message.id} className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`flex gap-3 max-w-[80%] ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                      <div className={`flex h-8 w-8 items-center justify-center rounded-full ${
+                        message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'
+                      }`}>
+                        {message.role === 'user' ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
+                      </div>
+                      <div className="space-y-2">
+                        <div className={`rounded-lg p-3 ${
+                          message.role === 'user' 
+                            ? 'bg-primary text-primary-foreground' 
+                            : 'bg-muted'
+                        }`}>
+                          <p className="text-sm">{message.content}</p>
+                        </div>
+                        
+                        {message.template && (
+                          <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg p-3 border border-primary/20">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Sparkles className="h-4 w-4 text-primary" />
+                              <span className="text-sm font-medium">Suggested Template</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <div className="text-2xl">{message.template.thumbnail}</div>
+                              <div className="flex-1">
+                                <h4 className="font-medium text-sm">{message.template.title}</h4>
+                                <p className="text-xs text-muted-foreground">{message.template.description}</p>
+                              </div>
+                              <Button 
+                                size="sm" 
+                                onClick={() => handleCustomize(message.template!)}
+                                className="flex items-center gap-1"
+                              >
+                                <Palette className="h-3 w-3" />
+                                Use This
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {message.suggestions && message.suggestions.length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {message.suggestions.map((suggestion, idx) => (
+                              <Button
+                                key={idx}
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleSuggestionClick(suggestion)}
+                                className="text-xs h-7"
+                              >
+                                {suggestion}
+                              </Button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                
+                {isTyping && (
+                  <div className="flex gap-3 justify-start">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+                      <Bot className="h-4 w-4" />
+                    </div>
+                    <div className="bg-muted rounded-lg p-3">
+                      <div className="flex gap-1">
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div ref={chatEndRef} />
+            </ScrollArea>
+            
+            <div className="border-t p-4">
+              <div className="flex gap-2">
+                <Input
+                  value={userInput}
+                  onChange={(e) => setUserInput(e.target.value)}
+                  placeholder="Tell me what you want to create... (e.g., 'I need a thank you card for my dental practice')"
+                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                  className="flex-1"
+                />
+                <Button onClick={handleSendMessage} disabled={!userInput.trim() || isTyping}>
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <div>
+          <div className="mb-6">
+            <h4 className="text-md font-medium mb-2">Template Gallery</h4>
+            <p className="text-sm text-muted-foreground">Browse and customize pre-made templates</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
         {templates.map((template) => (
           <Card key={template.id} className="hover:shadow-lg transition-all duration-300 cursor-pointer group border-2 hover:border-primary/20">
             <CardHeader className="text-center pb-4 bg-gradient-to-br from-gray-50 to-white">
@@ -475,16 +750,18 @@ export function AIContentCreator({ businessProfile }: AIContentCreatorProps) {
                               Download PDF
                             </Button>
                           </div>
-                        </DialogContent>
-                      </Dialog>
-                    </div>
-                  </div>
-                </SheetContent>
-              </Sheet>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                         </DialogContent>
+                       </Dialog>
+                     </div>
+                   </div>
+                 </SheetContent>
+               </Sheet>
+             </CardContent>
+           </Card>
+         ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
