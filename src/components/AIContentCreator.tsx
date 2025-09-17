@@ -6,11 +6,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Palette, FileText, Heart, GraduationCap, Eye, Download, Loader2, Wand2, Send, Bot, User, Sparkles, MessageSquare } from 'lucide-react';
+import { Palette, FileText, Heart, GraduationCap, Eye, Download, Loader2, Wand2, Send, Bot, User, Sparkles, MessageSquare, BookOpen } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { WelcomeBooklet } from '@/components/WelcomeBooklet';
 
 interface Template {
   id: string;
@@ -115,6 +116,7 @@ export function AIContentCreator({ businessProfile }: AIContentCreatorProps) {
   const [userInput, setUserInput] = useState('');
   const [isAIMode, setIsAIMode] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [isWelcomeBookletOpen, setIsWelcomeBookletOpen] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   
@@ -503,6 +505,39 @@ export function AIContentCreator({ businessProfile }: AIContentCreatorProps) {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
+            {/* Welcome Booklet Card */}
+            <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer group border-2 hover:border-primary/20">
+              <CardHeader className="text-center pb-4 bg-gradient-to-br from-blue-50 to-indigo-50">
+                <div className="flex justify-center mb-3">
+                  <div className="text-5xl group-hover:scale-110 transition-transform duration-300">📖</div>
+                </div>
+                <CardTitle className="text-xl font-playfair">Welcome Booklet</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-2">
+                <div className="mb-4 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg min-h-[80px] flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="space-y-1">
+                      <BookOpen className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+                      <div className="text-sm font-medium text-blue-700">12-Page Guide</div>
+                      <div className="text-xs text-blue-600">Comprehensive patient welcome</div>
+                    </div>
+                  </div>
+                </div>
+                
+                <p className="text-sm text-muted-foreground mb-4 text-center">
+                  Professional welcome booklet for new patients with practice information, services, and guidelines
+                </p>
+                
+                <Button 
+                  onClick={() => setIsWelcomeBookletOpen(true)}
+                  className="w-full"
+                  variant="outline"
+                >
+                  Create Booklet
+                </Button>
+              </CardContent>
+            </Card>
+            
         {templates.map((template) => (
           <Card key={template.id} className="hover:shadow-lg transition-all duration-300 cursor-pointer group border-2 hover:border-primary/20">
             <CardHeader className="text-center pb-4 bg-gradient-to-br from-gray-50 to-white">
@@ -762,6 +797,12 @@ export function AIContentCreator({ businessProfile }: AIContentCreatorProps) {
           </div>
         </div>
       )}
+
+      <WelcomeBooklet
+        isOpen={isWelcomeBookletOpen}
+        onClose={() => setIsWelcomeBookletOpen(false)}
+        businessProfile={businessProfile}
+      />
     </div>
   );
 }
