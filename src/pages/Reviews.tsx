@@ -6,6 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useOptimizedArray } from '@/hooks/useOptimizedState';
@@ -25,7 +27,9 @@ import {
   Calendar,
   User,
   Bot,
-  Sparkles
+  Sparkles,
+  Copy,
+  X
 } from 'lucide-react';
 
 interface GoogleReview {
@@ -66,6 +70,12 @@ export function Reviews() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('newest');
   const [placeId, setPlaceId] = useState('');
+  const [aiResponseDialog, setAiResponseDialog] = useState<{
+    isOpen: boolean;
+    content: string;
+    reviewId: string;
+    loading: boolean;
+  }>({ isOpen: false, content: '', reviewId: '', loading: false });
 
   const { fetchReviews: fetchGoogleReviews } = useGoogleReviews();
 
@@ -202,6 +212,14 @@ export function Reviews() {
     const review = reviews.find(r => r.google_review_id === reviewId);
     if (!review) return;
 
+    // Open dialog and show loading state
+    setAiResponseDialog({
+      isOpen: true,
+      content: '',
+      reviewId,
+      loading: true
+    });
+
     try {
       const { data, error } = await supabase.functions.invoke('ai-assistant', {
         body: {
@@ -224,19 +242,44 @@ export function Reviews() {
 
       if (error) throw error;
 
-      // Show generated response in a dialog or modal
-      // For now, we'll show it in a toast
+      // Show the response in the dialog
+      setAiResponseDialog(prev => ({
+        ...prev,
+        content: data.content,
+        loading: false
+      }));
+
       toast({
         title: 'AI Response Generated',
-        description: data.content.substring(0, 100) + '...',
+        description: 'Review response has been generated successfully.',
       });
 
       return data.content;
     } catch (error: any) {
       console.error('Error generating AI response:', error);
+      setAiResponseDialog(prev => ({
+        ...prev,
+        loading: false
+      }));
       toast({
         title: 'Error',
         description: 'Failed to generate AI response',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({
+        title: 'Copied!',
+        description: 'Response copied to clipboard',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to copy to clipboard',
         variant: 'destructive',
       });
     }
@@ -618,6 +661,63 @@ export function Reviews() {
           ))}
         </div>
       )}
+
+      {/* AI Response Dialog */}
+      <Dialog open={aiResponseDialog.isOpen} onOpenChange={(open) => 
+        setAiResponseDialog(prev => ({ ...prev, isOpen: open }))
+      }>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Bot className="h-5 w-5 text-primary" />
+              AI-Generated Review Response
+            </DialogTitle>
+            <DialogDescription>
+              Here's an AI-generated professional response for this review. You can copy and paste it to Google My Business or use it as inspiration.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {aiResponseDialog.loading ? (
+              <div className="flex items-center justify-center py-8">
+                <Bot className="h-8 w-8 animate-pulse text-primary mr-2" />
+                <p className="text-muted-foreground">Generating AI response...</p>
+              </div>
+            ) : (
+              <>
+                <div className="border rounded-lg p-4 bg-muted/50">
+                  <Textarea
+                    value={aiResponseDialog.content}
+                    readOnly
+                    className="min-h-[120px] resize-none border-0 bg-transparent focus:ring-0"
+                    placeholder="AI response will appear here..."
+                  />
+                </div>
+                
+                {aiResponseDialog.content && (
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => copyToClipboard(aiResponseDialog.content)}
+                      className="flex-1"
+                    >
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copy Response
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      onClick={() => generateAIResponse(aiResponseDialog.reviewId)}
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Regenerate
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

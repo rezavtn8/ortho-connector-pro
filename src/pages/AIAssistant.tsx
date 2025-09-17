@@ -112,7 +112,7 @@ export function AIAssistant({ onPageChange, onSourceSelect }: AIAssistantProps =
                 <p className="text-sm text-muted-foreground mb-4">
                   Generate professional referral emails with business context and personalization.
                 </p>
-                <Button className="w-full" onClick={() => window.location.hash = 'campaigns'}>
+                <Button className="w-full" onClick={() => onPageChange?.('campaigns')}>
                   <Mail className="h-4 w-4 mr-2" />
                   Generate Emails
                 </Button>
@@ -130,7 +130,7 @@ export function AIAssistant({ onPageChange, onSourceSelect }: AIAssistantProps =
                 <p className="text-sm text-muted-foreground mb-4">
                   AI-powered responses to Google reviews that match your practice's voice.
                 </p>
-                <Button className="w-full" variant="outline" onClick={() => window.location.hash = 'reviews'}>
+                <Button className="w-full" variant="outline" onClick={() => onPageChange?.('reviews')}>
                   <MessageSquare className="h-4 w-4 mr-2" />
                   Manage Reviews
                 </Button>
