@@ -221,15 +221,10 @@ export function AIContentCreator({ businessProfile }: AIContentCreatorProps) {
   };
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      <div className="text-center space-y-4">
-        <div className="space-y-2">
-          <h3 className="text-3xl font-playfair font-bold text-gray-800">Template Gallery</h3>
-          <div className="w-24 h-1 bg-gradient-primary mx-auto rounded-full"></div>
-        </div>
-        <p className="text-base font-inter text-muted-foreground max-w-2xl mx-auto">
-          Choose from our professionally designed templates and customize them with your practice details. Each template is optimized for print and digital use.
-        </p>
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-semibold mb-2">Template Gallery</h3>
+        <p className="text-sm text-muted-foreground">Choose a template to customize for your practice</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">

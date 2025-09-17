@@ -41,15 +41,10 @@ export function Creator({ onPageChange, onSourceSelect }: CreatorProps) {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between mb-2">
-        <div className="text-center space-y-4">
-          <div className="space-y-2">
-            <h2 className="text-4xl font-playfair font-bold text-foreground">Content Creator</h2>
-            <div className="w-32 h-1 bg-gradient-primary mx-auto rounded-full"></div>
-          </div>
-          <p className="text-lg font-inter text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-            Create professional marketing materials with AI-powered templates. Design beautiful brochures, welcome cards, and thank you notes that reflect your practice's unique brand and personality.
-          </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Content Creator</h1>
+          <p className="text-muted-foreground">Create professional marketing materials with AI-powered templates</p>
         </div>
       </div>
 
