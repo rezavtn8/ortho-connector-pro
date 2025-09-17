@@ -123,14 +123,15 @@ const handler = async (req: Request): Promise<Response> => {
         'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
-        body: JSON.stringify({
-          model: 'gpt-5-2025-08-07',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
-          ],
-          max_completion_tokens: 1500,
-        }),
+      body: JSON.stringify({
+        model: 'gpt-5-2025-08-07',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        max_completion_tokens: 1500,
+        response_format: { type: 'text' },
+      }),
     });
 
     console.log('OpenAI Response Status:', response.status);
@@ -142,9 +143,43 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     const data = await response.json();
-    const generatedContent = data.choices[0].message.content;
-    console.log('Generated Content:', generatedContent);
-    const tokensUsed = data.usage?.total_tokens || 0;
+    let generatedContent = (data.choices?.[0]?.message?.content || '').toString();
+    console.log('Generated Content (gpt-5):', generatedContent?.slice(0, 200));
+    let tokensUsed = data.usage?.total_tokens || 0;
+
+    // Fallback: if empty content, retry with gpt-4.1 using legacy params
+    if (!generatedContent || !generatedContent.trim()) {
+      console.warn('Empty content from gpt-5, retrying with gpt-4.1-2025-04-14');
+      const response2 = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4.1-2025-04-14',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          max_tokens: 800,
+          temperature: 0.7,
+        }),
+      });
+
+      console.log('Fallback OpenAI Response Status:', response2.status);
+      if (!response2.ok) {
+        const errorData2 = await response2.json();
+        console.error('Fallback OpenAI API Error:', errorData2);
+        throw new Error(`OpenAI API error (fallback): ${errorData2.error?.message || 'Unknown error'}`);
+      }
+
+      const data2 = await response2.json();
+      generatedContent = (data2.choices?.[0]?.message?.content || '').toString();
+      console.log('Generated Content (gpt-4.1):', generatedContent?.slice(0, 200));
+      tokensUsed += data2.usage?.total_tokens || 0;
+    }
+
     const estimatedCost = calculateCost(tokensUsed, 'gpt-4.1-2025-04-14');
 
     // Track usage

@@ -325,26 +325,42 @@ serve(async (req) => {
         throw new Error(`AI generation failed for ${office.name}: ${aiResponse.error.message}`);
       }
 
-      const aiContent = aiResponse.data?.content;
-      if (!aiContent) {
-        console.error(`No content in AI response for ${office.name}. Full response:`, JSON.stringify(aiResponse, null, 2));
-        throw new Error(`No content generated for ${office.name}. AI response: ${JSON.stringify(aiResponse.data)}`);
-      }
-
-      console.log(`AI generated content for ${office.name}:`, aiContent.substring(0, 200) + '...');
-
-      // Parse AI response (should be structured)
+      const aiContent = (aiResponse.data?.content ?? '').toString();
       let emailSubject = `Partnership Update from ${userProfile?.first_name || 'Dr.'} ${userProfile?.last_name || 'Doctor'}`;
-      let emailBody = aiContent;
+      let emailBody = aiContent.trim();
 
-      try {
-        const parsed = JSON.parse(aiContent);
-        if (parsed.subject && parsed.body) {
-          emailSubject = parsed.subject;
-          emailBody = parsed.body;
-        }
-      } catch (parseError) {
-        console.log('Using AI content as-is (not JSON formatted)');
+      if (!emailBody) {
+        console.warn(`AI returned empty content for ${office.name}, using deterministic fallback.`);
+        // Build deterministic fallback email matching the required structure
+        const greetingName = (extractedOwner || 'Doctor').replace(/,.*$/, '').trim();
+        const practiceName = clinic?.name || userProfile?.clinic_name || 'Our Practice';
+        const senderLineName = `${userProfile?.first_name || 'Dr.'} ${userProfile?.last_name || 'Name'}`.trim();
+        const senderDegrees = userProfile?.degrees || 'DDS';
+        const senderTitle = userProfile?.job_title || 'Owner';
+
+        const intro = (
+          mappedRelationship === 'VIP' ?
+            `Thank you for your continued trust in ${practiceName}. We truly value our collaboration and the care you provide for your patients.` :
+          mappedRelationship === 'Warm' ?
+            `I appreciate the patients you've sent our way and wanted to check in to see how we can continue supporting your team and your patients.` :
+          mappedRelationship === 'Sporadic' ?
+            `We've noticed a few recent referrals and wanted to reach out to ensure our process supports your team well.` :
+            `I’m reaching out to reintroduce ${practiceName} and make sure you have everything you need for any future cases we can assist with.`
+        );
+
+        const referralsYear = office.stats.totalReferrals;
+        const lastRef = office.stats.lastReferralMonth ? 'earlier this year' : 'some time ago';
+        const dataSummary = `Over the past year, we’ve seen ${referralsYear || 0} referral${(referralsYear||0) === 1 ? '' : 's'}. Typical cases include ${treatmentTypes}. Our most recent case from your office was ${lastRef}.`;
+
+        const cta = (
+          mappedRelationship === 'VIP' || mappedRelationship === 'Warm' ?
+            `If you’d like updated referral forms, sample notes, or CE opportunities for your team, we’d be happy to share. Please let me know what would be most helpful.` :
+            `If you’d like updated referral forms or a quick refresher on our process, I’d be glad to send materials or connect briefly.`
+        );
+
+        emailBody = `---\n**EMAIL DRAFT:**\n\nDear ${greetingName},\n\n${intro}\n\n${dataSummary}\n\n${cta}\n\nRespectfully,\n${senderLineName}, ${senderDegrees}\n${senderTitle}\n${practiceName}`;
+      } else {
+        console.log(`AI generated content for ${office.name}:`, emailBody.substring(0, 200) + '...');
         // If not JSON, treat as email body and create subject
         emailSubject = `${campaign_name} - ${userProfile?.first_name || 'Dr.'} ${userProfile?.last_name || 'Doctor'}`;
       }
