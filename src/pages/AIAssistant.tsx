@@ -1,13 +1,44 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AIBusinessSetup } from '@/components/AIBusinessSetup';
 import { AIUsageDashboard } from '@/components/AIUsageDashboard';
-import { Bot, MessageSquare, Mail, FileText, BarChart3, Settings, Activity } from 'lucide-react';
+import { Bot, MessageSquare, Mail, FileText, BarChart3, Settings, Activity, Building2, User, Network } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 
 export function AIAssistant() {
   const [activeTab, setActiveTab] = useState('overview');
+  const [businessProfile, setBusinessProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    loadBusinessProfile();
+  }, [user]);
+
+  const loadBusinessProfile = async () => {
+    if (!user) return;
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-business-context', {
+        body: { action: 'get' },
+        headers: {
+          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+      });
+
+      if (!error && data.profile) {
+        setBusinessProfile(data.profile);
+      }
+    } catch (error: any) {
+      console.error('Error loading business profile:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -26,6 +57,43 @@ export function AIAssistant() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
+          {/* Business Profile Section */}
+          {businessProfile?.business_persona && (
+            <Card className="border-primary/20 bg-primary/5">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Building2 className="h-5 w-5 text-primary" />
+                  {businessProfile.business_persona.practice_name}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="flex items-center gap-2">
+                    <User className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">Practice Owner</p>
+                      <p className="text-sm text-muted-foreground">{businessProfile.business_persona.owner_name}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Network className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">Referral Network</p>
+                      <p className="text-sm text-muted-foreground">{businessProfile.business_persona.referral_network_size} sources</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Settings className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">Communication Style</p>
+                      <p className="text-sm text-muted-foreground capitalize">{businessProfile.communication_style?.replace('-', ' & ') || 'Professional'}</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* AI Features Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <Card className="hover:shadow-md transition-shadow">
@@ -39,7 +107,7 @@ export function AIAssistant() {
                 <p className="text-sm text-muted-foreground mb-4">
                   Generate professional referral emails with business context and personalization.
                 </p>
-                <Button className="w-full">
+                <Button className="w-full" onClick={() => window.location.hash = 'campaigns'}>
                   <Mail className="h-4 w-4 mr-2" />
                   Generate Emails
                 </Button>
