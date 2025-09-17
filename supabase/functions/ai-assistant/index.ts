@@ -116,7 +116,11 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('System Prompt:', systemPrompt);
     console.log('User Prompt:', userPrompt);
 
-    // Make OpenAI API call
+    // Make OpenAI API call (primary: gpt-4.1-2025-04-14)
+    let modelUsed = 'gpt-4.1-2025-04-14';
+    let generatedContent = '';
+    let tokensUsed = 0;
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -124,32 +128,32 @@ const handler = async (req: Request): Promise<Response> => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-2025-08-07',
+        model: modelUsed,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        max_completion_tokens: 1500,
-        response_format: { type: 'text' },
+        // gpt-4.1+ uses max_completion_tokens and does not support temperature
+        max_completion_tokens: 1200,
       }),
     });
 
     console.log('OpenAI Response Status:', response.status);
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error('OpenAI API Error:', errorData);
-      throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`);
+    if (response.ok) {
+      const data = await response.json();
+      generatedContent = (data.choices?.[0]?.message?.content || '').toString();
+      tokensUsed = data.usage?.total_tokens || 0;
+      console.log('Generated Content (primary gpt-4.1):', generatedContent?.slice(0, 200));
+    } else {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('OpenAI API Error (primary):', errorData);
     }
 
-    const data = await response.json();
-    let generatedContent = (data.choices?.[0]?.message?.content || '').toString();
-    console.log('Generated Content (gpt-5):', generatedContent?.slice(0, 200));
-    let tokensUsed = data.usage?.total_tokens || 0;
-
-    // Fallback: if empty content, retry with gpt-4.1 using legacy params
+    // Fallback: if primary failed or returned empty, retry with legacy gpt-4o-mini (supports temperature/max_tokens)
     if (!generatedContent || !generatedContent.trim()) {
-      console.warn('Empty content from gpt-5, retrying with gpt-4.1-2025-04-14');
+      console.warn('Primary model empty/failed, retrying with gpt-4o-mini');
+      modelUsed = 'gpt-4o-mini';
       const response2 = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -157,7 +161,7 @@ const handler = async (req: Request): Promise<Response> => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4.1-2025-04-14',
+          model: modelUsed,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }
@@ -169,18 +173,18 @@ const handler = async (req: Request): Promise<Response> => {
 
       console.log('Fallback OpenAI Response Status:', response2.status);
       if (!response2.ok) {
-        const errorData2 = await response2.json();
+        const errorData2 = await response2.json().catch(() => ({}));
         console.error('Fallback OpenAI API Error:', errorData2);
-        throw new Error(`OpenAI API error (fallback): ${errorData2.error?.message || 'Unknown error'}`);
+        throw new Error(`OpenAI API error (fallback)`);
       }
 
       const data2 = await response2.json();
       generatedContent = (data2.choices?.[0]?.message?.content || '').toString();
-      console.log('Generated Content (gpt-4.1):', generatedContent?.slice(0, 200));
+      console.log('Generated Content (fallback gpt-4o-mini):', generatedContent?.slice(0, 200));
       tokensUsed += data2.usage?.total_tokens || 0;
     }
 
-    const estimatedCost = calculateCost(tokensUsed, 'gpt-4.1-2025-04-14');
+    const estimatedCost = calculateCost(tokensUsed, modelUsed);
 
     // Track usage
     await supabase
@@ -191,7 +195,7 @@ const handler = async (req: Request): Promise<Response> => {
         tokens_used: tokensUsed,
         estimated_cost: estimatedCost,
         execution_time_ms: Date.now() - startTime,
-        model_used: 'gpt-5-2025-08-07',
+        model_used: modelUsed,
         request_data: { task_type, context, prompt, parameters },
         response_data: { content: generatedContent },
         success: true,
