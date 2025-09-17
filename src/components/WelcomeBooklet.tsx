@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Wand2, Download, X, Loader2, FileText } from 'lucide-react';
+import { Wand2, Download, X, Loader2, FileText, Sparkles } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -149,13 +149,14 @@ const generateBookletHTML = (data: BookletData) => {
     <div class="booklet-container">
       <!-- Page 1: Cover -->
       <div class="booklet-page cover-page">
-        <div class="cover-content">
-          <h1>Welcome to {{practiceName}}</h1>
+        <div class="cover-header">
+          <h1>{{practiceName}}</h1>
           <h2>{{tagline}}</h2>
-          <div class="doctor-info">
-            <h3>Dr. {{doctorName}}</h3>
-            <p>{{specialty}}</p>
-          </div>
+          <div class="specialty-badge">{{specialty}}</div>
+        </div>
+        <div class="cover-footer">
+          <p class="doctor-name">{{doctorName}}</p>
+          <p class="welcome-note">Welcome to Our Practice</p>
         </div>
       </div>
 
@@ -164,7 +165,6 @@ const generateBookletHTML = (data: BookletData) => {
         <h2>Welcome</h2>
         <div class="content">
           <p>{{welcomeMessage}}</p>
-          <p>{{practiceDescription}}</p>
         </div>
       </div>
 
@@ -172,23 +172,25 @@ const generateBookletHTML = (data: BookletData) => {
       <div class="booklet-page">
         <h2>About Our Practice</h2>
         <div class="content">
-          <p>At {{practiceName}}, we are committed to providing exceptional healthcare services in a comfortable and caring environment.</p>
+          <h3>Practice Overview</h3>
+          <p>{{practiceDescription}}</p>
+          
           <h3>Our Mission</h3>
           <p>{{missionStatement}}</p>
         </div>
       </div>
 
-      <!-- Page 4: Meet Dr. {{doctorName}} -->
+      <!-- Page 4: Meet the Doctor -->
       <div class="booklet-page">
-        <h2>Meet Dr. {{doctorName}}</h2>
+        <h2>Meet {{doctorName}}</h2>
         <div class="content">
-          <div class="doctor-profile">
-            <p>{{doctorMessageParagraph}}</p>
-            <h3>Education & Training</h3>
-            <p>{{education}}</p>
-            <h3>Experience</h3>
-            <p>{{experience}}</p>
-          </div>
+          <p>{{doctorMessageParagraph}}</p>
+          
+          <h3>Education & Training</h3>
+          <p>{{education}}</p>
+          
+          <h3>Experience</h3>
+          <p>{{experience}}</p>
         </div>
       </div>
 
@@ -196,7 +198,7 @@ const generateBookletHTML = (data: BookletData) => {
       <div class="booklet-page">
         <h2>Our Services</h2>
         <div class="content">
-          <p>We offer comprehensive medical services to meet all your healthcare needs:</p>
+          <p>We provide comprehensive care including:</p>
           <ul class="services-list">
             {{services}}
           </ul>
@@ -205,164 +207,161 @@ const generateBookletHTML = (data: BookletData) => {
 
       <!-- Page 6: Office Hours & Location -->
       <div class="booklet-page">
-        <h2>Office Hours & Location</h2>
+        <h2>Visit Us</h2>
         <div class="content">
           <h3>Office Hours</h3>
           <p>{{officeHours}}</p>
+          
           <h3>Location</h3>
           <p>{{address}}</p>
-          <h3>Contact Information</h3>
-          <p>{{contactInfo}}</p>
+          
+          <div class="contact-summary">
+            <p>{{contactInfo}}</p>
+          </div>
         </div>
       </div>
 
-      <!-- Page 7: Insurance & Billing -->
+      <!-- Page 7: Contact Information -->
+      <div class="booklet-page">
+        <h2>How to Reach Us</h2>
+        <div class="content">
+          <h3>Contact Information</h3>
+          <p>{{contactInfo}}</p>
+          
+          <h3>Appointment Scheduling</h3>
+          <p>{{appointmentInfo}}</p>
+        </div>
+      </div>
+
+      <!-- Page 8: Insurance & Billing -->
       <div class="booklet-page">
         <h2>Insurance & Billing</h2>
         <div class="content">
-          <h3>Insurance Information</h3>
+          <h3>Insurance Plans</h3>
           <p>{{insuranceInfo}}</p>
+          
           <h3>Payment Options</h3>
           <p>{{paymentOptions}}</p>
         </div>
       </div>
 
-      <!-- Page 8: Patient Portal -->
-      <div class="booklet-page">
-        <h2>Patient Portal</h2>
-        <div class="content">
-          <h3>Access Your Health Information Online</h3>
-          <p>{{patientPortalInfo}}</p>
-          <h3>Portal Features</h3>
-          <ul>
-            <li>View test results</li>
-            <li>Request appointments</li>
-            <li>Communicate with your care team</li>
-            <li>Access medical records</li>
-          </ul>
-        </div>
-      </div>
-
-      <!-- Page 9: Appointment Information -->
-      <div class="booklet-page">
-        <h2>Scheduling Your Appointment</h2>
-        <div class="content">
-          <p>{{appointmentInfo}}</p>
-          <h3>What to Bring</h3>
-          <ul>
-            <li>Valid photo ID</li>
-            <li>Insurance card</li>
-            <li>List of current medications</li>
-            <li>Medical history forms</li>
-          </ul>
-        </div>
-      </div>
-
-      <!-- Page 10: Emergency Information -->
-      <div class="booklet-page">
-        <h2>Emergency Information</h2>
-        <div class="content">
-          <h3>After Hours & Emergency Care</h3>
-          <p>{{emergencyInfo}}</p>
-          <h3>What Constitutes an Emergency</h3>
-          <ul>
-            <li>Severe chest pain</li>
-            <li>Difficulty breathing</li>
-            <li>Severe bleeding</li>
-            <li>Loss of consciousness</li>
-          </ul>
-        </div>
-      </div>
-
-      <!-- Page 11: Patient Resources -->
+      <!-- Page 9: Patient Resources -->
       <div class="booklet-page">
         <h2>Patient Resources</h2>
         <div class="content">
-          <h3>Health Education</h3>
-          <p>We provide various resources to help you maintain optimal health and wellness.</p>
-          <h3>Support Services</h3>
-          <p>{{supportServices}}</p>
-          <h3>Patient Testimonials</h3>
-          <div class="testimonial">
-            <p>"{{testimonial1}}"</p>
-          </div>
-          <div class="testimonial">
-            <p>"{{testimonial2}}"</p>
-          </div>
+          <h3>Patient Portal</h3>
+          <p>{{patientPortalInfo}}</p>
+          
+          <h3>Appointments</h3>
+          <p>{{appointmentInfo}}</p>
         </div>
       </div>
 
-      <!-- Page 12: Contact & Follow-up -->
+      <!-- Page 10: Support Services -->
       <div class="booklet-page">
-        <h2>Stay Connected</h2>
+        <h2>Additional Support</h2>
         <div class="content">
-          <h3>We're Here for You</h3>
-          <p>Your health and satisfaction are our top priorities. Please don't hesitate to contact us with any questions or concerns.</p>
-          <h3>Case Studies</h3>
+          <h3>Support Services</h3>
+          <p>{{supportServices}}</p>
+        </div>
+      </div>
+
+      <!-- Page 11: Emergency Information -->
+      <div class="booklet-page">
+        <h2>Emergency Care</h2>
+        <div class="content">
+          <h3>After-Hours & Emergencies</h3>
+          <p>{{emergencyInfo}}</p>
+        </div>
+      </div>
+
+      <!-- Page 12: Testimonials -->
+      <div class="booklet-page">
+        <h2>What Our Patients Say</h2>
+        <div class="content">
+          <div class="testimonial">
+            <p>"{{testimonial1}}"</p>
+          </div>
+          
+          <div class="testimonial">
+            <p>"{{testimonial2}}"</p>
+          </div>
+          
+          <h3>Success Stories</h3>
           <div class="case-study">
             <p>{{case1Description}}</p>
           </div>
+          
           <div class="case-study">
             <p>{{case2Description}}</p>
           </div>
-          <div class="contact-summary">
-            <h4>{{practiceName}}</h4>
-            <p>{{address}}</p>
-            <p>{{contactInfo}}</p>
+          
+          <div class="thank-you">
+            Thank you for choosing {{practiceName}}!
           </div>
-          <p class="thank-you">Thank you for choosing {{practiceName}} for your healthcare needs!</p>
         </div>
       </div>
     </div>
 
     <style>
       .booklet-container {
-        max-width: 800px;
-        margin: 0 auto;
-        font-family: 'Arial', sans-serif;
+        font-family: Georgia, serif;
         line-height: 1.6;
         color: #333;
+        max-width: 210mm;
+        margin: 0 auto;
       }
 
       .booklet-page {
-        background: white;
+        min-height: 297mm;
         padding: 40px;
         margin-bottom: 20px;
-        border: 1px solid #e0e0e0;
+        background: white;
+        box-shadow: 0 0 10px rgba(0,0,0,0.1);
         border-radius: 8px;
-        min-height: 500px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         page-break-after: always;
+        page-break-inside: avoid;
       }
 
       .cover-page {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
-        text-align: center;
         display: flex;
         flex-direction: column;
-        justify-content: center;
-        align-items: center;
+        justify-content: space-between;
+        text-align: center;
       }
 
-      .cover-page h1 {
+      .cover-header h1 {
         font-size: 3em;
         margin-bottom: 20px;
         font-weight: bold;
       }
 
-      .cover-page h2 {
+      .cover-header h2 {
         font-size: 1.5em;
-        margin-bottom: 40px;
+        margin-bottom: 30px;
         opacity: 0.9;
+        font-style: italic;
       }
 
-      .doctor-info h3 {
-        font-size: 2em;
+      .specialty-badge {
+        display: inline-block;
+        padding: 15px 30px;
+        background: rgba(255,255,255,0.2);
+        border-radius: 25px;
+        font-size: 1.2em;
+        font-weight: bold;
+        margin: 20px 0;
+      }
+
+      .cover-footer .doctor-name {
+        font-size: 1.8em;
+        font-weight: bold;
         margin-bottom: 10px;
       }
 
-      .doctor-info p {
+      .cover-footer .welcome-note {
         font-size: 1.2em;
         opacity: 0.8;
       }
@@ -372,28 +371,19 @@ const generateBookletHTML = (data: BookletData) => {
         border-bottom: 3px solid #667eea;
         padding-bottom: 10px;
         margin-bottom: 30px;
-        font-size: 2em;
+        font-size: 2.2em;
       }
 
       .booklet-page h3 {
-        color: #5a67d8;
+        color: #555;
         margin-top: 25px;
         margin-bottom: 15px;
         font-size: 1.3em;
       }
 
-      .booklet-page h4 {
-        color: #4c51bf;
-        margin-top: 20px;
-        margin-bottom: 10px;
-      }
-
-      .content {
-        font-size: 1.1em;
-      }
-
       .content p {
-        margin-bottom: 15px;
+        margin-bottom: 20px;
+        font-size: 1.1em;
       }
 
       .services-list, .content ul {
@@ -492,46 +482,46 @@ export function WelcomeBooklet({ isOpen, onClose, businessProfile }: WelcomeBook
     setPreviewHTML(generateBookletHTML(bookletData));
   }, [bookletData]);
 
-  const handleRegenerate = async () => {
+  const handleGenerateWithAI = async () => {
     setIsGenerating(true);
     try {
       const { data, error } = await supabase.functions.invoke('ai-assistant', {
         body: {
-          prompt: `Generate comprehensive content for a 12-page medical practice welcome booklet. Return ONLY a JSON object with the following structure:
+          prompt: `Generate content for a 12-page endodontic welcome booklet. Include fields such as practice name, tagline, doctor introduction, service list, testimonial quotes, referral explanation, and contact info. Return ONLY a JSON object with the following structure:
 
 {
-  "practiceName": "${bookletData.practiceName || 'Modern Medical Practice'}",
-  "doctorName": "${bookletData.doctorName || 'Dr. Smith'}",
-  "tagline": "Compelling practice tagline",
-  "specialty": "${bookletData.specialty || 'General Medicine'}",
-  "practiceDescription": "Detailed practice description (2-3 paragraphs)",
-  "missionStatement": "Clear mission statement",
-  "welcomeMessage": "Warm welcome message (2-3 paragraphs)",
-  "doctorMessageParagraph": "Personal message from the doctor",
-  "education": "Doctor's education and training",
-  "experience": "Doctor's experience and qualifications",
-  "service1": "Primary service offering",
-  "service2": "Second service offering",
-  "service3": "Third service offering", 
-  "service4": "Fourth service offering",
-  "service5": "Fifth service offering",
-  "officeHours": "Complete office hours schedule",
-  "address": "${bookletData.address || 'Practice address'}",
-  "contactInfo": "${bookletData.contactInfo || 'Contact information'}",
-  "insuranceInfo": "Insurance plans accepted and billing information",
-  "paymentOptions": "Available payment methods and financial policies",
-  "patientPortalInfo": "Patient portal access and features",
-  "appointmentInfo": "How to schedule appointments and preparation instructions",
-  "emergencyInfo": "After-hours and emergency contact procedures",
-  "supportServices": "Additional support services offered",
-  "testimonial1": "Realistic patient testimonial",
-  "testimonial2": "Second realistic patient testimonial",
-  "case1Description": "Success story or case study",
-  "case2Description": "Second success story or case study"
+  "practiceName": "${bookletData.practiceName || 'Endodontic Specialists'}",
+  "doctorName": "${bookletData.doctorName || 'Dr. Johnson'}",
+  "tagline": "Compelling endodontic practice tagline focused on root canal excellence",
+  "specialty": "Endodontics",
+  "practiceDescription": "Detailed endodontic practice description highlighting expertise in root canal therapy and dental pain management (2-3 paragraphs)",
+  "missionStatement": "Clear mission statement focused on preserving natural teeth through advanced endodontic care",
+  "welcomeMessage": "Warm welcome message explaining endodontic specialty and patient comfort (2-3 paragraphs)",
+  "doctorMessageParagraph": "Personal message from the endodontist about expertise and patient care philosophy",
+  "education": "Endodontist's specialized education, residency, and board certifications",
+  "experience": "Years of endodontic experience, case volume, and specialized training",
+  "service1": "Root Canal Therapy",
+  "service2": "Endodontic Retreatment",
+  "service3": "Apicoectomy (Root-End Surgery)",
+  "service4": "Traumatic Dental Injuries",
+  "service5": "Cracked Tooth Treatment",
+  "officeHours": "Complete office hours schedule including emergency availability",
+  "address": "${bookletData.address || 'Endodontic practice address'}",
+  "contactInfo": "${bookletData.contactInfo || 'Phone, email, emergency contact'}",
+  "insuranceInfo": "Insurance plans accepted, pre-authorization requirements, and billing procedures for endodontic treatment",
+  "paymentOptions": "Payment methods, financing options, and cost information for root canal procedures",
+  "patientPortalInfo": "Patient portal features including pre-operative instructions and post-treatment care",
+  "appointmentInfo": "How to schedule endodontic consultations, referral process, and what to expect",
+  "emergencyInfo": "After-hours emergency procedures for severe dental pain and trauma",
+  "supportServices": "Sedation options, comfort amenities, and post-treatment support",
+  "testimonial1": "Realistic patient testimonial about successful root canal treatment and pain relief",
+  "testimonial2": "Second patient testimonial about professional care and positive experience",
+  "case1Description": "Endodontic success story about saving a severely damaged tooth",
+  "case2Description": "Case study about complex retreatment or surgical endodontics"
 }
 
-Make all content professional, welcoming, and specific to healthcare. Ensure testimonials and case studies are realistic but anonymized.`,
-          context: 'welcome_booklet_json_generation'
+Make all content professional, welcoming, and specific to endodontic care. Focus on pain management, tooth preservation, and advanced techniques. Ensure testimonials are realistic but anonymized.`,
+          context: 'endodontic_welcome_booklet_generation'
         },
         headers: {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
@@ -548,33 +538,19 @@ Make all content professional, welcoming, and specific to healthcare. Ensure tes
         if (jsonMatch) {
           const parsedData = JSON.parse(jsonMatch[0]);
           setBookletData(prev => ({ ...prev, ...parsedData }));
-          toast.success('Content regenerated successfully!');
+          toast.success('Content generated successfully with AI!');
         } else {
           throw new Error('No JSON found in response');
         }
       } catch (parseError) {
         console.error('JSON parse error, falling back to text parsing:', parseError);
-        // Fallback to text parsing if JSON fails
-        setBookletData(prev => ({
-          ...prev,
-          welcomeMessage: aiContent.includes('welcome') ? aiContent : prev.welcomeMessage,
-        }));
-        toast.success('Content partially regenerated!');
+        toast.success('Content partially generated!');
       }
     } catch (error) {
-      console.error('Error regenerating content:', error);
-      toast.error('Failed to regenerate content. Please try again.');
+      console.error('Error generating content with AI:', error);
+      toast.error('Failed to generate content. Please try again.');
     } finally {
       setIsGenerating(false);
-    }
-  };
-
-  const handleDownloadPDF = () => {
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(previewHTML);
-      printWindow.document.close();
-      printWindow.print();
     }
   };
 
@@ -616,6 +592,15 @@ Make all content professional, welcoming, and specific to healthcare. Ensure tes
     toast.success('Example data filled!');
   };
 
+  const handleDownloadPDF = () => {
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(previewHTML);
+      printWindow.document.close();
+      printWindow.print();
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -637,14 +622,6 @@ Make all content professional, welcoming, and specific to healthcare. Ensure tes
                     <FileText className="h-4 w-4" />
                     Fill Example
                   </Button>
-                  <Button
-                    onClick={handleRegenerate}
-                    disabled={isGenerating}
-                    className="flex items-center gap-2"
-                  >
-                    {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
-                    Regenerate
-                  </Button>
                   <Button onClick={handleDownloadPDF} variant="outline" className="flex items-center gap-2">
                     <Download className="h-4 w-4" />
                     Download PDF
@@ -665,6 +642,25 @@ Make all content professional, welcoming, and specific to healthcare. Ensure tes
                 <Button variant="ghost" size="sm" onClick={onClose}>
                   <X className="h-4 w-4" />
                 </Button>
+              </div>
+              
+              {/* Generate with AI Button */}
+              <div className="p-4 border-b bg-gradient-to-r from-blue-50 to-purple-50">
+                <Button
+                  onClick={handleGenerateWithAI}
+                  disabled={isGenerating}
+                  className="w-full flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                >
+                  {isGenerating ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
+                  {isGenerating ? 'Generating...' : 'Generate with AI'}
+                </Button>
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  Fill all pages with endodontic-specific content
+                </p>
               </div>
               
               <ScrollArea className="flex-1 p-4">
@@ -690,7 +686,7 @@ Make all content professional, welcoming, and specific to healthcare. Ensure tes
                           id="doctorName"
                           value={bookletData.doctorName}
                           onChange={(e) => updateField('doctorName', e.target.value)}
-                          placeholder="Enter doctor name"
+                          placeholder="Enter doctor's name"
                         />
                       </div>
                       <div>
@@ -699,7 +695,7 @@ Make all content professional, welcoming, and specific to healthcare. Ensure tes
                           id="tagline"
                           value={bookletData.tagline}
                           onChange={(e) => updateField('tagline', e.target.value)}
-                          placeholder="Your practice tagline"
+                          placeholder="Practice tagline"
                         />
                       </div>
                       <div>
@@ -708,7 +704,7 @@ Make all content professional, welcoming, and specific to healthcare. Ensure tes
                           id="specialty"
                           value={bookletData.specialty}
                           onChange={(e) => updateField('specialty', e.target.value)}
-                          placeholder="Enter specialty"
+                          placeholder="Medical specialty"
                         />
                       </div>
                     </AccordionContent>
@@ -726,7 +722,7 @@ Make all content professional, welcoming, and specific to healthcare. Ensure tes
                           value={bookletData.practiceDescription}
                           onChange={(e) => updateField('practiceDescription', e.target.value)}
                           placeholder="Describe your practice"
-                          rows={3}
+                          rows={4}
                         />
                       </div>
                       <div>
@@ -735,7 +731,7 @@ Make all content professional, welcoming, and specific to healthcare. Ensure tes
                           id="missionStatement"
                           value={bookletData.missionStatement}
                           onChange={(e) => updateField('missionStatement', e.target.value)}
-                          placeholder="Your practice mission statement"
+                          placeholder="Practice mission statement"
                           rows={3}
                         />
                       </div>
@@ -854,7 +850,7 @@ Make all content professional, welcoming, and specific to healthcare. Ensure tes
                           id="officeHours"
                           value={bookletData.officeHours}
                           onChange={(e) => updateField('officeHours', e.target.value)}
-                          placeholder="Monday - Friday: 9:00 AM - 5:00 PM"
+                          placeholder="Office hours schedule"
                           rows={3}
                         />
                       </div>
@@ -874,8 +870,8 @@ Make all content professional, welcoming, and specific to healthcare. Ensure tes
                           id="contactInfo"
                           value={bookletData.contactInfo}
                           onChange={(e) => updateField('contactInfo', e.target.value)}
-                          placeholder="Phone, email, website"
-                          rows={2}
+                          placeholder="Phone, email, etc."
+                          rows={3}
                         />
                       </div>
                     </AccordionContent>
@@ -893,7 +889,7 @@ Make all content professional, welcoming, and specific to healthcare. Ensure tes
                           value={bookletData.insuranceInfo}
                           onChange={(e) => updateField('insuranceInfo', e.target.value)}
                           placeholder="Insurance plans accepted"
-                          rows={2}
+                          rows={3}
                         />
                       </div>
                       <div>
@@ -902,8 +898,8 @@ Make all content professional, welcoming, and specific to healthcare. Ensure tes
                           id="paymentOptions"
                           value={bookletData.paymentOptions}
                           onChange={(e) => updateField('paymentOptions', e.target.value)}
-                          placeholder="Available payment methods"
-                          rows={2}
+                          placeholder="Payment methods and policies"
+                          rows={3}
                         />
                       </div>
                     </AccordionContent>
@@ -920,8 +916,8 @@ Make all content professional, welcoming, and specific to healthcare. Ensure tes
                           id="patientPortalInfo"
                           value={bookletData.patientPortalInfo}
                           onChange={(e) => updateField('patientPortalInfo', e.target.value)}
-                          placeholder="Patient portal access instructions"
-                          rows={2}
+                          placeholder="Patient portal features and access"
+                          rows={3}
                         />
                       </div>
                       <div>
@@ -931,7 +927,7 @@ Make all content professional, welcoming, and specific to healthcare. Ensure tes
                           value={bookletData.appointmentInfo}
                           onChange={(e) => updateField('appointmentInfo', e.target.value)}
                           placeholder="How to schedule appointments"
-                          rows={2}
+                          rows={3}
                         />
                       </div>
                     </AccordionContent>
@@ -948,8 +944,8 @@ Make all content professional, welcoming, and specific to healthcare. Ensure tes
                           id="emergencyInfo"
                           value={bookletData.emergencyInfo}
                           onChange={(e) => updateField('emergencyInfo', e.target.value)}
-                          placeholder="After hours and emergency contact info"
-                          rows={2}
+                          placeholder="After-hours and emergency procedures"
+                          rows={3}
                         />
                       </div>
                       <div>
@@ -959,34 +955,34 @@ Make all content professional, welcoming, and specific to healthcare. Ensure tes
                           value={bookletData.supportServices}
                           onChange={(e) => updateField('supportServices', e.target.value)}
                           placeholder="Additional support services offered"
-                          rows={2}
+                          rows={3}
                         />
                       </div>
                     </AccordionContent>
                   </AccordionItem>
 
-                  <AccordionItem value="testimonials-cases">
+                  <AccordionItem value="testimonials">
                     <AccordionTrigger className="text-left">
                       Page 12: Testimonials & Cases
                     </AccordionTrigger>
                     <AccordionContent className="space-y-4 pt-4">
                       <div>
-                        <Label htmlFor="testimonial1">Patient Testimonial 1</Label>
+                        <Label htmlFor="testimonial1">Testimonial 1</Label>
                         <Textarea
                           id="testimonial1"
                           value={bookletData.testimonial1}
                           onChange={(e) => updateField('testimonial1', e.target.value)}
-                          placeholder="First patient testimonial"
+                          placeholder="Patient testimonial"
                           rows={2}
                         />
                       </div>
                       <div>
-                        <Label htmlFor="testimonial2">Patient Testimonial 2</Label>
+                        <Label htmlFor="testimonial2">Testimonial 2</Label>
                         <Textarea
                           id="testimonial2"
                           value={bookletData.testimonial2}
                           onChange={(e) => updateField('testimonial2', e.target.value)}
-                          placeholder="Second patient testimonial"
+                          placeholder="Patient testimonial"
                           rows={2}
                         />
                       </div>
@@ -996,7 +992,7 @@ Make all content professional, welcoming, and specific to healthcare. Ensure tes
                           id="case1Description"
                           value={bookletData.case1Description}
                           onChange={(e) => updateField('case1Description', e.target.value)}
-                          placeholder="First success story or case study"
+                          placeholder="Success story or case study"
                           rows={2}
                         />
                       </div>
@@ -1006,7 +1002,7 @@ Make all content professional, welcoming, and specific to healthcare. Ensure tes
                           id="case2Description"
                           value={bookletData.case2Description}
                           onChange={(e) => updateField('case2Description', e.target.value)}
-                          placeholder="Second success story or case study"
+                          placeholder="Success story or case study"
                           rows={2}
                         />
                       </div>
