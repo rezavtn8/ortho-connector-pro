@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Filter, Users, Calendar, Truck } from 'lucide-react';
+import { Plus, Users, Calendar } from 'lucide-react';
 import { CreateCampaignDialog } from '@/components/CreateCampaignDialog';
 import { CampaignDetailDialog } from '@/components/CampaignDetailDialog';
 import { UnifiedCampaignDialog } from '@/components/UnifiedCampaignDialog';
@@ -14,7 +14,6 @@ import { CampaignExecutionDialog } from '@/components/CampaignExecutionDialog';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow, format } from 'date-fns';
 import { DateRange } from 'react-day-picker';
-import { DateRangePicker } from '@/components/DateRangePicker';
 import { CalendarView } from '@/components/CalendarView';
 import { ImportantDatesCalendar } from '@/components/ImportantDatesCalendar';
 import { ImportantDateCampaignDialog } from '@/components/ImportantDateCampaignDialog';
@@ -48,7 +47,6 @@ export function Campaigns() {
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [executionDialogOpen, setExecutionDialogOpen] = useState(false);
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [activeTab, setActiveTab] = useState('important-dates');
   
   // Important Dates functionality
@@ -58,7 +56,6 @@ export function Campaigns() {
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [typeFilter, setTypeFilter] = useState('all');
 
   const fetchCampaigns = useCallback(async () => {
     if (!user) {
@@ -113,16 +110,10 @@ export function Campaigns() {
     return campaigns.filter(campaign => {
       const matchesSearch = campaign.name.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === 'all' || campaign.status === statusFilter;
-      const matchesType = typeFilter === 'all' || campaign.campaign_type === typeFilter;
       
-      // Date range filtering
-      const plannedDate = campaign.planned_delivery_date ? new Date(campaign.planned_delivery_date) : null;
-      const matchesDateRange = (!dateRange?.from || !plannedDate || plannedDate >= dateRange.from) &&
-                              (!dateRange?.to || !plannedDate || plannedDate <= dateRange.to);
-      
-      return matchesSearch && matchesStatus && matchesType && matchesDateRange;
+      return matchesSearch && matchesStatus;
     });
-  }, [campaigns, searchQuery, statusFilter, typeFilter, dateRange]);
+  }, [campaigns, searchQuery, statusFilter]);
 
   const handleCampaignClick = (campaign: Campaign) => {
     setSelectedCampaign(campaign);
@@ -166,80 +157,58 @@ export function Campaigns() {
   }
 
   return (
-    <div className="space-y-8 p-6 max-w-7xl mx-auto">
-      {/* Modern Header */}
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Calendar className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-semibold text-foreground">Campaigns</h1>
-                <p className="text-sm text-muted-foreground">
-                  Create seasonal campaigns with AI-generated content or manage ongoing outreach
-                </p>
-              </div>
-            </div>
+    <div className="space-y-6 p-6 max-w-7xl mx-auto">
+      {/* Streamlined Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-primary/10">
+            <Calendar className="w-6 h-6 text-primary" />
           </div>
-          
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Button 
-              onClick={() => setUnifiedCampaignOpen(true)} 
-              className="gap-2 shadow-sm"
-              size="sm"
-            >
-              <Plus className="w-4 h-4" />
-              AI Campaign
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={() => setCreateDialogOpen(true)} 
-              className="gap-2"
-              size="sm"
-            >
-              <Plus className="w-4 h-4" />
-              Traditional
-            </Button>
+          <div>
+            <h1 className="text-2xl font-semibold text-foreground">Campaign Center</h1>
+            <p className="text-sm text-muted-foreground">
+              Create seasonal campaigns or manage ongoing outreach to referral offices
+            </p>
           </div>
         </div>
+        
+        <Button 
+          onClick={() => activeTab === 'important-dates' ? setImportantDateDialogOpen(true) : setUnifiedCampaignOpen(true)}
+          className="gap-2 shadow-sm"
+        >
+          <Plus className="w-4 h-4" />
+          {activeTab === 'important-dates' ? 'Create Seasonal Campaign' : 'New Campaign'}
+        </Button>
       </div>
 
-      {/* Modern Navigation */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <TabsList className="grid w-full sm:w-auto grid-cols-3 bg-muted/50 p-1">
-            <TabsTrigger value="important-dates" className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
-              <Calendar className="w-4 h-4" />
-              <span className="hidden sm:inline">Important Dates</span>
-              <span className="sm:hidden">Dates</span>
-            </TabsTrigger>
-            <TabsTrigger value="grid" className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
-              <Users className="w-4 h-4" />
-              <span className="hidden sm:inline">My Campaigns</span>
-              <span className="sm:hidden">Campaigns</span>
-            </TabsTrigger>
-            <TabsTrigger value="calendar" className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
-              <Calendar className="w-4 h-4" />
-              <span className="hidden sm:inline">Calendar</span>
-              <span className="sm:hidden">Cal</span>
-            </TabsTrigger>
-          </TabsList>
-          
-          <div className="flex items-center gap-4">
-            {activeTab !== 'important-dates' && (
-              <>
-                {/* Compact Filters */}
+      {/* Unified Navigation & Content */}
+      <Card className="overflow-hidden">
+        <div className="border-b bg-muted/30">
+          <div className="flex items-center justify-between p-4">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
+              <TabsList className="bg-background border">
+                <TabsTrigger value="important-dates" className="gap-2">
+                  <Calendar className="w-4 h-4" />
+                  Seasonal Opportunities
+                </TabsTrigger>
+                <TabsTrigger value="campaigns" className="gap-2">
+                  <Users className="w-4 h-4" />
+                  My Campaigns ({filteredCampaigns.length})
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            
+            {activeTab === 'campaigns' && (
+              <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
                   <Input
-                    placeholder="Search..."
+                    placeholder="Search campaigns..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-48 h-8"
+                    className="w-48 h-9"
                   />
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-28 h-8">
+                    <SelectTrigger className="w-32 h-9">
                       <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -251,155 +220,199 @@ export function Campaigns() {
                     </SelectContent>
                   </Select>
                 </div>
-                <Badge variant="outline" className="text-xs">
-                  {filteredCampaigns.length} campaigns
-                </Badge>
-              </>
-            )}
-            {activeTab === 'important-dates' && (
-              <Badge variant="outline" className="text-xs">
-                Seasonal & Dental Awareness
-              </Badge>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setCreateDialogOpen(true)}
+                  size="sm" 
+                  className="gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Traditional
+                </Button>
+              </div>
             )}
           </div>
         </div>
 
-        <TabsContent value="important-dates">
-          <ImportantDatesCalendar onDateSelected={handleImportantDateSelected} />
-        </TabsContent>
-
-        <TabsContent value="grid" className="space-y-6">
-          {filteredCampaigns.length === 0 ? (
-            <div className="text-center py-16">
-              <div className="mx-auto w-24 h-24 bg-muted/50 rounded-full flex items-center justify-center mb-6">
-                <Calendar className="w-12 h-12 text-muted-foreground" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">No campaigns yet</h3>
-              <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
-                {campaigns.length === 0 
-                  ? "Create your first campaign to start engaging with referral offices"
-                  : "No campaigns match your current filters"
-                }
-              </p>
-              {campaigns.length === 0 && (
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <Button onClick={() => setUnifiedCampaignOpen(true)} className="gap-2">
-                    <Plus className="w-4 h-4" />
-                    AI Campaign
-                  </Button>
-                  <Button variant="outline" onClick={() => setCreateDialogOpen(true)} className="gap-2">
-                    <Plus className="w-4 h-4" />
-                    Traditional Campaign
-                  </Button>
+        <div className="p-6">
+          {activeTab === 'important-dates' && (
+            <ImportantDatesCalendar onDateSelected={handleImportantDateSelected} />
+          )}
+          
+          {activeTab === 'campaigns' && (
+            <>
+              {filteredCampaigns.length === 0 ? (
+                <div className="text-center py-16">
+                  <div className="mx-auto w-24 h-24 bg-muted/50 rounded-full flex items-center justify-center mb-6">
+                    <Calendar className="w-12 h-12 text-muted-foreground" />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2">No campaigns yet</h3>
+                  <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
+                    {campaigns.length === 0 
+                      ? "Create your first campaign to start engaging with referral offices"
+                      : "No campaigns match your current filters"
+                    }
+                  </p>
+                  {campaigns.length === 0 && (
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                      <Button onClick={() => setUnifiedCampaignOpen(true)} className="gap-2">
+                        <Plus className="w-4 h-4" />
+                        AI Campaign
+                      </Button>
+                      <Button variant="outline" onClick={() => setCreateDialogOpen(true)} className="gap-2">
+                        <Plus className="w-4 h-4" />
+                        Traditional Campaign
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Campaign Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {filteredCampaigns.map((campaign) => (
+                      <Card 
+                        key={campaign.id} 
+                        className="group cursor-pointer border-border/50 hover:border-border hover:shadow-lg transition-all duration-200"
+                        onClick={() => handleCampaignClick(campaign)}
+                      >
+                        <CardHeader className="pb-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <h3 className="font-medium text-base leading-tight truncate group-hover:text-primary transition-colors">
+                                {campaign.name}
+                              </h3>
+                              <div className="flex flex-wrap gap-1.5 mt-2">
+                                <Badge 
+                                  variant="secondary" 
+                                  className="text-xs px-2 py-0.5 bg-muted/80"
+                                >
+                                  {campaign.campaign_type}
+                                </Badge>
+                                {campaign.campaign_mode === 'unified' && (
+                                  <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-primary/10 text-primary">
+                                    AI
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            <Badge 
+                              variant="outline"
+                              className={`text-xs whitespace-nowrap ${
+                                campaign.status === 'Completed' ? 'bg-green-50 border-green-200 text-green-700' :
+                                campaign.status === 'In Progress' ? 'bg-yellow-50 border-yellow-200 text-yellow-700' :
+                                campaign.status === 'Scheduled' ? 'bg-blue-50 border-blue-200 text-blue-700' :
+                                'bg-muted/50 border-muted text-muted-foreground'
+                              }`}
+                            >
+                              {campaign.status}
+                            </Badge>
+                          </div>
+                        </CardHeader>
+                        
+                        <CardContent className="space-y-3 pt-0">
+                          <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Users className="w-3.5 h-3.5 shrink-0" />
+                              <span className="truncate">
+                                {campaign.office_count || 0} offices
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Calendar className="w-3.5 h-3.5 shrink-0" />
+                              <span className="truncate">
+                                {campaign.planned_delivery_date 
+                                  ? format(new Date(campaign.planned_delivery_date), 'MMM dd')
+                                  : 'No date'
+                                }
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {campaign.delivered_count > 0 && (
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-xs text-muted-foreground">
+                                <span>Progress</span>
+                                <span>{campaign.delivered_count}/{campaign.office_count}</span>
+                              </div>
+                              <div className="w-full bg-muted/50 rounded-full h-1.5">
+                                <div 
+                                  className="bg-primary h-1.5 rounded-full transition-all duration-300"
+                                  style={{ 
+                                    width: `${((campaign.delivered_count || 0) / (campaign.office_count || 1)) * 100}%` 
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                  
+                  {/* Calendar View Toggle */}
+                  {filteredCampaigns.length > 0 && (
+                    <div className="border-t pt-6">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-medium text-muted-foreground">Calendar View</h3>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setActiveTab('calendar')}
+                        >
+                          <Calendar className="w-4 h-4 mr-2" />
+                          View Calendar
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {filteredCampaigns.map((campaign) => (
-                <Card 
-                  key={campaign.id} 
-                  className="group cursor-pointer border-border/50 hover:border-border hover:shadow-lg transition-all duration-200"
-                  onClick={() => handleCampaignClick(campaign)}
+            </>
+          )}
+          
+          {activeTab === 'calendar' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setActiveTab('campaigns')}
                 >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <h3 className="font-medium text-base leading-tight truncate group-hover:text-primary transition-colors">
-                          {campaign.name}
-                        </h3>
-                        <div className="flex flex-wrap gap-1.5 mt-2">
-                          <Badge 
-                            variant="secondary" 
-                            className="text-xs px-2 py-0.5 bg-muted/80"
-                          >
-                            {campaign.campaign_type}
-                          </Badge>
-                          {campaign.campaign_mode === 'unified' && (
-                            <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-primary/10 text-primary">
-                              AI
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                      <Badge 
-                        variant="outline"
-                        className={`text-xs whitespace-nowrap ${
-                          campaign.status === 'Completed' ? 'bg-green-50 border-green-200 text-green-700' :
-                          campaign.status === 'In Progress' ? 'bg-yellow-50 border-yellow-200 text-yellow-700' :
-                          campaign.status === 'Scheduled' ? 'bg-blue-50 border-blue-200 text-blue-700' :
-                          'bg-muted/50 border-muted text-muted-foreground'
-                        }`}
-                      >
-                        {campaign.status}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  
-                  <CardContent className="space-y-3 pt-0">
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Users className="w-3.5 h-3.5 shrink-0" />
-                        <span className="truncate">
-                          {campaign.office_count || 0} offices
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Calendar className="w-3.5 h-3.5 shrink-0" />
-                        <span className="truncate">
-                          {campaign.planned_delivery_date 
-                            ? format(new Date(campaign.planned_delivery_date), 'MMM dd')
-                            : 'No date'
-                          }
-                        </span>
-                      </div>
-                    </div>
-                    
-                    {campaign.delivered_count > 0 && (
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>Progress</span>
-                          <span>{campaign.delivered_count}/{campaign.office_count}</span>
-                        </div>
-                        <div className="w-full bg-muted/50 rounded-full h-1.5">
-                          <div 
-                            className="bg-primary h-1.5 rounded-full transition-all duration-300"
-                            style={{ 
-                              width: `${((campaign.delivered_count || 0) / (campaign.office_count || 1)) * 100}%` 
-                            }}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
+                  ← Back to Grid
+                </Button>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Search campaigns..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-48 h-9"
+                  />
+                </div>
+              </div>
+              <CalendarView
+                events={filteredCampaigns.map(campaign => ({
+                  id: campaign.id,
+                  title: campaign.name,
+                  date: campaign.planned_delivery_date ? new Date(campaign.planned_delivery_date) : new Date(),
+                  type: 'campaign' as const,
+                  status: campaign.status,
+                  description: `${campaign.campaign_type} - ${campaign.office_count || 0} offices`
+                }))}
+                onEventClick={(event) => {
+                  const campaign = campaigns.find(c => c.id === event.id);
+                  if (campaign) {
+                    handleCampaignClick(campaign);
+                  }
+                }}
+                onAddEvent={(date) => {
+                  setUnifiedCampaignOpen(true);
+                }}
+              />
             </div>
           )}
-        </TabsContent>
-
-        <TabsContent value="calendar">
-          <CalendarView
-            events={filteredCampaigns.map(campaign => ({
-              id: campaign.id,
-              title: campaign.name,
-              date: campaign.planned_delivery_date ? new Date(campaign.planned_delivery_date) : new Date(),
-              type: 'campaign' as const,
-              status: campaign.status,
-              description: `${campaign.campaign_type} - ${campaign.office_count || 0} offices`
-            }))}
-            onEventClick={(event) => {
-              const campaign = campaigns.find(c => c.id === event.id);
-              if (campaign) {
-                handleCampaignClick(campaign);
-              }
-            }}
-            onAddEvent={(date) => {
-              setCreateDialogOpen(true);
-            }}
-          />
-        </TabsContent>
-      </Tabs>
+        </div>
+      </Card>
 
       {/* Create Unified Campaign Dialog */}
       <UnifiedCampaignDialog
