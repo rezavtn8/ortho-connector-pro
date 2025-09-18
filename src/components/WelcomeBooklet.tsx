@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Wand2, Download, X, Loader2, FileText, Sparkles } from 'lucide-react';
+import { Wand2, Download, X, Loader2, FileText, Sparkles, Send, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -67,393 +67,828 @@ interface BookletData {
 }
 
 const defaultBookletData: BookletData = {
-  // Pages 1-2: Basic Information
   practiceName: '',
   doctorName: '',
   tagline: '',
   specialty: '',
-  
-  // Page 3: About Practice
   practiceDescription: '',
   missionStatement: '',
-  
-  // Page 4: Doctor Profile
   welcomeMessage: '',
   doctorMessageParagraph: '',
   education: '',
   experience: '',
-  
-  // Page 5: Services
   service1: '',
   service2: '',
   service3: '',
   service4: '',
   service5: '',
-  
-  // Pages 6-7: Contact & Operations
   officeHours: '',
   address: '',
   contactInfo: '',
-  
-  // Page 8: Insurance & Billing
   insuranceInfo: '',
   paymentOptions: '',
-  
-  // Page 9-10: Patient Resources
   patientPortalInfo: '',
   appointmentInfo: '',
-  
-  // Page 11: Emergency & Support
   emergencyInfo: '',
   supportServices: '',
-  
-  // Page 12: Testimonials & Cases
   testimonial1: '',
   testimonial2: '',
   case1Description: '',
   case2Description: ''
 };
 
-// Enhanced HTML template with comprehensive placeholder support
 const generateBookletHTML = (data: BookletData) => {
-  const replaceTokens = (template: string, data: BookletData) => {
-    return template
-      .replace(/{{practiceName}}/g, data.practiceName || '[Practice Name]')
-      .replace(/{{doctorName}}/g, data.doctorName || '[Doctor Name]')
-      .replace(/{{tagline}}/g, data.tagline || '[Your Guide to Quality Care]')
-      .replace(/{{specialty}}/g, data.specialty || '[Specialty]')
-      .replace(/{{practiceDescription}}/g, data.practiceDescription || '[Practice Description]')
-      .replace(/{{missionStatement}}/g, data.missionStatement || '[Mission Statement]')
-      .replace(/{{welcomeMessage}}/g, data.welcomeMessage || '[Welcome Message]')
-      .replace(/{{doctorMessageParagraph}}/g, data.doctorMessageParagraph || '[Doctor Message]')
-      .replace(/{{education}}/g, data.education || '[Education & Training]')
-      .replace(/{{experience}}/g, data.experience || '[Experience]')
-      .replace(/{{officeHours}}/g, data.officeHours || '[Office Hours]')
-      .replace(/{{contactInfo}}/g, data.contactInfo || '[Contact Information]')
-      .replace(/{{address}}/g, data.address || '[Practice Address]')
-      .replace(/{{insuranceInfo}}/g, data.insuranceInfo || '[Insurance Information]')
-      .replace(/{{paymentOptions}}/g, data.paymentOptions || '[Payment Options]')
-      .replace(/{{patientPortalInfo}}/g, data.patientPortalInfo || '[Patient Portal Information]')
-      .replace(/{{appointmentInfo}}/g, data.appointmentInfo || '[Appointment Information]')
-      .replace(/{{emergencyInfo}}/g, data.emergencyInfo || '[Emergency Information]')
-      .replace(/{{supportServices}}/g, data.supportServices || '[Support Services]')
-      .replace(/{{testimonial1}}/g, data.testimonial1 || '[Patient Testimonial 1]')
-      .replace(/{{testimonial2}}/g, data.testimonial2 || '[Patient Testimonial 2]')
-      .replace(/{{case1Description}}/g, data.case1Description || '[Case Study 1]')
-      .replace(/{{case2Description}}/g, data.case2Description || '[Case Study 2]')
-      .replace(/{{services}}/g, [data.service1, data.service2, data.service3, data.service4, data.service5]
-        .filter(s => s && s.trim()).map(service => `<li>${service}</li>`).join(''));
-  };
-
   const template = `
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${data.practiceName} - Welcome Booklet</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body>
     <div class="booklet-container">
-      <!-- Page 1: Cover -->
+      
+      <!-- Cover Page -->
       <div class="booklet-page cover-page">
-        <div class="cover-header">
-          <h1>{{practiceName}}</h1>
-          <h2>{{tagline}}</h2>
-          <div class="specialty-badge">{{specialty}}</div>
-        </div>
-        <div class="cover-footer">
-          <p class="doctor-name">{{doctorName}}</p>
-          <p class="welcome-note">Welcome to Our Practice</p>
-        </div>
-      </div>
-
-      <!-- Page 2: Welcome Message -->
-      <div class="booklet-page">
-        <h2>Welcome</h2>
-        <div class="content">
-          <p>{{welcomeMessage}}</p>
-        </div>
-      </div>
-
-      <!-- Page 3: About Our Practice -->
-      <div class="booklet-page">
-        <h2>About Our Practice</h2>
-        <div class="content">
-          <h3>Practice Overview</h3>
-          <p>{{practiceDescription}}</p>
-          
-          <h3>Our Mission</h3>
-          <p>{{missionStatement}}</p>
-        </div>
-      </div>
-
-      <!-- Page 4: Meet the Doctor -->
-      <div class="booklet-page">
-        <h2>Meet {{doctorName}}</h2>
-        <div class="content">
-          <p>{{doctorMessageParagraph}}</p>
-          
-          <h3>Education & Training</h3>
-          <p>{{education}}</p>
-          
-          <h3>Experience</h3>
-          <p>{{experience}}</p>
-        </div>
-      </div>
-
-      <!-- Page 5: Our Services -->
-      <div class="booklet-page">
-        <h2>Our Services</h2>
-        <div class="content">
-          <p>We provide comprehensive care including:</p>
-          <ul class="services-list">
-            {{services}}
-          </ul>
-        </div>
-      </div>
-
-      <!-- Page 6: Office Hours & Location -->
-      <div class="booklet-page">
-        <h2>Visit Us</h2>
-        <div class="content">
-          <h3>Office Hours</h3>
-          <p>{{officeHours}}</p>
-          
-          <h3>Location</h3>
-          <p>{{address}}</p>
-          
-          <div class="contact-summary">
-            <p>{{contactInfo}}</p>
+        <div class="cover-content">
+          <div class="practice-logo">
+            <div class="logo-circle">
+              <span class="logo-text">${data.practiceName.charAt(0)}</span>
+            </div>
+          </div>
+          <h1 class="practice-title">${data.practiceName}</h1>
+          <p class="tagline">${data.tagline}</p>
+          <div class="welcome-card">
+            <h2 class="welcome-title">Welcome to Our Practice</h2>
+            <p class="welcome-message">${data.welcomeMessage}</p>
+            <div class="specialty-badge">
+              <span>${data.specialty}</span>
+            </div>
+          </div>
+          <div class="contact-preview">
+            <p>${data.address}</p>
+            <p>${data.contactInfo}</p>
           </div>
         </div>
       </div>
 
-      <!-- Page 7: Contact Information -->
+      <!-- Page 2: About the Practice -->
       <div class="booklet-page">
-        <h2>How to Reach Us</h2>
-        <div class="content">
-          <h3>Contact Information</h3>
-          <p>{{contactInfo}}</p>
-          
-          <h3>Appointment Scheduling</h3>
-          <p>{{appointmentInfo}}</p>
+        <div class="page-header">
+          <h2 class="page-title">About ${data.practiceName}</h2>
+          <div class="title-underline"></div>
         </div>
-      </div>
-
-      <!-- Page 8: Insurance & Billing -->
-      <div class="booklet-page">
-        <h2>Insurance & Billing</h2>
-        <div class="content">
-          <h3>Insurance Plans</h3>
-          <p>{{insuranceInfo}}</p>
-          
-          <h3>Payment Options</h3>
-          <p>{{paymentOptions}}</p>
-        </div>
-      </div>
-
-      <!-- Page 9: Patient Resources -->
-      <div class="booklet-page">
-        <h2>Patient Resources</h2>
-        <div class="content">
-          <h3>Patient Portal</h3>
-          <p>{{patientPortalInfo}}</p>
-          
-          <h3>Appointments</h3>
-          <p>{{appointmentInfo}}</p>
-        </div>
-      </div>
-
-      <!-- Page 10: Support Services -->
-      <div class="booklet-page">
-        <h2>Additional Support</h2>
-        <div class="content">
-          <h3>Support Services</h3>
-          <p>{{supportServices}}</p>
-        </div>
-      </div>
-
-      <!-- Page 11: Emergency Information -->
-      <div class="booklet-page">
-        <h2>Emergency Care</h2>
-        <div class="content">
-          <h3>After-Hours & Emergencies</h3>
-          <p>{{emergencyInfo}}</p>
-        </div>
-      </div>
-
-      <!-- Page 12: Testimonials -->
-      <div class="booklet-page">
-        <h2>What Our Patients Say</h2>
-        <div class="content">
-          <div class="testimonial">
-            <p>"{{testimonial1}}"</p>
+        <div class="content-grid">
+          <div class="content-card">
+            <div class="card-icon">🏥</div>
+            <h3>Our Practice</h3>
+            <p>${data.practiceDescription}</p>
           </div>
-          
-          <div class="testimonial">
-            <p>"{{testimonial2}}"</p>
-          </div>
-          
-          <h3>Success Stories</h3>
-          <div class="case-study">
-            <p>{{case1Description}}</p>
-          </div>
-          
-          <div class="case-study">
-            <p>{{case2Description}}</p>
-          </div>
-          
-          <div class="thank-you">
-            Thank you for choosing {{practiceName}}!
+          <div class="content-card">
+            <div class="card-icon">🎯</div>
+            <h3>Our Mission</h3>
+            <p>${data.missionStatement}</p>
           </div>
         </div>
       </div>
+
+      <!-- Page 3: Meet the Doctor -->
+      <div class="booklet-page">
+        <div class="page-header">
+          <h2 class="page-title">Meet ${data.doctorName}</h2>
+          <div class="title-underline"></div>
+        </div>
+        <div class="doctor-profile">
+          <div class="doctor-intro">
+            <div class="content-card main-message">
+              <div class="card-icon">👨‍⚕️</div>
+              <h3>A Personal Message</h3>
+              <p class="doctor-quote">"${data.doctorMessageParagraph}"</p>
+            </div>
+          </div>
+          <div class="credentials-grid">
+            <div class="credential-card">
+              <div class="credential-icon">🎓</div>
+              <h4>Education & Training</h4>
+              <p>${data.education}</p>
+            </div>
+            <div class="credential-card">
+              <div class="credential-icon">⭐</div>
+              <h4>Experience</h4>
+              <p>${data.experience}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Page 4: Our Services -->
+      <div class="booklet-page">
+        <div class="page-header">
+          <h2 class="page-title">Our Services</h2>
+          <div class="title-underline"></div>
+        </div>
+        <div class="services-showcase">
+          <div class="service-card featured">
+            <div class="service-icon">🦷</div>
+            <h4>${data.service1}</h4>
+            <div class="service-highlight"></div>
+          </div>
+          <div class="services-grid">
+            <div class="service-card">
+              <div class="service-icon">🔄</div>
+              <h4>${data.service2}</h4>
+            </div>
+            <div class="service-card">
+              <div class="service-icon">🔬</div>
+              <h4>${data.service3}</h4>
+            </div>
+            <div class="service-card">
+              <div class="service-icon">⚡</div>
+              <h4>${data.service4}</h4>
+            </div>
+            <div class="service-card">
+              <div class="service-icon">🩹</div>
+              <h4>${data.service5}</h4>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Page 5: Office Information -->
+      <div class="booklet-page">
+        <div class="page-header">
+          <h2 class="page-title">Office Information</h2>
+          <div class="title-underline"></div>
+        </div>
+        <div class="office-info-grid">
+          <div class="info-card schedule">
+            <div class="card-icon">🕒</div>
+            <h3>Office Hours</h3>
+            <div class="schedule-content">
+              <pre>${data.officeHours}</pre>
+            </div>
+          </div>
+          <div class="info-card location">
+            <div class="card-icon">📍</div>
+            <h3>Location</h3>
+            <div class="address-content">
+              <pre>${data.address}</pre>
+            </div>
+          </div>
+          <div class="info-card contact">
+            <div class="card-icon">📞</div>
+            <h3>Contact Information</h3>
+            <div class="contact-content">
+              <pre>${data.contactInfo}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Page 6: Insurance & Billing -->
+      <div class="booklet-page">
+        <div class="page-header">
+          <h2 class="page-title">Insurance & Billing</h2>
+          <div class="title-underline"></div>
+        </div>
+        <div class="billing-section">
+          <div class="content-card insurance">
+            <div class="card-icon">🏛️</div>
+            <h3>Insurance Plans Accepted</h3>
+            <p>${data.insuranceInfo}</p>
+          </div>
+          <div class="content-card payment">
+            <div class="card-icon">💳</div>
+            <h3>Payment Options</h3>
+            <p>${data.paymentOptions}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Page 7: Patient Resources -->
+      <div class="booklet-page">
+        <div class="page-header">
+          <h2 class="page-title">Patient Resources</h2>
+          <div class="title-underline"></div>
+        </div>
+        <div class="resources-grid">
+          <div class="content-card portal">
+            <div class="card-icon">💻</div>
+            <h3>Patient Portal</h3>
+            <p>${data.patientPortalInfo}</p>
+          </div>
+          <div class="content-card appointments">
+            <div class="card-icon">📅</div>
+            <h3>Scheduling Appointments</h3>
+            <p>${data.appointmentInfo}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Page 8: Emergency & Support -->
+      <div class="booklet-page">
+        <div class="page-header">
+          <h2 class="page-title">Emergency & Support</h2>
+          <div class="title-underline"></div>
+        </div>
+        <div class="emergency-section">
+          <div class="content-card emergency">
+            <div class="card-icon emergency-icon">🚨</div>
+            <h3>Emergency Procedures</h3>
+            <p>${data.emergencyInfo}</p>
+          </div>
+          <div class="content-card support">
+            <div class="card-icon">🤝</div>
+            <h3>Support Services</h3>
+            <p>${data.supportServices}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Page 9: Testimonials & Success Stories -->
+      <div class="booklet-page">
+        <div class="page-header">
+          <h2 class="page-title">What Our Patients Say</h2>
+          <div class="title-underline"></div>
+        </div>
+        <div class="testimonials-section">
+          <div class="testimonial-card">
+            <div class="quote-icon">💬</div>
+            <p class="testimonial-text">"${data.testimonial1}"</p>
+            <div class="testimonial-author">
+              <div class="stars">⭐⭐⭐⭐⭐</div>
+              <span class="patient-initial">- Patient</span>
+            </div>
+          </div>
+          <div class="testimonial-card">
+            <div class="quote-icon">💬</div>
+            <p class="testimonial-text">"${data.testimonial2}"</p>
+            <div class="testimonial-author">
+              <div class="stars">⭐⭐⭐⭐⭐</div>
+              <span class="patient-initial">- Patient</span>
+            </div>
+          </div>
+          <div class="success-stories">
+            <h3 class="stories-title">Success Stories</h3>
+            <div class="case-study-card">
+              <div class="case-icon">✅</div>
+              <p>${data.case1Description}</p>
+            </div>
+            <div class="case-study-card">
+              <div class="case-icon">✅</div>
+              <p>${data.case2Description}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Thank You Page -->
+      <div class="booklet-page thank-you-page">
+        <div class="thank-you-content">
+          <div class="gratitude-message">
+            <h2 class="thank-you-title">Thank You for Choosing ${data.practiceName}</h2>
+            <p class="thank-you-subtitle">We look forward to serving you and your family</p>
+          </div>
+          <div class="final-contact-card">
+            <div class="contact-header">
+              <h3>We're Here to Help</h3>
+              <div class="contact-decoration"></div>
+            </div>
+            <div class="contact-details">
+              <div class="contact-item">
+                <div class="contact-icon">📞</div>
+                <pre>${data.contactInfo}</pre>
+              </div>
+              <div class="contact-item">
+                <div class="contact-icon">📍</div>
+                <pre>${data.address}</pre>
+              </div>
+            </div>
+            <div class="visit-cta">
+              <p class="cta-text">Schedule your appointment today!</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
+  </body>
 
-    <style>
-      .booklet-container {
-        font-family: Georgia, serif;
-        line-height: 1.6;
-        color: #333;
-        max-width: 210mm;
-        margin: 0 auto;
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.6;
+      color: hsl(185 20% 20%);
+      background: white;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .booklet-container {
+      max-width: 8.5in;
+      margin: 0 auto;
+      background: white;
+    }
+
+    .booklet-page {
+      width: 100%;
+      min-height: 11in;
+      padding: 1in;
+      margin-bottom: 20px;
+      background: white;
+      box-shadow: 0 10px 30px -10px hsl(185 75% 35% / 0.2);
+      border: 1px solid hsl(185 15% 85%);
+      page-break-after: always;
+      page-break-inside: avoid;
+      position: relative;
+    }
+
+    /* Cover Page Styles */
+    .cover-page {
+      background: linear-gradient(135deg, hsl(185 15% 99%), hsl(185 15% 95%));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .cover-content {
+      text-align: center;
+      max-width: 600px;
+    }
+
+    .practice-logo {
+      margin-bottom: 2rem;
+    }
+
+    .logo-circle {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, hsl(185 75% 35%), hsl(185 75% 45%));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1rem;
+      box-shadow: 0 0 20px hsl(185 75% 35% / 0.3);
+    }
+
+    .logo-text {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: white;
+      font-family: 'Playfair Display', serif;
+    }
+
+    .practice-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 3.5rem;
+      font-weight: 700;
+      color: hsl(185 75% 35%);
+      margin-bottom: 0.5rem;
+      line-height: 1.1;
+    }
+
+    .tagline {
+      font-size: 1.3rem;
+      color: hsl(185 10% 45%);
+      margin-bottom: 2.5rem;
+      font-style: italic;
+      font-weight: 500;
+    }
+
+    .welcome-card {
+      background: white;
+      border: 2px solid hsl(185 75% 35%);
+      padding: 2.5rem;
+      border-radius: 16px;
+      margin-bottom: 2rem;
+      box-shadow: 0 0 20px hsl(185 75% 35% / 0.1);
+    }
+
+    .welcome-title {
+      font-size: 1.8rem;
+      color: hsl(185 75% 35%);
+      margin-bottom: 1rem;
+      font-weight: 600;
+    }
+
+    .welcome-message {
+      font-size: 1.1rem;
+      line-height: 1.7;
+      color: hsl(185 20% 30%);
+      margin-bottom: 1.5rem;
+    }
+
+    .specialty-badge {
+      display: inline-block;
+      background: linear-gradient(135deg, hsl(185 75% 35%), hsl(185 75% 45%));
+      color: white;
+      padding: 0.5rem 1.5rem;
+      border-radius: 25px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      letter-spacing: 0.5px;
+    }
+
+    .contact-preview {
+      font-size: 0.95rem;
+      color: hsl(185 10% 50%);
+      line-height: 1.4;
+    }
+
+    /* Page Headers */
+    .page-header {
+      margin-bottom: 2.5rem;
+      text-align: center;
+    }
+
+    .page-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 2.2rem;
+      font-weight: 600;
+      color: hsl(185 75% 35%);
+      margin-bottom: 0.5rem;
+    }
+
+    .title-underline {
+      width: 80px;
+      height: 3px;
+      background: linear-gradient(90deg, hsl(185 75% 35%), hsl(185 75% 45%));
+      margin: 0 auto;
+      border-radius: 2px;
+    }
+
+    /* Content Cards */
+    .content-card {
+      background: linear-gradient(145deg, hsl(185 10% 99%), hsl(185 15% 96%));
+      padding: 1.8rem;
+      border-radius: 12px;
+      border-left: 4px solid hsl(185 75% 35%);
+      box-shadow: 0 4px 20px -4px hsl(185 20% 20% / 0.08);
+      margin-bottom: 1.5rem;
+    }
+
+    .content-card h3 {
+      font-size: 1.3rem;
+      color: hsl(185 75% 35%);
+      margin-bottom: 1rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .card-icon {
+      font-size: 1.5rem;
+      margin-right: 0.5rem;
+    }
+
+    /* Grids */
+    .content-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+    }
+
+    .office-info-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+
+    .resources-grid, .emergency-section, .billing-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+    }
+
+    /* Services Showcase */
+    .services-showcase {
+      text-align: center;
+    }
+
+    .service-card.featured {
+      background: linear-gradient(135deg, hsl(185 75% 35%), hsl(185 75% 45%));
+      color: white;
+      padding: 2rem;
+      border-radius: 16px;
+      margin-bottom: 2rem;
+      box-shadow: 0 0 20px hsl(185 75% 35% / 0.3);
+    }
+
+    .service-card.featured h4 {
+      color: white;
+      font-size: 1.4rem;
+      margin-top: 0.5rem;
+    }
+
+    .services-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.5rem;
+    }
+
+    .service-card {
+      background: hsl(185 10% 98%);
+      padding: 1.5rem;
+      border-radius: 12px;
+      border: 2px solid hsl(185 15% 90%);
+      text-align: center;
+      transition: all 0.3s ease;
+    }
+
+    .service-icon {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .service-card h4 {
+      font-size: 1.1rem;
+      color: hsl(185 75% 35%);
+      font-weight: 600;
+    }
+
+    /* Doctor Profile */
+    .doctor-profile .main-message {
+      margin-bottom: 2rem;
+    }
+
+    .doctor-quote {
+      font-style: italic;
+      font-size: 1.1rem;
+      color: hsl(185 20% 25%);
+      line-height: 1.7;
+    }
+
+    .credentials-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+    }
+
+    .credential-card {
+      background: hsl(185 5% 98%);
+      padding: 1.5rem;
+      border-radius: 12px;
+      border: 2px solid hsl(185 15% 90%);
+    }
+
+    .credential-icon {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .credential-card h4 {
+      color: hsl(185 75% 35%);
+      font-weight: 600;
+      margin-bottom: 0.8rem;
+    }
+
+    /* Testimonials */
+    .testimonials-section {
+      space-y: 2rem;
+    }
+
+    .testimonial-card {
+      background: hsl(185 5% 98%);
+      padding: 2rem;
+      border-radius: 12px;
+      border-left: 4px solid hsl(150 75% 35%);
+      margin-bottom: 1.5rem;
+      box-shadow: 0 4px 20px -4px hsl(150 75% 35% / 0.1);
+    }
+
+    .quote-icon {
+      font-size: 1.5rem;
+      color: hsl(150 75% 35%);
+      margin-bottom: 1rem;
+    }
+
+    .testimonial-text {
+      font-style: italic;
+      font-size: 1.1rem;
+      line-height: 1.7;
+      color: hsl(185 20% 25%);
+      margin-bottom: 1rem;
+    }
+
+    .testimonial-author {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .stars {
+      color: hsl(45 85% 55%);
+    }
+
+    .patient-initial {
+      font-weight: 500;
+      color: hsl(185 10% 50%);
+    }
+
+    .success-stories {
+      margin-top: 2rem;
+    }
+
+    .stories-title {
+      font-size: 1.4rem;
+      color: hsl(185 75% 35%);
+      margin-bottom: 1.5rem;
+      text-align: center;
+      font-weight: 600;
+    }
+
+    .case-study-card {
+      background: linear-gradient(145deg, hsl(150 20% 98%), hsl(150 15% 96%));
+      padding: 1.5rem;
+      border-radius: 12px;
+      border-left: 4px solid hsl(150 75% 35%);
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+
+    .case-icon {
+      font-size: 1.2rem;
+      color: hsl(150 75% 35%);
+      margin-top: 0.2rem;
+    }
+
+    /* Thank You Page */
+    .thank-you-page {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, hsl(185 15% 99%), hsl(185 10% 96%));
+    }
+
+    .thank-you-content {
+      text-align: center;
+      max-width: 600px;
+    }
+
+    .gratitude-message {
+      margin-bottom: 3rem;
+    }
+
+    .thank-you-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: hsl(185 75% 35%);
+      margin-bottom: 1rem;
+      line-height: 1.2;
+    }
+
+    .thank-you-subtitle {
+      font-size: 1.2rem;
+      color: hsl(185 10% 45%);
+      font-style: italic;
+    }
+
+    .final-contact-card {
+      background: white;
+      border: 2px solid hsl(185 75% 35%);
+      padding: 2.5rem;
+      border-radius: 16px;
+      box-shadow: 0 0 20px hsl(185 75% 35% / 0.1);
+    }
+
+    .contact-header h3 {
+      font-size: 1.5rem;
+      color: hsl(185 75% 35%);
+      margin-bottom: 1rem;
+      font-weight: 600;
+    }
+
+    .contact-decoration {
+      width: 50px;
+      height: 3px;
+      background: linear-gradient(90deg, hsl(185 75% 35%), hsl(185 75% 45%));
+      margin: 0 auto 1.5rem;
+      border-radius: 2px;
+    }
+
+    .contact-details {
+      margin-bottom: 2rem;
+    }
+
+    .contact-item {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      font-size: 1.05rem;
+    }
+
+    .contact-icon {
+      font-size: 1.2rem;
+      color: hsl(185 75% 35%);
+    }
+
+    .visit-cta {
+      background: linear-gradient(135deg, hsl(185 75% 35%), hsl(185 75% 45%));
+      color: white;
+      padding: 1rem 2rem;
+      border-radius: 25px;
+      display: inline-block;
+    }
+
+    .cta-text {
+      font-weight: 600;
+      font-size: 1.1rem;
+    }
+
+    /* Emergency Styles */
+    .emergency-icon {
+      color: hsl(0 84% 60%) !important;
+    }
+
+    .content-card.emergency {
+      border-left-color: hsl(0 84% 60%);
+      background: linear-gradient(145deg, hsl(0 20% 99%), hsl(0 15% 96%));
+    }
+
+    /* Pre formatting for addresses and contact info */
+    pre {
+      font-family: inherit;
+      white-space: pre-line;
+      word-wrap: break-word;
+    }
+
+    /* Print Styles */
+    @media print {
+      body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
       }
 
       .booklet-page {
-        min-height: 297mm;
-        padding: 40px;
-        margin-bottom: 20px;
-        background: white;
-        box-shadow: 0 0 10px rgba(0,0,0,0.1);
-        border-radius: 8px;
+        margin-bottom: 0;
+        box-shadow: none;
+        border: none;
         page-break-after: always;
         page-break-inside: avoid;
+        width: 8.5in;
+        height: 11in;
+        padding: 0.75in;
+      }
+      
+      .booklet-container {
+        font-size: 11pt;
+        line-height: 1.4;
+      }
+      
+      .practice-title {
+        font-size: 28pt;
+      }
+      
+      .page-title {
+        font-size: 20pt;
+      }
+      
+      h3 {
+        font-size: 14pt;
       }
 
-      .cover-page {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        text-align: center;
+      .content-grid, .resources-grid, .emergency-section, .billing-section {
+        grid-template-columns: 1fr;
+        gap: 1rem;
       }
 
-      .cover-header h1 {
-        font-size: 3em;
-        margin-bottom: 20px;
-        font-weight: bold;
+      .services-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
       }
 
-      .cover-header h2 {
-        font-size: 1.5em;
-        margin-bottom: 30px;
-        opacity: 0.9;
-        font-style: italic;
+      .credentials-grid {
+        grid-template-columns: 1fr;
       }
+    }
 
-      .specialty-badge {
-        display: inline-block;
-        padding: 15px 30px;
-        background: rgba(255,255,255,0.2);
-        border-radius: 25px;
-        font-size: 1.2em;
-        font-weight: bold;
-        margin: 20px 0;
+    @media screen and (max-width: 768px) {
+      .content-grid, .resources-grid, .emergency-section, .billing-section, .credentials-grid {
+        grid-template-columns: 1fr;
       }
-
-      .cover-footer .doctor-name {
-        font-size: 1.8em;
-        font-weight: bold;
-        margin-bottom: 10px;
+      
+      .services-grid {
+        grid-template-columns: 1fr;
       }
-
-      .cover-footer .welcome-note {
-        font-size: 1.2em;
-        opacity: 0.8;
-      }
-
-      .booklet-page h2 {
-        color: #667eea;
-        border-bottom: 3px solid #667eea;
-        padding-bottom: 10px;
-        margin-bottom: 30px;
-        font-size: 2.2em;
-      }
-
-      .booklet-page h3 {
-        color: #555;
-        margin-top: 25px;
-        margin-bottom: 15px;
-        font-size: 1.3em;
-      }
-
-      .content p {
-        margin-bottom: 20px;
-        font-size: 1.1em;
-      }
-
-      .services-list, .content ul {
-        list-style-type: none;
-        padding-left: 0;
-      }
-
-      .services-list li, .content ul li {
-        background: #f7fafc;
-        padding: 10px 15px;
-        margin-bottom: 8px;
-        border-left: 4px solid #667eea;
-        border-radius: 4px;
-      }
-
-      .contact-summary {
-        background: #edf2f7;
-        padding: 20px;
-        border-radius: 8px;
-        margin: 20px 0;
-        text-align: center;
-      }
-
-      .thank-you {
-        font-weight: bold;
-        text-align: center;
-        font-size: 1.2em;
-        color: #667eea;
-        margin-top: 30px;
-      }
-
-      .testimonial, .case-study {
-        background: #f8fafc;
-        padding: 15px;
-        border-left: 4px solid #667eea;
-        margin: 15px 0;
-        border-radius: 4px;
-        font-style: italic;
-      }
-
-      @media print {
-        .booklet-page {
-          margin-bottom: 0;
-          box-shadow: none;
-          border: none;
-          page-break-after: always;
-          page-break-inside: avoid;
-        }
-        
-        .booklet-container {
-          font-size: 12pt;
-          line-height: 1.5;
-        }
-        
-        .cover-page h1 {
-          font-size: 24pt;
-        }
-        
-        .booklet-page h2 {
-          font-size: 18pt;
-        }
-        
-        .booklet-page h3 {
-          font-size: 14pt;
-        }
-      }
-    </style>
+    }
+  </style>
   `;
 
-  return replaceTokens(template, data);
+  return template;
 };
 
 export function WelcomeBooklet({ isOpen, onClose, businessProfile }: WelcomeBookletProps) {
@@ -560,36 +995,36 @@ Make all content professional, welcoming, and specific to endodontic care. Focus
 
   const fillExampleData = () => {
     setBookletData({
-      practiceName: 'Wellness Medical Center',
-      doctorName: 'Dr. Sarah Johnson',
-      tagline: 'Your Partner in Health and Wellness',
-      specialty: 'Family Medicine',
-      practiceDescription: 'At Wellness Medical Center, we provide comprehensive healthcare services with a focus on preventive care and patient education. Our modern facility is equipped with the latest medical technology.',
-      missionStatement: 'To deliver personalized, compassionate healthcare that exceeds our patients\' expectations while maintaining the highest standards of medical excellence.',
-      welcomeMessage: 'Welcome to our practice! We are committed to providing you and your family with exceptional medical care in a comfortable environment.',
-      doctorMessageParagraph: 'As your physician, I am dedicated to understanding your unique health needs and working with you to achieve optimal wellness.',
-      education: 'MD from Johns Hopkins University, Residency in Family Medicine at Mayo Clinic',
-      experience: '15+ years of experience in family medicine with specialization in preventive care and chronic disease management',
-      service1: 'Annual Physical Exams',
-      service2: 'Preventive Care Screenings',
-      service3: 'Chronic Disease Management',
-      service4: 'Minor Procedures',
-      service5: 'Health Education & Counseling',
-      officeHours: 'Monday-Friday: 8:00 AM - 6:00 PM\nSaturday: 9:00 AM - 2:00 PM\nSunday: Closed',
-      address: '123 Health Street\nWellness City, WC 12345',
-      contactInfo: 'Phone: (555) 123-4567\nEmail: info@wellnessmc.com',
-      insuranceInfo: 'We accept most major insurance plans including Blue Cross, Aetna, UnitedHealth, and Medicare.',
-      paymentOptions: 'We accept cash, credit cards, HSA/FSA cards, and offer payment plans for uninsured patients.',
-      patientPortalInfo: 'Access your health records, test results, and communicate with our team through our secure online portal.',
-      appointmentInfo: 'Schedule appointments online or call us directly. Same-day appointments available for urgent needs.',
-      emergencyInfo: 'For after-hours emergencies, call our main number. For life-threatening emergencies, call 911.',
-      supportServices: 'We offer nutrition counseling, health screenings, wellness programs, and educational resources.',
-      testimonial1: 'Dr. Johnson and her team provide excellent care. They always take time to answer my questions and make me feel heard.',
-      testimonial2: 'The staff is incredibly friendly and professional. I feel confident in the care I receive here.',
-      case1Description: 'Successfully helped a patient reduce their diabetes medication through lifestyle changes and regular monitoring.',
-      case2Description: 'Early detection of cardiovascular risk factors led to preventive treatment and improved patient outcomes.'
+      practiceName: 'Advanced Endodontic Care',
+      doctorName: 'Dr. Sarah Johnson, DDS',
+      tagline: 'Preserving Your Natural Teeth with Expert Endodontic Care',
+      specialty: 'Endodontics',
+      practiceDescription: 'At Advanced Endodontic Care, we specialize in saving natural teeth through advanced root canal therapy and endodontic treatments. Our state-of-the-art facility utilizes the latest technology and techniques to ensure comfortable, successful outcomes for our patients.',
+      missionStatement: 'To preserve natural teeth through expert endodontic care, utilizing advanced technology and compassionate treatment to eliminate pain and restore oral health.',
+      welcomeMessage: 'Welcome to our endodontic practice! We understand that visiting an endodontist can be stressful, which is why we prioritize your comfort and provide gentle, expert care to preserve your natural teeth.',
+      doctorMessageParagraph: 'As a board-certified endodontist, I am committed to providing you with the highest quality endodontic care in a comfortable, caring environment. My goal is to help you maintain your natural teeth for a lifetime.',
+      education: 'DDS from University of California San Francisco, Endodontic Residency at Harvard School of Dental Medicine, Board Certified by the American Board of Endodontics',
+      experience: '15+ years of specialized endodontic practice with over 8,000 successful root canal procedures and advanced surgical endodontic treatments',
+      service1: 'Root Canal Therapy',
+      service2: 'Endodontic Retreatment',
+      service3: 'Apicoectomy Surgery',
+      service4: 'Traumatic Dental Injuries',
+      service5: 'Cracked Tooth Treatment',
+      officeHours: 'Monday - Thursday: 8:00 AM - 5:00 PM\nFriday: 8:00 AM - 2:00 PM\nSaturday & Sunday: Emergency Only\nEmergency Line: Available 24/7',
+      address: '123 Dental Plaza, Suite 200\nHealthcare District\nCity, State 12345',
+      contactInfo: 'Phone: (555) 123-ENDO\nFax: (555) 123-4568\nEmail: info@advancedendocare.com\nEmergency: (555) 999-HELP',
+      insuranceInfo: 'We accept most major dental insurance plans including Delta Dental, MetLife, Cigna, Aetna, and Guardian. We provide detailed treatment estimates and help with pre-authorizations to maximize your benefits.',
+      paymentOptions: 'We accept cash, checks, credit cards, CareCredit financing, and HSA/FSA accounts. Payment plans available for extensive treatments.',
+      patientPortalInfo: 'Access your secure patient portal to view treatment plans, post-operative instructions, appointment scheduling, and communicate with our team. Pre-operative instructions and educational materials available online.',
+      appointmentInfo: 'Most appointments can be scheduled within 24-48 hours. Emergency appointments available same day. Referrals welcome from general dentists. Initial consultation includes digital imaging and comprehensive evaluation.',
+      emergencyInfo: 'For after-hours dental emergencies involving severe pain, swelling, or trauma, call our emergency line at (555) 999-HELP. Dr. Johnson or our on-call associate will respond promptly to urgent situations.',
+      supportServices: 'Nitrous oxide sedation available, digital X-rays with reduced radiation, same-day emergency treatment, post-operative care instructions, and 24/7 emergency support for all patients.',
+      testimonial1: 'Dr. Johnson saved my tooth when I thought it would need to be extracted. The root canal was completely painless and I felt comfortable throughout the entire procedure. I highly recommend this practice!',
+      testimonial2: 'The staff was incredibly professional and caring. They explained every step of the treatment and made sure I was comfortable. My emergency appointment was handled quickly and efficiently.',
+      case1Description: 'Successfully treated a complex case involving a fractured molar with calcified canals using advanced microscopy and ultrasonic techniques, preserving the patient\'s natural tooth.',
+      case2Description: 'Performed apicoectomy surgery on a previously treated tooth with persistent infection, resulting in complete healing and symptom resolution within 6 months.'
     });
-    toast.success('Example data filled!');
+    toast.success('Example data loaded successfully!');
   };
 
   const handleDownloadPDF = () => {
@@ -605,413 +1040,455 @@ Make all content professional, welcoming, and specific to endodontic care. Focus
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-screen-xl h-screen max-h-screen p-0 gap-0">
-        <div className="flex h-full">
-          {/* Left Panel - Preview */}
-          <div className="flex-1 bg-gray-50 border-r">
-            <div className="h-full flex flex-col">
-              <div className="p-4 border-b bg-white flex items-center justify-between">
-                <h3 className="font-semibold text-lg">Welcome Booklet Preview</h3>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={fillExampleData}
-                    variant="outline"
-                    size="sm"
-                    className="flex items-center gap-2"
-                  >
-                    <FileText className="h-4 w-4" />
-                    Fill Example
-                  </Button>
-                  <Button onClick={handleDownloadPDF} variant="outline" className="flex items-center gap-2">
-                    <Download className="h-4 w-4" />
+      <DialogContent className="max-w-screen-xl h-screen max-h-screen p-0 gap-0 bg-gradient-subtle">
+        <div className="flex h-full bg-gradient-subtle">
+          {/* Left Side - Preview */}
+          <div className="flex-1 p-6">
+            <Card className="h-full shadow-elegant border-border/50 bg-gradient-card">
+              <div className="h-16 bg-gradient-connection border-b border-border/30 flex items-center px-6 rounded-t-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <span className="font-semibold text-foreground text-lg">Live Preview</span>
+                    <p className="text-xs text-muted-foreground">Real-time booklet preview</p>
+                  </div>
+                </div>
+                <div className="ml-auto flex items-center gap-4">
+                  <Button onClick={handleDownloadPDF} variant="outline" size="sm" className="border-primary/20 hover:bg-primary/5">
+                    <Download className="w-4 h-4 mr-2" />
                     Download PDF
                   </Button>
+                  <div className="flex gap-2">
+                    <div className="w-3 h-3 rounded-full bg-status-moderate/60"></div>
+                    <div className="w-3 h-3 rounded-full bg-status-strong/60"></div>
+                    <div className="w-3 h-3 rounded-full bg-destructive/60"></div>
+                  </div>
                 </div>
               </div>
-              <ScrollArea className="flex-1 p-4">
-                <div dangerouslySetInnerHTML={{ __html: previewHTML }} />
+              <ScrollArea className="flex-1">
+                <div className="p-6">
+                  <div 
+                    dangerouslySetInnerHTML={{ __html: previewHTML }}
+                    className="booklet-preview"
+                  />
+                </div>
               </ScrollArea>
-            </div>
+            </Card>
           </div>
 
-          {/* Right Panel - Editable Fields */}
-          <div className="w-96 bg-white">
-            <div className="h-full flex flex-col">
-              <div className="p-4 border-b flex items-center justify-between">
-                <h3 className="font-semibold text-lg">Edit Content</h3>
-                <Button variant="ghost" size="sm" onClick={onClose}>
-                  <X className="h-4 w-4" />
+          {/* Right Side - Editor */}
+          <div className="w-[420px] flex flex-col">
+            <Card className="flex-1 shadow-elegant border-border/50 bg-gradient-card">
+              <div className="h-16 bg-gradient-connection border-b border-border/30 flex items-center px-6 justify-between rounded-t-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Wand2 className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <span className="font-semibold text-foreground text-lg">Content Editor</span>
+                    <p className="text-xs text-muted-foreground">Edit booklet content</p>
+                  </div>
+                </div>
+                <Button variant="ghost" size="sm" onClick={onClose} className="hover:bg-destructive/10">
+                  <X className="w-4 h-4" />
                 </Button>
               </div>
               
-              {/* Generate with AI Button */}
-              <div className="p-4 border-b bg-gradient-to-r from-blue-50 to-purple-50">
-                <Button
-                  onClick={handleGenerateWithAI}
-                  disabled={isGenerating}
-                  className="w-full flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                >
-                  {isGenerating ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-4 w-4" />
-                  )}
-                  {isGenerating ? 'Generating...' : 'Generate with AI'}
-                </Button>
-                <p className="text-xs text-muted-foreground mt-2 text-center">
-                  Fill all pages with endodontic-specific content
-                </p>
-              </div>
-              
-              <ScrollArea className="flex-1 p-4">
-                <Accordion type="multiple" defaultValue={["basic-info"]} className="space-y-4">
-                  
-                  <AccordionItem value="basic-info">
-                    <AccordionTrigger className="text-left">
-                      Pages 1-2: Basic Information
-                    </AccordionTrigger>
-                    <AccordionContent className="space-y-4 pt-4">
-                      <div>
-                        <Label htmlFor="practiceName">Practice Name</Label>
-                        <Input
-                          id="practiceName"
-                          value={bookletData.practiceName}
-                          onChange={(e) => updateField('practiceName', e.target.value)}
-                          placeholder="Enter practice name"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="doctorName">Doctor Name</Label>
-                        <Input
-                          id="doctorName"
-                          value={bookletData.doctorName}
-                          onChange={(e) => updateField('doctorName', e.target.value)}
-                          placeholder="Enter doctor's name"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="tagline">Tagline</Label>
-                        <Input
-                          id="tagline"
-                          value={bookletData.tagline}
-                          onChange={(e) => updateField('tagline', e.target.value)}
-                          placeholder="Practice tagline"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="specialty">Specialty</Label>
-                        <Input
-                          id="specialty"
-                          value={bookletData.specialty}
-                          onChange={(e) => updateField('specialty', e.target.value)}
-                          placeholder="Medical specialty"
-                        />
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
+              <ScrollArea className="flex-1">
+                <div className="p-6 space-y-6">
+                  {/* AI Generation Section */}
+                  <div className="space-y-4">
+                    <Button
+                      onClick={handleGenerateWithAI}
+                      disabled={isGenerating}
+                      className="w-full bg-gradient-primary hover:opacity-90 text-white shadow-glow border-0 h-12 font-semibold"
+                      size="lg"
+                    >
+                      {isGenerating ? (
+                        <>
+                          <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                          Generating Content...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-5 h-5 mr-2" />
+                          Generate with AI
+                        </>
+                      )}
+                    </Button>
+                    
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={fillExampleData}
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 border-border/30 hover:bg-muted/50 text-xs"
+                      >
+                        <FileText className="w-3 h-3 mr-1" />
+                        Example Data
+                      </Button>
+                      <Button
+                        onClick={() => setBookletData(defaultBookletData)}
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 border-border/30 hover:bg-muted/50 text-xs"
+                      >
+                        <RefreshCw className="w-3 h-3 mr-1" />
+                        Clear All
+                      </Button>
+                    </div>
+                    
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground">
+                        Auto-generate professional endodontic content for all 12 pages
+                      </p>
+                    </div>
+                  </div>
 
-                  <AccordionItem value="about-practice">
-                    <AccordionTrigger className="text-left">
-                      Page 3: About Practice
-                    </AccordionTrigger>
-                    <AccordionContent className="space-y-4 pt-4">
-                      <div>
-                        <Label htmlFor="practiceDescription">Practice Description</Label>
-                        <Textarea
-                          id="practiceDescription"
-                          value={bookletData.practiceDescription}
-                          onChange={(e) => updateField('practiceDescription', e.target.value)}
-                          placeholder="Describe your practice"
-                          rows={4}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="missionStatement">Mission Statement</Label>
-                        <Textarea
-                          id="missionStatement"
-                          value={bookletData.missionStatement}
-                          onChange={(e) => updateField('missionStatement', e.target.value)}
-                          placeholder="Practice mission statement"
-                          rows={3}
-                        />
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
+                  <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent"></div>
 
-                  <AccordionItem value="doctor-profile">
-                    <AccordionTrigger className="text-left">
-                      Page 4: Doctor Profile
-                    </AccordionTrigger>
-                    <AccordionContent className="space-y-4 pt-4">
-                      <div>
-                        <Label htmlFor="welcomeMessage">Welcome Message</Label>
-                        <Textarea
-                          id="welcomeMessage"
-                          value={bookletData.welcomeMessage}
-                          onChange={(e) => updateField('welcomeMessage', e.target.value)}
-                          placeholder="Personal welcome message"
-                          rows={4}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="doctorMessageParagraph">Doctor Message</Label>
-                        <Textarea
-                          id="doctorMessageParagraph"
-                          value={bookletData.doctorMessageParagraph}
-                          onChange={(e) => updateField('doctorMessageParagraph', e.target.value)}
-                          placeholder="Personal message from the doctor"
-                          rows={3}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="education">Education & Training</Label>
-                        <Textarea
-                          id="education"
-                          value={bookletData.education}
-                          onChange={(e) => updateField('education', e.target.value)}
-                          placeholder="Doctor's education and training"
-                          rows={2}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="experience">Experience</Label>
-                        <Textarea
-                          id="experience"
-                          value={bookletData.experience}
-                          onChange={(e) => updateField('experience', e.target.value)}
-                          placeholder="Professional experience"
-                          rows={2}
-                        />
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
+                  {/* Form Fields - Organized by Page */}
+                  <Accordion type="multiple" defaultValue={["basic-info"]} className="space-y-2">
 
-                  <AccordionItem value="services">
-                    <AccordionTrigger className="text-left">
-                      Page 5: Services
-                    </AccordionTrigger>
-                    <AccordionContent className="space-y-4 pt-4">
-                      <div>
-                        <Label htmlFor="service1">Service 1</Label>
-                        <Input
-                          id="service1"
-                          value={bookletData.service1}
-                          onChange={(e) => updateField('service1', e.target.value)}
-                          placeholder="Primary service"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="service2">Service 2</Label>
-                        <Input
-                          id="service2"
-                          value={bookletData.service2}
-                          onChange={(e) => updateField('service2', e.target.value)}
-                          placeholder="Second service"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="service3">Service 3</Label>
-                        <Input
-                          id="service3"
-                          value={bookletData.service3}
-                          onChange={(e) => updateField('service3', e.target.value)}
-                          placeholder="Third service"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="service4">Service 4</Label>
-                        <Input
-                          id="service4"
-                          value={bookletData.service4}
-                          onChange={(e) => updateField('service4', e.target.value)}
-                          placeholder="Fourth service"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="service5">Service 5</Label>
-                        <Input
-                          id="service5"
-                          value={bookletData.service5}
-                          onChange={(e) => updateField('service5', e.target.value)}
-                          placeholder="Fifth service"
-                        />
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
+                    <AccordionItem value="basic-info" className="border border-border/50 rounded-lg bg-card/50 overflow-hidden">
+                      <AccordionTrigger className="px-4 py-3 hover:bg-muted/30 font-medium text-sm">
+                        📄 Pages 1-2: Basic Information
+                      </AccordionTrigger>
+                      <AccordionContent className="px-4 pb-4 space-y-3">
+                        <div>
+                          <Label htmlFor="practiceName" className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 block">Practice Name</Label>
+                          <Input
+                            id="practiceName"
+                            value={bookletData.practiceName}
+                            onChange={(e) => updateField('practiceName', e.target.value)}
+                            placeholder="Your practice name"
+                            className="border-border/30 focus:border-primary/50"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="doctorName" className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 block">Doctor Name</Label>
+                          <Input
+                            id="doctorName"
+                            value={bookletData.doctorName}
+                            onChange={(e) => updateField('doctorName', e.target.value)}
+                            placeholder="Dr. John Smith"
+                            className="border-border/30 focus:border-primary/50"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="tagline" className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 block">Tagline</Label>
+                          <Input
+                            id="tagline"
+                            value={bookletData.tagline}
+                            onChange={(e) => updateField('tagline', e.target.value)}
+                            placeholder="Your practice tagline"
+                            className="border-border/30 focus:border-primary/50"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="specialty" className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 block">Specialty</Label>
+                          <Input
+                            id="specialty"
+                            value={bookletData.specialty}
+                            onChange={(e) => updateField('specialty', e.target.value)}
+                            placeholder="Medical specialty"
+                            className="border-border/30 focus:border-primary/50"
+                          />
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
 
-                  <AccordionItem value="contact-operations">
-                    <AccordionTrigger className="text-left">
-                      Pages 6-7: Contact & Operations
-                    </AccordionTrigger>
-                    <AccordionContent className="space-y-4 pt-4">
-                      <div>
-                        <Label htmlFor="officeHours">Office Hours</Label>
-                        <Textarea
-                          id="officeHours"
-                          value={bookletData.officeHours}
-                          onChange={(e) => updateField('officeHours', e.target.value)}
-                          placeholder="Office hours schedule"
-                          rows={3}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="address">Address</Label>
-                        <Textarea
-                          id="address"
-                          value={bookletData.address}
-                          onChange={(e) => updateField('address', e.target.value)}
-                          placeholder="Practice address"
-                          rows={2}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="contactInfo">Contact Information</Label>
-                        <Textarea
-                          id="contactInfo"
-                          value={bookletData.contactInfo}
-                          onChange={(e) => updateField('contactInfo', e.target.value)}
-                          placeholder="Phone, email, etc."
-                          rows={3}
-                        />
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
+                    <AccordionItem value="about-practice" className="border border-border/50 rounded-lg bg-card/50 overflow-hidden">
+                      <AccordionTrigger className="px-4 py-3 hover:bg-muted/30 font-medium text-sm">
+                        🏥 Page 3: About Practice
+                      </AccordionTrigger>
+                      <AccordionContent className="px-4 pb-4 space-y-3">
+                        <div>
+                          <Label htmlFor="practiceDescription" className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 block">Practice Description</Label>
+                          <Textarea
+                            id="practiceDescription"
+                            value={bookletData.practiceDescription}
+                            onChange={(e) => updateField('practiceDescription', e.target.value)}
+                            placeholder="Describe your practice and services"
+                            rows={3}
+                            className="border-border/30 focus:border-primary/50 resize-none"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="missionStatement" className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 block">Mission Statement</Label>
+                          <Textarea
+                            id="missionStatement"
+                            value={bookletData.missionStatement}
+                            onChange={(e) => updateField('missionStatement', e.target.value)}
+                            placeholder="Your practice mission statement"
+                            rows={2}
+                            className="border-border/30 focus:border-primary/50 resize-none"
+                          />
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
 
-                  <AccordionItem value="insurance-billing">
-                    <AccordionTrigger className="text-left">
-                      Page 8: Insurance & Billing
-                    </AccordionTrigger>
-                    <AccordionContent className="space-y-4 pt-4">
-                      <div>
-                        <Label htmlFor="insuranceInfo">Insurance Information</Label>
-                        <Textarea
-                          id="insuranceInfo"
-                          value={bookletData.insuranceInfo}
-                          onChange={(e) => updateField('insuranceInfo', e.target.value)}
-                          placeholder="Insurance plans accepted"
-                          rows={3}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="paymentOptions">Payment Options</Label>
-                        <Textarea
-                          id="paymentOptions"
-                          value={bookletData.paymentOptions}
-                          onChange={(e) => updateField('paymentOptions', e.target.value)}
-                          placeholder="Payment methods and policies"
-                          rows={3}
-                        />
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
+                    <AccordionItem value="doctor-profile" className="border border-border/50 rounded-lg bg-card/50 overflow-hidden">
+                      <AccordionTrigger className="px-4 py-3 hover:bg-muted/30 font-medium text-sm">
+                        👨‍⚕️ Page 4: Doctor Profile
+                      </AccordionTrigger>
+                      <AccordionContent className="px-4 pb-4 space-y-3">
+                        <div>
+                          <Label htmlFor="welcomeMessage" className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 block">Welcome Message</Label>
+                          <Textarea
+                            id="welcomeMessage"
+                            value={bookletData.welcomeMessage}
+                            onChange={(e) => updateField('welcomeMessage', e.target.value)}
+                            placeholder="Personal welcome message"
+                            rows={3}
+                            className="border-border/30 focus:border-primary/50 resize-none"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="doctorMessageParagraph" className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 block">Doctor Message</Label>
+                          <Textarea
+                            id="doctorMessageParagraph"
+                            value={bookletData.doctorMessageParagraph}
+                            onChange={(e) => updateField('doctorMessageParagraph', e.target.value)}
+                            placeholder="Personal message from the doctor"
+                            rows={2}
+                            className="border-border/30 focus:border-primary/50 resize-none"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="education" className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 block">Education & Training</Label>
+                          <Textarea
+                            id="education"
+                            value={bookletData.education}
+                            onChange={(e) => updateField('education', e.target.value)}
+                            placeholder="Doctor's education and training"
+                            rows={2}
+                            className="border-border/30 focus:border-primary/50 resize-none"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="experience" className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 block">Experience</Label>
+                          <Textarea
+                            id="experience"
+                            value={bookletData.experience}
+                            onChange={(e) => updateField('experience', e.target.value)}
+                            placeholder="Professional experience"
+                            rows={2}
+                            className="border-border/30 focus:border-primary/50 resize-none"
+                          />
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
 
-                  <AccordionItem value="patient-resources">
-                    <AccordionTrigger className="text-left">
-                      Pages 9-10: Patient Resources
-                    </AccordionTrigger>
-                    <AccordionContent className="space-y-4 pt-4">
-                      <div>
-                        <Label htmlFor="patientPortalInfo">Patient Portal Information</Label>
-                        <Textarea
-                          id="patientPortalInfo"
-                          value={bookletData.patientPortalInfo}
-                          onChange={(e) => updateField('patientPortalInfo', e.target.value)}
-                          placeholder="Patient portal features and access"
-                          rows={3}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="appointmentInfo">Appointment Information</Label>
-                        <Textarea
-                          id="appointmentInfo"
-                          value={bookletData.appointmentInfo}
-                          onChange={(e) => updateField('appointmentInfo', e.target.value)}
-                          placeholder="How to schedule appointments"
-                          rows={3}
-                        />
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
+                    <AccordionItem value="services" className="border border-border/50 rounded-lg bg-card/50 overflow-hidden">
+                      <AccordionTrigger className="px-4 py-3 hover:bg-muted/30 font-medium text-sm">
+                        🦷 Page 5: Services
+                      </AccordionTrigger>
+                      <AccordionContent className="px-4 pb-4 space-y-3">
+                        {[1, 2, 3, 4, 5].map(num => (
+                          <div key={num}>
+                            <Label htmlFor={`service${num}`} className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 block">Service {num}</Label>
+                            <Input
+                              id={`service${num}`}
+                              value={bookletData[`service${num}` as keyof BookletData] as string}
+                              onChange={(e) => updateField(`service${num}` as keyof BookletData, e.target.value)}
+                              placeholder={`Service ${num}`}
+                              className="border-border/30 focus:border-primary/50"
+                            />
+                          </div>
+                        ))}
+                      </AccordionContent>
+                    </AccordionItem>
 
-                  <AccordionItem value="emergency-support">
-                    <AccordionTrigger className="text-left">
-                      Page 11: Emergency & Support
-                    </AccordionTrigger>
-                    <AccordionContent className="space-y-4 pt-4">
-                      <div>
-                        <Label htmlFor="emergencyInfo">Emergency Information</Label>
-                        <Textarea
-                          id="emergencyInfo"
-                          value={bookletData.emergencyInfo}
-                          onChange={(e) => updateField('emergencyInfo', e.target.value)}
-                          placeholder="After-hours and emergency procedures"
-                          rows={3}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="supportServices">Support Services</Label>
-                        <Textarea
-                          id="supportServices"
-                          value={bookletData.supportServices}
-                          onChange={(e) => updateField('supportServices', e.target.value)}
-                          placeholder="Additional support services offered"
-                          rows={3}
-                        />
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
+                    <AccordionItem value="contact-operations" className="border border-border/50 rounded-lg bg-card/50 overflow-hidden">
+                      <AccordionTrigger className="px-4 py-3 hover:bg-muted/30 font-medium text-sm">
+                        📞 Pages 6-7: Contact & Operations
+                      </AccordionTrigger>
+                      <AccordionContent className="px-4 pb-4 space-y-3">
+                        <div>
+                          <Label htmlFor="officeHours" className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 block">Office Hours</Label>
+                          <Textarea
+                            id="officeHours"
+                            value={bookletData.officeHours}
+                            onChange={(e) => updateField('officeHours', e.target.value)}
+                            placeholder="Office hours schedule"
+                            rows={3}
+                            className="border-border/30 focus:border-primary/50 resize-none"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="address" className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 block">Address</Label>
+                          <Textarea
+                            id="address"
+                            value={bookletData.address}
+                            onChange={(e) => updateField('address', e.target.value)}
+                            placeholder="Practice address"
+                            rows={2}
+                            className="border-border/30 focus:border-primary/50 resize-none"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="contactInfo" className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 block">Contact Information</Label>
+                          <Textarea
+                            id="contactInfo"
+                            value={bookletData.contactInfo}
+                            onChange={(e) => updateField('contactInfo', e.target.value)}
+                            placeholder="Phone, email, etc."
+                            rows={3}
+                            className="border-border/30 focus:border-primary/50 resize-none"
+                          />
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
 
-                  <AccordionItem value="testimonials">
-                    <AccordionTrigger className="text-left">
-                      Page 12: Testimonials & Cases
-                    </AccordionTrigger>
-                    <AccordionContent className="space-y-4 pt-4">
-                      <div>
-                        <Label htmlFor="testimonial1">Testimonial 1</Label>
-                        <Textarea
-                          id="testimonial1"
-                          value={bookletData.testimonial1}
-                          onChange={(e) => updateField('testimonial1', e.target.value)}
-                          placeholder="Patient testimonial"
-                          rows={2}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="testimonial2">Testimonial 2</Label>
-                        <Textarea
-                          id="testimonial2"
-                          value={bookletData.testimonial2}
-                          onChange={(e) => updateField('testimonial2', e.target.value)}
-                          placeholder="Patient testimonial"
-                          rows={2}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="case1Description">Case Study 1</Label>
-                        <Textarea
-                          id="case1Description"
-                          value={bookletData.case1Description}
-                          onChange={(e) => updateField('case1Description', e.target.value)}
-                          placeholder="Success story or case study"
-                          rows={2}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="case2Description">Case Study 2</Label>
-                        <Textarea
-                          id="case2Description"
-                          value={bookletData.case2Description}
-                          onChange={(e) => updateField('case2Description', e.target.value)}
-                          placeholder="Success story or case study"
-                          rows={2}
-                        />
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
+                    <AccordionItem value="insurance-billing" className="border border-border/50 rounded-lg bg-card/50 overflow-hidden">
+                      <AccordionTrigger className="px-4 py-3 hover:bg-muted/30 font-medium text-sm">
+                        💳 Page 8: Insurance & Billing
+                      </AccordionTrigger>
+                      <AccordionContent className="px-4 pb-4 space-y-3">
+                        <div>
+                          <Label htmlFor="insuranceInfo" className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 block">Insurance Information</Label>
+                          <Textarea
+                            id="insuranceInfo"
+                            value={bookletData.insuranceInfo}
+                            onChange={(e) => updateField('insuranceInfo', e.target.value)}
+                            placeholder="Insurance plans accepted"
+                            rows={3}
+                            className="border-border/30 focus:border-primary/50 resize-none"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="paymentOptions" className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 block">Payment Options</Label>
+                          <Textarea
+                            id="paymentOptions"
+                            value={bookletData.paymentOptions}
+                            onChange={(e) => updateField('paymentOptions', e.target.value)}
+                            placeholder="Payment methods and policies"
+                            rows={3}
+                            className="border-border/30 focus:border-primary/50 resize-none"
+                          />
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
 
-                </Accordion>
+                    <AccordionItem value="patient-resources" className="border border-border/50 rounded-lg bg-card/50 overflow-hidden">
+                      <AccordionTrigger className="px-4 py-3 hover:bg-muted/30 font-medium text-sm">
+                        💻 Pages 9-10: Patient Resources
+                      </AccordionTrigger>
+                      <AccordionContent className="px-4 pb-4 space-y-3">
+                        <div>
+                          <Label htmlFor="patientPortalInfo" className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 block">Patient Portal Information</Label>
+                          <Textarea
+                            id="patientPortalInfo"
+                            value={bookletData.patientPortalInfo}
+                            onChange={(e) => updateField('patientPortalInfo', e.target.value)}
+                            placeholder="Patient portal features and access"
+                            rows={3}
+                            className="border-border/30 focus:border-primary/50 resize-none"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="appointmentInfo" className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 block">Appointment Information</Label>
+                          <Textarea
+                            id="appointmentInfo"
+                            value={bookletData.appointmentInfo}
+                            onChange={(e) => updateField('appointmentInfo', e.target.value)}
+                            placeholder="How to schedule appointments"
+                            rows={3}
+                            className="border-border/30 focus:border-primary/50 resize-none"
+                          />
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="emergency-support" className="border border-border/50 rounded-lg bg-card/50 overflow-hidden">
+                      <AccordionTrigger className="px-4 py-3 hover:bg-muted/30 font-medium text-sm">
+                        🚨 Page 11: Emergency & Support
+                      </AccordionTrigger>
+                      <AccordionContent className="px-4 pb-4 space-y-3">
+                        <div>
+                          <Label htmlFor="emergencyInfo" className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 block">Emergency Information</Label>
+                          <Textarea
+                            id="emergencyInfo"
+                            value={bookletData.emergencyInfo}
+                            onChange={(e) => updateField('emergencyInfo', e.target.value)}
+                            placeholder="After-hours and emergency procedures"
+                            rows={3}
+                            className="border-border/30 focus:border-primary/50 resize-none"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="supportServices" className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 block">Support Services</Label>
+                          <Textarea
+                            id="supportServices"
+                            value={bookletData.supportServices}
+                            onChange={(e) => updateField('supportServices', e.target.value)}
+                            placeholder="Additional support services offered"
+                            rows={3}
+                            className="border-border/30 focus:border-primary/50 resize-none"
+                          />
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="testimonials" className="border border-border/50 rounded-lg bg-card/50 overflow-hidden">
+                      <AccordionTrigger className="px-4 py-3 hover:bg-muted/30 font-medium text-sm">
+                        ⭐ Page 12: Testimonials & Cases
+                      </AccordionTrigger>
+                      <AccordionContent className="px-4 pb-4 space-y-3">
+                        <div>
+                          <Label htmlFor="testimonial1" className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 block">Testimonial 1</Label>
+                          <Textarea
+                            id="testimonial1"
+                            value={bookletData.testimonial1}
+                            onChange={(e) => updateField('testimonial1', e.target.value)}
+                            placeholder="Patient testimonial"
+                            rows={2}
+                            className="border-border/30 focus:border-primary/50 resize-none"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="testimonial2" className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 block">Testimonial 2</Label>
+                          <Textarea
+                            id="testimonial2"
+                            value={bookletData.testimonial2}
+                            onChange={(e) => updateField('testimonial2', e.target.value)}
+                            placeholder="Patient testimonial"
+                            rows={2}
+                            className="border-border/30 focus:border-primary/50 resize-none"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="case1Description" className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 block">Case Study 1</Label>
+                          <Textarea
+                            id="case1Description"
+                            value={bookletData.case1Description}
+                            onChange={(e) => updateField('case1Description', e.target.value)}
+                            placeholder="Success story or case study"
+                            rows={2}
+                            className="border-border/30 focus:border-primary/50 resize-none"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="case2Description" className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 block">Case Study 2</Label>
+                          <Textarea
+                            id="case2Description"
+                            value={bookletData.case2Description}
+                            onChange={(e) => updateField('case2Description', e.target.value)}
+                            placeholder="Success story or case study"
+                            rows={2}
+                            className="border-border/30 focus:border-primary/50 resize-none"
+                          />
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+
+                  </Accordion>
+                </div>
               </ScrollArea>
-            </div>
+            </Card>
           </div>
         </div>
       </DialogContent>
