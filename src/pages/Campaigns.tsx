@@ -16,6 +16,8 @@ import { formatDistanceToNow } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import { DateRangePicker } from '@/components/DateRangePicker';
 import { CalendarView } from '@/components/CalendarView';
+import { ImportantDatesCalendar } from '@/components/ImportantDatesCalendar';
+import { ImportantDateCampaignDialog } from '@/components/ImportantDateCampaignDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface Campaign {
@@ -65,7 +67,11 @@ export function Campaigns() {
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [executionDialogOpen, setExecutionDialogOpen] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
-  const [activeTab, setActiveTab] = useState('grid');
+  const [activeTab, setActiveTab] = useState('important-dates');
+  
+  // Important Dates functionality
+  const [selectedImportantDate, setSelectedImportantDate] = useState<any>(null);
+  const [importantDateDialogOpen, setImportantDateDialogOpen] = useState(false);
   
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -161,6 +167,11 @@ export function Campaigns() {
     });
   }, [fetchCampaigns]);
 
+  const handleImportantDateSelected = (importantDate: any) => {
+    setSelectedImportantDate(importantDate);
+    setImportantDateDialogOpen(true);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px] animate-fade-in">
@@ -253,13 +264,18 @@ export function Campaigns() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="flex items-center justify-between">
           <TabsList>
-            <TabsTrigger value="grid">Grid View</TabsTrigger>
+            <TabsTrigger value="important-dates">Important Dates</TabsTrigger>
+            <TabsTrigger value="grid">Active Campaigns</TabsTrigger>
             <TabsTrigger value="calendar">Calendar View</TabsTrigger>
           </TabsList>
           <div className="text-sm text-muted-foreground">
-            {filteredCampaigns.length} campaigns found
+            {activeTab === 'important-dates' ? 'Seasonal & Dental Awareness Calendar' : `${filteredCampaigns.length} campaigns found`}
           </div>
         </div>
+
+        <TabsContent value="important-dates">
+          <ImportantDatesCalendar onDateSelected={handleImportantDateSelected} />
+        </TabsContent>
 
         <TabsContent value="grid">
           {/* Campaigns Grid */}
@@ -404,6 +420,14 @@ export function Campaigns() {
           onCampaignUpdated={handleCampaignUpdated}
         />
       )}
+
+      {/* Important Date Campaign Dialog */}
+      <ImportantDateCampaignDialog
+        importantDate={selectedImportantDate}
+        open={importantDateDialogOpen}
+        onOpenChange={setImportantDateDialogOpen}
+        onCampaignCreated={handleCampaignCreated}
+      />
     </div>
   );
 }
