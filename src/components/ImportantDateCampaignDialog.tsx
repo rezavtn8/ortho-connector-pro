@@ -425,261 +425,283 @@ Your Dental Team`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Calendar className="w-5 h-5" />
-            {importantDate.title} Campaign
-          </DialogTitle>
-          <DialogDescription>
-            Create a campaign for {importantDate.title} ({format(importantDate.date, 'MMMM dd')}) with AI-generated content
-          </DialogDescription>
+      <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto">
+        <DialogHeader className="space-y-3 pb-4 border-b">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <Calendar className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <DialogTitle className="text-xl font-semibold">
+                {importantDate.title} Campaign
+              </DialogTitle>
+              <DialogDescription className="text-sm">
+                Create a targeted campaign for {importantDate.title} ({format(importantDate.date, 'MMMM dd')}) with AI-generated content
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Campaign Details */}
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Campaign Name *</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="e.g., Valentine's Day Campaign"
-              />
-            </div>
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 py-6">
+          {/* Campaign Setup - Left Column */}
+          <div className="lg:col-span-2 space-y-6">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Campaign Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="text-xs font-medium">Campaign Name *</Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="e.g., Valentine's Day Campaign"
+                    className="h-9"
+                  />
+                </div>
 
-            <div className="space-y-2">
-              <Label>Planned Date</Label>
-              <EnhancedDatePicker
-                value={formData.planned_delivery_date}
-                onChange={(date) => setFormData(prev => ({ ...prev, planned_delivery_date: date }))}
-                placeholder="Select date"
-                minDate={new Date()}
-                withTime={false}
-                presets={true}
-              />
-            </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium">Planned Date</Label>
+                  <EnhancedDatePicker
+                    value={formData.planned_delivery_date}
+                    onChange={(date) => setFormData(prev => ({ ...prev, planned_delivery_date: date }))}
+                    placeholder="Select date"
+                    minDate={new Date()}
+                    withTime={false}
+                    presets={true}
+                  />
+                </div>
 
-            <div className="space-y-2">
-              <Label>Campaign Theme *</Label>
-              <Select value={selectedSuggestion} onValueChange={setSelectedSuggestion}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select campaign theme" />
-                </SelectTrigger>
-                <SelectContent>
-                  {importantDate.campaignSuggestions.map((suggestion) => (
-                    <SelectItem key={suggestion} value={suggestion}>
-                      {suggestion}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium">Campaign Theme *</Label>
+                  <Select value={selectedSuggestion} onValueChange={setSelectedSuggestion}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Select campaign theme" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {importantDate.campaignSuggestions.map((suggestion) => (
+                        <SelectItem key={suggestion} value={suggestion}>
+                          {suggestion}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                value={formData.notes}
-                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                placeholder="Campaign objectives, special instructions..."
-                rows={3}
-              />
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="notes" className="text-xs font-medium">Notes</Label>
+                  <Textarea
+                    id="notes"
+                    value={formData.notes}
+                    onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                    placeholder="Campaign objectives..."
+                    rows={3}
+                    className="resize-none text-sm"
+                  />
+                </div>
 
-            {/* Generate AI Content Button */}
-            <Button 
-              onClick={generateAIContent}
-              disabled={!selectedSuggestion || generatingContent}
-              className="w-full gap-2"
-            >
-              {generatingContent ? (
-                <RefreshCw className="w-4 h-4 animate-spin" />
-              ) : (
-                <Wand2 className="w-4 h-4" />
-              )}
-              {generatingContent ? 'Generating...' : 'Generate AI Content'}
-            </Button>
+                <Button 
+                  onClick={generateAIContent}
+                  disabled={!selectedSuggestion || generatingContent}
+                  className="w-full gap-2 h-9"
+                >
+                  {generatingContent ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Wand2 className="w-4 h-4" />
+                  )}
+                  {generatingContent ? 'Generating Content...' : 'Generate AI Content'}
+                </Button>
+              </CardContent>
+            </Card>
           </div>
 
-          {/* AI Content Preview */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5" />
-              <Label>AI-Generated Content</Label>
-            </div>
-            
-            {aiContent ? (
-              <Tabs defaultValue="email" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="email">Email</TabsTrigger>
-                  <TabsTrigger value="social">Social</TabsTrigger>
-                  <TabsTrigger value="print">Print</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="email" className="space-y-2">
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm">Email Subject</CardTitle>
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => copyToClipboard(aiContent.emailSubject, 'Email subject')}
-                        >
-                          <Copy className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm">{aiContent.emailSubject}</p>
-                    </CardContent>
-                  </Card>
-                  
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm">Email Body</CardTitle>
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => copyToClipboard(aiContent.emailBody, 'Email body')}
-                        >
-                          <Copy className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-sm whitespace-pre-line">{aiContent.emailBody}</div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-                
-                <TabsContent value="social">
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm">Social Media Caption</CardTitle>
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => copyToClipboard(aiContent.socialCaption, 'Social caption')}
-                        >
-                          <Copy className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm">{aiContent.socialCaption}</p>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-                
-                <TabsContent value="print">
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm">Print/Card Message</CardTitle>
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => copyToClipboard(aiContent.printMessage, 'Print message')}
-                        >
-                          <Copy className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm">{aiContent.printMessage}</p>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
-            ) : (
-              <Card className="text-center py-8">
-                <CardContent>
-                  <Wand2 className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">
-                    Select a campaign theme and click "Generate AI Content" to create personalized marketing materials.
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {/* Office Selection */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Users className="w-5 h-5" />
-                <Label>Target Offices * ({selectedOffices.length} selected)</Label>
-              </div>
-              <Select value={tierFilter} onValueChange={setTierFilter}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {OFFICE_TIER_FILTERS.map((filter) => (
-                    <SelectItem key={filter.value} value={filter.value}>
-                      {filter.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            {loadingOffices ? (
-              <div className="text-center py-8">
-                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                <p className="text-sm text-muted-foreground">Loading offices...</p>
-              </div>
-            ) : (
-              <div className="border rounded-md max-h-96 overflow-y-auto">
-                {filteredOffices.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <p>No offices found for the selected filter.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2 p-4">
-                    {filteredOffices.map((office) => (
-                      <div key={office.id} className="flex items-start space-x-3">
-                        <Checkbox
-                          id={office.id}
-                          checked={selectedOffices.includes(office.id)}
-                          onCheckedChange={(checked) => handleOfficeSelection(office.id, checked as boolean)}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <Label htmlFor={office.id} className="cursor-pointer">
-                            <div className="font-medium">{office.name}</div>
-                            {office.address && (
-                              <div className="text-sm text-muted-foreground truncate">{office.address}</div>
-                            )}
-                            <div className="flex items-center gap-2 mt-1">
-                              <Badge 
-                                variant="secondary" 
-                                className={`text-xs ${
-                                  office.referral_tier === 'VIP' ? 'bg-purple-100 text-purple-800' :
-                                  office.referral_tier === 'Warm' ? 'bg-green-100 text-green-800' :
-                                  office.referral_tier === 'Cold' ? 'bg-blue-100 text-blue-800' :
-                                  'bg-gray-100 text-gray-800'
-                                }`}
-                              >
-                                {office.referral_tier || 'Unknown'}
-                              </Badge>
-                            </div>
-                          </Label>
+          {/* AI Content Preview - Center Column */}
+          <div className="lg:col-span-2 space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  <CardTitle className="text-sm font-medium">AI-Generated Content</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {aiContent ? (
+                  <Tabs defaultValue="email" className="w-full">
+                    <TabsList className="grid w-full grid-cols-3 bg-muted/50">
+                      <TabsTrigger value="email" className="text-xs">📧 Email</TabsTrigger>
+                      <TabsTrigger value="social" className="text-xs">📱 Social</TabsTrigger>
+                      <TabsTrigger value="print" className="text-xs">🖨️ Print</TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="email" className="space-y-3 mt-4">
+                      <div className="space-y-3">
+                        <div className="p-3 bg-muted/30 rounded-lg border">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-medium text-muted-foreground">Subject Line</span>
+                            <Button 
+                              size="sm" 
+                              variant="ghost"
+                              onClick={() => copyToClipboard(aiContent.emailSubject, 'Email subject')}
+                              className="h-6 w-6 p-0"
+                            >
+                              <Copy className="w-3 h-3" />
+                            </Button>
+                          </div>
+                          <p className="text-sm font-medium">{aiContent.emailSubject}</p>
+                        </div>
+                        
+                        <div className="p-3 bg-muted/30 rounded-lg border">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-medium text-muted-foreground">Email Body</span>
+                            <Button 
+                              size="sm" 
+                              variant="ghost"
+                              onClick={() => copyToClipboard(aiContent.emailBody, 'Email body')}
+                              className="h-6 w-6 p-0"
+                            >
+                              <Copy className="w-3 h-3" />
+                            </Button>
+                          </div>
+                          <div className="text-sm whitespace-pre-line leading-relaxed text-muted-foreground">
+                            {aiContent.emailBody}
+                          </div>
                         </div>
                       </div>
-                    ))}
+                    </TabsContent>
+                    
+                    <TabsContent value="social" className="mt-4">
+                      <div className="p-3 bg-muted/30 rounded-lg border">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-medium text-muted-foreground">Social Media Caption</span>
+                          <Button 
+                            size="sm" 
+                            variant="ghost"
+                            onClick={() => copyToClipboard(aiContent.socialCaption, 'Social caption')}
+                            className="h-6 w-6 p-0"
+                          >
+                            <Copy className="w-3 h-3" />
+                          </Button>
+                        </div>
+                        <p className="text-sm text-muted-foreground">{aiContent.socialCaption}</p>
+                      </div>
+                    </TabsContent>
+                    
+                    <TabsContent value="print" className="mt-4">
+                      <div className="p-3 bg-muted/30 rounded-lg border">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-medium text-muted-foreground">Print/Card Message</span>
+                          <Button 
+                            size="sm" 
+                            variant="ghost"
+                            onClick={() => copyToClipboard(aiContent.printMessage, 'Print message')}
+                            className="h-6 w-6 p-0"
+                          >
+                            <Copy className="w-3 h-3" />
+                          </Button>
+                        </div>
+                        <p className="text-sm text-muted-foreground">{aiContent.printMessage}</p>
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="mx-auto w-16 h-16 bg-muted/30 rounded-full flex items-center justify-center mb-4">
+                      <Wand2 className="w-8 h-8 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
+                      Select a campaign theme and generate AI content to see personalized marketing materials
+                    </p>
                   </div>
                 )}
-              </div>
-            )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Office Selection - Right Column */}
+          <div className="lg:col-span-1 space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-primary" />
+                    <CardTitle className="text-sm font-medium">Target Offices</CardTitle>
+                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    {selectedOffices.length} selected
+                  </Badge>
+                </div>
+              </CardHeader>
+              
+              <CardContent className="space-y-4">
+                <Select value={tierFilter} onValueChange={setTierFilter}>
+                  <SelectTrigger className="h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {OFFICE_TIER_FILTERS.map((filter) => (
+                      <SelectItem key={filter.value} value={filter.value}>
+                        {filter.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                {loadingOffices ? (
+                  <div className="text-center py-6">
+                    <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                    <p className="text-xs text-muted-foreground">Loading offices...</p>
+                  </div>
+                ) : (
+                  <div className="border rounded-md max-h-80 overflow-y-auto">
+                    {filteredOffices.length === 0 ? (
+                      <div className="text-center py-6 text-muted-foreground">
+                        <p className="text-xs">No offices found for the selected filter.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-1 p-2">
+                        {filteredOffices.map((office) => (
+                          <div key={office.id} className="flex items-start space-x-2 p-2 hover:bg-muted/50 rounded">
+                            <Checkbox
+                              id={office.id}
+                              checked={selectedOffices.includes(office.id)}
+                              onCheckedChange={(checked) => handleOfficeSelection(office.id, checked as boolean)}
+                              className="mt-0.5"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <Label htmlFor={office.id} className="cursor-pointer">
+                                <div className="text-xs font-medium leading-tight">{office.name}</div>
+                                {office.address && (
+                                  <div className="text-xs text-muted-foreground truncate mt-0.5">{office.address}</div>
+                                )}
+                                <div className="mt-1">
+                                  <Badge 
+                                    variant="secondary" 
+                                    className={`text-xs h-4 px-1.5 ${
+                                      office.referral_tier === 'VIP' ? 'bg-purple-100 text-purple-800' :
+                                      office.referral_tier === 'Warm' ? 'bg-green-100 text-green-800' :
+                                      office.referral_tier === 'Cold' ? 'bg-blue-100 text-blue-800' :
+                                      'bg-gray-100 text-gray-800'
+                                    }`}
+                                  >
+                                    {office.referral_tier || 'Unknown'}
+                                  </Badge>
+                                </div>
+                              </Label>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="border-t pt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
             Cancel
           </Button>
@@ -693,7 +715,7 @@ Your Dental Team`;
             ) : (
               <Send className="w-4 h-4" />
             )}
-            {loading ? 'Creating...' : 'Launch Campaign'}
+            {loading ? 'Creating Campaign...' : 'Launch Campaign'}
           </Button>
         </DialogFooter>
       </DialogContent>

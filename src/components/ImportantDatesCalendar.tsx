@@ -220,104 +220,125 @@ export function ImportantDatesCalendar({ onDateSelected }: ImportantDatesCalenda
 
   return (
     <div className="space-y-6">
-      {/* Header with Filters */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">Important Dates</h2>
-          <p className="text-muted-foreground">
-            Seasonal events and dental awareness days with AI-generated campaign suggestions
+      {/* Improved Header with Filters */}
+      <div className="space-y-4">
+        <div className="text-center space-y-2">
+          <h2 className="text-xl font-semibold text-foreground">Important Dates & Opportunities</h2>
+          <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
+            Leverage seasonal events and dental awareness days to create timely, relevant campaigns with AI-generated content
           </p>
         </div>
         
-        <div className="flex gap-2">
-          <Button
-            variant={selectedType === 'all' ? 'default' : 'outline'}
-            onClick={() => setSelectedType('all')}
-            size="sm"
-          >
-            All Dates
-          </Button>
-          <Button
-            variant={selectedType === 'seasonal' ? 'default' : 'outline'}
-            onClick={() => setSelectedType('seasonal')}
-            size="sm"
-          >
-            Seasonal
-          </Button>
-          <Button
-            variant={selectedType === 'dental' ? 'default' : 'outline'}
-            onClick={() => setSelectedType('dental')}
-            size="sm"
-          >
-            Dental Awareness
-          </Button>
-          <Button
-            variant={selectedType === 'business' ? 'default' : 'outline'}
-            onClick={() => setSelectedType('business')}
-            size="sm"
-          >
-            Business Events
-          </Button>
+        <div className="flex justify-center">
+          <div className="inline-flex bg-muted/50 rounded-lg p-1 gap-1">
+            <Button
+              variant={selectedType === 'all' ? 'default' : 'ghost'}
+              onClick={() => setSelectedType('all')}
+              size="sm"
+              className="h-8 text-xs"
+            >
+              All Events
+            </Button>
+            <Button
+              variant={selectedType === 'seasonal' ? 'default' : 'ghost'}
+              onClick={() => setSelectedType('seasonal')}
+              size="sm"
+              className="h-8 text-xs"
+            >
+              🎄 Seasonal
+            </Button>
+            <Button
+              variant={selectedType === 'dental' ? 'default' : 'ghost'}
+              onClick={() => setSelectedType('dental')}
+              size="sm"
+              className="h-8 text-xs"
+            >
+              🦷 Dental Awareness
+            </Button>
+            <Button
+              variant={selectedType === 'business' ? 'default' : 'ghost'}
+              onClick={() => setSelectedType('business')}
+              size="sm"
+              className="h-8 text-xs"
+            >
+              💼 Business
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Important Dates Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {/* Improved Important Dates Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {upcomingDates.map((importantDate) => (
           <Card 
             key={importantDate.id}
-            className="cursor-pointer hover:shadow-md hover-scale transition-all duration-300"
+            className="group cursor-pointer border-border/50 hover:border-border hover:shadow-lg transition-all duration-200 overflow-hidden"
             onClick={() => onDateSelected(importantDate)}
           >
-            <CardHeader className="pb-2">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2">
-                  {importantDate.icon}
-                  <CardTitle className="text-sm font-medium leading-tight">
-                    {importantDate.title}
-                  </CardTitle>
+            <div className={`h-2 w-full ${
+              importantDate.type === 'seasonal' ? 'bg-gradient-to-r from-red-400 to-pink-400' :
+              importantDate.type === 'dental' ? 'bg-gradient-to-r from-blue-400 to-cyan-400' :
+              'bg-gradient-to-r from-green-400 to-emerald-400'
+            }`} />
+            
+            <CardHeader className="pb-3">
+              <div className="space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="shrink-0 p-1.5 rounded-md bg-muted/50">
+                      {importantDate.icon}
+                    </div>
+                    <h3 className="font-medium text-sm leading-tight group-hover:text-primary transition-colors truncate">
+                      {importantDate.title}
+                    </h3>
+                  </div>
                 </div>
-                <Badge 
-                  variant="secondary" 
-                  className={typeColors[importantDate.type]}
-                >
-                  {importantDate.type}
-                </Badge>
+                
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Calendar className="w-3 h-3" />
+                    <span className="font-medium">{format(importantDate.date, 'MMM dd')}</span>
+                  </div>
+                  <Badge 
+                    variant="outline" 
+                    className={`text-xs h-5 px-2 ${
+                      getDaysUntil(importantDate.date) === 'Today' ? 'bg-primary/10 text-primary border-primary/20' :
+                      getDaysUntil(importantDate.date) === 'Tomorrow' ? 'bg-orange-50 text-orange-600 border-orange-200' :
+                      'bg-muted/50 text-muted-foreground'
+                    }`}
+                  >
+                    {getDaysUntil(importantDate.date)}
+                  </Badge>
+                </div>
               </div>
             </CardHeader>
             
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Calendar className="w-4 h-4" />
-                  <span>{format(importantDate.date, 'MMM dd')}</span>
-                </div>
-                <Badge variant="outline" className="text-xs">
-                  {getDaysUntil(importantDate.date)}
-                </Badge>
-              </div>
-              
-              <div className="text-xs text-muted-foreground">
-                {importantDate.category}
-              </div>
-              
-              <p className="text-sm text-muted-foreground line-clamp-2">
+            <CardContent className="space-y-3 pt-0">
+              <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
                 {importantDate.description}
               </p>
               
-              <div className="pt-2">
-                <p className="text-xs font-medium text-muted-foreground mb-1">
-                  Campaign Ideas:
-                </p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary/40" />
+                  <p className="text-xs font-medium text-muted-foreground">Campaign Ideas:</p>
+                </div>
                 <div className="flex flex-wrap gap-1">
                   {importantDate.campaignSuggestions.slice(0, 2).map((suggestion, index) => (
-                    <Badge key={index} variant="secondary" className="text-xs">
+                    <Badge 
+                      key={index} 
+                      variant="secondary" 
+                      className="text-xs py-0.5 px-2 bg-primary/5 text-primary/80 border-primary/20"
+                    >
                       {suggestion}
                     </Badge>
                   ))}
                   {importantDate.campaignSuggestions.length > 2 && (
-                    <Badge variant="secondary" className="text-xs">
-                      +{importantDate.campaignSuggestions.length - 2}
+                    <Badge 
+                      variant="outline" 
+                      className="text-xs py-0.5 px-2 bg-muted/30"
+                    >
+                      +{importantDate.campaignSuggestions.length - 2} more
                     </Badge>
                   )}
                 </div>
@@ -328,15 +349,15 @@ export function ImportantDatesCalendar({ onDateSelected }: ImportantDatesCalenda
       </div>
       
       {upcomingDates.length === 0 && (
-        <Card className="text-center py-12">
-          <CardContent>
-            <Calendar className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-lg font-semibold mb-2">No upcoming dates</h3>
-            <p className="text-muted-foreground">
-              No important dates found for the selected filter.
-            </p>
-          </CardContent>
-        </Card>
+        <div className="text-center py-12">
+          <div className="mx-auto w-16 h-16 bg-muted/50 rounded-full flex items-center justify-center mb-4">
+            <Calendar className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <h3 className="text-lg font-semibold mb-2">No upcoming dates</h3>
+          <p className="text-sm text-muted-foreground">
+            No important dates found for the selected filter.
+          </p>
+        </div>
       )}
     </div>
   );
