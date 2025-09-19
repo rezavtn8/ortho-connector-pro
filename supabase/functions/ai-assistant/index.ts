@@ -459,45 +459,45 @@ PARAMETERS:
 PROMPT: ${prompt || 'Create appropriate content based on the context provided.'}`;
 
     case 'free_form_analysis':
-      const analysisData = context.analysis_data;
+      const freeFormAnalysisData = context.analysis_data;
       return `Analyze this practice's complete business data and generate 4-6 unique, valuable insights.
 
 PRACTICE DATA:
-- Total Sources: ${analysisData.total_sources}
-- Total Referrals: ${analysisData.total_referrals}
-- Source Types Distribution: ${JSON.stringify(analysisData.source_types)}
-- Recent Performance (6mo): ${analysisData.last_6_months?.length} months of data
-- Monthly Data Points: ${analysisData.monthly_data?.length} records
-- Marketing Visits: ${analysisData.visits?.length} visits
+- Total Sources: ${freeFormAnalysisData.total_sources}
+- Total Referrals: ${freeFormAnalysisData.total_referrals}
+- Source Types Distribution: ${JSON.stringify(freeFormAnalysisData.source_types)}
+- Recent Performance (6mo): ${freeFormAnalysisData.last_6_months?.length} months of data
+- Monthly Data Points: ${freeFormAnalysisData.monthly_data?.length} records
+- Marketing Visits: ${freeFormAnalysisData.visits?.length} visits
 
 DETAILED DATA:
-Sources: ${JSON.stringify(analysisData.sources?.slice(0, 10))} ${analysisData.sources?.length > 10 ? '... (showing first 10)' : ''}
-Recent Monthly Data: ${JSON.stringify(analysisData.last_6_months)}
-Visits Data: ${JSON.stringify(analysisData.visits?.slice(0, 5))} ${analysisData.visits?.length > 5 ? '... (showing first 5)' : ''}
+Sources: ${JSON.stringify(freeFormAnalysisData.sources?.slice(0, 10))} ${freeFormAnalysisData.sources?.length > 10 ? '... (showing first 10)' : ''}
+Recent Monthly Data: ${JSON.stringify(freeFormAnalysisData.last_6_months)}
+Visits Data: ${JSON.stringify(freeFormAnalysisData.visits?.slice(0, 5))} ${freeFormAnalysisData.visits?.length > 5 ? '... (showing first 5)' : ''}
 
 Generate 4-6 unique insights as JSON array. Each insight should have a punchy nutshell and detailed content with actionable recommendations.
 
 ${prompt || ''}`;
 
     case 'comprehensive_analysis':
-      const analysisData = context.analysis_data;
+      const comprehensiveAnalysisData = context.analysis_data;
       return `Analyze this practice's complete business data and generate insights for these 6 categories:
 
 CATEGORIES TO ANALYZE:
 ${context.insight_categories?.map((cat: string, i: number) => `${i + 1}. ${cat}`).join('\n') || ''}
 
 PRACTICE DATA:
-- Total Sources: ${analysisData.total_sources}
-- Total Referrals: ${analysisData.total_referrals}
-- Source Types Distribution: ${JSON.stringify(analysisData.source_types)}
-- Recent Performance (6mo): ${analysisData.last_6_months?.length} months of data
-- Monthly Data Points: ${analysisData.monthly_data?.length} records
-- Marketing Visits: ${analysisData.visits?.length} visits
+- Total Sources: ${comprehensiveAnalysisData.total_sources}
+- Total Referrals: ${comprehensiveAnalysisData.total_referrals}
+- Source Types Distribution: ${JSON.stringify(comprehensiveAnalysisData.source_types)}
+- Recent Performance (6mo): ${comprehensiveAnalysisData.last_6_months?.length} months of data
+- Monthly Data Points: ${comprehensiveAnalysisData.monthly_data?.length} records
+- Marketing Visits: ${comprehensiveAnalysisData.visits?.length} visits
 
 DETAILED DATA:
-Sources: ${JSON.stringify(analysisData.sources?.slice(0, 10))} ${analysisData.sources?.length > 10 ? '... (showing first 10)' : ''}
-Recent Monthly Data: ${JSON.stringify(analysisData.last_6_months)}
-Visits Data: ${JSON.stringify(analysisData.visits?.slice(0, 5))} ${analysisData.visits?.length > 5 ? '... (showing first 5)' : ''}
+Sources: ${JSON.stringify(comprehensiveAnalysisData.sources?.slice(0, 10))} ${comprehensiveAnalysisData.sources?.length > 10 ? '... (showing first 10)' : ''}
+Recent Monthly Data: ${JSON.stringify(comprehensiveAnalysisData.last_6_months)}
+Visits Data: ${JSON.stringify(comprehensiveAnalysisData.visits?.slice(0, 5))} ${comprehensiveAnalysisData.visits?.length > 5 ? '... (showing first 5)' : ''}
 
 ${prompt}
 
