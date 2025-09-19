@@ -4,11 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MessageSquare, Send, Bot, User, Search, Lightbulb, BarChart3, FileText, Users, AlertTriangle, TrendingUp, Target } from 'lucide-react';
+import { MessageSquare, Send, Bot, User, Lightbulb, BarChart3, FileText, Users, AlertTriangle, TrendingUp, Target } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
-import { ChatMessageContent } from './ChatMessageContent';
 
 interface ChatMessage {
   id: string;
@@ -218,7 +217,7 @@ export function AIChatAssistant() {
     
     switch (message.type) {
       case 'analysis':
-        return Search;
+        return BarChart3;
       case 'suggestion':
         return Lightbulb;
       default:
@@ -231,165 +230,138 @@ export function AIChatAssistant() {
     
     switch (message.type) {
       case 'analysis':
-        return (
-          <Badge className="bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950/50 dark:text-cyan-300 dark:border-cyan-800 text-xs font-medium px-2 py-1 rounded-full border-0">
-            <Search className="h-3 w-3 mr-1" />
-            Analysis
-          </Badge>
-        );
+        return <Badge variant="secondary" className="text-xs">Analysis</Badge>;
       case 'suggestion':
-        return (
-          <Badge className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800 text-xs font-medium px-2 py-1 rounded-full border-0">
-            <Lightbulb className="h-3 w-3 mr-1" />
-            Recommendation
-          </Badge>
-        );
+        return <Badge variant="default" className="text-xs">Suggestion</Badge>;
       default:
         return null;
     }
   };
 
   return (
-    <div className="bg-muted/30 rounded-2xl p-6">
-      <Card className="h-[600px] flex flex-col border-0 shadow-lg max-w-4xl mx-auto">
-        <CardHeader className="flex-shrink-0 pb-4">
-          <div className="space-y-1">
-            <CardTitle className="flex items-center gap-2 text-xl font-bold">
-              <MessageSquare className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
-              AI Practice Assistant
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Get insights and recommendations based on your practice data
-            </p>
-          </div>
-        </CardHeader>
-        
-        <CardContent className="flex-1 flex flex-col space-y-6 p-6">
-          {/* Chat Messages */}
-          <ScrollArea className="flex-1 pr-4" ref={scrollAreaRef}>
-            <div className="space-y-6 max-w-3xl">
-              {messages.map((message) => {
-                const IconComponent = getMessageIcon(message);
-                return (
+    <Card className="h-[600px] flex flex-col">
+      <CardHeader className="flex-shrink-0">
+        <CardTitle className="flex items-center gap-2">
+          <MessageSquare className="h-5 w-5 text-primary" />
+          AI Practice Assistant
+        </CardTitle>
+      </CardHeader>
+      
+      <CardContent className="flex-1 flex flex-col space-y-4 p-6">
+        {/* Chat Messages */}
+        <ScrollArea className="flex-1 pr-4" ref={scrollAreaRef}>
+          <div className="space-y-4">
+            {messages.map((message) => {
+              const IconComponent = getMessageIcon(message);
+              return (
+                <div
+                  key={message.id}
+                  className={`flex gap-3 ${
+                    message.role === 'user' ? 'justify-end' : 'justify-start'
+                  }`}
+                >
+                  {message.role === 'assistant' && (
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <IconComponent className="h-4 w-4 text-primary" />
+                    </div>
+                  )}
+                  
                   <div
-                    key={message.id}
-                    className={`flex gap-4 ${
-                      message.role === 'user' ? 'justify-end' : 'justify-start'
+                    className={`max-w-[80%] rounded-lg p-4 ${
+                      message.role === 'user'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted'
                     }`}
                   >
-                    {message.role === 'assistant' && (
-                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-cyan-50 dark:bg-cyan-950/50 flex items-center justify-center shadow-sm">
-                        <IconComponent className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
-                      </div>
-                    )}
-                    
-                    <div
-                      className={`max-w-[650px] rounded-2xl p-5 shadow-sm ${
-                        message.role === 'user'
-                          ? 'bg-cyan-600 dark:bg-cyan-700 text-white'
-                          : 'bg-slate-50 dark:bg-slate-800 text-foreground'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3 mb-3">
-                        {getMessageBadge(message)}
-                        <span className={`text-xs font-medium ${
-                          message.role === 'user' 
-                            ? 'text-cyan-100 dark:text-cyan-200' 
-                            : 'text-muted-foreground'
-                        }`}>
-                          {formatTime(message.timestamp)}
-                        </span>
-                      </div>
-                      <div className={message.role === 'user' ? 'text-white' : ''}>
-                        <ChatMessageContent 
-                          content={message.content} 
-                          isAssistant={message.role === 'assistant'}
-                        />
-                      </div>
-                    </div>
-                    
-                    {message.role === 'user' && (
-                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-cyan-600 dark:bg-cyan-700 flex items-center justify-center shadow-sm">
-                        <User className="h-5 w-5 text-white" />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              
-              {isLoading && (
-                <div className="flex gap-4 justify-start">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-cyan-50 dark:bg-cyan-950/50 flex items-center justify-center shadow-sm">
-                    <Bot className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
-                  </div>
-                  <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-5 max-w-[650px] shadow-sm">
-                    <div className="flex items-center space-x-3">
-                      <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-cyan-600 dark:bg-cyan-400 rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-cyan-600 dark:bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                        <div className="w-2 h-2 bg-cyan-600 dark:bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                      </div>
-                      <span className="text-sm text-muted-foreground font-medium">
-                        Analyzing your practice data...
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      {getMessageBadge(message)}
+                      <span className="text-xs opacity-70">
+                        {formatTime(message.timestamp)}
                       </span>
                     </div>
+                    <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                      {message.content}
+                    </p>
+                  </div>
+                  
+                  {message.role === 'user' && (
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                      <User className="h-4 w-4 text-primary-foreground" />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            
+            {isLoading && (
+              <div className="flex gap-3 justify-start">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Bot className="h-4 w-4 text-primary" />
+                </div>
+                <div className="bg-muted rounded-lg p-4 max-w-[80%]">
+                  <div className="flex items-center space-x-2">
+                    <div className="animate-pulse flex space-x-1">
+                      <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                      <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    </div>
+                    <span className="text-sm text-muted-foreground">
+                      Analyzing your data...
+                    </span>
                   </div>
                 </div>
-              )}
-            </div>
-          </ScrollArea>
-
-          {/* Quick Actions */}
-          <div className="flex-shrink-0 space-y-4">
-            <div className="h-px bg-border"></div>
-            <div className="space-y-3">
-              <p className="text-sm font-semibold text-foreground">Quick Insights</p>
-              <div className="grid grid-cols-1 gap-2 max-h-32 overflow-y-auto">
-                {quickActions.map((action, index) => {
-                  const IconComponent = action.icon;
-                  return (
-                    <Button
-                      key={index}
-                      variant="ghost"
-                      size="sm"
-                      className="justify-start text-left h-auto p-3 rounded-xl hover:bg-muted/50 transition-all duration-200"
-                      onClick={() => handleQuickAction(action.prompt)}
-                      disabled={isLoading}
-                    >
-                      <IconComponent className="h-4 w-4 mr-3 flex-shrink-0 text-cyan-600 dark:text-cyan-400" />
-                      <span className="text-sm font-medium">{action.label}</span>
-                    </Button>
-                  );
-                })}
               </div>
-            </div>
+            )}
           </div>
+        </ScrollArea>
 
-          {/* Message Input */}
-          <div className="flex-shrink-0 flex space-x-3">
-            <Textarea
-              placeholder="Ask about referral source performance, geographic distribution, seasonal trends, ROI analysis, or any specific practice data insights..."
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage();
-                }
-              }}
-              className="min-h-[60px] resize-none rounded-xl border-2 focus:border-cyan-300 dark:focus:border-cyan-700"
-              disabled={isLoading}
-            />
-            <Button
-              onClick={() => handleSendMessage()}
-              disabled={!inputMessage.trim() || isLoading}
-              className="px-4 rounded-xl bg-cyan-600 hover:bg-cyan-700 dark:bg-cyan-700 dark:hover:bg-cyan-600 shadow-sm"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
+        {/* Quick Actions */}
+        <div className="flex-shrink-0 space-y-3">
+          <p className="text-sm font-medium text-muted-foreground">Business Intelligence Queries:</p>
+          <div className="grid grid-cols-1 gap-2 max-h-32 overflow-y-auto">
+            {quickActions.map((action, index) => {
+              const IconComponent = action.icon;
+              return (
+                <Button
+                  key={index}
+                  variant="outline"
+                  size="sm"
+                  className="justify-start text-left h-auto p-2"
+                  onClick={() => handleQuickAction(action.prompt)}
+                  disabled={isLoading}
+                >
+                  <IconComponent className="h-3 w-3 mr-2 flex-shrink-0" />
+                  <span className="text-xs">{action.label}</span>
+                </Button>
+              );
+            })}
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+
+        {/* Message Input */}
+        <div className="flex-shrink-0 flex space-x-2">
+          <Textarea
+            placeholder="Ask about referral source performance, geographic distribution, seasonal trends, ROI analysis, or any specific practice data insights..."
+            value={inputMessage}
+            onChange={(e) => setInputMessage(e.target.value)}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+              }
+            }}
+            className="min-h-[50px] resize-none"
+            disabled={isLoading}
+          />
+          <Button
+            onClick={() => handleSendMessage()}
+            disabled={!inputMessage.trim() || isLoading}
+            className="px-4"
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
