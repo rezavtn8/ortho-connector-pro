@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, CheckCircle, TrendingUp, Target, Users, Activity, Zap, Brain, RefreshCw, BarChart3, MapPin, Calendar, Shield, Search, DollarSign } from 'lucide-react';
+import { BarChart3, TrendingUp, MapPin, Target, Shield, Search, Brain, RefreshCw, Eye } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { InsightModal } from './InsightModal';
 
 interface AIInsight {
   id: string;
@@ -20,6 +21,8 @@ export function AIDataAnalysis() {
   const [insights, setInsights] = useState<AIInsight[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasAnalysis, setHasAnalysis] = useState(false);
+  const [selectedInsight, setSelectedInsight] = useState<AIInsight | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const { user } = useAuth();
 
   const generateAIAnalysis = async () => {
@@ -148,55 +151,63 @@ Focus on specific data-driven insights, not generic advice. Include actual numbe
     }
   };
 
+  const openModal = (insight: AIInsight) => {
+    setSelectedInsight(insight);
+    setIsModalOpen(true);
+  };
+
   const getPriorityBadge = (priority: string) => {
     switch (priority) {
       case 'high': 
         return { 
-          variant: 'destructive' as const, 
-          className: 'bg-red-500/10 text-red-700 border-red-200 dark:bg-red-500/20 dark:text-red-300 dark:border-red-800',
-          label: 'High Risk'
+          className: 'bg-red-50 text-red-600 dark:bg-red-950/50 dark:text-red-400',
+          label: 'High'
         };
       case 'medium': 
         return { 
-          variant: 'default' as const, 
-          className: 'bg-orange-500/10 text-orange-700 border-orange-200 dark:bg-orange-500/20 dark:text-orange-300 dark:border-orange-800',
-          label: 'Medium'
+          className: 'bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400',
+          label: 'Med'
         };
       case 'low': 
         return { 
-          variant: 'secondary' as const, 
-          className: 'bg-green-500/10 text-green-700 border-green-200 dark:bg-green-500/20 dark:text-green-300 dark:border-green-800',
-          label: 'Low Risk'
+          className: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400',
+          label: 'Low'
         };
       default: 
         return { 
-          variant: 'default' as const, 
-          className: 'bg-blue-500/10 text-blue-700 border-blue-200 dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-800',
+          className: 'bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400',
           label: 'Info'
         };
     }
   };
 
-  const getCardStyle = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'border-l-4 border-l-red-500 bg-gradient-to-r from-red-50/50 to-transparent dark:from-red-950/20';
-      case 'medium': return 'border-l-4 border-l-orange-500 bg-gradient-to-r from-orange-50/50 to-transparent dark:from-orange-950/20';
-      case 'low': return 'border-l-4 border-l-green-500 bg-gradient-to-r from-green-50/50 to-transparent dark:from-green-950/20';
-      default: return 'border-l-4 border-l-blue-500 bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-950/20';
-    }
+  const getCardStyle = () => {
+    return 'bg-card border border-border/50';
   };
 
-  const formatContent = (content: string) => {
-    // Remove markdown symbols and format text for better readability
-    return content
-      .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold markdown
-      .replace(/\*(.*?)\*/g, '$1') // Remove italic markdown
+  const formatContent = (content: string, forDisplay = false) => {
+    let formatted = content
       .replace(/###\s*/g, '') // Remove heading symbols
       .replace(/--+/g, '') // Remove dashes
-      .replace(/^\s*[\-\*\+]\s*/gm, '• ') // Convert list items to bullets
+      .replace(/^\s*[\-\*\+]\s*/gm, '• '); // Convert list items to bullets
+
+    if (forDisplay) {
+      // For display in cards, keep bold formatting but clean up
+      formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    } else {
+      // For truncated preview, remove all markdown
+      formatted = formatted.replace(/\*\*(.*?)\*\*/g, '$1');
+    }
+    
+    return formatted
       .split('\n')
-      .filter(line => line.trim()) // Remove empty lines
+      .filter(line => line.trim())
       .join('\n');
+  };
+
+  const truncateText = (text: string, maxLength: number = 150) => {
+    if (text.length <= maxLength) return text;
+    return text.slice(0, maxLength) + '...';
   };
 
   if (!hasAnalysis && !loading) {
@@ -278,57 +289,81 @@ Focus on specific data-driven insights, not generic advice. Include actual numbe
         </Button>
       </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
-        {insights.map((insight) => {
-          const IconComponent = insight.icon;
-          const badgeInfo = getPriorityBadge(insight.priority);
-          const formattedContent = formatContent(insight.content);
-          
-          return (
-            <Card 
-              key={insight.id} 
-              className={`${getCardStyle(insight.priority)} hover:shadow-xl hover:-translate-y-1 transition-all duration-300 rounded-xl border-0 shadow-lg h-[320px] flex flex-col`}
-            >
-              <CardHeader className="pb-4 flex-shrink-0">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <div className="p-2 bg-primary/10 rounded-lg flex-shrink-0">
-                      <IconComponent className="h-5 w-5 text-primary" />
+      <div className="bg-muted/30 rounded-2xl p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          {insights.map((insight) => {
+            const IconComponent = insight.icon;
+            const badgeInfo = getPriorityBadge(insight.priority);
+            const formattedContent = formatContent(insight.content);
+            const truncatedContent = truncateText(formattedContent);
+            const shouldTruncate = formattedContent.length > 150;
+            
+            return (
+              <Card 
+                key={insight.id} 
+                className={`${getCardStyle()} hover:shadow-lg hover:-translate-y-1 transition-all duration-300 rounded-xl h-[280px] flex flex-col group cursor-pointer`}
+                onClick={() => shouldTruncate && openModal(insight)}
+              >
+                <CardHeader className="pb-3 flex-shrink-0">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="p-2 bg-cyan-50 dark:bg-cyan-950/50 rounded-lg flex-shrink-0">
+                        <IconComponent className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
+                      </div>
+                      <CardTitle className="text-base font-bold text-foreground leading-tight">
+                        {insight.title}
+                      </CardTitle>
                     </div>
-                    <CardTitle className="text-lg font-bold text-foreground leading-tight line-clamp-2">
-                      {insight.title}
-                    </CardTitle>
+                    <Badge 
+                      className={`${badgeInfo.className} text-xs font-medium px-2 py-1 rounded-full border-0 flex-shrink-0`}
+                    >
+                      {badgeInfo.label}
+                    </Badge>
                   </div>
-                  <Badge 
-                    className={`${badgeInfo.className} text-xs font-medium px-3 py-1 rounded-full border flex-shrink-0`}
-                  >
-                    {badgeInfo.label}
-                  </Badge>
+                </CardHeader>
+                
+                <div className="px-6 mb-3">
+                  <div className="h-px bg-border/50"></div>
                 </div>
-              </CardHeader>
-              <CardContent className="flex-1 overflow-hidden">
-                <div className="text-muted-foreground leading-relaxed text-sm line-clamp-8">
-                  {formattedContent.split('\n').map((line, index) => {
-                    if (line.startsWith('• ')) {
-                      return (
-                        <div key={index} className="flex items-start gap-2 mb-2">
-                          <span className="text-primary font-bold text-xs mt-1">•</span>
-                          <span className="flex-1">{line.substring(2)}</span>
-                        </div>
-                      );
-                    }
-                    return line.trim() && (
-                      <p key={index} className="mb-3 last:mb-0">
-                        {line}
-                      </p>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
+                
+                <CardContent className="flex-1 flex flex-col pt-0">
+                  <div className="text-muted-foreground leading-relaxed text-sm flex-1">
+                    <div 
+                      dangerouslySetInnerHTML={{ 
+                        __html: formatContent(truncatedContent, true) 
+                      }}
+                      className="prose prose-sm max-w-none dark:prose-invert [&>strong]:font-semibold [&>strong]:text-foreground"
+                    />
+                  </div>
+                  
+                  {shouldTruncate && (
+                    <div className="mt-3 pt-3 border-t border-border/50">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-auto p-0 text-xs text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 font-medium group-hover:underline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openModal(insight);
+                        }}
+                      >
+                        <Eye className="h-3 w-3 mr-1" />
+                        See More
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       </div>
+
+      <InsightModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        insight={selectedInsight}
+      />
     </div>
   );
 }
