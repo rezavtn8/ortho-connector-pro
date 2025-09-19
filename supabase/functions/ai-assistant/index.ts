@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 interface AIRequest {
-  task_type: 'email_generation' | 'review_response' | 'content_creation' | 'analysis' | 'comprehensive_analysis' | 'business_intelligence' | 'structured_report';
+  task_type: 'email_generation' | 'review_response' | 'content_creation' | 'analysis' | 'comprehensive_analysis' | 'business_intelligence' | 'structured_report' | 'practice_consultation';
   context: any;
   prompt?: string;
   parameters?: {
@@ -435,6 +435,30 @@ BUSINESS CONTEXT:
 - Owner: ${business_persona?.owner_name || 'Healthcare Professional'}
 - Focus: Data-driven insights for referral source optimization`;
 
+    case 'practice_consultation':
+      return `You are an AI practice management consultant specializing in healthcare referral optimization.
+
+CONSULTATION GUIDELINES:
+- Provide concise, actionable advice in exactly 2-3 paragraphs
+- First paragraph: Direct answer to the question with key insight
+- Second paragraph: Supporting data analysis and context
+- Third paragraph (if needed): Specific actionable recommendations
+- Use real practice data whenever possible
+- Be conversational but professional
+- Focus on practical, implementable solutions
+
+RESPONSE LENGTH REQUIREMENT:
+- Maximum 3 paragraphs
+- Each paragraph 3-5 sentences
+- Total response under 300 words
+- Prioritize actionable insights over lengthy explanations
+
+BUSINESS CONTEXT:
+- Practice: ${business_persona?.practice_name || 'Healthcare Practice'}
+- Owner: ${business_persona?.owner_name || 'Healthcare Professional'}
+- Communication Style: ${communication_style || 'professional'}
+- Focus: Practical advice based on real practice data and performance metrics`;
+
     default:
       return basePrompt + `
 
@@ -545,7 +569,59 @@ Marketing Activity:
 
 INSTRUCTION: Generate the exact JSON structure for all 6 sections as specified. Use real data from above to create specific, actionable insights.
 
-${prompt || ''}
+${prompt || ''}`;
+
+    case 'practice_consultation':
+      return `You are answering this question about the practice: "${prompt}"
+
+COMPREHENSIVE PRACTICE DATA AVAILABLE:
+
+REFERRAL SOURCES (${context.practice_data?.sources?.length || 0} total):
+${context.practice_data?.sources?.slice(0, 10).map((s: any) => 
+  `- ${s.name} (${s.source_type}): ${s.is_active ? 'Active' : 'Inactive'}, Location: ${s.address || 'N/A'}`
+).join('\n') || 'No sources data'}
+
+MONTHLY PERFORMANCE:
+${context.practice_data?.monthly_data?.slice(0, 12).map((m: any) => 
+  `${m.year_month}: ${m.patient_count || 0} referrals from ${m.source_id ? 'tracked source' : 'unknown'}`
+).join('\n') || 'No monthly data'}
+
+MARKETING VISITS (${context.practice_data?.visits?.length || 0} total):
+${context.practice_data?.visits?.slice(0, 8).map((v: any) => 
+  `- ${new Date(v.visit_date).toLocaleDateString()}: ${v.visited ? 'Completed' : 'Planned'} visit, Rating: ${v.star_rating || 'N/A'}`
+).join('\n') || 'No visit data'}
+
+CAMPAIGNS (${context.practice_data?.campaigns?.length || 0} total):
+${context.practice_data?.campaigns?.slice(0, 5).map((c: any) => 
+  `- "${c.name}" (${c.status}): ${c.campaign_type} campaign, ${c.delivery_method}`
+).join('\n') || 'No campaign data'}
+
+DISCOVERED OFFICES (${context.practice_data?.discovered_offices?.length || 0} total):
+${context.practice_data?.discovered_offices?.slice(0, 5).map((d: any) => 
+  `- ${d.name}: ${d.office_type}, Rating: ${d.rating || 'N/A'}, ${d.imported ? 'Imported' : 'Not imported'}`
+).join('\n') || 'No discovered offices'}
+
+REVIEWS (${context.practice_data?.reviews?.length || 0} total):
+${context.practice_data?.reviews?.slice(0, 5).map((r: any) => 
+  `- ${r.status} review, Attention needed: ${r.needs_attention ? 'Yes' : 'No'}`
+).join('\n') || 'No review data'}
+
+ANALYTICS SUMMARY:
+- Total Active Sources: ${context.practice_data?.analytics?.total_sources || 0}
+- Total Referrals: ${context.practice_data?.analytics?.total_referrals || 0}
+- Sources Active This Month: ${context.practice_data?.analytics?.active_sources_this_month || 0}
+- Recent Marketing Visits: ${context.practice_data?.analytics?.recent_visits || 0}
+- Source Distribution: ${JSON.stringify(context.practice_data?.analytics?.source_types_distribution || {})}
+
+USER PROFILE:
+${context.practice_data?.user_profile ? `
+- Name: ${context.practice_data.user_profile.first_name} ${context.practice_data.user_profile.last_name}
+- Role: ${context.practice_data.user_profile.role}
+- Clinic: ${context.practice_data.user_profile.clinic_name || 'N/A'}` : 'Profile data not available'}
+
+IMPORTANT: Respond in exactly 2-3 paragraphs, maximum 300 words total. Use specific data points from above to support your analysis and recommendations.
+
+USER QUESTION: ${prompt}
 
 Provide exactly 4-6 insights, each starting with **Bold Summary:** followed by detailed analysis and specific recommendations.`;
 

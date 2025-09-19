@@ -111,18 +111,44 @@ export function AIChatAssistant() {
     setIsLoading(true);
 
     try {
-      // Get comprehensive practice data for context
-      const [sourcesResult, monthlyResult, visitsResult, campaignsResult] = await Promise.all([
+      // Get comprehensive practice data for context - ALL PLATFORM DATA
+      const [
+        sourcesResult, 
+        monthlyResult, 
+        visitsResult, 
+        campaignsResult,
+        discoveredResult,
+        reviewsResult,
+        deliveriesResult,
+        usageResult,
+        userProfileResult,
+        clinicResult,
+        activityResult
+      ] = await Promise.all([
         supabase.from('patient_sources').select('*').eq('created_by', user?.id),
         supabase.from('monthly_patients').select('*').eq('user_id', user?.id),
         supabase.from('marketing_visits').select('*').eq('user_id', user?.id),
-        supabase.from('campaigns').select('*').eq('created_by', user?.id)
+        supabase.from('campaigns').select('*').eq('created_by', user?.id),
+        supabase.from('discovered_offices').select('*').eq('discovered_by', user?.id),
+        supabase.from('review_status').select('*').eq('user_id', user?.id),
+        supabase.from('campaign_deliveries').select('*').eq('created_by', user?.id),
+        supabase.from('ai_usage_tracking').select('*').eq('user_id', user?.id).order('created_at', { ascending: false }).limit(50),
+        supabase.from('user_profiles').select('*').eq('user_id', user?.id).single(),
+        supabase.from('clinics').select('*').eq('owner_id', user?.id).maybeSingle(),
+        supabase.from('activity_log').select('*').eq('user_id', user?.id).order('created_at', { ascending: false }).limit(100)
       ]);
 
       const sources = sourcesResult.data || [];
       const monthlyData = monthlyResult.data || [];
       const visits = visitsResult.data || [];
       const campaigns = campaignsResult.data || [];
+      const discoveredOffices = discoveredResult.data || [];
+      const reviews = reviewsResult.data || [];
+      const deliveries = deliveriesResult.data || [];
+      const aiUsage = usageResult.data || [];
+      const userProfile = userProfileResult.data;
+      const clinic = clinicResult.data;
+      const activities = activityResult.data || [];
 
       const { data, error } = await supabase.functions.invoke('ai-assistant', {
         body: {
@@ -130,10 +156,22 @@ export function AIChatAssistant() {
           context: {
             business_profile: businessProfile,
             practice_data: {
+              // Core referral data
               sources: sources,
               monthly_data: monthlyData,
               visits: visits,
               campaigns: campaigns,
+              
+              // Additional platform data
+              discovered_offices: discoveredOffices,
+              reviews: reviews,
+              campaign_deliveries: deliveries,
+              ai_usage_history: aiUsage,
+              user_profile: userProfile,
+              clinic_info: clinic,
+              recent_activities: activities,
+              
+              // Computed analytics
               analytics: {
                 total_sources: sources.length,
                 total_referrals: monthlyData.reduce((sum, m) => sum + (m.patient_count || 0), 0),
@@ -156,7 +194,18 @@ export function AIChatAssistant() {
                   const sixMonthsAgo = new Date();
                   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
                   return monthDate >= sixMonthsAgo;
-                })
+                }),
+                discovered_offices_count: discoveredOffices.length,
+                imported_offices: discoveredOffices.filter(d => d.imported).length,
+                pending_reviews: reviews.filter(r => r.needs_attention).length,
+                campaign_delivery_success_rate: deliveries.length > 0 ? 
+                  Math.round((deliveries.filter(d => d.delivery_status === 'Completed').length / deliveries.length) * 100) : 0,
+                ai_usage_last_30_days: aiUsage.filter(u => {
+                  const usageDate = new Date(u.created_at);
+                  const thirtyDaysAgo = new Date();
+                  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                  return usageDate >= thirtyDaysAgo;
+                }).length
               }
             },
             conversation_history: messages.slice(-5)
