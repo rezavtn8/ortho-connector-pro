@@ -153,6 +153,7 @@ Use only real data provided. If insufficient data exists for a category, state "
           .replace(/\*(.*?)\*/g, '$1')
           .replace(/###\s*/g, '')
           .replace(/--+/g, '')
+          .replace(new RegExp(`^${category.title}:?\\s*`, 'i'), '') // Remove duplicate title
           .trim();
 
         if (!cleanContent || cleanContent === category.title) {

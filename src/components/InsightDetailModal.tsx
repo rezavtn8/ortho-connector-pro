@@ -51,6 +51,7 @@ export function InsightDetailModal({ isOpen, onClose, insight }: InsightDetailMo
       .replace(/\*(.*?)\*/g, '$1') // Remove italic markdown
       .replace(/###\s*/g, '') // Remove heading symbols
       .replace(/--+/g, '') // Remove dashes
+      .replace(new RegExp(`^${insight.title}:?\\s*`, 'i'), '') // Remove duplicate title
       .replace(/^\s*[\-\*\+]\s*/gm, '• ') // Convert list items to bullets
       .trim();
 
