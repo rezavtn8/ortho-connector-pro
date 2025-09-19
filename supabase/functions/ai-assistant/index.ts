@@ -441,55 +441,33 @@ PROMPT: ${prompt || 'Create appropriate content based on the context provided.'}
 
     case 'comprehensive_analysis':
       const analysisData = context.analysis_data;
-      
-      return `CRITICAL INSTRUCTION: You MUST use ONLY the real data provided below. Do NOT create fictional examples, sample names, or placeholder data.
+      return `Analyze this comprehensive practice data and provide specific insights:
 
-ACTUAL PRACTICE DATA TO ANALYZE:
+PRACTICE DATA SUMMARY:
+- Total Active Sources: ${analysisData?.total_sources || 0}
+- Total Referrals (All Time): ${analysisData?.total_referrals || 0}
+- Active Sources This Month: ${analysisData?.analytics?.active_sources_this_month || 0}
+- Recent Visits (30 Days): ${analysisData?.analytics?.recent_visits || 0}
 
-BUSINESS METRICS (Real Numbers):
-- Total Sources: ${analysisData?.metrics?.total_sources || 0}
-- Active Sources: ${analysisData?.metrics?.active_sources || 0}
-- Total Lifetime Referrals: ${analysisData?.metrics?.total_lifetime_referrals || 0}
-- Current Month Referrals: ${analysisData?.metrics?.current_month_referrals || 0}
-- Last 6 Months Referrals: ${analysisData?.metrics?.last_6_months_referrals || 0}
+SOURCE TYPE DISTRIBUTION:
+${Object.entries(analysisData?.source_types || {}).map(([type, count]) => `- ${type}: ${count} sources`).join('\n')}
 
-ACTUAL TOP PERFORMING SOURCES:
-${analysisData?.top_performers?.map((s: any, i: number) => 
-  `${i+1}. "${s.name}" - ${s.total_patients} total patients (Type: ${s.type}${s.address ? `, Located: ${s.address}` : ''})`
-).join('\n') || 'No top performers data available'}
+RECENT 6-MONTH TREND:
+${analysisData?.last_6_months?.map((month: any) => `- ${month.year_month}: ${month.patient_count} patients from ${month.source_name || 'source'}`).join('\n') || 'No recent data available'}
 
-ACTUAL SOURCE TYPE DISTRIBUTION:
-${Object.entries(analysisData?.source_types_distribution || {}).map(([type, count]) => 
-  `- ${type}: ${count} sources (${analysisData?.metrics?.total_sources ? Math.round((count as number)/analysisData.metrics.total_sources*100) : 0}%)`
-).join('\n') || 'No source type data available'}
+DETAILED SOURCE DATA:
+${analysisData?.sources?.slice(0, 10).map((source: any) => 
+  `- ${source.name} (${source.source_type}): Located at ${source.address || 'Unknown location'}`
+).join('\n') || 'No sources available'}
 
-ACTUAL MONTHLY PERFORMANCE TRENDS:
-${Object.entries(analysisData?.monthly_trends || {}).map(([month, count]) => 
-  `- ${month}: ${count} referrals`
-).join('\n') || 'No monthly trend data available'}
+MARKETING VISIT DATA:
+${analysisData?.visits?.slice(0, 5).map((visit: any) => 
+  `- ${visit.office_name || 'Office'}: Visited ${visit.visit_date}, Rating: ${visit.star_rating || 'N/A'}/5`
+).join('\n') || 'No recent visits'}
 
-ACTUAL UNDERPERFORMING SOURCES:
-${analysisData?.underperformers?.slice(0, 5).map((s: any) => 
-  `- "${s.name}" (${s.type}): ${s.total_patients} total referrals, ${s.recent_patients} recent referrals`
-).join('\n') || 'No underperformer data available'}
+${prompt}
 
-ACTUAL GEOGRAPHIC DISTRIBUTION:
-${analysisData?.geographic_distribution?.slice(0, 5).map((g: any) => 
-  `- "${g.name}": ${g.patients} patients from ${g.address}`
-).join('\n') || 'No geographic data available'}
-
-MANDATORY REQUIREMENTS:
-1. Use ONLY the actual source names, numbers, and addresses listed above
-2. Calculate percentages from the real data provided (do not estimate)
-3. Reference specific source names in quotes when mentioned
-4. If data is missing or zero, state that clearly instead of making up numbers
-5. Structure each insight: Executive Summary (bold), Supporting Data (real numbers), Key Insight (interpretation), Recommended Action
-6. Do NOT use ** in section titles - use clean headers like "Source Concentration Risk Analysis"
-7. Provide 4-6 insights based on the actual data patterns shown above
-
-USER QUESTION: ${prompt}
-
-REMEMBER: Every number, name, and percentage MUST come from the data provided above. Do not create examples.`;
+IMPORTANT: Use the specific numbers and data provided above. Do not use generic examples or placeholder text.`;
 
     case 'practice_consultation':
       const practiceData = context.practice_data;
