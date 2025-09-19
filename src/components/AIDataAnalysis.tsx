@@ -50,24 +50,80 @@ export function AIDataAnalysis() {
       const visits = visitsResult.data || [];
       const businessProfile = businessProfileResult.data?.profile || {};
 
-      // Prepare comprehensive data for AI analysis
+      // Prepare more detailed analysis data with actual business metrics
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      const last6MonthsData = monthlyData.filter(m => {
+        const monthDate = new Date(m.year_month + '-01');
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+        return monthDate >= sixMonthsAgo;
+      });
+
+      // Calculate source-specific metrics
+      const sourceMetrics = sources.map(source => {
+        const sourceMonthlyData = monthlyData.filter(m => m.source_id === source.id);
+        const totalPatients = sourceMonthlyData.reduce((sum, m) => sum + (m.patient_count || 0), 0);
+        const recentPatients = sourceMonthlyData
+          .filter(m => m.year_month >= currentMonth.slice(0, 7))
+          .reduce((sum, m) => sum + (m.patient_count || 0), 0);
+        
+        return {
+          name: source.name,
+          type: source.source_type,
+          address: source.address,
+          total_patients: totalPatients,
+          recent_patients: recentPatients,
+          last_referral: sourceMonthlyData
+            .sort((a, b) => b.year_month.localeCompare(a.year_month))
+            .find(m => m.patient_count > 0)?.year_month || 'No recent referrals'
+        };
+      });
+
+      // Calculate geographic distribution
+      const geographicData = sources
+        .filter(s => s.address)
+        .map(s => ({
+          name: s.name,
+          address: s.address,
+          patients: monthlyData
+            .filter(m => m.source_id === s.id)
+            .reduce((sum, m) => sum + (m.patient_count || 0), 0)
+        }))
+        .sort((a, b) => b.patients - a.patients);
+
       const analysisData = {
         business_profile: businessProfile,
-        sources: sources,
-        monthly_data: monthlyData,
-        visits: visits,
-        total_sources: sources.length,
-        total_referrals: monthlyData.reduce((sum, m) => sum + (m.patient_count || 0), 0),
-        source_types: sources.reduce((acc, s) => {
+        raw_sources: sources,
+        raw_monthly_data: monthlyData,
+        raw_visits: visits,
+        metrics: {
+          total_sources: sources.length,
+          active_sources: sources.filter(s => s.is_active).length,
+          total_lifetime_referrals: monthlyData.reduce((sum, m) => sum + (m.patient_count || 0), 0),
+          current_month_referrals: monthlyData
+            .filter(m => m.year_month === currentMonth)
+            .reduce((sum, m) => sum + (m.patient_count || 0), 0),
+          last_6_months_referrals: last6MonthsData.reduce((sum, m) => sum + (m.patient_count || 0), 0)
+        },
+        source_breakdown: sourceMetrics,
+        geographic_distribution: geographicData.slice(0, 10),
+        source_types_distribution: sources.reduce((acc, s) => {
           acc[s.source_type] = (acc[s.source_type] || 0) + 1;
           return acc;
         }, {} as Record<string, number>),
-        last_6_months: monthlyData.filter(m => {
-          const monthDate = new Date(m.year_month + '-01');
-          const sixMonthsAgo = new Date();
-          sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-          return monthDate >= sixMonthsAgo;
-        })
+        monthly_trends: last6MonthsData.reduce((acc, m) => {
+          if (!acc[m.year_month]) {
+            acc[m.year_month] = 0;
+          }
+          acc[m.year_month] += m.patient_count || 0;
+          return acc;
+        }, {} as Record<string, number>),
+        top_performers: sourceMetrics
+          .filter(s => s.total_patients > 0)
+          .sort((a, b) => b.total_patients - a.total_patients)
+          .slice(0, 5),
+        underperformers: sourceMetrics
+          .filter(s => s.total_patients === 0 || s.recent_patients === 0)
       };
 
       // Call AI assistant for comprehensive analysis
@@ -78,15 +134,44 @@ export function AIDataAnalysis() {
             analysis_data: analysisData,
             analysis_type: 'business_intelligence'
           },
-          prompt: `Analyze the complete business data and provide 4-6 comprehensive insights covering:
-1. Referral source distribution and concentration risk
-2. Performance trends and seasonal patterns  
-3. Geographic distribution and market penetration
-4. Source quality and reliability analysis
-5. Specific actionable recommendations with data points
-6. Risk factors and improvement opportunities
+          prompt: `CRITICAL: Use ONLY the actual data provided below. Do NOT create sample data, placeholder names, or fictional examples.
 
-Focus on specific data-driven insights, not generic advice. Include actual numbers and percentages where relevant.`,
+REAL CLINIC DATA ANALYSIS:
+
+BUSINESS METRICS:
+- Total Sources: ${analysisData.metrics.total_sources}
+- Active Sources: ${analysisData.metrics.active_sources}  
+- Lifetime Referrals: ${analysisData.metrics.total_lifetime_referrals}
+- Current Month: ${analysisData.metrics.current_month_referrals} referrals
+- Last 6 Months: ${analysisData.metrics.last_6_months_referrals} referrals
+
+TOP PERFORMING SOURCES (by total patients):
+${analysisData.top_performers.map((s, i) => 
+  `${i+1}. ${s.name} - ${s.total_patients} patients (${s.type}, ${s.address || 'No address'})`
+).join('\n')}
+
+SOURCE TYPE BREAKDOWN:
+${Object.entries(analysisData.source_types_distribution).map(([type, count]) => 
+  `- ${type}: ${count} sources (${Math.round(count/analysisData.metrics.total_sources*100)}%)`
+).join('\n')}
+
+MONTHLY TREND (Last 6 Months):
+${Object.entries(analysisData.monthly_trends).map(([month, count]) => 
+  `- ${month}: ${count} patients`
+).join('\n')}
+
+UNDERPERFORMING SOURCES:
+${analysisData.underperformers.slice(0, 5).map(s => 
+  `- ${s.name} (${s.type}): ${s.total_patients} total patients, ${s.recent_patients} recent`
+).join('\n')}
+
+REQUIREMENTS:
+1. Reference ONLY these actual source names, numbers, and data points
+2. Calculate actual percentages from the real data provided
+3. Each insight must have: Bold executive summary (one sentence), Supporting data (real numbers), Insight (interpretation)
+4. Do NOT use examples like "SmileWorks Dental" unless that exact name appears in the data above
+5. Remove ** from section titles - use clean text headers
+6. Provide 4-6 comprehensive insights covering distribution, trends, geographic patterns, and actionable recommendations`,
         },
         headers: {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
@@ -95,28 +180,59 @@ Focus on specific data-driven insights, not generic advice. Include actual numbe
 
       if (error) throw error;
 
-      // Parse AI response and create insight cards
+      // Parse AI response more carefully to extract real insights
       const aiContent = data.content || '';
-      const sections = aiContent.split(/\d+\./);
+      
+      // Split by numbered sections and clean up formatting
+      let sections = aiContent.split(/(?=\d+\.\s)/);
+      if (sections[0].trim() === '') {
+        sections = sections.slice(1);
+      }
       
       const generatedInsights: AIInsight[] = [];
       const icons = [BarChart3, TrendingUp, MapPin, Target, Shield, Search];
       const types = ['summary', 'improvement', 'alert', 'action'] as const;
 
-      sections.slice(1).forEach((section, index) => {
+      sections.forEach((section, index) => {
         if (section.trim() && index < 6) {
           const lines = section.trim().split('\n');
-          const title = lines[0]?.replace(/[:,-].*/, '').trim() || `Analysis ${index + 1}`;
-          const content = lines.slice(1).join('\n').trim() || section.trim();
+          // Remove the number prefix and clean title
+          let title = lines[0]?.replace(/^\d+\.\s*/, '').replace(/\*\*/g, '').trim() || `Analysis ${index + 1}`;
           
-          // Determine priority based on keywords
+          // Extract executive summary (usually in bold or first substantive line)
+          let executiveSummary = '';
+          let remainingContent = '';
+          
+          const contentLines = lines.slice(1).join('\n');
+          
+          // Look for bold executive summary
+          const boldMatch = contentLines.match(/\*\*([^*]+)\*\*/);
+          if (boldMatch) {
+            executiveSummary = boldMatch[1];
+            remainingContent = contentLines.replace(boldMatch[0], '').trim();
+          } else {
+            // Use first substantial sentence as executive summary
+            const sentences = contentLines.split(/[.!?]+/);
+            executiveSummary = sentences[0]?.trim() + '.' || '';
+            remainingContent = sentences.slice(1).join('. ').trim();
+          }
+          
+          const fullContent = executiveSummary ? 
+            `**${executiveSummary}**\n\n${remainingContent}` : 
+            contentLines;
+          
+          // Determine priority based on content analysis
           let priority: 'high' | 'medium' | 'low' = 'medium';
-          if (content.toLowerCase().includes('risk') || content.toLowerCase().includes('concern') || 
-              content.toLowerCase().includes('urgent') || content.toLowerCase().includes('critical')) {
+          const contentLower = fullContent.toLowerCase();
+          if (contentLower.includes('risk') || contentLower.includes('concern') || 
+              contentLower.includes('urgent') || contentLower.includes('critical') ||
+              contentLower.includes('0 referral') || contentLower.includes('no recent')) {
             priority = 'high';
-          } else if (content.toLowerCase().includes('opportunity') || content.toLowerCase().includes('growth')) {
+          } else if (contentLower.includes('opportunity') || contentLower.includes('growth') ||
+                     contentLower.includes('improve') || contentLower.includes('increase')) {
             priority = 'medium';
-          } else if (content.toLowerCase().includes('good') || content.toLowerCase().includes('strong')) {
+          } else if (contentLower.includes('strong') || contentLower.includes('good') ||
+                     contentLower.includes('performing well')) {
             priority = 'low';
           }
 
@@ -124,7 +240,7 @@ Focus on specific data-driven insights, not generic advice. Include actual numbe
             id: (index + 1).toString(),
             type: types[index % types.length],
             title: title,
-            content: content,
+            content: fullContent,
             priority: priority,
             icon: icons[index % icons.length]
           });
