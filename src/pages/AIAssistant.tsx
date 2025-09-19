@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AIBusinessSetup } from '@/components/AIBusinessSetup';
 import { AIUsageDashboard } from '@/components/AIUsageDashboard';
-import { Bot, MessageSquare, Mail, FileText, BarChart3, Settings, Activity, Building2, User, Network, Palette } from 'lucide-react';
+import { AIDataAnalysis } from '@/components/AIDataAnalysis';
+import { AIChatAssistant } from '@/components/AIChatAssistant';
+import { Bot, MessageSquare, Mail, FileText, BarChart3, Settings, Activity, Building2, User, Network, Palette, TrendingUp, Zap } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -50,15 +52,16 @@ export function AIAssistant({ onPageChange, onSourceSelect }: AIAssistantProps =
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-foreground">AI Assistant</h2>
-          <p className="text-muted-foreground">Intelligent automation for your practice</p>
+          <p className="text-muted-foreground">Intelligent automation and insights for your practice</p>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="setup">Business Setup</TabsTrigger>
-          <TabsTrigger value="usage">Usage Dashboard</TabsTrigger>
+          <TabsTrigger value="analysis">Data Analysis</TabsTrigger>
+          <TabsTrigger value="chat">AI Chat</TabsTrigger>
+          <TabsTrigger value="setup">Settings</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -99,22 +102,40 @@ export function AIAssistant({ onPageChange, onSourceSelect }: AIAssistantProps =
             </Card>
           )}
 
-          {/* AI Features Grid */}
+          {/* Quick Actions Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Card className="hover:shadow-md transition-shadow">
+            <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => setActiveTab('analysis')}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Mail className="h-5 w-5 text-primary" />
-                  Email Generator
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                  Practice Insights
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Generate professional referral emails with business context and personalization.
+                  Get comprehensive analysis of your referral patterns and performance metrics.
                 </p>
-                <Button className="w-full" onClick={() => onPageChange?.('campaigns')}>
-                  <Mail className="h-4 w-4 mr-2" />
-                  Generate Emails
+                <Button className="w-full">
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  View Analysis
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => setActiveTab('chat')}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Bot className="h-5 w-5 text-primary" />
+                  AI Consultation
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Chat with AI for personalized insights and recommendations about your practice.
+                </p>
+                <Button className="w-full" variant="outline">
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Start Chat
                 </Button>
               </CardContent>
             </Card>
@@ -122,17 +143,17 @@ export function AIAssistant({ onPageChange, onSourceSelect }: AIAssistantProps =
             <Card className="hover:shadow-md transition-shadow">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5 text-primary" />
-                  Review Responses
+                  <Mail className="h-5 w-5 text-primary" />
+                  Smart Campaigns
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">
-                  AI-powered responses to Google reviews that match your practice's voice.
+                  Create AI-powered marketing campaigns based on your practice data.
                 </p>
-                <Button className="w-full" variant="outline" onClick={() => onPageChange?.('reviews')}>
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  Manage Reviews
+                <Button className="w-full" variant="outline" onClick={() => onPageChange?.('campaigns')}>
+                  <Mail className="h-4 w-4 mr-2" />
+                  Create Campaign
                 </Button>
               </CardContent>
             </Card>
@@ -141,12 +162,12 @@ export function AIAssistant({ onPageChange, onSourceSelect }: AIAssistantProps =
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-5 w-5 text-primary" />
-                  Content Creator
+                  Content Studio
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Create marketing materials and practice communications with your brand voice.
+                  Generate marketing materials tailored to your practice's brand and voice.
                 </p>
                 <Button className="w-full" variant="outline" onClick={() => onPageChange?.('creator')}>
                   <Palette className="h-4 w-4 mr-2" />
@@ -158,17 +179,17 @@ export function AIAssistant({ onPageChange, onSourceSelect }: AIAssistantProps =
             <Card className="hover:shadow-md transition-shadow">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Settings className="h-5 w-5 text-primary" />
-                  Business Context
+                  <MessageSquare className="h-5 w-5 text-primary" />
+                  Review Manager
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Configure your AI assistant's understanding of your practice and brand.
+                  AI-powered responses to reviews that match your practice's voice.
                 </p>
-                <Button className="w-full" variant="outline" onClick={() => setActiveTab('setup')}>
-                  <Settings className="h-4 w-4 mr-2" />
-                  Setup AI Context
+                <Button className="w-full" variant="outline" onClick={() => onPageChange?.('reviews')}>
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Manage Reviews
                 </Button>
               </CardContent>
             </Card>
@@ -182,23 +203,40 @@ export function AIAssistant({ onPageChange, onSourceSelect }: AIAssistantProps =
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Monitor AI usage, costs, and performance metrics for your practice.
+                  Monitor AI usage, costs, and performance metrics for optimization.
                 </p>
-                <Button className="w-full" variant="outline" onClick={() => setActiveTab('usage')}>
+                <Button className="w-full" variant="outline" onClick={() => setActiveTab('setup')}>
                   <Activity className="h-4 w-4 mr-2" />
-                  View Analytics
+                  View Usage
                 </Button>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
-        <TabsContent value="setup">
-          <AIBusinessSetup />
+        <TabsContent value="analysis" className="space-y-6">
+          <AIDataAnalysis />
         </TabsContent>
 
-        <TabsContent value="usage">
-          <AIUsageDashboard />
+        <TabsContent value="chat" className="space-y-6">
+          <AIChatAssistant />
+        </TabsContent>
+
+        <TabsContent value="setup" className="space-y-6">
+          <Tabs defaultValue="business" className="space-y-6">
+            <TabsList>
+              <TabsTrigger value="business">Business Setup</TabsTrigger>
+              <TabsTrigger value="usage">Usage Dashboard</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="business">
+              <AIBusinessSetup />
+            </TabsContent>
+            
+            <TabsContent value="usage">
+              <AIUsageDashboard />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
       </Tabs>
     </div>
