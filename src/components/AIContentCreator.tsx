@@ -6,8 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Palette, FileText, Heart, GraduationCap, Eye, Download, Loader2, Wand2, Send, Bot, User, Sparkles, MessageSquare, BookOpen } from 'lucide-react';
+import { Palette, FileText, Heart, GraduationCap, Eye, Download, Loader2, Wand2, Send, Bot, User, Sparkles, MessageSquare, BookOpen, Database, Brain } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useUnifiedAIData } from '@/hooks/useUnifiedAIData';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -119,6 +120,7 @@ export function AIContentCreator({ businessProfile }: AIContentCreatorProps) {
   const [isWelcomeBookletOpen, setIsWelcomeBookletOpen] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
+  const { data: unifiedData, loading: unifiedLoading, fetchAllData } = useUnifiedAIData();
   
   const [formData, setFormData] = useState<FormData>({
     practiceName: '',
@@ -184,8 +186,22 @@ export function AIContentCreator({ businessProfile }: AIContentCreatorProps) {
     setIsTyping(true);
 
     try {
+      // Fetch unified data if not already loaded
+      let currentData = unifiedData;
+      if (!currentData && !unifiedLoading) {
+        currentData = await fetchAllData();
+      }
+
       const { data, error } = await supabase.functions.invoke('ai-assistant', {
         body: {
+          task_type: 'content_creation',
+          context: {
+            business_profile: businessProfile || currentData?.business_profile,
+            practice_data: currentData,
+            user_request: userInput,
+            available_templates: templates.map(t => ({ id: t.id, title: t.title, type: t.type })),
+            form_data: formData
+          },
           prompt: `You are a helpful AI assistant that helps create marketing materials for medical practices. The user said: "${userInput}". 
           
           Based on their request, either:
@@ -196,8 +212,9 @@ export function AIContentCreator({ businessProfile }: AIContentCreatorProps) {
           Be conversational, helpful, and professional. If you suggest a template, mention why it would be good for their needs.
           
           Practice info: ${formData.practiceName ? `Practice: ${formData.practiceName}` : 'No practice info yet'}
-          ${formData.specialty ? `Specialty: ${formData.specialty}` : ''}`,
-          context: 'content_creation_chat'
+          ${formData.specialty ? `Specialty: ${formData.specialty}` : ''}
+          
+          Available platform data: ${currentData ? 'Full practice data available including referral sources, campaigns, and analytics' : 'Limited data'}`
         },
         headers: {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
@@ -277,8 +294,21 @@ export function AIContentCreator({ businessProfile }: AIContentCreatorProps) {
     
     setIsGenerating(true);
     try {
+      // Fetch unified data if not already loaded
+      let currentData = unifiedData;
+      if (!currentData && !unifiedLoading) {
+        currentData = await fetchAllData();
+      }
+
       const { data, error } = await supabase.functions.invoke('ai-assistant', {
         body: {
+          task_type: 'content_creation',
+          context: {
+            business_profile: businessProfile || currentData?.business_profile,
+            practice_data: currentData,
+            template_info: selectedTemplate,
+            form_data: formData
+          },
           prompt: `Generate content for a ${selectedTemplate.type} template with the following details:
             Practice: ${formData.practiceName}
             Doctor: ${formData.doctorName}
@@ -291,8 +321,7 @@ export function AIContentCreator({ businessProfile }: AIContentCreatorProps) {
             - Body paragraph (2-3 sentences, warm and professional)
             - Call to action (clear, actionable)
             
-            Make it sound personal and reflect the practice's expertise.`,
-          context: 'content_creation'
+            Make it sound personal and reflect the practice's expertise. Use comprehensive practice data when available: ${currentData ? 'Full practice analytics available' : 'Limited data'}.`
         },
         headers: {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,

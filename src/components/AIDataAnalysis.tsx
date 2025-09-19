@@ -24,6 +24,17 @@ interface AnalysisData {
   total_referrals: number;
   source_types: Record<string, number>;
   last_6_months: any[];
+  // Additional comprehensive data
+  campaigns?: any[];
+  discovered_offices?: any[];
+  reviews?: any[];
+  campaign_deliveries?: any[];
+  ai_usage_history?: any[];
+  ai_templates?: any[];
+  ai_content?: any[];
+  user_profile?: any;
+  clinic_info?: any;
+  recent_activities?: any[];
 }
 
 const SECTION_CONFIGS = [
@@ -83,31 +94,75 @@ export function AIDataAnalysis() {
     setHasAnalysis(false);
 
     try {
-      // Fetch comprehensive business data
-      const [sourcesResult, monthlyResult, visitsResult, businessProfileResult] = await Promise.all([
-        supabase.from('patient_sources').select('*').eq('created_by', user.id).order('created_at', { ascending: false }),
-        supabase.from('monthly_patients').select('*').eq('user_id', user.id).order('year_month', { ascending: false }),
-        supabase.from('marketing_visits').select('*').eq('user_id', user.id).order('visit_date', { ascending: false }),
-        supabase.functions.invoke('ai-business-context', {
-          body: { action: 'get' },
-          headers: {
-            Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-          },
-        })
+      // Fetch ALL comprehensive platform data using unified approach
+      const [
+        sourcesResult,
+        monthlyResult, 
+        visitsResult,
+        campaignsResult,
+        discoveredResult,
+        reviewsResult,
+        deliveriesResult,
+        usageResult,
+        userProfileResult,
+        clinicResult,
+        activityResult,
+        aiBusinessProfileResult,
+        aiTemplatesResult,
+        aiContentResult
+      ] = await Promise.all([
+        supabase.from('patient_sources').select('*').eq('created_by', user.id),
+        supabase.from('monthly_patients').select('*').eq('user_id', user.id),
+        supabase.from('marketing_visits').select('*').eq('user_id', user.id),
+        supabase.from('campaigns').select('*').eq('created_by', user.id),
+        supabase.from('discovered_offices').select('*').eq('discovered_by', user.id),
+        supabase.from('review_status').select('*').eq('user_id', user.id),
+        supabase.from('campaign_deliveries').select('*').eq('created_by', user.id),
+        supabase.from('ai_usage_tracking').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(50),
+        supabase.from('user_profiles').select('*').eq('user_id', user.id).single(),
+        supabase.from('clinics').select('*').eq('owner_id', user.id).maybeSingle(),
+        supabase.from('activity_log').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(100),
+        supabase.from('ai_business_profiles').select('*').eq('user_id', user.id).maybeSingle(),
+        supabase.from('ai_response_templates').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(10),
+        supabase.from('ai_generated_content').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(20)
       ]);
 
-      if (sourcesResult.error) throw new Error(`Sources error: ${sourcesResult.error.message}`);
-      if (monthlyResult.error) throw new Error(`Monthly data error: ${monthlyResult.error.message}`);
-      if (visitsResult.error) throw new Error(`Visits error: ${visitsResult.error.message}`);
-
+      // Extract data with error checking
       const sources = sourcesResult.data || [];
       const monthlyData = monthlyResult.data || [];
       const visits = visitsResult.data || [];
-      const businessProfile = businessProfileResult.data?.profile || {};
+      const campaigns = campaignsResult.data || [];
+      const discoveredOffices = discoveredResult.data || [];
+      const reviews = reviewsResult.data || [];
+      const deliveries = deliveriesResult.data || [];
+      const aiUsage = usageResult.data || [];
+      const userProfile = userProfileResult.data;
+      const clinic = clinicResult.data;
+      const activities = activityResult.data || [];
+      const aiBusinessProfileData = aiBusinessProfileResult.data;
+      const aiTemplates = aiTemplatesResult.data || [];
+      const aiGeneratedContent = aiContentResult.data || [];
 
-      // Prepare comprehensive analysis data
+      // Get business profile from AI business context if not available
+      let businessProfile = aiBusinessProfileData;
+      if (!businessProfile) {
+        try {
+          const { data: contextData } = await supabase.functions.invoke('ai-business-context', {
+            body: { action: 'get' },
+            headers: {
+              Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+            },
+          });
+          businessProfile = contextData?.profile || null;
+        } catch (e) {
+          console.warn('Could not fetch business profile:', e);
+          businessProfile = null;
+        }
+      }
+
+      // Prepare comprehensive analysis data with ALL platform data
       const analysisData: AnalysisData = {
-        business_profile: businessProfile,
+        business_profile: businessProfile || {},
         sources: sources,
         monthly_data: monthlyData,
         visits: visits,
@@ -123,10 +178,21 @@ export function AIDataAnalysis() {
           const sixMonthsAgo = new Date();
           sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
           return monthDate >= sixMonthsAgo;
-        }).slice(0, 6)
+        }).slice(0, 6),
+        // Additional comprehensive data
+        campaigns,
+        discovered_offices: discoveredOffices,
+        reviews,
+        campaign_deliveries: deliveries,
+        ai_usage_history: aiUsage,
+        ai_templates: aiTemplates,
+        ai_content: aiGeneratedContent,
+        user_profile: userProfile,
+        clinic_info: clinic,
+        recent_activities: activities
       };
 
-      console.log('Analysis data prepared:', analysisData);
+      console.log('Comprehensive analysis data prepared:', analysisData);
 
       // Call AI assistant for structured report
       const { data, error } = await supabase.functions.invoke('ai-assistant', {
@@ -302,9 +368,9 @@ export function AIDataAnalysis() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Business Intelligence Report</h3>
+          <h3 className="text-lg font-semibold">AI Business Intelligence Report</h3>
           <p className="text-sm text-muted-foreground">
-            Comprehensive analysis across {sections.length} key areas
+            Comprehensive analysis across {sections.length} key areas using unified platform data
           </p>
         </div>
         <Button 
@@ -314,8 +380,8 @@ export function AIDataAnalysis() {
           disabled={loading}
           className="gap-2"
         >
-          <RefreshCw className="h-4 w-4" />
-          Refresh Report
+          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          Refresh Analysis
         </Button>
       </div>
       
