@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 interface AIRequest {
-  task_type: 'email_generation' | 'review_response' | 'content_creation' | 'analysis' | 'comprehensive_analysis';
+  task_type: 'email_generation' | 'review_response' | 'content_creation' | 'analysis';
   context: any;
   prompt?: string;
   parameters?: {
@@ -357,29 +357,6 @@ REQUIREMENTS:
 4. Include clear calls to action when relevant
 5. Maintain professional credibility`;
 
-    case 'comprehensive_analysis':
-      return `You are an AI business analyst specializing in healthcare practice intelligence for ${business_persona.practice_name}.
-
-BUSINESS CONTEXT:
-- Practice: ${business_persona.practice_name}
-- Owner: ${business_persona.owner_name} (${business_persona.owner_title})
-- Location: ${business_persona.location}
-- Communication Style: ${communication_style}
-
-TASK: Generate comprehensive business intelligence insights across 6 specific categories.
-
-REQUIREMENTS:
-1. Use ONLY the real data provided - never use placeholder or example data
-2. For each category, structure response with clear sections:
-   - Executive Summary (1 bold sentence highlighting the key finding)
-   - Supporting Data (specific numbers and percentages from provided data)
-   - Insight Analysis (interpretation of what the data reveals)
-   - Recommended Actions (specific, actionable next steps)
-3. If insufficient data exists for a category, state: "Not enough data available to generate this insight."
-4. Focus on actionable, data-driven recommendations specific to this practice
-5. Include risk assessments and priority levels where appropriate
-6. Maintain professional healthcare industry language and standards`;
-
     default:
       return basePrompt + `
 
@@ -435,30 +412,6 @@ PARAMETERS:
 - Tone: ${parameters?.tone || 'professional'}
 
 PROMPT: ${prompt || 'Create appropriate content based on the context provided.'}`;
-
-    case 'comprehensive_analysis':
-      const analysisData = context.analysis_data;
-      return `Analyze this practice's complete business data and generate insights for these 6 categories:
-
-CATEGORIES TO ANALYZE:
-${context.insight_categories?.map((cat: string, i: number) => `${i + 1}. ${cat}`).join('\n') || ''}
-
-PRACTICE DATA:
-- Total Sources: ${analysisData.total_sources}
-- Total Referrals: ${analysisData.total_referrals}
-- Source Types Distribution: ${JSON.stringify(analysisData.source_types)}
-- Recent Performance (6mo): ${analysisData.last_6_months?.length} months of data
-- Monthly Data Points: ${analysisData.monthly_data?.length} records
-- Marketing Visits: ${analysisData.visits?.length} visits
-
-DETAILED DATA:
-Sources: ${JSON.stringify(analysisData.sources?.slice(0, 10))} ${analysisData.sources?.length > 10 ? '... (showing first 10)' : ''}
-Recent Monthly Data: ${JSON.stringify(analysisData.last_6_months)}
-Visits Data: ${JSON.stringify(analysisData.visits?.slice(0, 5))} ${analysisData.visits?.length > 5 ? '... (showing first 5)' : ''}
-
-${prompt}
-
-Structure each response clearly with the required sections. Use specific data points and percentages.`;
 
     default:
       return prompt || 'Please provide assistance with the given context.';

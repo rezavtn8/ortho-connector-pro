@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, CheckCircle, TrendingUp, Target, Users, Activity, Zap, Brain, RefreshCw, BarChart3, MapPin, Calendar, Shield, Search, DollarSign } from 'lucide-react';
-import { InsightDetailModal } from '@/components/InsightDetailModal';
+import { AlertTriangle, CheckCircle, TrendingUp, Target, Users, Activity, Zap, Brain, RefreshCw, BarChart3, MapPin, Calendar } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -13,8 +12,6 @@ interface AIInsight {
   type: 'summary' | 'action' | 'improvement' | 'alert';
   title: string;
   content: string;
-  executiveSummary: string;
-  truncatedPreview: string;
   priority: 'high' | 'medium' | 'low';
   icon: any;
 }
@@ -23,19 +20,7 @@ export function AIDataAnalysis() {
   const [insights, setInsights] = useState<AIInsight[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasAnalysis, setHasAnalysis] = useState(false);
-  const [selectedInsight, setSelectedInsight] = useState<AIInsight | null>(null);
-  const [showDetailModal, setShowDetailModal] = useState(false);
   const { user } = useAuth();
-
-  // Predefined insight categories with their icons
-  const insightCategories = [
-    { title: 'Source Distribution', icon: BarChart3 },
-    { title: 'Performance Trends', icon: TrendingUp },
-    { title: 'Geographic Distribution', icon: MapPin },
-    { title: 'Source Quality & Reliability', icon: Shield },
-    { title: 'Strategic Recommendations', icon: Target },
-    { title: 'Emerging Patterns', icon: Search }
-  ];
 
   const generateAIAnalysis = async () => {
     if (!user) return;
@@ -88,8 +73,17 @@ export function AIDataAnalysis() {
           task_type: 'comprehensive_analysis',
           context: {
             analysis_data: analysisData,
-            insight_categories: insightCategories.map(cat => cat.title)
-          }
+            analysis_type: 'business_intelligence'
+          },
+          prompt: `Analyze the complete business data and provide 4-6 comprehensive insights covering:
+1. Referral source distribution and concentration risk
+2. Performance trends and seasonal patterns  
+3. Geographic distribution and market penetration
+4. Source quality and reliability analysis
+5. Specific actionable recommendations with data points
+6. Risk factors and improvement opportunities
+
+Focus on specific data-driven insights, not generic advice. Include actual numbers and percentages where relevant.`,
         },
         headers: {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
@@ -100,113 +94,39 @@ export function AIDataAnalysis() {
 
       // Parse AI response and create insight cards
       const aiContent = data.content || '';
+      const sections = aiContent.split(/\d+\./);
+      
       const generatedInsights: AIInsight[] = [];
-      const types = ['summary', 'improvement', 'alert', 'action', 'summary', 'improvement'] as const;
+      const icons = [BarChart3, TrendingUp, MapPin, Target, AlertTriangle, Brain];
+      const types = ['summary', 'improvement', 'alert', 'action'] as const;
 
-      try {
-        // Try to parse as JSON first (structured response)
-        const aiResponse = JSON.parse(aiContent);
-        
-        if (Array.isArray(aiResponse) && aiResponse.length === 6) {
-          // Process structured JSON response
-          aiResponse.forEach((insight, index) => {
-            const category = insightCategories[index];
-            let executiveSummary = insight.executive_summary || 'Analysis available';
-            let content = insight.full_content || 'Not enough data available to generate this insight.';
-            let truncatedPreview = content.split('\n').slice(0, 4).join('\n') + (content.split('\n').length > 4 ? '...' : '');
-            
-            // Determine priority based on keywords
-            let priority: 'high' | 'medium' | 'low' = 'medium';
-            if (content.toLowerCase().includes('risk') || content.toLowerCase().includes('concern') || 
-                content.toLowerCase().includes('urgent') || content.toLowerCase().includes('critical')) {
-              priority = 'high';
-            } else if (content.toLowerCase().includes('opportunity') || content.toLowerCase().includes('growth') ||
-                       content.toLowerCase().includes('improve') || content.toLowerCase().includes('increase')) {
-              priority = 'medium';  
-            } else if (content.toLowerCase().includes('good') || content.toLowerCase().includes('strong') ||
-                       content.toLowerCase().includes('excellent') || content.toLowerCase().includes('performing well')) {
-              priority = 'low';
-            }
-
-            generatedInsights.push({
-              id: (index + 1).toString(),
-              type: types[index % types.length],
-              title: category.title,
-              content: content,
-              executiveSummary: executiveSummary,
-              truncatedPreview: truncatedPreview,
-              priority: priority,
-              icon: category.icon
-            });
-          });
-        } else {
-          throw new Error('Invalid JSON format');
-        }
-      } catch (jsonError) {
-        console.log('Failed to parse as JSON, parsing as text:', jsonError);
-        
-        // Fallback to text parsing
-        const sections = aiContent.split(/(?=### \d+\.|(?:Source Distribution|Performance Trends|Geographic Distribution|Source Quality & Reliability|Strategic Recommendations|Emerging Patterns))/gi);
-        
-        insightCategories.forEach((category, index) => {
-          let content = '';
-          let executiveSummary = '';
-          let truncatedPreview = '';
-          
-          // Find matching content for this category
-          const matchingSection = sections.find(section => 
-            section.toLowerCase().includes(category.title.toLowerCase())
-          ) || sections[index + 1] || '';
-          
-          // Clean and format content
-          const cleanContent = matchingSection
-            .replace(/\*\*(.*?)\*\*/g, '$1')
-            .replace(/\*(.*?)\*/g, '$1')
-            .replace(/###\s*/g, '')
-            .replace(/--+/g, '')
-            .replace(new RegExp(`^${category.title}:?\\s*`, 'i'), '') // Remove duplicate title
-            .trim();
-
-          if (!cleanContent || cleanContent === category.title) {
-            content = 'Not enough data available to generate this insight.';
-            executiveSummary = 'Insufficient data for analysis';
-            truncatedPreview = 'Not enough data available to generate this insight.';
-          } else {
-            const lines = cleanContent.split('\n').filter(line => line.trim());
-            
-            // Extract executive summary (first substantial line)
-            executiveSummary = lines[0] || 'Analysis available';
-            
-            // Create truncated preview (first 3-4 lines)
-            truncatedPreview = lines.slice(0, 4).join('\n') + (lines.length > 4 ? '...' : '');
-            content = cleanContent;
-          }
+      sections.slice(1).forEach((section, index) => {
+        if (section.trim() && index < 6) {
+          const lines = section.trim().split('\n');
+          const title = lines[0]?.replace(/[:,-].*/, '').trim() || `Analysis ${index + 1}`;
+          const content = lines.slice(1).join('\n').trim() || section.trim();
           
           // Determine priority based on keywords
           let priority: 'high' | 'medium' | 'low' = 'medium';
           if (content.toLowerCase().includes('risk') || content.toLowerCase().includes('concern') || 
               content.toLowerCase().includes('urgent') || content.toLowerCase().includes('critical')) {
             priority = 'high';
-          } else if (content.toLowerCase().includes('opportunity') || content.toLowerCase().includes('growth') ||
-                     content.toLowerCase().includes('improve') || content.toLowerCase().includes('increase')) {
-            priority = 'medium';  
-          } else if (content.toLowerCase().includes('good') || content.toLowerCase().includes('strong') ||
-                     content.toLowerCase().includes('excellent') || content.toLowerCase().includes('performing well')) {
+          } else if (content.toLowerCase().includes('opportunity') || content.toLowerCase().includes('growth')) {
+            priority = 'medium';
+          } else if (content.toLowerCase().includes('good') || content.toLowerCase().includes('strong')) {
             priority = 'low';
           }
 
           generatedInsights.push({
             id: (index + 1).toString(),
             type: types[index % types.length],
-            title: category.title,
+            title: title,
             content: content,
-            executiveSummary: executiveSummary,
-            truncatedPreview: truncatedPreview,
             priority: priority,
-            icon: category.icon
+            icon: icons[index % icons.length]
           });
-        });
-      }
+        }
+      });
 
       setInsights(generatedInsights);
       setHasAnalysis(true);
@@ -228,66 +148,37 @@ export function AIDataAnalysis() {
     }
   };
 
-  const getPriorityBadge = (priority: string) => {
+  const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high': 
-        return { 
-          variant: 'destructive' as const, 
-          className: 'bg-red-500/10 text-red-700 border-red-200 dark:bg-red-500/20 dark:text-red-300 dark:border-red-800',
-          label: 'High Risk'
-        };
-      case 'medium': 
-        return { 
-          variant: 'default' as const, 
-          className: 'bg-orange-500/10 text-orange-700 border-orange-200 dark:bg-orange-500/20 dark:text-orange-300 dark:border-orange-800',
-          label: 'Medium'
-        };
-      case 'low': 
-        return { 
-          variant: 'secondary' as const, 
-          className: 'bg-green-500/10 text-green-700 border-green-200 dark:bg-green-500/20 dark:text-green-300 dark:border-green-800',
-          label: 'Low Risk'
-        };
-      default: 
-        return { 
-          variant: 'default' as const, 
-          className: 'bg-blue-500/10 text-blue-700 border-blue-200 dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-800',
-          label: 'Info'
-        };
+      case 'high': return 'destructive';
+      case 'medium': return 'default';
+      case 'low': return 'secondary';
+      default: return 'default';
     }
   };
 
-  const getCardStyle = (priority: string) => {
+  const getCardBorderClass = (priority: string) => {
     switch (priority) {
-      case 'high': return 'border-l-4 border-l-red-500 bg-gradient-to-r from-red-50/50 to-transparent dark:from-red-950/20';
-      case 'medium': return 'border-l-4 border-l-orange-500 bg-gradient-to-r from-orange-50/50 to-transparent dark:from-orange-950/20';
-      case 'low': return 'border-l-4 border-l-green-500 bg-gradient-to-r from-green-50/50 to-transparent dark:from-green-950/20';
-      default: return 'border-l-4 border-l-blue-500 bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-950/20';
+      case 'high': return 'border-l-4 border-l-destructive';
+      case 'medium': return 'border-l-4 border-l-primary';
+      case 'low': return 'border-l-4 border-l-muted-foreground';
+      default: return '';
     }
-  };
-
-  const handleSeeMore = (insight: AIInsight) => {
-    setSelectedInsight(insight);
-    setShowDetailModal(true);
   };
 
   if (!hasAnalysis && !loading) {
     return (
-      <div className="text-center space-y-6 py-12">
-        <div className="w-20 h-20 mx-auto bg-gradient-to-br from-primary/20 to-primary/10 rounded-2xl flex items-center justify-center shadow-lg">
-          <Brain className="h-10 w-10 text-primary" />
+      <div className="text-center space-y-4 py-8">
+        <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
+          <Brain className="h-8 w-8 text-primary" />
         </div>
-        <div className="space-y-4">
-          <h3 className="text-2xl font-bold text-foreground">AI Business Intelligence</h3>
-          <p className="text-muted-foreground text-base max-w-lg mx-auto leading-relaxed">
-            Generate comprehensive insights about your referral patterns, source distribution, performance trends, and actionable recommendations based on your complete practice data.
+        <div>
+          <h3 className="text-lg font-semibold mb-2">Generate AI Business Analysis</h3>
+          <p className="text-muted-foreground mb-4 max-w-md mx-auto">
+            Get comprehensive insights about your referral patterns, source distribution, performance trends, and actionable recommendations based on your complete practice data.
           </p>
-          <Button 
-            onClick={generateAIAnalysis} 
-            className="bg-primary hover:bg-primary/90 px-6 py-3 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200"
-            size="lg"
-          >
-            <BarChart3 className="h-5 w-5 mr-2" />
+          <Button onClick={generateAIAnalysis} className="bg-primary hover:bg-primary/90">
+            <BarChart3 className="h-4 w-4 mr-2" />
             Generate Analysis
           </Button>
         </div>
@@ -297,32 +188,27 @@ export function AIDataAnalysis() {
 
   if (loading) {
     return (
-      <div className="space-y-8">
-        <div className="text-center py-6">
-          <div className="inline-flex items-center gap-3 text-base text-muted-foreground bg-muted/50 px-6 py-3 rounded-full">
+      <div className="space-y-6">
+        <div className="text-center py-4">
+          <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
             <div className="animate-spin">
-              <RefreshCw className="h-5 w-5" />
+              <RefreshCw className="h-4 w-4" />
             </div>
             Analyzing your practice data...
           </div>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, i) => (
-            <Card key={i} className="animate-pulse rounded-xl border-0 shadow-md h-[280px]">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 bg-muted rounded-lg"></div>
-                    <div className="h-6 bg-muted rounded-lg w-32"></div>
-                  </div>
-                  <div className="h-6 w-16 bg-muted rounded-full"></div>
-                </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <CardHeader>
+                <div className="h-5 bg-muted rounded w-3/4"></div>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="h-4 bg-muted rounded-lg"></div>
-                <div className="h-4 bg-muted rounded-lg w-5/6"></div>
-                <div className="h-4 bg-muted rounded-lg w-4/6"></div>
-                <div className="h-4 bg-muted rounded-lg w-3/4"></div>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="h-4 bg-muted rounded"></div>
+                  <div className="h-4 bg-muted rounded w-5/6"></div>
+                  <div className="h-4 bg-muted rounded w-4/6"></div>
+                </div>
               </CardContent>
             </Card>
           ))}
@@ -332,94 +218,46 @@ export function AIDataAnalysis() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <h3 className="text-2xl font-bold text-foreground">AI Business Intelligence</h3>
-          <p className="text-muted-foreground">Data-driven insights and strategic recommendations</p>
+        <div>
+          <h3 className="text-lg font-semibold">AI Business Intelligence</h3>
+          <p className="text-sm text-muted-foreground">Data-driven insights and recommendations</p>
         </div>
         <Button 
           variant="outline" 
-          size="default"
+          size="sm" 
           onClick={generateAIAnalysis}
           disabled={loading}
-          className="rounded-xl px-4 py-2 font-medium border-2 hover:bg-muted/50 transition-all duration-200"
         >
           <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
+          Refresh Analysis
         </Button>
       </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {insights.map((insight) => {
           const IconComponent = insight.icon;
-          const badgeInfo = getPriorityBadge(insight.priority);
-          
           return (
-            <Card 
-              key={insight.id} 
-              className={`${getCardStyle(insight.priority)} hover:shadow-lg hover:-translate-y-1 transition-all duration-300 rounded-xl border-0 shadow-md h-[280px] flex flex-col`}
-            >
-              <CardHeader className="pb-3 flex-shrink-0">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <div className="p-2 bg-primary/10 rounded-lg flex-shrink-0">
-                      <IconComponent className="h-5 w-5 text-primary" />
-                    </div>
-                    <CardTitle className="text-base font-bold text-foreground leading-tight">
-                      {insight.title}
-                    </CardTitle>
+            <Card key={insight.id} className={`${getCardBorderClass(insight.priority)} hover:shadow-md transition-shadow`}>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <IconComponent className="h-5 w-5 text-primary" />
+                    {insight.title}
                   </div>
-                  <Badge 
-                    className={`${badgeInfo.className} text-xs font-medium px-2 py-1 rounded-full border flex-shrink-0`}
-                  >
-                    {badgeInfo.label}
+                  <Badge variant={getPriorityColor(insight.priority) as any} className="text-xs">
+                    {insight.priority.toUpperCase()}
                   </Badge>
-                </div>
+                </CardTitle>
               </CardHeader>
-              
-              <CardContent className="flex-1 flex flex-col justify-between overflow-hidden">
-                <div className="space-y-3">
-                  {/* Executive Summary */}
-                  <div className="font-semibold text-foreground text-sm leading-tight">
-                    {insight.executiveSummary}
-                  </div>
-                  
-                  {/* Truncated Preview */}
-                  <div className="text-muted-foreground text-sm leading-relaxed line-clamp-4">
-                    {insight.truncatedPreview.split('\n').slice(0, 3).map((line, index) => 
-                      line.trim() && (
-                        <p key={index} className="mb-2 last:mb-0">
-                          {line.replace(/^\s*[\-\*\+]\s*/, '• ')}
-                        </p>
-                      )
-                    )}
-                  </div>
-                </div>
-                
-                {/* See More Button */}
-                <div className="pt-3 border-t border-border">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="w-full text-primary hover:text-primary hover:bg-primary/5 font-medium"
-                    onClick={() => handleSeeMore(insight)}
-                  >
-                    See More
-                  </Button>
-                </div>
+              <CardContent>
+                <p className="text-muted-foreground leading-relaxed whitespace-pre-line">{insight.content}</p>
               </CardContent>
             </Card>
           );
         })}
       </div>
-
-      {/* Detail Modal */}
-      <InsightDetailModal 
-        isOpen={showDetailModal}
-        onClose={() => setShowDetailModal(false)}
-        insight={selectedInsight}
-      />
     </div>
   );
 }
