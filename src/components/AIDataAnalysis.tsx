@@ -27,15 +27,8 @@ export function AIDataAnalysis() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const { user } = useAuth();
 
-  // Predefined insight categories with their icons
-  const insightCategories = [
-    { title: 'Source Distribution', icon: BarChart3 },
-    { title: 'Performance Trends', icon: TrendingUp },
-    { title: 'Geographic Distribution', icon: MapPin },
-    { title: 'Source Quality & Reliability', icon: Shield },
-    { title: 'Strategic Recommendations', icon: Target },
-    { title: 'Emerging Patterns', icon: Search }
-  ];
+  // Available icons for AI to choose from
+  const availableIcons = [BarChart3, TrendingUp, MapPin, Shield, Target, Search, Users, Activity, Zap, DollarSign, Calendar, AlertTriangle, CheckCircle];
 
   const generateAIAnalysis = async () => {
     if (!user) return;
@@ -85,10 +78,9 @@ export function AIDataAnalysis() {
       // Call AI assistant for comprehensive analysis
       const { data, error } = await supabase.functions.invoke('ai-assistant', {
         body: {
-          task_type: 'comprehensive_analysis',
+          task_type: 'free_form_analysis',
           context: {
-            analysis_data: analysisData,
-            insight_categories: insightCategories.map(cat => cat.title)
+            analysis_data: analysisData
           }
         },
         headers: {
@@ -107,104 +99,63 @@ export function AIDataAnalysis() {
         // Try to parse as JSON first (structured response)
         const aiResponse = JSON.parse(aiContent);
         
-        if (Array.isArray(aiResponse) && aiResponse.length === 6) {
-          // Process structured JSON response
+        if (Array.isArray(aiResponse)) {
+          // Process structured JSON response - AI generates free-form insights
           aiResponse.forEach((insight, index) => {
-            const category = insightCategories[index];
-            let executiveSummary = insight.executive_summary || 'Analysis available';
-            let content = insight.full_content || 'Not enough data available to generate this insight.';
-            let truncatedPreview = content.split('\n').slice(0, 4).join('\n') + (content.split('\n').length > 4 ? '...' : '');
+            let nutshell = insight.nutshell || 'Key insight available';
+            let content = insight.content || 'Not enough data available to generate this insight.';
+            let truncatedPreview = content.split('\n').slice(0, 3).join('\n') + (content.split('\n').length > 3 ? '...' : '');
+            let iconName = insight.icon || 'BarChart3';
+            
+            // Map icon name to actual icon component
+            const iconIndex = ['BarChart3', 'TrendingUp', 'MapPin', 'Shield', 'Target', 'Search', 'Users', 'Activity', 'Zap', 'DollarSign', 'Calendar', 'AlertTriangle', 'CheckCircle'].indexOf(iconName);
+            const icon = availableIcons[iconIndex >= 0 ? iconIndex : 0];
             
             // Determine priority based on keywords
             let priority: 'high' | 'medium' | 'low' = 'medium';
-            if (content.toLowerCase().includes('risk') || content.toLowerCase().includes('concern') || 
-                content.toLowerCase().includes('urgent') || content.toLowerCase().includes('critical')) {
+            const fullText = (nutshell + ' ' + content).toLowerCase();
+            if (fullText.includes('risk') || fullText.includes('concern') || 
+                fullText.includes('urgent') || fullText.includes('critical')) {
               priority = 'high';
-            } else if (content.toLowerCase().includes('opportunity') || content.toLowerCase().includes('growth') ||
-                       content.toLowerCase().includes('improve') || content.toLowerCase().includes('increase')) {
+            } else if (fullText.includes('opportunity') || fullText.includes('growth') ||
+                       fullText.includes('improve') || fullText.includes('increase')) {
               priority = 'medium';  
-            } else if (content.toLowerCase().includes('good') || content.toLowerCase().includes('strong') ||
-                       content.toLowerCase().includes('excellent') || content.toLowerCase().includes('performing well')) {
+            } else if (fullText.includes('good') || fullText.includes('strong') ||
+                       fullText.includes('excellent') || fullText.includes('performing well')) {
               priority = 'low';
             }
 
             generatedInsights.push({
               id: (index + 1).toString(),
               type: types[index % types.length],
-              title: category.title,
+              title: '', // No fixed title
               content: content,
-              executiveSummary: executiveSummary,
+              executiveSummary: nutshell,
               truncatedPreview: truncatedPreview,
               priority: priority,
-              icon: category.icon
+              icon: icon
             });
           });
         } else {
           throw new Error('Invalid JSON format');
         }
       } catch (jsonError) {
-        console.log('Failed to parse as JSON, parsing as text:', jsonError);
+        console.log('Failed to parse as JSON, creating generic insights:', jsonError);
         
-        // Fallback to text parsing
-        const sections = aiContent.split(/(?=### \d+\.|(?:Source Distribution|Performance Trends|Geographic Distribution|Source Quality & Reliability|Strategic Recommendations|Emerging Patterns))/gi);
+        // Fallback - create a single insight from the raw text
+        const lines = aiContent.split('\n').filter(line => line.trim());
+        const nutshell = lines[0] || 'Analysis complete';
+        const content = aiContent;
         
-        insightCategories.forEach((category, index) => {
-          let content = '';
-          let executiveSummary = '';
-          let truncatedPreview = '';
-          
-          // Find matching content for this category
-          const matchingSection = sections.find(section => 
-            section.toLowerCase().includes(category.title.toLowerCase())
-          ) || sections[index + 1] || '';
-          
-          // Clean and format content
-          const cleanContent = matchingSection
-            .replace(/\*\*(.*?)\*\*/g, '$1')
-            .replace(/\*(.*?)\*/g, '$1')
-            .replace(/###\s*/g, '')
-            .replace(/--+/g, '')
-            .replace(new RegExp(`^${category.title}:?\\s*`, 'i'), '') // Remove duplicate title
-            .trim();
-
-          if (!cleanContent || cleanContent === category.title) {
-            content = 'Not enough data available to generate this insight.';
-            executiveSummary = 'Insufficient data for analysis';
-            truncatedPreview = 'Not enough data available to generate this insight.';
-          } else {
-            const lines = cleanContent.split('\n').filter(line => line.trim());
-            
-            // Extract executive summary (first substantial line)
-            executiveSummary = lines[0] || 'Analysis available';
-            
-            // Create truncated preview (first 3-4 lines)
-            truncatedPreview = lines.slice(0, 4).join('\n') + (lines.length > 4 ? '...' : '');
-            content = cleanContent;
-          }
-          
-          // Determine priority based on keywords
-          let priority: 'high' | 'medium' | 'low' = 'medium';
-          if (content.toLowerCase().includes('risk') || content.toLowerCase().includes('concern') || 
-              content.toLowerCase().includes('urgent') || content.toLowerCase().includes('critical')) {
-            priority = 'high';
-          } else if (content.toLowerCase().includes('opportunity') || content.toLowerCase().includes('growth') ||
-                     content.toLowerCase().includes('improve') || content.toLowerCase().includes('increase')) {
-            priority = 'medium';  
-          } else if (content.toLowerCase().includes('good') || content.toLowerCase().includes('strong') ||
-                     content.toLowerCase().includes('excellent') || content.toLowerCase().includes('performing well')) {
-            priority = 'low';
-          }
-
-          generatedInsights.push({
-            id: (index + 1).toString(),
-            type: types[index % types.length],
-            title: category.title,
-            content: content,
-            executiveSummary: executiveSummary,
-            truncatedPreview: truncatedPreview,
-            priority: priority,
-            icon: category.icon
-          });
+        generatedInsights.push({
+          id: '1',
+          type: 'summary',
+          title: '',
+          content: content,
+          executiveSummary: nutshell,
+          truncatedPreview: lines.slice(0, 3).join('\n') + (lines.length > 3 ? '...' : ''),
+          priority: 'medium',
+          icon: availableIcons[0]
         });
       }
 
@@ -366,9 +317,6 @@ export function AIDataAnalysis() {
                     <div className="p-2 bg-primary/10 rounded-lg flex-shrink-0">
                       <IconComponent className="h-5 w-5 text-primary" />
                     </div>
-                    <CardTitle className="text-base font-bold text-foreground leading-tight">
-                      {insight.title}
-                    </CardTitle>
                   </div>
                   <Badge 
                     className={`${badgeInfo.className} text-xs font-medium px-2 py-1 rounded-full border flex-shrink-0`}
@@ -380,12 +328,12 @@ export function AIDataAnalysis() {
               
               <CardContent className="flex-1 flex flex-col justify-between overflow-hidden">
                 <div className="space-y-3">
-                  {/* Executive Summary */}
-                  <div className="font-semibold text-foreground text-sm leading-tight">
+                  {/* Bold Nutshell */}
+                  <div className="font-bold text-foreground text-sm leading-tight">
                     {insight.executiveSummary}
                   </div>
                   
-                  {/* Truncated Preview */}
+                  {/* Content Preview */}
                   <div className="text-muted-foreground text-sm leading-relaxed line-clamp-4">
                     {insight.truncatedPreview.split('\n').slice(0, 3).map((line, index) => 
                       line.trim() && (
