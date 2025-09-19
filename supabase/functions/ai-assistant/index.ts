@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 interface AIRequest {
-  task_type: 'email_generation' | 'review_response' | 'content_creation' | 'analysis' | 'comprehensive_analysis';
+  task_type: 'email_generation' | 'review_response' | 'content_creation' | 'analysis';
   context: any;
   prompt?: string;
   parameters?: {
@@ -357,36 +357,6 @@ REQUIREMENTS:
 4. Include clear calls to action when relevant
 5. Maintain professional credibility`;
 
-    case 'comprehensive_analysis':
-      return `You are a healthcare practice business intelligence analyst for ${business_persona.practice_name}.
-
-Your job is to analyze REAL practice data and provide specific, actionable insights based on the actual numbers and patterns in the data.
-
-CRITICAL REQUIREMENTS:
-1. Only analyze the actual data provided - no hypothetical examples
-2. Include specific numbers, percentages, and data points from the practice
-3. Focus on actionable insights that can improve the practice
-4. Identify specific risks and opportunities based on the real data
-5. Provide concrete recommendations with measurable goals
-6. Be direct and data-driven - avoid generic advice
-
-ANALYSIS FRAMEWORK:
-- Source Performance: Which referral sources are strongest/weakest
-- Geographic Patterns: Where patients are coming from
-- Temporal Trends: Seasonal patterns, growth/decline trends
-- Risk Assessment: Dependencies, vulnerabilities in referral network
-- Growth Opportunities: Underperforming areas with potential
-- Operational Insights: Efficiency improvements, resource allocation
-
-OUTPUT FORMAT:
-Provide 4-6 specific insights, each with:
-- Clear heading describing the insight
-- Actual data points and numbers
-- Specific implications for the practice
-- Actionable recommendations
-
-DO NOT provide hypothetical examples. Only analyze the real practice data provided.`;
-
     default:
       return basePrompt + `
 
@@ -442,79 +412,6 @@ PARAMETERS:
 - Tone: ${parameters?.tone || 'professional'}
 
 PROMPT: ${prompt || 'Create appropriate content based on the context provided.'}`;
-
-    case 'comprehensive_analysis':
-      const analysisData = context.analysis_data;
-      
-      // Build comprehensive data summary
-      let dataPrompt = `Analyze this REAL practice data for ${analysisData.business_profile?.business_persona?.practice_name || 'the practice'}:
-
-## PRACTICE OVERVIEW
-- Total Active Sources: ${analysisData.total_sources || 0}
-- Total Patient Referrals (All Time): ${analysisData.total_referrals || 0}
-- Practice Location: ${analysisData.business_profile?.business_persona?.location || 'Not specified'}
-
-## REFERRAL SOURCES DATA (${analysisData.sources?.length || 0} sources)`;
-
-      // Add source breakdown by type
-      if (analysisData.source_types && Object.keys(analysisData.source_types).length > 0) {
-        dataPrompt += `\n### Source Distribution by Type:`;
-        Object.entries(analysisData.source_types).forEach(([type, count]) => {
-          dataPrompt += `\n- ${type}: ${count} sources`;
-        });
-      }
-
-      // Add top sources with specific data
-      if (analysisData.sources && analysisData.sources.length > 0) {
-        dataPrompt += `\n\n### Top Referral Sources:`;
-        analysisData.sources.slice(0, 10).forEach((source: any, index: number) => {
-          dataPrompt += `\n${index + 1}. ${source.name} (${source.source_type})`;
-          if (source.address) dataPrompt += ` - ${source.address}`;
-          if (source.google_rating) dataPrompt += ` - Rating: ${source.google_rating}/5`;
-        });
-      }
-
-      // Add monthly performance data
-      if (analysisData.monthly_data && analysisData.monthly_data.length > 0) {
-        dataPrompt += `\n\n## MONTHLY PATIENT DATA (${analysisData.monthly_data.length} records)`;
-        
-        // Group by month and calculate totals
-        const monthlyTotals: Record<string, number> = {};
-        analysisData.monthly_data.forEach((record: any) => {
-          monthlyTotals[record.year_month] = (monthlyTotals[record.year_month] || 0) + (record.patient_count || 0);
-        });
-
-        dataPrompt += `\n### Monthly Patient Totals:`;
-        Object.entries(monthlyTotals)
-          .sort(([a], [b]) => b.localeCompare(a))
-          .slice(0, 12)
-          .forEach(([month, total]) => {
-            dataPrompt += `\n- ${month}: ${total} patients`;
-          });
-
-        // Recent 6 months performance
-        if (analysisData.last_6_months && analysisData.last_6_months.length > 0) {
-          const recent6MonthsTotal = analysisData.last_6_months.reduce((sum: number, m: any) => sum + (m.patient_count || 0), 0);
-          dataPrompt += `\n\n### Recent 6 Months Performance:`;
-          dataPrompt += `\n- Total Patients: ${recent6MonthsTotal}`;
-          dataPrompt += `\n- Average per Month: ${Math.round(recent6MonthsTotal / 6)}`;
-        }
-      }
-
-      // Add marketing visits data if available
-      if (analysisData.visits && analysisData.visits.length > 0) {
-        dataPrompt += `\n\n## MARKETING VISITS DATA (${analysisData.visits.length} visits recorded)`;
-        const completedVisits = analysisData.visits.filter((v: any) => v.visited).length;
-        dataPrompt += `\n- Completed Visits: ${completedVisits}`;
-        dataPrompt += `\n- Pending Visits: ${analysisData.visits.length - completedVisits}`;
-      }
-
-      dataPrompt += `\n\n## ANALYSIS REQUEST
-${prompt || 'Provide comprehensive business intelligence insights based on this real practice data.'}
-
-IMPORTANT: Analyze ONLY this real data. Include specific numbers, patterns, and actionable recommendations based on what you see in the actual practice performance.`;
-
-      return dataPrompt;
 
     default:
       return prompt || 'Please provide assistance with the given context.';

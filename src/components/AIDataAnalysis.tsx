@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, CheckCircle, TrendingUp, Target, Users, Activity, Zap, Brain, RefreshCw, BarChart3, MapPin, Calendar, Shield, Search, DollarSign, ChevronUp, ChevronDown } from 'lucide-react';
+import { AlertTriangle, CheckCircle, TrendingUp, Target, Users, Activity, Zap, Brain, RefreshCw, BarChart3, MapPin, Calendar, Shield, Search, DollarSign } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -20,18 +20,7 @@ export function AIDataAnalysis() {
   const [insights, setInsights] = useState<AIInsight[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasAnalysis, setHasAnalysis] = useState(false);
-  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const { user } = useAuth();
-
-  const toggleCardExpansion = (cardId: string) => {
-    const newExpanded = new Set(expandedCards);
-    if (newExpanded.has(cardId)) {
-      newExpanded.delete(cardId);
-    } else {
-      newExpanded.add(cardId);
-    }
-    setExpandedCards(newExpanded);
-  };
 
   const generateAIAnalysis = async () => {
     if (!user) return;
@@ -108,8 +97,7 @@ Focus on specific data-driven insights, not generic advice. Include actual numbe
       const sections = aiContent.split(/\d+\./);
       
       const generatedInsights: AIInsight[] = [];
-      // Modern flat icons in teal/blue tones
-      const icons = [BarChart3, TrendingUp, Target, Activity, Shield, Users];
+      const icons = [BarChart3, TrendingUp, MapPin, Target, Shield, Search];
       const types = ['summary', 'improvement', 'alert', 'action'] as const;
 
       sections.slice(1).forEach((section, index) => {
@@ -164,60 +152,51 @@ Focus on specific data-driven insights, not generic advice. Include actual numbe
     switch (priority) {
       case 'high': 
         return { 
-          className: 'bg-red-50 text-red-600 border border-red-100 dark:bg-red-950/50 dark:text-red-400 dark:border-red-900/50',
-          label: 'High'
+          variant: 'destructive' as const, 
+          className: 'bg-red-500/10 text-red-700 border-red-200 dark:bg-red-500/20 dark:text-red-300 dark:border-red-800',
+          label: 'High Risk'
         };
       case 'medium': 
         return { 
-          className: 'bg-amber-50 text-amber-600 border border-amber-100 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-900/50',
+          variant: 'default' as const, 
+          className: 'bg-orange-500/10 text-orange-700 border-orange-200 dark:bg-orange-500/20 dark:text-orange-300 dark:border-orange-800',
           label: 'Medium'
         };
       case 'low': 
         return { 
-          className: 'bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-900/50',
-          label: 'Low'
+          variant: 'secondary' as const, 
+          className: 'bg-green-500/10 text-green-700 border-green-200 dark:bg-green-500/20 dark:text-green-300 dark:border-green-800',
+          label: 'Low Risk'
         };
       default: 
         return { 
-          className: 'bg-blue-50 text-blue-600 border border-blue-100 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-900/50',
+          variant: 'default' as const, 
+          className: 'bg-blue-500/10 text-blue-700 border-blue-200 dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-800',
           label: 'Info'
         };
     }
   };
 
   const getCardStyle = (priority: string) => {
-    const baseStyle = 'bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800';
     switch (priority) {
-      case 'high': return `${baseStyle} border-l-4 border-l-red-400`;
-      case 'medium': return `${baseStyle} border-l-4 border-l-amber-400`;
-      case 'low': return `${baseStyle} border-l-4 border-l-emerald-400`;
-      default: return `${baseStyle} border-l-4 border-l-blue-400`;
+      case 'high': return 'border-l-4 border-l-red-500 bg-gradient-to-r from-red-50/50 to-transparent dark:from-red-950/20';
+      case 'medium': return 'border-l-4 border-l-orange-500 bg-gradient-to-r from-orange-50/50 to-transparent dark:from-orange-950/20';
+      case 'low': return 'border-l-4 border-l-green-500 bg-gradient-to-r from-green-50/50 to-transparent dark:from-green-950/20';
+      default: return 'border-l-4 border-l-blue-500 bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-950/20';
     }
   };
 
   const formatContent = (content: string) => {
-    // Clean and format content for modern display
-    let cleaned = content
+    // Remove markdown symbols and format text for better readability
+    return content
       .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold markdown
       .replace(/\*(.*?)\*/g, '$1') // Remove italic markdown
       .replace(/###\s*/g, '') // Remove heading symbols
       .replace(/--+/g, '') // Remove dashes
       .replace(/^\s*[\-\*\+]\s*/gm, '• ') // Convert list items to bullets
-      .trim();
-    
-    // Split into sentences and clean up
-    const sentences = cleaned.split(/[.!?]+/).filter(s => s.trim().length > 10);
-    return sentences.map(s => s.trim()).join('. ') + (sentences.length > 0 ? '.' : '');
-  };
-
-  const getInsightType = (type: string) => {
-    switch (type) {
-      case 'summary': return { label: 'Data', color: 'text-blue-600 dark:text-blue-400' };
-      case 'improvement': return { label: 'Insight', color: 'text-teal-600 dark:text-teal-400' };
-      case 'alert': return { label: 'Alert', color: 'text-red-600 dark:text-red-400' };
-      case 'action': return { label: 'Action', color: 'text-purple-600 dark:text-purple-400' };
-      default: return { label: 'Info', color: 'text-gray-600 dark:text-gray-400' };
-    }
+      .split('\n')
+      .filter(line => line.trim()) // Remove empty lines
+      .join('\n');
   };
 
   if (!hasAnalysis && !loading) {
@@ -284,98 +263,71 @@ Focus on specific data-driven insights, not generic advice. Include actual numbe
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div className="space-y-1">
-          <h3 className="text-3xl font-bold text-foreground">AI Business Intelligence</h3>
-          <p className="text-muted-foreground text-lg">Data-driven insights and strategic recommendations</p>
+          <h3 className="text-2xl font-bold text-foreground">AI Business Intelligence</h3>
+          <p className="text-muted-foreground">Data-driven insights and strategic recommendations</p>
         </div>
         <Button 
           variant="outline" 
           size="default"
           onClick={generateAIAnalysis}
           disabled={loading}
-          className="rounded-full px-6 py-2 font-medium hover:bg-muted/50 transition-all duration-200 border-gray-200 dark:border-gray-700"
+          className="rounded-xl px-4 py-2 font-medium border-2 hover:bg-muted/50 transition-all duration-200"
         >
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
         </Button>
       </div>
       
-      {/* Background tint for grid area */}
-      <div className="bg-gray-50/50 dark:bg-gray-900/20 rounded-3xl p-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {insights.map((insight) => {
-            const IconComponent = insight.icon;
-            const badgeInfo = getPriorityBadge(insight.priority);
-            const typeInfo = getInsightType(insight.type);
-            const formattedContent = formatContent(insight.content);
-            const isExpanded = expandedCards.has(insight.id);
-            const shouldTruncate = formattedContent.length > 180;
-            const displayContent = shouldTruncate && !isExpanded 
-              ? formattedContent.substring(0, 180) + "..." 
-              : formattedContent;
-            
-            return (
-              <Card 
-                key={insight.id} 
-                className={`${getCardStyle(insight.priority)} hover:shadow-xl hover:-translate-y-2 transition-all duration-300 rounded-2xl shadow-md h-[300px] flex flex-col group`}
-              >
-                <CardHeader className="pb-3 flex-shrink-0">
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div className="p-2.5 bg-teal-50 dark:bg-teal-950/50 rounded-xl flex-shrink-0">
-                        <IconComponent className="h-5 w-5 text-teal-600 dark:text-teal-400" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className={`text-xs font-medium uppercase tracking-wider mb-1 ${typeInfo.color}`}>
-                          {typeInfo.label}
-                        </div>
-                        <CardTitle className="text-xl font-bold text-foreground leading-tight line-clamp-2">
-                          {insight.title}
-                        </CardTitle>
-                      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
+        {insights.map((insight) => {
+          const IconComponent = insight.icon;
+          const badgeInfo = getPriorityBadge(insight.priority);
+          const formattedContent = formatContent(insight.content);
+          
+          return (
+            <Card 
+              key={insight.id} 
+              className={`${getCardStyle(insight.priority)} hover:shadow-xl hover:-translate-y-1 transition-all duration-300 rounded-xl border-0 shadow-lg h-[320px] flex flex-col`}
+            >
+              <CardHeader className="pb-4 flex-shrink-0">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="p-2 bg-primary/10 rounded-lg flex-shrink-0">
+                      <IconComponent className="h-5 w-5 text-primary" />
                     </div>
-                    <Badge 
-                      className={`${badgeInfo.className} text-xs font-medium px-3 py-1.5 rounded-full flex-shrink-0 shadow-sm`}
-                    >
-                      {badgeInfo.label}
-                    </Badge>
+                    <CardTitle className="text-lg font-bold text-foreground leading-tight line-clamp-2">
+                      {insight.title}
+                    </CardTitle>
                   </div>
-                  
-                  {/* Light divider */}
-                  <div className="w-full h-px bg-gray-200 dark:bg-gray-700"></div>
-                </CardHeader>
-                
-                <CardContent className="flex-1 overflow-hidden flex flex-col">
-                  <div className="text-gray-600 dark:text-gray-300 leading-relaxed text-sm flex-1">
-                    <p className="font-light">
-                      {displayContent}
-                    </p>
-                  </div>
-                  
-                  {shouldTruncate && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => toggleCardExpansion(insight.id)}
-                      className="mt-3 p-0 h-auto text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 font-medium text-xs self-start"
-                    >
-                      {isExpanded ? (
-                        <>
-                          <ChevronUp className="h-3 w-3 mr-1" />
-                          Show Less
-                        </>
-                      ) : (
-                        <>
-                          <ChevronDown className="h-3 w-3 mr-1" />
-                          See More
-                        </>
-                      )}
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+                  <Badge 
+                    className={`${badgeInfo.className} text-xs font-medium px-3 py-1 rounded-full border flex-shrink-0`}
+                  >
+                    {badgeInfo.label}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="flex-1 overflow-hidden">
+                <div className="text-muted-foreground leading-relaxed text-sm line-clamp-8">
+                  {formattedContent.split('\n').map((line, index) => {
+                    if (line.startsWith('• ')) {
+                      return (
+                        <div key={index} className="flex items-start gap-2 mb-2">
+                          <span className="text-primary font-bold text-xs mt-1">•</span>
+                          <span className="flex-1">{line.substring(2)}</span>
+                        </div>
+                      );
+                    }
+                    return line.trim() && (
+                      <p key={index} className="mb-3 last:mb-0">
+                        {line}
+                      </p>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );
