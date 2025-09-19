@@ -251,7 +251,7 @@ export function AIChatAssistant() {
 
   return (
     <div className="bg-muted/30 rounded-2xl p-6">
-      <Card className="h-[600px] flex flex-col border-0 shadow-lg">
+      <Card className="h-[600px] flex flex-col border-0 shadow-lg max-w-4xl mx-auto">
         <CardHeader className="flex-shrink-0 pb-4">
           <div className="space-y-1">
             <CardTitle className="flex items-center gap-2 text-xl font-bold">
@@ -267,7 +267,7 @@ export function AIChatAssistant() {
         <CardContent className="flex-1 flex flex-col space-y-6 p-6">
           {/* Chat Messages */}
           <ScrollArea className="flex-1 pr-4" ref={scrollAreaRef}>
-            <div className="space-y-6">
+            <div className="space-y-6 max-w-3xl">
               {messages.map((message) => {
                 const IconComponent = getMessageIcon(message);
                 return (
@@ -284,7 +284,7 @@ export function AIChatAssistant() {
                     )}
                     
                     <div
-                      className={`max-w-[75%] rounded-2xl p-5 shadow-sm ${
+                      className={`max-w-[650px] rounded-2xl p-5 shadow-sm ${
                         message.role === 'user'
                           ? 'bg-cyan-600 dark:bg-cyan-700 text-white'
                           : 'bg-slate-50 dark:bg-slate-800 text-foreground'
@@ -322,7 +322,7 @@ export function AIChatAssistant() {
                   <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-cyan-50 dark:bg-cyan-950/50 flex items-center justify-center shadow-sm">
                     <Bot className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
                   </div>
-                  <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-5 max-w-[75%] shadow-sm">
+                  <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-5 max-w-[650px] shadow-sm">
                     <div className="flex items-center space-x-3">
                       <div className="flex space-x-1">
                         <div className="w-2 h-2 bg-cyan-600 dark:bg-cyan-400 rounded-full animate-bounce"></div>

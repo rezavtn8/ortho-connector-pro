@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 interface AIRequest {
-  task_type: 'email_generation' | 'review_response' | 'content_creation' | 'analysis';
+  task_type: 'email_generation' | 'review_response' | 'content_creation' | 'analysis' | 'comprehensive_analysis' | 'practice_consultation';
   context: any;
   prompt?: string;
   parameters?: {
@@ -357,6 +357,32 @@ REQUIREMENTS:
 4. Include clear calls to action when relevant
 5. Maintain professional credibility`;
 
+    case 'comprehensive_analysis':
+    case 'practice_consultation':
+      return basePrompt + `
+
+TASK: Provide data-driven business intelligence and strategic recommendations based on actual practice data.
+
+CRITICAL REQUIREMENTS:
+1. ALWAYS ground responses in the specific practice data provided (referral patterns, patient volumes, geographic distribution, seasonal trends)
+2. NEVER use placeholder text like "Types may include" or "example data"
+3. Structure each response with:
+   - **Executive Summary** (bold, 1-2 sentences with the main takeaway)
+   - **Data Analysis** (specific numbers, percentages, comparisons from actual data)
+   - **Key Insights** (interpret what the data means for the practice)
+   - **Recommended Actions** (specific, actionable recommendations with priorities)
+4. Use actual numbers from the provided data - no generic examples
+5. Focus on actionable insights that can improve practice performance
+6. Include risk factors and opportunities based on actual patterns
+7. Compare current performance to trends and benchmarks when possible
+
+DATA INTERPRETATION GUIDELINES:
+- Convert data into meaningful business insights
+- Identify patterns, trends, and anomalies in the actual data
+- Provide context for what the numbers mean for practice growth
+- Highlight both strengths to leverage and weaknesses to address
+- Give specific recommendations with clear next steps`;
+
     default:
       return basePrompt + `
 
@@ -412,6 +438,72 @@ PARAMETERS:
 - Tone: ${parameters?.tone || 'professional'}
 
 PROMPT: ${prompt || 'Create appropriate content based on the context provided.'}`;
+
+    case 'comprehensive_analysis':
+      const analysisData = context.analysis_data;
+      return `Analyze this comprehensive practice data and provide specific insights:
+
+PRACTICE DATA SUMMARY:
+- Total Active Sources: ${analysisData?.total_sources || 0}
+- Total Referrals (All Time): ${analysisData?.total_referrals || 0}
+- Active Sources This Month: ${analysisData?.analytics?.active_sources_this_month || 0}
+- Recent Visits (30 Days): ${analysisData?.analytics?.recent_visits || 0}
+
+SOURCE TYPE DISTRIBUTION:
+${Object.entries(analysisData?.source_types || {}).map(([type, count]) => `- ${type}: ${count} sources`).join('\n')}
+
+RECENT 6-MONTH TREND:
+${analysisData?.last_6_months?.map((month: any) => `- ${month.year_month}: ${month.patient_count} patients from ${month.source_name || 'source'}`).join('\n') || 'No recent data available'}
+
+DETAILED SOURCE DATA:
+${analysisData?.sources?.slice(0, 10).map((source: any) => 
+  `- ${source.name} (${source.source_type}): Located at ${source.address || 'Unknown location'}`
+).join('\n') || 'No sources available'}
+
+MARKETING VISIT DATA:
+${analysisData?.visits?.slice(0, 5).map((visit: any) => 
+  `- ${visit.office_name || 'Office'}: Visited ${visit.visit_date}, Rating: ${visit.star_rating || 'N/A'}/5`
+).join('\n') || 'No recent visits'}
+
+${prompt}
+
+IMPORTANT: Use the specific numbers and data provided above. Do not use generic examples or placeholder text.`;
+
+    case 'practice_consultation':
+      const practiceData = context.practice_data;
+      const conversationHistory = context.conversation_history || [];
+      
+      return `Based on this specific practice data, provide a detailed consultation response:
+
+CURRENT PRACTICE METRICS:
+- Active Sources: ${practiceData?.analytics?.total_sources || 0}
+- Total Lifetime Referrals: ${practiceData?.analytics?.total_referrals || 0}  
+- Active Sources This Month: ${practiceData?.analytics?.active_sources_this_month || 0}
+- Recent Marketing Visits: ${practiceData?.analytics?.recent_visits || 0}
+
+SOURCE BREAKDOWN BY TYPE:
+${Object.entries(practiceData?.analytics?.source_types_distribution || {}).map(([type, count]) => `- ${type}: ${count} sources (${Math.round((count as number) / (practiceData?.analytics?.total_sources || 1) * 100)}%)`).join('\n')}
+
+PERFORMANCE TRENDS (Last 6 Months):
+${practiceData?.analytics?.last_6_months_trend?.map((month: any) => 
+  `- ${month.year_month}: ${month.patient_count} patients`
+).join('\n') || 'Limited trend data available'}
+
+RECENT ACTIVITY:
+- Sources: ${practiceData?.sources?.length || 0} total referral sources
+- Monthly Data Points: ${practiceData?.monthly_data?.length || 0} records
+- Marketing Visits: ${practiceData?.visits?.length || 0} visits logged
+- Campaign History: ${practiceData?.campaigns?.length || 0} campaigns
+
+USER QUESTION: ${prompt}
+
+RESPONSE REQUIREMENTS:
+1. **Executive Summary**: Start with a bold 1-2 sentence takeaway
+2. **Data Analysis**: Use the specific numbers provided above
+3. **Key Insights**: Interpret what these numbers mean for practice growth
+4. **Recommended Actions**: Give specific, prioritized recommendations
+
+Use ONLY the actual data provided - no generic advice or placeholder examples.`;
 
     default:
       return prompt || 'Please provide assistance with the given context.';
