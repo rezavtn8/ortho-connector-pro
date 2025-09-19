@@ -25,6 +25,21 @@ export function AIDataAnalysis() {
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const { user } = useAuth();
 
+  // Helper function to format inline markdown
+  const formatInlineMarkdown = (text: string) => {
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+    return parts.map((part, idx) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return (
+          <strong key={idx} className="font-semibold text-foreground">
+            {part.replace(/^\*\*|\*\*$/g, '')}
+          </strong>
+        );
+      }
+      return part;
+    });
+  };
+
   const generateAIAnalysis = async () => {
     if (!user) return;
     
@@ -143,25 +158,59 @@ Use actual numbers from the data: ${analysisData.total_referrals} total referral
       } catch {
         // Fallback: Parse structured text response
         console.log('Falling back to text parsing');
-        const sections = aiContent.split(/\d+\.\s*/);
-        parsedInsights = sections.slice(1).map((section, index) => {
+        
+        // Try multiple parsing strategies
+        let sections = [];
+        
+        // Strategy 1: Split on numbered list pattern "1.", "2.", etc.
+        if (aiContent.includes('1.') && aiContent.includes('2.')) {
+          sections = aiContent.split(/(?=\d+\.\s+\*\*)/);
+        }
+        // Strategy 2: Split on markdown headers
+        else if (aiContent.includes('##') || aiContent.includes('**')) {
+          sections = aiContent.split(/(?=#+\s+|\*\*[^*]+\*\*)/);
+        }
+        // Strategy 3: Split on double line breaks
+        else {
+          sections = aiContent.split(/\n\s*\n/).filter(s => s.trim().length > 50);
+        }
+        
+        parsedInsights = sections.filter(section => section.trim()).map((section, index) => {
           const lines = section.trim().split('\n').filter(line => line.trim());
-          const title = lines[0]?.replace(/[*:,-].*/, '').replace(/\*\*/g, '').trim() || `Insight ${index + 1}`;
-          const content = lines.slice(1).join('\n').trim() || section.trim();
           
-          // Clean up markdown formatting
-          const cleanContent = content
-            .replace(/\*\*(.*?)\*\*/g, '$1')  // Remove **bold** formatting
-            .replace(/^\s*[-•]\s*/gm, '• ')   // Normalize bullet points
-            .replace(/\n\s*\n/g, '\n')       // Remove extra line breaks
-            .trim();
+          // Extract title - look for patterns like "1. **Title**" or "## Title" or "**Title**"
+          let title = '';
+          let contentLines = lines;
+          
+          const firstLine = lines[0] || '';
+          if (firstLine.includes('**')) {
+            // Extract text between ** markers
+            const titleMatch = firstLine.match(/\*\*([^*]+)\*\*/);
+            title = titleMatch ? titleMatch[1].trim() : firstLine.replace(/\d+\.\s*/, '').replace(/#+\s*/, '').trim();
+            contentLines = lines.slice(1);
+          } else if (firstLine.match(/^\d+\.\s+/)) {
+            title = firstLine.replace(/^\d+\.\s+/, '').trim();
+            contentLines = lines.slice(1);
+          } else if (firstLine.match(/^#+\s+/)) {
+            title = firstLine.replace(/^#+\s+/, '').trim();
+            contentLines = lines.slice(1);
+          } else {
+            title = `Business Insight ${index + 1}`;
+            contentLines = lines;
+          }
+          
+          const content = contentLines.join('\n').trim() || section.trim();
+          
+          // Create summary (first 2 sentences)
+          const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 10);
+          const summary = sentences.slice(0, 2).join('. ').trim() + (sentences.length > 0 ? '.' : '');
           
           return {
-            title,
-            summary: cleanContent.split('.').slice(0, 2).join('.') + (cleanContent.includes('.') ? '.' : ''),
-            content: cleanContent,
-            priority: cleanContent.toLowerCase().includes('risk') || cleanContent.toLowerCase().includes('critical') ? 'high' : 
-                     cleanContent.toLowerCase().includes('opportunity') || cleanContent.toLowerCase().includes('improve') ? 'medium' : 'low',
+            title: title || `Business Insight ${index + 1}`,
+            summary: summary || content.substring(0, 120) + '...',
+            content: content,
+            priority: (content.toLowerCase().includes('risk') || content.toLowerCase().includes('critical') || content.toLowerCase().includes('urgent')) ? 'high' : 
+                     (content.toLowerCase().includes('opportunity') || content.toLowerCase().includes('improve') || content.toLowerCase().includes('growth')) ? 'medium' : 'low',
             actionable_steps: []
           };
         });
@@ -332,9 +381,24 @@ Use actual numbers from the data: ${analysisData.total_referrals} total referral
                 {/* Expandable Content */}
                 {isExpanded && (
                   <div className="space-y-4">
-                    <div className="text-sm leading-relaxed whitespace-pre-line">
+                    <div className="text-sm leading-relaxed">
                       {insight.content.split('\n').map((line, idx) => {
-                        // Handle markdown-style formatting
+                        // Skip empty lines
+                        if (!line.trim()) {
+                          return <br key={idx} />;
+                        }
+                        
+                        // Handle markdown headers (## Title)
+                        if (line.trim().match(/^#+\s+/)) {
+                          const headerText = line.replace(/^#+\s*/, '').trim();
+                          return (
+                            <h4 key={idx} className="font-semibold text-foreground mb-2 mt-3 first:mt-0 text-base">
+                              {headerText}
+                            </h4>
+                          );
+                        }
+                        
+                        // Handle bold text lines (**text**)
                         if (line.trim().startsWith('**') && line.trim().endsWith('**')) {
                           const cleanLine = line.replace(/^\*\*|\*\*$/g, '').trim();
                           return (
@@ -345,34 +409,33 @@ Use actual numbers from the data: ${analysisData.total_referrals} total referral
                         }
                         
                         // Handle bullet points
-                        if (line.trim().startsWith('•') || line.trim().startsWith('-')) {
+                        if (line.trim().match(/^[-•*]\s+/)) {
+                          const bulletText = line.replace(/^[-•*]\s*/, '').trim();
                           return (
-                            <div key={idx} className="flex items-start gap-2 mb-1">
-                              <span className="text-primary mt-1">•</span>
-                              <span>{line.replace(/^[•-]\s*/, '').trim()}</span>
+                            <div key={idx} className="flex items-start gap-2 mb-1 ml-4">
+                              <span className="text-primary mt-1 font-medium">•</span>
+                              <span className="flex-1">{formatInlineMarkdown(bulletText)}</span>
                             </div>
                           );
                         }
                         
-                        // Handle bold text within lines
-                        const parts = line.split(/(\*\*.*?\*\*)/g);
-                        const formattedLine = parts.map((part, partIdx) => {
-                          if (part.startsWith('**') && part.endsWith('**')) {
-                            return (
-                              <strong key={partIdx} className="font-semibold text-foreground">
-                                {part.replace(/^\*\*|\*\*$/g, '')}
-                              </strong>
-                            );
-                          }
-                          return part;
-                        });
+                        // Handle numbered lists
+                        if (line.trim().match(/^\d+\.\s+/)) {
+                          const listText = line.replace(/^\d+\.\s*/, '').trim();
+                          const number = line.match(/^(\d+)\./)?.[1] || '1';
+                          return (
+                            <div key={idx} className="flex items-start gap-2 mb-1 ml-4">
+                              <span className="text-primary mt-1 font-medium min-w-[20px]">{number}.</span>
+                              <span className="flex-1">{formatInlineMarkdown(listText)}</span>
+                            </div>
+                          );
+                        }
                         
-                        return line.trim() ? (
+                        // Regular paragraphs with inline formatting
+                        return (
                           <p key={idx} className="mb-2 last:mb-0">
-                            {formattedLine}
+                            {formatInlineMarkdown(line)}
                           </p>
-                        ) : (
-                          <br key={idx} />
                         );
                       })}
                     </div>
