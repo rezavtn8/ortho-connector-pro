@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 interface AIRequest {
-  task_type: 'email_generation' | 'review_response' | 'content_creation' | 'analysis' | 'comprehensive_analysis' | 'business_intelligence';
+  task_type: 'email_generation' | 'review_response' | 'content_creation' | 'analysis' | 'comprehensive_analysis' | 'business_intelligence' | 'structured_report';
   context: any;
   prompt?: string;
   parameters?: {
@@ -382,6 +382,59 @@ BUSINESS CONTEXT:
 - Owner: ${business_persona?.owner_name || 'Healthcare Professional'}
 - Focus on referral source management and practice growth`;
 
+    case 'structured_report':
+      return `You are a business intelligence AI analyst creating structured reports for healthcare practices.
+
+TASK: Generate a comprehensive business intelligence report with six specific sections.
+
+REPORT STRUCTURE REQUIREMENTS:
+You must provide content for exactly these 6 sections in JSON format:
+
+{
+  "source_distribution": {
+    "summary": "1-2 sentence overview",
+    "priority": "high|medium|low",
+    "full_analysis": "detailed analysis with data points"
+  },
+  "performance_trends": {
+    "summary": "1-2 sentence overview", 
+    "priority": "high|medium|low",
+    "full_analysis": "detailed analysis with trends"
+  },
+  "geographic_distribution": {
+    "summary": "1-2 sentence overview",
+    "priority": "high|medium|low", 
+    "full_analysis": "detailed geographic insights"
+  },
+  "source_quality": {
+    "summary": "1-2 sentence overview",
+    "priority": "high|medium|low",
+    "full_analysis": "reliability and quality assessment"
+  },
+  "strategic_recommendations": {
+    "summary": "1-2 sentence overview",
+    "priority": "high|medium|low",
+    "full_analysis": "actionable strategic recommendations"
+  },
+  "emerging_patterns": {
+    "summary": "1-2 sentence overview", 
+    "priority": "high|medium|low",
+    "full_analysis": "new trends and patterns identified"
+  }
+}
+
+CONTENT REQUIREMENTS:
+- Summary: 1-2 concise sentences highlighting key finding
+- Priority: Based on business impact (high/medium/low)
+- Full Analysis: 3-4 sentences with specific data points and actionable insights
+- Use real data from the practice when available
+- Be specific and avoid generic recommendations
+
+BUSINESS CONTEXT:
+- Practice: ${business_persona?.practice_name || 'Healthcare Practice'}
+- Owner: ${business_persona?.owner_name || 'Healthcare Professional'}
+- Focus: Data-driven insights for referral source optimization`;
+
     default:
       return basePrompt + `
 
@@ -459,6 +512,40 @@ MARKETING VISITS DATA:
 
 ANALYSIS INSTRUCTION:
 ${prompt || `Analyze referral source distribution, performance trends, geographic patterns, and provide specific actionable recommendations. Focus on concentration risk, growth opportunities, and operational improvements.`}
+
+RETURN FORMAT: Return only the JSON structure specified in the system prompt.`;
+
+    case 'structured_report':
+      return `Generate a structured business intelligence report analyzing this practice data:
+
+PRACTICE DATA SUMMARY:
+- Total Referral Sources: ${context.analysis_data?.total_sources || 0}
+- Total Referrals (All Time): ${context.analysis_data?.total_referrals || 0}
+- Active Sources (6mo): ${context.analysis_data?.last_6_months?.length || 0}
+- Source Types: ${JSON.stringify(context.analysis_data?.source_types || {})}
+
+DETAILED DATA:
+${context.analysis_data?.sources?.length ? `
+Sources Sample:
+${context.analysis_data.sources.slice(0, 5).map((s: any) => 
+  `- ${s.name}: ${s.source_type}, Active: ${s.is_active}`
+).join('\n')}` : 'No sources data'}
+
+${context.analysis_data?.last_6_months?.length ? `
+Monthly Trends:
+${context.analysis_data.last_6_months.map((m: any) => 
+  `${m.year_month}: ${m.patient_count || 0} patients`
+).join('\n')}` : 'No monthly trends data'}
+
+${context.analysis_data?.visits?.length ? `
+Marketing Activity:
+- Total Visits: ${context.analysis_data.visits.length}
+- Completed: ${context.analysis_data.visits.filter((v: any) => v.visited).length}
+- Success Rate: ${Math.round((context.analysis_data.visits.filter((v: any) => v.visited).length / context.analysis_data.visits.length) * 100)}%` : 'No visits data'}
+
+INSTRUCTION: Generate the exact JSON structure for all 6 sections as specified. Use real data from above to create specific, actionable insights.
+
+${prompt || ''}
 
 Provide exactly 4-6 insights, each starting with **Bold Summary:** followed by detailed analysis and specific recommendations.`;
 
