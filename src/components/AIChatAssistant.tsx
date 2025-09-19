@@ -111,7 +111,7 @@ export function AIChatAssistant() {
     setIsLoading(true);
 
     try {
-      // Get comprehensive practice data for context - ALL PLATFORM DATA
+      // Get comprehensive practice data for context - ALL PLATFORM DATA INCLUDING LOCATIONS & AI SETTINGS
       const [
         sourcesResult, 
         monthlyResult, 
@@ -123,7 +123,10 @@ export function AIChatAssistant() {
         usageResult,
         userProfileResult,
         clinicResult,
-        activityResult
+        activityResult,
+        aiBusinessProfileResult,
+        aiTemplatesResult,
+        aiContentResult
       ] = await Promise.all([
         supabase.from('patient_sources').select('*').eq('created_by', user?.id),
         supabase.from('monthly_patients').select('*').eq('user_id', user?.id),
@@ -135,7 +138,10 @@ export function AIChatAssistant() {
         supabase.from('ai_usage_tracking').select('*').eq('user_id', user?.id).order('created_at', { ascending: false }).limit(50),
         supabase.from('user_profiles').select('*').eq('user_id', user?.id).single(),
         supabase.from('clinics').select('*').eq('owner_id', user?.id).maybeSingle(),
-        supabase.from('activity_log').select('*').eq('user_id', user?.id).order('created_at', { ascending: false }).limit(100)
+        supabase.from('activity_log').select('*').eq('user_id', user?.id).order('created_at', { ascending: false }).limit(100),
+        supabase.from('ai_business_profiles').select('*').eq('user_id', user?.id).maybeSingle(),
+        supabase.from('ai_response_templates').select('*').eq('user_id', user?.id).order('created_at', { ascending: false }).limit(10),
+        supabase.from('ai_generated_content').select('*').eq('user_id', user?.id).order('created_at', { ascending: false }).limit(20)
       ]);
 
       const sources = sourcesResult.data || [];
@@ -149,14 +155,17 @@ export function AIChatAssistant() {
       const userProfile = userProfileResult.data;
       const clinic = clinicResult.data;
       const activities = activityResult.data || [];
+      const aiBusinessProfileData = aiBusinessProfileResult.data;
+      const aiTemplates = aiTemplatesResult.data || [];
+      const aiContent = aiContentResult.data || [];
 
       const { data, error } = await supabase.functions.invoke('ai-assistant', {
         body: {
           task_type: 'practice_consultation',
           context: {
-            business_profile: businessProfile,
+            business_profile: businessProfile || aiBusinessProfileData,
             practice_data: {
-              // Core referral data
+              // Core referral data with locations
               sources: sources,
               monthly_data: monthlyData,
               visits: visits,
@@ -167,6 +176,8 @@ export function AIChatAssistant() {
               reviews: reviews,
               campaign_deliveries: deliveries,
               ai_usage_history: aiUsage,
+              ai_templates: aiTemplates,
+              ai_content: aiContent,
               user_profile: userProfile,
               clinic_info: clinic,
               recent_activities: activities,

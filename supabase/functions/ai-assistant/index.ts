@@ -578,7 +578,7 @@ COMPREHENSIVE PRACTICE DATA AVAILABLE:
 
 REFERRAL SOURCES (${context.practice_data?.sources?.length || 0} total):
 ${context.practice_data?.sources?.slice(0, 10).map((s: any) => 
-  `- ${s.name} (${s.source_type}): ${s.is_active ? 'Active' : 'Inactive'}, Location: ${s.address || 'N/A'}`
+  `- ${s.name} (${s.source_type}): ${s.is_active ? 'Active' : 'Inactive'}, Location: ${s.address || 'N/A'}${s.latitude && s.longitude ? `, Coordinates: ${s.latitude}, ${s.longitude}` : ''}`
 ).join('\n') || 'No sources data'}
 
 MONTHLY PERFORMANCE:
@@ -618,6 +618,26 @@ ${context.practice_data?.user_profile ? `
 - Name: ${context.practice_data.user_profile.first_name} ${context.practice_data.user_profile.last_name}
 - Role: ${context.practice_data.user_profile.role}
 - Clinic: ${context.practice_data.user_profile.clinic_name || 'N/A'}` : 'Profile data not available'}
+
+CLINIC LOCATION:
+${context.practice_data?.clinic_info ? `
+- Name: ${context.practice_data.clinic_info.name}
+- Address: ${context.practice_data.clinic_info.address || 'N/A'}
+- Coordinates: ${context.practice_data.clinic_info.latitude && context.practice_data.clinic_info.longitude ? `${context.practice_data.clinic_info.latitude}, ${context.practice_data.clinic_info.longitude}` : 'Not set'}` : 'Clinic data not available'}
+
+AI BUSINESS PROFILE & SETTINGS:
+${context.business_profile ? `
+- Practice Style: ${context.business_profile.communication_style || 'professional'}
+- Specialties: ${context.business_profile.specialties?.join(', ') || 'General healthcare'}
+- Target Audience: ${context.business_profile.target_audience || 'Not specified'}
+- Brand Voice: ${JSON.stringify(context.business_profile.brand_voice || {})}
+- Competitive Advantages: ${context.business_profile.competitive_advantages?.join(', ') || 'Not specified'}
+- Practice Values: ${context.business_profile.practice_values?.join(', ') || 'Not specified'}` : 'AI business profile not configured'}
+
+AI TEMPLATES & CONTENT HISTORY:
+- Active Templates: ${context.practice_data?.ai_templates?.length || 0}
+- Recent AI Content Generated: ${context.practice_data?.ai_content?.length || 0}
+- AI Usage (Last 30 Days): ${context.practice_data?.analytics?.ai_usage_last_30_days || 0}
 
 IMPORTANT: Respond in exactly 2-3 paragraphs, maximum 300 words total. Use specific data points from above to support your analysis and recommendations.
 
