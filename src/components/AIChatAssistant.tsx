@@ -250,16 +250,16 @@ export function AIChatAssistant() {
   };
 
   return (
-    <div className="bg-muted/30 rounded-2xl p-6">
-      <Card className="h-[600px] flex flex-col border-0 shadow-lg max-w-4xl mx-auto">
-        <CardHeader className="flex-shrink-0 pb-4">
-          <div className="space-y-1">
-            <CardTitle className="flex items-center gap-2 text-xl font-bold">
-              <MessageSquare className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
+    <div className="bg-slate-50/30 dark:bg-slate-900/30 rounded-2xl p-6">
+      <Card className="h-[700px] flex flex-col border-0 shadow-lg max-w-4xl mx-auto bg-white dark:bg-slate-800">
+        <CardHeader className="flex-shrink-0 pb-4 border-b border-border/50">
+          <div className="space-y-2">
+            <CardTitle className="flex items-center gap-3 text-xl font-bold">
+              <MessageSquare className="h-6 w-6 text-primary" />
               AI Practice Assistant
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Get insights and recommendations based on your practice data
+              Ask questions about your referral data, performance trends, and growth opportunities
             </p>
           </div>
         </CardHeader>
@@ -267,7 +267,7 @@ export function AIChatAssistant() {
         <CardContent className="flex-1 flex flex-col space-y-6 p-6">
           {/* Chat Messages */}
           <ScrollArea className="flex-1 pr-4" ref={scrollAreaRef}>
-            <div className="space-y-6 max-w-3xl">
+            <div className="space-y-6 max-w-3xl mx-auto">
               {messages.map((message) => {
                 const IconComponent = getMessageIcon(message);
                 return (
@@ -278,23 +278,23 @@ export function AIChatAssistant() {
                     }`}
                   >
                     {message.role === 'assistant' && (
-                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-cyan-50 dark:bg-cyan-950/50 flex items-center justify-center shadow-sm">
-                        <IconComponent className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
+                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center shadow-sm border border-primary/10">
+                        <IconComponent className="h-5 w-5 text-primary" />
                       </div>
                     )}
                     
                     <div
-                      className={`max-w-[650px] rounded-2xl p-5 shadow-sm ${
+                      className={`max-w-[650px] rounded-2xl p-6 shadow-sm border ${
                         message.role === 'user'
-                          ? 'bg-cyan-600 dark:bg-cyan-700 text-white'
-                          : 'bg-slate-50 dark:bg-slate-800 text-foreground'
+                          ? 'bg-gradient-to-br from-primary to-primary/90 text-white ml-auto'
+                          : 'bg-gradient-to-br from-slate-50 to-white dark:from-slate-800 dark:to-slate-700 text-foreground border-border/50'
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-3 mb-3">
+                      <div className="flex items-start justify-between gap-3 mb-4">
                         {getMessageBadge(message)}
                         <span className={`text-xs font-medium ${
                           message.role === 'user' 
-                            ? 'text-cyan-100 dark:text-cyan-200' 
+                            ? 'text-white/80' 
                             : 'text-muted-foreground'
                         }`}>
                           {formatTime(message.timestamp)}
@@ -309,7 +309,7 @@ export function AIChatAssistant() {
                     </div>
                     
                     {message.role === 'user' && (
-                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-cyan-600 dark:bg-cyan-700 flex items-center justify-center shadow-sm">
+                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/90 flex items-center justify-center shadow-sm">
                         <User className="h-5 w-5 text-white" />
                       </div>
                     )}
@@ -319,15 +319,15 @@ export function AIChatAssistant() {
               
               {isLoading && (
                 <div className="flex gap-4 justify-start">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-cyan-50 dark:bg-cyan-950/50 flex items-center justify-center shadow-sm">
-                    <Bot className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
+                  <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center shadow-sm border border-primary/10">
+                    <Bot className="h-5 w-5 text-primary" />
                   </div>
-                  <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-5 max-w-[650px] shadow-sm">
+                  <div className="bg-gradient-to-br from-slate-50 to-white dark:from-slate-800 dark:to-slate-700 rounded-2xl p-6 max-w-[650px] shadow-sm border border-border/50">
                     <div className="flex items-center space-x-3">
                       <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-cyan-600 dark:bg-cyan-400 rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-cyan-600 dark:bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                        <div className="w-2 h-2 bg-cyan-600 dark:bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                        <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                        <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                       </div>
                       <span className="text-sm text-muted-foreground font-medium">
                         Analyzing your practice data...
@@ -340,24 +340,23 @@ export function AIChatAssistant() {
           </ScrollArea>
 
           {/* Quick Actions */}
-          <div className="flex-shrink-0 space-y-4">
-            <div className="h-px bg-border"></div>
+          <div className="flex-shrink-0 space-y-4 border-t border-border/50 pt-4">
             <div className="space-y-3">
-              <p className="text-sm font-semibold text-foreground">Quick Insights</p>
-              <div className="grid grid-cols-1 gap-2 max-h-32 overflow-y-auto">
-                {quickActions.map((action, index) => {
+              <h4 className="text-sm font-semibold text-foreground">Quick Insights</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {quickActions.slice(0, 4).map((action, index) => {
                   const IconComponent = action.icon;
                   return (
                     <Button
                       key={index}
                       variant="ghost"
                       size="sm"
-                      className="justify-start text-left h-auto p-3 rounded-xl hover:bg-muted/50 transition-all duration-200"
+                      className="justify-start text-left h-auto p-3 rounded-xl hover:bg-muted/50 transition-all duration-200 border border-border/30"
                       onClick={() => handleQuickAction(action.prompt)}
                       disabled={isLoading}
                     >
-                      <IconComponent className="h-4 w-4 mr-3 flex-shrink-0 text-cyan-600 dark:text-cyan-400" />
-                      <span className="text-sm font-medium">{action.label}</span>
+                      <IconComponent className="h-4 w-4 mr-3 flex-shrink-0 text-primary" />
+                      <span className="text-sm font-medium truncate">{action.label}</span>
                     </Button>
                   );
                 })}
@@ -366,9 +365,9 @@ export function AIChatAssistant() {
           </div>
 
           {/* Message Input */}
-          <div className="flex-shrink-0 flex space-x-3">
+          <div className="flex-shrink-0 flex space-x-3 border-t border-border/50 pt-4">
             <Textarea
-              placeholder="Ask about referral source performance, geographic distribution, seasonal trends, ROI analysis, or any specific practice data insights..."
+              placeholder="Ask about referral source performance, seasonal trends, geographic distribution, ROI analysis, or any specific practice insights..."
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={(e) => {
@@ -377,13 +376,13 @@ export function AIChatAssistant() {
                   handleSendMessage();
                 }
               }}
-              className="min-h-[60px] resize-none rounded-xl border-2 focus:border-cyan-300 dark:focus:border-cyan-700"
+              className="min-h-[60px] resize-none rounded-xl border-2 focus:border-primary/30 bg-white dark:bg-slate-800"
               disabled={isLoading}
             />
             <Button
               onClick={() => handleSendMessage()}
               disabled={!inputMessage.trim() || isLoading}
-              className="px-4 rounded-xl bg-cyan-600 hover:bg-cyan-700 dark:bg-cyan-700 dark:hover:bg-cyan-600 shadow-sm"
+              className="px-6 rounded-xl bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-lg hover:shadow-xl transition-all duration-200"
             >
               <Send className="h-4 w-4" />
             </Button>
