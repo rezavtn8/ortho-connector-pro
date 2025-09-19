@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MessageSquare, Send, Bot, User, Lightbulb, BarChart3, FileText, Users } from 'lucide-react';
+import { MessageSquare, Send, Bot, User, Lightbulb, BarChart3, FileText, Users, AlertTriangle, TrendingUp, Target } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
@@ -35,24 +35,34 @@ export function AIChatAssistant() {
 
   const quickActions = [
     {
-      label: 'Analyze my top sources',
+      label: 'Source distribution analysis',
       icon: BarChart3,
-      prompt: 'Analyze my top performing referral sources and give me insights on how to optimize them.'
+      prompt: 'Analyze my referral source distribution by type, geographic location, and performance. Are there concentration risks or gaps?'
     },
     {
-      label: 'Growth suggestions',
-      icon: Lightbulb,
-      prompt: 'Based on my referral data, what are your top 3 suggestions for growing my practice?'
+      label: 'Identify underperformers',
+      icon: AlertTriangle,
+      prompt: 'Which of my referral sources are underperforming based on historical data? What specific actions should I take for each?'
     },
     {
-      label: 'Create thank you message',
-      icon: FileText,
-      prompt: 'Help me create a personalized thank you message for my top referring practices.'
+      label: 'Seasonal patterns & trends',
+      icon: TrendingUp,
+      prompt: 'Analyze my referral patterns over the past year. What seasonal trends do you see and how can I prepare for them?'
     },
     {
-      label: 'Source performance review',
+      label: 'ROI optimization strategy',
+      icon: Target,
+      prompt: 'Based on my marketing visits and referral data, which sources give the best ROI and deserve more investment?'
+    },
+    {
+      label: 'Market expansion opportunities',
       icon: Users,
-      prompt: 'Review my referral source performance over the last 6 months and identify trends.'
+      prompt: 'Analyze gaps in my referral network. What types of practices or geographic areas should I target for expansion?'
+    },
+    {
+      label: 'Personalized outreach plan',
+      icon: FileText,
+      prompt: 'Create a data-driven outreach plan for my top 5 sources, including specific talking points based on their referral history.'
     }
   ];
 
@@ -101,16 +111,18 @@ export function AIChatAssistant() {
     setIsLoading(true);
 
     try {
-      // Get practice data for context
-      const { data: sources } = await supabase
-        .from('patient_sources')
-        .select('*')
-        .eq('created_by', user?.id);
+      // Get comprehensive practice data for context
+      const [sourcesResult, monthlyResult, visitsResult, campaignsResult] = await Promise.all([
+        supabase.from('patient_sources').select('*').eq('created_by', user?.id),
+        supabase.from('monthly_patients').select('*').eq('user_id', user?.id),
+        supabase.from('marketing_visits').select('*').eq('user_id', user?.id),
+        supabase.from('campaigns').select('*').eq('created_by', user?.id)
+      ]);
 
-      const { data: monthlyData } = await supabase
-        .from('monthly_patients')
-        .select('*')
-        .eq('user_id', user?.id);
+      const sources = sourcesResult.data || [];
+      const monthlyData = monthlyResult.data || [];
+      const visits = visitsResult.data || [];
+      const campaigns = campaignsResult.data || [];
 
       const { data, error } = await supabase.functions.invoke('ai-assistant', {
         body: {
@@ -118,10 +130,34 @@ export function AIChatAssistant() {
           context: {
             business_profile: businessProfile,
             practice_data: {
-              sources: sources || [],
-              monthly_data: monthlyData || [],
-              total_sources: sources?.length || 0,
-              total_referrals: monthlyData?.reduce((sum, m) => sum + (m.patient_count || 0), 0) || 0
+              sources: sources,
+              monthly_data: monthlyData,
+              visits: visits,
+              campaigns: campaigns,
+              analytics: {
+                total_sources: sources.length,
+                total_referrals: monthlyData.reduce((sum, m) => sum + (m.patient_count || 0), 0),
+                active_sources_this_month: monthlyData.filter(m => {
+                  const currentMonth = new Date().toISOString().slice(0, 7);
+                  return m.year_month === currentMonth && m.patient_count > 0;
+                }).length,
+                source_types_distribution: sources.reduce((acc, s) => {
+                  acc[s.source_type] = (acc[s.source_type] || 0) + 1;
+                  return acc;
+                }, {} as Record<string, number>),
+                recent_visits: visits.filter(v => {
+                  const visitDate = new Date(v.visit_date);
+                  const thirtyDaysAgo = new Date();
+                  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                  return visitDate >= thirtyDaysAgo;
+                }).length,
+                last_6_months_trend: monthlyData.filter(m => {
+                  const monthDate = new Date(m.year_month + '-01');
+                  const sixMonthsAgo = new Date();
+                  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+                  return monthDate >= sixMonthsAgo;
+                })
+              }
             },
             conversation_history: messages.slice(-5)
           },
@@ -281,8 +317,8 @@ export function AIChatAssistant() {
 
         {/* Quick Actions */}
         <div className="flex-shrink-0 space-y-3">
-          <p className="text-sm font-medium text-muted-foreground">Quick Actions:</p>
-          <div className="grid grid-cols-2 gap-2">
+          <p className="text-sm font-medium text-muted-foreground">Business Intelligence Queries:</p>
+          <div className="grid grid-cols-1 gap-2 max-h-32 overflow-y-auto">
             {quickActions.map((action, index) => {
               const IconComponent = action.icon;
               return (
@@ -290,11 +326,11 @@ export function AIChatAssistant() {
                   key={index}
                   variant="outline"
                   size="sm"
-                  className="justify-start text-left h-auto p-3"
+                  className="justify-start text-left h-auto p-2"
                   onClick={() => handleQuickAction(action.prompt)}
                   disabled={isLoading}
                 >
-                  <IconComponent className="h-4 w-4 mr-2 flex-shrink-0" />
+                  <IconComponent className="h-3 w-3 mr-2 flex-shrink-0" />
                   <span className="text-xs">{action.label}</span>
                 </Button>
               );
@@ -305,7 +341,7 @@ export function AIChatAssistant() {
         {/* Message Input */}
         <div className="flex-shrink-0 flex space-x-2">
           <Textarea
-            placeholder="Ask me about your practice data, referral patterns, or marketing strategies..."
+            placeholder="Ask about referral source performance, geographic distribution, seasonal trends, ROI analysis, or any specific practice data insights..."
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyPress={(e) => {
