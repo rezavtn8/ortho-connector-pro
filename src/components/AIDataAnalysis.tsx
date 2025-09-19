@@ -89,22 +89,7 @@ export function AIDataAnalysis() {
           context: {
             analysis_data: analysisData,
             insight_categories: insightCategories.map(cat => cat.title)
-          },
-          prompt: `Generate structured insights for each of these 6 specific categories using real data:
-1. Source Distribution - analyze referral source concentration, diversity, and dependency risks
-2. Performance Trends - identify seasonal patterns, growth/decline trends in patient volume  
-3. Geographic Distribution - examine location-based referral patterns and market coverage
-4. Source Quality & Reliability - evaluate source consistency, reliability scores, and performance
-5. Strategic Recommendations - provide specific actionable strategies based on data analysis
-6. Emerging Patterns - identify new trends, opportunities, or risks in the data
-
-For each category, structure your response with:
-- Executive Summary (1 bold sentence)
-- Supporting Data (specific numbers from the provided data)
-- Insight Analysis (interpretation of what the data means)
-- Recommended Actions (specific next steps)
-
-Use only real data provided. If insufficient data exists for a category, state "Not enough data available to generate this insight."`,
+          }
         },
         headers: {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
@@ -115,86 +100,113 @@ Use only real data provided. If insufficient data exists for a category, state "
 
       // Parse AI response and create insight cards
       const aiContent = data.content || '';
-      let sections: string[];
-      
-      // Try to split by numbered sections first, then by category names if that fails
-      if (aiContent.includes('1.') && aiContent.includes('2.')) {
-        sections = aiContent.split(/\d+\.\s*/);
-      } else {
-        // Split by category titles as fallback
-        const categoryPattern = new RegExp(`(${insightCategories.map(cat => cat.title).join('|')})`, 'gi');
-        sections = aiContent.split(categoryPattern).filter(s => s.trim());
-      }
-      
       const generatedInsights: AIInsight[] = [];
       const types = ['summary', 'improvement', 'alert', 'action', 'summary', 'improvement'] as const;
 
-      // Process each category
-      insightCategories.forEach((category, index) => {
-        let content = '';
-        let executiveSummary = '';
-        let truncatedPreview = '';
+      try {
+        // Try to parse as JSON first (structured response)
+        const aiResponse = JSON.parse(aiContent);
         
-        // Find matching content for this category
-        const categoryIndex = sections.findIndex(section => 
-          section.toLowerCase().includes(category.title.toLowerCase()) ||
-          (index < sections.length - 1 && sections[index + 1])
-        );
-        
-        if (categoryIndex !== -1 && categoryIndex + 1 < sections.length) {
-          content = sections[categoryIndex + 1];
-        } else if (index + 1 < sections.length) {
-          content = sections[index + 1] || '';
-        }
+        if (Array.isArray(aiResponse) && aiResponse.length === 6) {
+          // Process structured JSON response
+          aiResponse.forEach((insight, index) => {
+            const category = insightCategories[index];
+            let executiveSummary = insight.executive_summary || 'Analysis available';
+            let content = insight.full_content || 'Not enough data available to generate this insight.';
+            let truncatedPreview = content.split('\n').slice(0, 4).join('\n') + (content.split('\n').length > 4 ? '...' : '');
+            
+            // Determine priority based on keywords
+            let priority: 'high' | 'medium' | 'low' = 'medium';
+            if (content.toLowerCase().includes('risk') || content.toLowerCase().includes('concern') || 
+                content.toLowerCase().includes('urgent') || content.toLowerCase().includes('critical')) {
+              priority = 'high';
+            } else if (content.toLowerCase().includes('opportunity') || content.toLowerCase().includes('growth') ||
+                       content.toLowerCase().includes('improve') || content.toLowerCase().includes('increase')) {
+              priority = 'medium';  
+            } else if (content.toLowerCase().includes('good') || content.toLowerCase().includes('strong') ||
+                       content.toLowerCase().includes('excellent') || content.toLowerCase().includes('performing well')) {
+              priority = 'low';
+            }
 
-        // Clean and format content
-        const cleanContent = content
-          .replace(/\*\*(.*?)\*\*/g, '$1')
-          .replace(/\*(.*?)\*/g, '$1')
-          .replace(/###\s*/g, '')
-          .replace(/--+/g, '')
-          .replace(new RegExp(`^${category.title}:?\\s*`, 'i'), '') // Remove duplicate title
-          .trim();
-
-        if (!cleanContent || cleanContent === category.title) {
-          content = 'Not enough data available to generate this insight.';
-          executiveSummary = 'Insufficient data for analysis';
-          truncatedPreview = 'Not enough data available to generate this insight.';
+            generatedInsights.push({
+              id: (index + 1).toString(),
+              type: types[index % types.length],
+              title: category.title,
+              content: content,
+              executiveSummary: executiveSummary,
+              truncatedPreview: truncatedPreview,
+              priority: priority,
+              icon: category.icon
+            });
+          });
         } else {
-          const lines = cleanContent.split('\n').filter(line => line.trim());
-          
-          // Extract executive summary (first substantial line)
-          executiveSummary = lines[0] || 'Analysis available';
-          
-          // Create truncated preview (first 3-4 lines)
-          truncatedPreview = lines.slice(0, 4).join('\n') + (lines.length > 4 ? '...' : '');
-          content = cleanContent;
+          throw new Error('Invalid JSON format');
         }
+      } catch (jsonError) {
+        console.log('Failed to parse as JSON, parsing as text:', jsonError);
         
-        // Determine priority based on keywords
-        let priority: 'high' | 'medium' | 'low' = 'medium';
-        if (content.toLowerCase().includes('risk') || content.toLowerCase().includes('concern') || 
-            content.toLowerCase().includes('urgent') || content.toLowerCase().includes('critical')) {
-          priority = 'high';
-        } else if (content.toLowerCase().includes('opportunity') || content.toLowerCase().includes('growth') ||
-                   content.toLowerCase().includes('improve') || content.toLowerCase().includes('increase')) {
-          priority = 'medium';  
-        } else if (content.toLowerCase().includes('good') || content.toLowerCase().includes('strong') ||
-                   content.toLowerCase().includes('excellent') || content.toLowerCase().includes('performing well')) {
-          priority = 'low';
-        }
+        // Fallback to text parsing
+        const sections = aiContent.split(/(?=### \d+\.|(?:Source Distribution|Performance Trends|Geographic Distribution|Source Quality & Reliability|Strategic Recommendations|Emerging Patterns))/gi);
+        
+        insightCategories.forEach((category, index) => {
+          let content = '';
+          let executiveSummary = '';
+          let truncatedPreview = '';
+          
+          // Find matching content for this category
+          const matchingSection = sections.find(section => 
+            section.toLowerCase().includes(category.title.toLowerCase())
+          ) || sections[index + 1] || '';
+          
+          // Clean and format content
+          const cleanContent = matchingSection
+            .replace(/\*\*(.*?)\*\*/g, '$1')
+            .replace(/\*(.*?)\*/g, '$1')
+            .replace(/###\s*/g, '')
+            .replace(/--+/g, '')
+            .replace(new RegExp(`^${category.title}:?\\s*`, 'i'), '') // Remove duplicate title
+            .trim();
 
-        generatedInsights.push({
-          id: (index + 1).toString(),
-          type: types[index % types.length],
-          title: category.title,
-          content: content,
-          executiveSummary: executiveSummary,
-          truncatedPreview: truncatedPreview,
-          priority: priority,
-          icon: category.icon
+          if (!cleanContent || cleanContent === category.title) {
+            content = 'Not enough data available to generate this insight.';
+            executiveSummary = 'Insufficient data for analysis';
+            truncatedPreview = 'Not enough data available to generate this insight.';
+          } else {
+            const lines = cleanContent.split('\n').filter(line => line.trim());
+            
+            // Extract executive summary (first substantial line)
+            executiveSummary = lines[0] || 'Analysis available';
+            
+            // Create truncated preview (first 3-4 lines)
+            truncatedPreview = lines.slice(0, 4).join('\n') + (lines.length > 4 ? '...' : '');
+            content = cleanContent;
+          }
+          
+          // Determine priority based on keywords
+          let priority: 'high' | 'medium' | 'low' = 'medium';
+          if (content.toLowerCase().includes('risk') || content.toLowerCase().includes('concern') || 
+              content.toLowerCase().includes('urgent') || content.toLowerCase().includes('critical')) {
+            priority = 'high';
+          } else if (content.toLowerCase().includes('opportunity') || content.toLowerCase().includes('growth') ||
+                     content.toLowerCase().includes('improve') || content.toLowerCase().includes('increase')) {
+            priority = 'medium';  
+          } else if (content.toLowerCase().includes('good') || content.toLowerCase().includes('strong') ||
+                     content.toLowerCase().includes('excellent') || content.toLowerCase().includes('performing well')) {
+            priority = 'low';
+          }
+
+          generatedInsights.push({
+            id: (index + 1).toString(),
+            type: types[index % types.length],
+            title: category.title,
+            content: content,
+            executiveSummary: executiveSummary,
+            truncatedPreview: truncatedPreview,
+            priority: priority,
+            icon: category.icon
+          });
         });
-      });
+      }
 
       setInsights(generatedInsights);
       setHasAnalysis(true);
