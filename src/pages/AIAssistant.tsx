@@ -57,9 +57,8 @@ export function AIAssistant({ onPageChange, onSourceSelect }: AIAssistantProps =
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="analysis">Data Analysis</TabsTrigger>
           <TabsTrigger value="chat">AI Chat</TabsTrigger>
           <TabsTrigger value="setup">Settings</TabsTrigger>
         </TabsList>
@@ -102,26 +101,17 @@ export function AIAssistant({ onPageChange, onSourceSelect }: AIAssistantProps =
             </Card>
           )}
 
+          {/* AI Insights Section */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-primary" />
+              <h3 className="text-lg font-semibold">AI Business Analysis</h3>
+            </div>
+            <AIDataAnalysis />
+          </div>
+
           {/* Quick Actions Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => setActiveTab('analysis')}>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-primary" />
-                  Practice Insights
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Get comprehensive analysis of your referral patterns and performance metrics.
-                </p>
-                <Button className="w-full">
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                  View Analysis
-                </Button>
-              </CardContent>
-            </Card>
-
             <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => setActiveTab('chat')}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -133,7 +123,7 @@ export function AIAssistant({ onPageChange, onSourceSelect }: AIAssistantProps =
                 <p className="text-sm text-muted-foreground mb-4">
                   Chat with AI for personalized insights and recommendations about your practice.
                 </p>
-                <Button className="w-full" variant="outline">
+                <Button className="w-full">
                   <MessageSquare className="h-4 w-4 mr-2" />
                   Start Chat
                 </Button>
@@ -214,9 +204,6 @@ export function AIAssistant({ onPageChange, onSourceSelect }: AIAssistantProps =
           </div>
         </TabsContent>
 
-        <TabsContent value="analysis" className="space-y-6">
-          <AIDataAnalysis />
-        </TabsContent>
 
         <TabsContent value="chat" className="space-y-6">
           <AIChatAssistant />
