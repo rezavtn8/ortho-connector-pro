@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 interface AIRequest {
-  task_type: 'email_generation' | 'review_response' | 'content_creation' | 'analysis' | 'comprehensive_analysis' | 'practice_consultation';
+  task_type: 'email_generation' | 'review_response' | 'content_creation' | 'analysis';
   context: any;
   prompt?: string;
   parameters?: {
@@ -357,53 +357,6 @@ REQUIREMENTS:
 4. Include clear calls to action when relevant
 5. Maintain professional credibility`;
 
-    case 'comprehensive_analysis':
-      return `You are a business intelligence AI analyzing comprehensive practice data for ${business_persona.practice_name}.
-
-BUSINESS CONTEXT:
-- Practice: ${business_persona.practice_name}
-- Owner: ${business_persona.owner_name} (${business_persona.owner_title})
-- Location: ${business_persona.location}
-- Communication Style: ${communication_style}
-- Values: ${brand_voice.values?.join(', ') || 'Excellence in healthcare'}
-
-TASK: Provide structured business intelligence analysis.
-
-ANALYSIS REQUIREMENTS:
-1. Use specific data points and percentages from the provided data
-2. Identify patterns, trends, and correlations in referral data
-3. Highlight concentration risks and diversification opportunities
-4. Assess geographic distribution and market penetration
-5. Evaluate ROI and performance metrics
-6. Provide actionable recommendations with clear next steps
-7. Focus on data-driven insights, not generic advice
-
-OUTPUT FORMAT: Return ONLY valid JSON array with structured insights.`;
-
-    case 'practice_consultation':
-      return `You are an AI practice consultant for ${business_persona.practice_name}, owned by ${business_persona.owner_name}.
-
-BUSINESS CONTEXT:
-- Practice: ${business_persona.practice_name}
-- Owner: ${business_persona.owner_name} (${business_persona.owner_title})
-- Location: ${business_persona.location}
-- Communication Style: ${communication_style}
-- Brand Voice: ${brand_voice.tone || 'professional'}
-- Values: ${brand_voice.values?.join(', ') || 'Excellence, Trust, Care'}
-
-TASK: Provide expert consultation on practice management, referral optimization, and business growth.
-
-CONSULTATION CAPABILITIES:
-1. Analyze referral source performance and patterns
-2. Identify growth opportunities and market gaps
-3. Provide strategic recommendations based on actual data
-4. Suggest marketing and relationship-building strategies
-5. Evaluate campaign effectiveness and ROI
-6. Offer insights on geographic expansion opportunities
-7. Help optimize practice operations and efficiency
-
-Always reference specific data points when available and provide actionable advice tailored to this practice's unique situation and goals.`;
-
     default:
       return basePrompt + `
 
@@ -459,57 +412,6 @@ PARAMETERS:
 - Tone: ${parameters?.tone || 'professional'}
 
 PROMPT: ${prompt || 'Create appropriate content based on the context provided.'}`;
-
-    case 'comprehensive_analysis':
-      const analysisData = context.analysis_data;
-      return `Analyze this comprehensive practice data and provide business intelligence insights:
-
-PRACTICE DATA SUMMARY:
-- Total Referral Sources: ${analysisData.total_sources}
-- Total Referrals (All Time): ${analysisData.total_referrals}
-- Active Sources This Month: ${analysisData.active_sources_this_month}
-- Source Type Distribution: ${JSON.stringify(analysisData.source_types)}
-- Geographic Distribution: ${JSON.stringify(analysisData.geographic_distribution || {})}
-- Recent Marketing Visits: ${analysisData.recent_visits?.length || 0}
-- Campaign Performance: ${JSON.stringify(analysisData.campaign_performance || {})}
-
-DETAILED DATA:
-${JSON.stringify(analysisData, null, 2)}
-
-${prompt}`;
-
-    case 'practice_consultation':
-      const practiceData = context.practice_data;
-      const analytics = practiceData.analytics;
-      
-      return `Based on this comprehensive practice data, provide expert consultation:
-
-PRACTICE OVERVIEW:
-- Total Sources: ${analytics.total_sources}
-- Total Referrals: ${analytics.total_referrals}
-- Active Sources This Month: ${analytics.active_sources_this_month}
-- Recent Visits (30 days): ${analytics.recent_visits}
-- Total Campaigns: ${analytics.campaign_performance?.total_campaigns || 0}
-- Completed Deliveries: ${analytics.campaign_performance?.completed_deliveries || 0}
-
-SOURCE DISTRIBUTION:
-${JSON.stringify(analytics.source_types_distribution, null, 2)}
-
-GEOGRAPHIC DISTRIBUTION:
-${JSON.stringify(analytics.geographic_distribution, null, 2)}
-
-TOP PERFORMING SOURCES:
-${JSON.stringify(analytics.source_performance?.slice(0, 10) || [], null, 2)}
-
-RECENT TRENDS:
-${JSON.stringify(analytics.last_6_months_trend?.slice(-6) || [], null, 2)}
-
-TAG ANALYSIS:
-${JSON.stringify(analytics.tag_analysis || {}, null, 2)}
-
-CONSULTATION REQUEST: ${prompt}
-
-Please provide specific, actionable advice based on this data.`;
 
     default:
       return prompt || 'Please provide assistance with the given context.';

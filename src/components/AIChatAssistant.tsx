@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MessageSquare, Send, Bot, User, Lightbulb, BarChart3, FileText, Users, AlertTriangle, TrendingUp, Target } from 'lucide-react';
+import { MessageSquare, Send, Bot, User, Lightbulb, BarChart3, FileText, Users } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
@@ -35,34 +35,24 @@ export function AIChatAssistant() {
 
   const quickActions = [
     {
-      label: 'Source distribution analysis',
+      label: 'Analyze my top sources',
       icon: BarChart3,
-      prompt: 'Analyze my referral source distribution by type, geographic location, and performance. Are there concentration risks or gaps?'
+      prompt: 'Analyze my top performing referral sources and give me insights on how to optimize them.'
     },
     {
-      label: 'Identify underperformers',
-      icon: AlertTriangle,
-      prompt: 'Which of my referral sources are underperforming based on historical data? What specific actions should I take for each?'
+      label: 'Growth suggestions',
+      icon: Lightbulb,
+      prompt: 'Based on my referral data, what are your top 3 suggestions for growing my practice?'
     },
     {
-      label: 'Seasonal patterns & trends',
-      icon: TrendingUp,
-      prompt: 'Analyze my referral patterns over the past year. What seasonal trends do you see and how can I prepare for them?'
-    },
-    {
-      label: 'ROI optimization strategy',
-      icon: Target,
-      prompt: 'Based on my marketing visits and referral data, which sources give the best ROI and deserve more investment?'
-    },
-    {
-      label: 'Market expansion opportunities',
-      icon: Users,
-      prompt: 'Analyze gaps in my referral network. What types of practices or geographic areas should I target for expansion?'
-    },
-    {
-      label: 'Personalized outreach plan',
+      label: 'Create thank you message',
       icon: FileText,
-      prompt: 'Create a data-driven outreach plan for my top 5 sources, including specific talking points based on their referral history.'
+      prompt: 'Help me create a personalized thank you message for my top referring practices.'
+    },
+    {
+      label: 'Source performance review',
+      icon: Users,
+      prompt: 'Review my referral source performance over the last 6 months and identify trends.'
     }
   ];
 
@@ -111,22 +101,16 @@ export function AIChatAssistant() {
     setIsLoading(true);
 
     try {
-      // Get comprehensive practice data for context
-      const [sourcesResult, monthlyResult, visitsResult, campaignsResult, deliveriesResult, tagsResult] = await Promise.all([
-        supabase.from('patient_sources').select('*').eq('created_by', user?.id),
-        supabase.from('monthly_patients').select('*').eq('user_id', user?.id),
-        supabase.from('marketing_visits').select('*').eq('user_id', user?.id),
-        supabase.from('campaigns').select('*').eq('created_by', user?.id),
-        supabase.from('campaign_deliveries').select('*').eq('created_by', user?.id),
-        supabase.from('source_tags').select('*').eq('user_id', user?.id)
-      ]);
+      // Get practice data for context
+      const { data: sources } = await supabase
+        .from('patient_sources')
+        .select('*')
+        .eq('created_by', user?.id);
 
-      const sources = sourcesResult.data || [];
-      const monthlyData = monthlyResult.data || [];
-      const visits = visitsResult.data || [];
-      const campaigns = campaignsResult.data || [];
-      const deliveries = deliveriesResult.data || [];
-      const tags = tagsResult.data || [];
+      const { data: monthlyData } = await supabase
+        .from('monthly_patients')
+        .select('*')
+        .eq('user_id', user?.id);
 
       const { data, error } = await supabase.functions.invoke('ai-assistant', {
         body: {
@@ -134,71 +118,10 @@ export function AIChatAssistant() {
           context: {
             business_profile: businessProfile,
             practice_data: {
-              sources: sources,
-              monthly_data: monthlyData,
-              visits: visits,
-              campaigns: campaigns,
-              deliveries: deliveries,
-              tags: tags,
-              analytics: {
-                total_sources: sources.length,
-                total_referrals: monthlyData.reduce((sum, m) => sum + (m.patient_count || 0), 0),
-                active_sources_this_month: monthlyData.filter(m => {
-                  const currentMonth = new Date().toISOString().slice(0, 7);
-                  return m.year_month === currentMonth && m.patient_count > 0;
-                }).length,
-                source_types_distribution: sources.reduce((acc, s) => {
-                  acc[s.source_type] = (acc[s.source_type] || 0) + 1;
-                  return acc;
-                }, {} as Record<string, number>),
-                geographic_distribution: sources.reduce((acc, s) => {
-                  if (s.address) {
-                    const city = s.address.split(',')[1]?.trim() || 'Unknown';
-                    acc[city] = (acc[city] || 0) + 1;
-                  }
-                  return acc;
-                }, {} as Record<string, number>),
-                recent_visits: visits.filter(v => {
-                  const visitDate = new Date(v.visit_date);
-                  const thirtyDaysAgo = new Date();
-                  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-                  return visitDate >= thirtyDaysAgo;
-                }).length,
-                campaign_performance: {
-                  total_campaigns: campaigns.length,
-                  active_campaigns: campaigns.filter(c => c.status === 'Active').length,
-                  completed_deliveries: deliveries.filter(d => d.delivery_status === 'Completed').length,
-                  pending_deliveries: deliveries.filter(d => d.delivery_status === 'Not Started' || d.delivery_status === 'In Progress').length
-                },
-                source_performance: sources.map(source => {
-                  const sourceData = monthlyData.filter(m => m.source_id === source.id);
-                  const totalReferrals = sourceData.reduce((sum, m) => sum + (m.patient_count || 0), 0);
-                  const recentReferrals = sourceData.filter(m => {
-                    const monthDate = new Date(m.year_month + '-01');
-                    const threeMonthsAgo = new Date();
-                    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-                    return monthDate >= threeMonthsAgo;
-                  }).reduce((sum, m) => sum + (m.patient_count || 0), 0);
-                  
-                  return {
-                    name: source.name,
-                    type: source.source_type,
-                    total_referrals: totalReferrals,
-                    recent_referrals: recentReferrals,
-                    city: source.address?.split(',')[1]?.trim() || 'Unknown'
-                  };
-                }),
-                last_6_months_trend: monthlyData.filter(m => {
-                  const monthDate = new Date(m.year_month + '-01');
-                  const sixMonthsAgo = new Date();
-                  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-                  return monthDate >= sixMonthsAgo;
-                }),
-                tag_analysis: tags.reduce((acc, tag) => {
-                  acc[tag.tag_name] = (acc[tag.tag_name] || 0) + 1;
-                  return acc;
-                }, {} as Record<string, number>)
-              }
+              sources: sources || [],
+              monthly_data: monthlyData || [],
+              total_sources: sources?.length || 0,
+              total_referrals: monthlyData?.reduce((sum, m) => sum + (m.patient_count || 0), 0) || 0
             },
             conversation_history: messages.slice(-5)
           },
@@ -320,50 +243,9 @@ export function AIChatAssistant() {
                         {formatTime(message.timestamp)}
                       </span>
                     </div>
-                    <div className="text-sm whitespace-pre-wrap leading-relaxed">
-                      {message.content.split('\n').map((line, idx) => {
-                        // Handle markdown-style formatting
-                        if (line.trim().startsWith('**') && line.trim().endsWith('**')) {
-                          const cleanLine = line.replace(/^\*\*|\*\*$/g, '').trim();
-                          return (
-                            <h4 key={idx} className="font-semibold text-foreground mb-2 mt-3 first:mt-0">
-                              {cleanLine}
-                            </h4>
-                          );
-                        }
-                        
-                        // Handle bullet points
-                        if (line.trim().startsWith('•') || line.trim().startsWith('-')) {
-                          return (
-                            <div key={idx} className="flex items-start gap-2 mb-1">
-                              <span className="text-primary mt-1">•</span>
-                              <span>{line.replace(/^[•-]\s*/, '').trim()}</span>
-                            </div>
-                          );
-                        }
-                        
-                        // Handle bold text within lines
-                        const parts = line.split(/(\*\*.*?\*\*)/g);
-                        const formattedLine = parts.map((part, partIdx) => {
-                          if (part.startsWith('**') && part.endsWith('**')) {
-                            return (
-                              <strong key={partIdx} className="font-semibold text-foreground">
-                                {part.replace(/^\*\*|\*\*$/g, '')}
-                              </strong>
-                            );
-                          }
-                          return part;
-                        });
-                        
-                        return line.trim() ? (
-                          <p key={idx} className="mb-2 last:mb-0">
-                            {formattedLine}
-                          </p>
-                        ) : (
-                          <br key={idx} />
-                        );
-                      })}
-                    </div>
+                    <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                      {message.content}
+                    </p>
                   </div>
                   
                   {message.role === 'user' && (
@@ -399,8 +281,8 @@ export function AIChatAssistant() {
 
         {/* Quick Actions */}
         <div className="flex-shrink-0 space-y-3">
-          <p className="text-sm font-medium text-muted-foreground">Business Intelligence Queries:</p>
-          <div className="grid grid-cols-1 gap-2 max-h-32 overflow-y-auto">
+          <p className="text-sm font-medium text-muted-foreground">Quick Actions:</p>
+          <div className="grid grid-cols-2 gap-2">
             {quickActions.map((action, index) => {
               const IconComponent = action.icon;
               return (
@@ -408,11 +290,11 @@ export function AIChatAssistant() {
                   key={index}
                   variant="outline"
                   size="sm"
-                  className="justify-start text-left h-auto p-2"
+                  className="justify-start text-left h-auto p-3"
                   onClick={() => handleQuickAction(action.prompt)}
                   disabled={isLoading}
                 >
-                  <IconComponent className="h-3 w-3 mr-2 flex-shrink-0" />
+                  <IconComponent className="h-4 w-4 mr-2 flex-shrink-0" />
                   <span className="text-xs">{action.label}</span>
                 </Button>
               );
@@ -423,7 +305,7 @@ export function AIChatAssistant() {
         {/* Message Input */}
         <div className="flex-shrink-0 flex space-x-2">
           <Textarea
-            placeholder="Ask about referral source performance, geographic distribution, seasonal trends, ROI analysis, or any specific practice data insights..."
+            placeholder="Ask me about your practice data, referral patterns, or marketing strategies..."
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyPress={(e) => {
