@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 interface AIRequest {
-  task_type: 'email_generation' | 'review_response' | 'content_creation' | 'analysis';
+  task_type: 'email_generation' | 'review_response' | 'content_creation' | 'analysis' | 'comprehensive_analysis' | 'business_intelligence';
   context: any;
   prompt?: string;
   parameters?: {
@@ -357,6 +357,31 @@ REQUIREMENTS:
 4. Include clear calls to action when relevant
 5. Maintain professional credibility`;
 
+    case 'comprehensive_analysis':
+    case 'business_intelligence':
+      return `You are a business intelligence AI analyst specializing in healthcare practice management and referral analytics.
+
+TASK: Analyze comprehensive practice data and provide actionable business insights.
+
+ANALYSIS REQUIREMENTS:
+1. Provide exactly 4-6 distinct insights as separate paragraphs
+2. Each insight should start with a **bold summary** followed by detailed analysis
+3. Focus on different aspects: distribution, trends, risks, opportunities, recommendations
+4. Use specific data points and percentages when available
+5. Be concise but actionable - avoid generic advice
+6. Prioritize insights by business impact
+
+FORMAT REQUIREMENTS:
+- Start each insight with **Bold Title:** then analysis
+- Use natural paragraph breaks between insights
+- Include specific numbers and trends where relevant
+- End each insight with a clear recommendation
+
+BUSINESS CONTEXT:
+- Practice: ${business_persona?.practice_name || 'Healthcare Practice'}
+- Owner: ${business_persona?.owner_name || 'Healthcare Professional'}
+- Focus on referral source management and practice growth`;
+
     default:
       return basePrompt + `
 
@@ -412,6 +437,30 @@ PARAMETERS:
 - Tone: ${parameters?.tone || 'professional'}
 
 PROMPT: ${prompt || 'Create appropriate content based on the context provided.'}`;
+
+    case 'comprehensive_analysis':
+    case 'business_intelligence':
+      return `Analyze this comprehensive practice data and provide 4-6 actionable business insights:
+
+PRACTICE DATA SUMMARY:
+- Total Referral Sources: ${context.analysis_data?.total_sources || 0}
+- Total Referrals (All Time): ${context.analysis_data?.total_referrals || 0}
+- Active Recent Sources: ${context.analysis_data?.last_6_months?.length || 0}
+- Source Type Distribution: ${JSON.stringify(context.analysis_data?.source_types || {})}
+
+MONTHLY TRENDS:
+${context.analysis_data?.last_6_months?.map((m: any) => 
+  `${m.year_month}: ${m.patient_count} patients`
+).join('\n') || 'No recent data available'}
+
+MARKETING VISITS DATA:
+- Total Visits Tracked: ${context.analysis_data?.visits?.length || 0}
+- Recent Visit Activity: ${context.analysis_data?.visits?.filter((v: any) => v.visited)?.length || 0}
+
+ANALYSIS INSTRUCTION:
+${prompt || `Analyze referral source distribution, performance trends, geographic patterns, and provide specific actionable recommendations. Focus on concentration risk, growth opportunities, and operational improvements.`}
+
+Provide exactly 4-6 insights, each starting with **Bold Summary:** followed by detailed analysis and specific recommendations.`;
 
     default:
       return prompt || 'Please provide assistance with the given context.';
