@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, CheckCircle, TrendingUp, Target, Users, Activity, Zap, Brain, RefreshCw, BarChart3, MapPin, Calendar, Shield, Search, DollarSign } from 'lucide-react';
+import { InsightDetailModal } from '@/components/InsightDetailModal';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -12,6 +13,8 @@ interface AIInsight {
   type: 'summary' | 'action' | 'improvement' | 'alert';
   title: string;
   content: string;
+  executiveSummary: string;
+  truncatedPreview: string;
   priority: 'high' | 'medium' | 'low';
   icon: any;
 }
@@ -20,7 +23,19 @@ export function AIDataAnalysis() {
   const [insights, setInsights] = useState<AIInsight[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasAnalysis, setHasAnalysis] = useState(false);
+  const [selectedInsight, setSelectedInsight] = useState<AIInsight | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const { user } = useAuth();
+
+  // Predefined insight categories with their icons
+  const insightCategories = [
+    { title: 'Source Distribution', icon: BarChart3 },
+    { title: 'Performance Trends', icon: TrendingUp },
+    { title: 'Geographic Distribution', icon: MapPin },
+    { title: 'Source Quality & Reliability', icon: Shield },
+    { title: 'Strategic Recommendations', icon: Target },
+    { title: 'Emerging Patterns', icon: Search }
+  ];
 
   const generateAIAnalysis = async () => {
     if (!user) return;
@@ -73,17 +88,23 @@ export function AIDataAnalysis() {
           task_type: 'comprehensive_analysis',
           context: {
             analysis_data: analysisData,
-            analysis_type: 'business_intelligence'
+            insight_categories: insightCategories.map(cat => cat.title)
           },
-          prompt: `Analyze the complete business data and provide 4-6 comprehensive insights covering:
-1. Referral source distribution and concentration risk
-2. Performance trends and seasonal patterns  
-3. Geographic distribution and market penetration
-4. Source quality and reliability analysis
-5. Specific actionable recommendations with data points
-6. Risk factors and improvement opportunities
+          prompt: `Generate structured insights for each of these 6 specific categories using real data:
+1. Source Distribution - analyze referral source concentration, diversity, and dependency risks
+2. Performance Trends - identify seasonal patterns, growth/decline trends in patient volume  
+3. Geographic Distribution - examine location-based referral patterns and market coverage
+4. Source Quality & Reliability - evaluate source consistency, reliability scores, and performance
+5. Strategic Recommendations - provide specific actionable strategies based on data analysis
+6. Emerging Patterns - identify new trends, opportunities, or risks in the data
 
-Focus on specific data-driven insights, not generic advice. Include actual numbers and percentages where relevant.`,
+For each category, structure your response with:
+- Executive Summary (1 bold sentence)
+- Supporting Data (specific numbers from the provided data)
+- Insight Analysis (interpretation of what the data means)
+- Recommended Actions (specific next steps)
+
+Use only real data provided. If insufficient data exists for a category, state "Not enough data available to generate this insight."`,
         },
         headers: {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
@@ -94,38 +115,84 @@ Focus on specific data-driven insights, not generic advice. Include actual numbe
 
       // Parse AI response and create insight cards
       const aiContent = data.content || '';
-      const sections = aiContent.split(/\d+\./);
+      let sections: string[];
+      
+      // Try to split by numbered sections first, then by category names if that fails
+      if (aiContent.includes('1.') && aiContent.includes('2.')) {
+        sections = aiContent.split(/\d+\.\s*/);
+      } else {
+        // Split by category titles as fallback
+        const categoryPattern = new RegExp(`(${insightCategories.map(cat => cat.title).join('|')})`, 'gi');
+        sections = aiContent.split(categoryPattern).filter(s => s.trim());
+      }
       
       const generatedInsights: AIInsight[] = [];
-      const icons = [BarChart3, TrendingUp, MapPin, Target, Shield, Search];
-      const types = ['summary', 'improvement', 'alert', 'action'] as const;
+      const types = ['summary', 'improvement', 'alert', 'action', 'summary', 'improvement'] as const;
 
-      sections.slice(1).forEach((section, index) => {
-        if (section.trim() && index < 6) {
-          const lines = section.trim().split('\n');
-          const title = lines[0]?.replace(/[:,-].*/, '').trim() || `Analysis ${index + 1}`;
-          const content = lines.slice(1).join('\n').trim() || section.trim();
-          
-          // Determine priority based on keywords
-          let priority: 'high' | 'medium' | 'low' = 'medium';
-          if (content.toLowerCase().includes('risk') || content.toLowerCase().includes('concern') || 
-              content.toLowerCase().includes('urgent') || content.toLowerCase().includes('critical')) {
-            priority = 'high';
-          } else if (content.toLowerCase().includes('opportunity') || content.toLowerCase().includes('growth')) {
-            priority = 'medium';
-          } else if (content.toLowerCase().includes('good') || content.toLowerCase().includes('strong')) {
-            priority = 'low';
-          }
-
-          generatedInsights.push({
-            id: (index + 1).toString(),
-            type: types[index % types.length],
-            title: title,
-            content: content,
-            priority: priority,
-            icon: icons[index % icons.length]
-          });
+      // Process each category
+      insightCategories.forEach((category, index) => {
+        let content = '';
+        let executiveSummary = '';
+        let truncatedPreview = '';
+        
+        // Find matching content for this category
+        const categoryIndex = sections.findIndex(section => 
+          section.toLowerCase().includes(category.title.toLowerCase()) ||
+          (index < sections.length - 1 && sections[index + 1])
+        );
+        
+        if (categoryIndex !== -1 && categoryIndex + 1 < sections.length) {
+          content = sections[categoryIndex + 1];
+        } else if (index + 1 < sections.length) {
+          content = sections[index + 1] || '';
         }
+
+        // Clean and format content
+        const cleanContent = content
+          .replace(/\*\*(.*?)\*\*/g, '$1')
+          .replace(/\*(.*?)\*/g, '$1')
+          .replace(/###\s*/g, '')
+          .replace(/--+/g, '')
+          .trim();
+
+        if (!cleanContent || cleanContent === category.title) {
+          content = 'Not enough data available to generate this insight.';
+          executiveSummary = 'Insufficient data for analysis';
+          truncatedPreview = 'Not enough data available to generate this insight.';
+        } else {
+          const lines = cleanContent.split('\n').filter(line => line.trim());
+          
+          // Extract executive summary (first substantial line)
+          executiveSummary = lines[0] || 'Analysis available';
+          
+          // Create truncated preview (first 3-4 lines)
+          truncatedPreview = lines.slice(0, 4).join('\n') + (lines.length > 4 ? '...' : '');
+          content = cleanContent;
+        }
+        
+        // Determine priority based on keywords
+        let priority: 'high' | 'medium' | 'low' = 'medium';
+        if (content.toLowerCase().includes('risk') || content.toLowerCase().includes('concern') || 
+            content.toLowerCase().includes('urgent') || content.toLowerCase().includes('critical')) {
+          priority = 'high';
+        } else if (content.toLowerCase().includes('opportunity') || content.toLowerCase().includes('growth') ||
+                   content.toLowerCase().includes('improve') || content.toLowerCase().includes('increase')) {
+          priority = 'medium';  
+        } else if (content.toLowerCase().includes('good') || content.toLowerCase().includes('strong') ||
+                   content.toLowerCase().includes('excellent') || content.toLowerCase().includes('performing well')) {
+          priority = 'low';
+        }
+
+        generatedInsights.push({
+          id: (index + 1).toString(),
+          type: types[index % types.length],
+          title: category.title,
+          content: content,
+          executiveSummary: executiveSummary,
+          truncatedPreview: truncatedPreview,
+          priority: priority,
+          icon: category.icon
+        });
       });
 
       setInsights(generatedInsights);
@@ -186,17 +253,9 @@ Focus on specific data-driven insights, not generic advice. Include actual numbe
     }
   };
 
-  const formatContent = (content: string) => {
-    // Remove markdown symbols and format text for better readability
-    return content
-      .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold markdown
-      .replace(/\*(.*?)\*/g, '$1') // Remove italic markdown
-      .replace(/###\s*/g, '') // Remove heading symbols
-      .replace(/--+/g, '') // Remove dashes
-      .replace(/^\s*[\-\*\+]\s*/gm, '• ') // Convert list items to bullets
-      .split('\n')
-      .filter(line => line.trim()) // Remove empty lines
-      .join('\n');
+  const handleSeeMore = (insight: AIInsight) => {
+    setSelectedInsight(insight);
+    setShowDetailModal(true);
   };
 
   if (!hasAnalysis && !loading) {
@@ -278,57 +337,76 @@ Focus on specific data-driven insights, not generic advice. Include actual numbe
         </Button>
       </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {insights.map((insight) => {
           const IconComponent = insight.icon;
           const badgeInfo = getPriorityBadge(insight.priority);
-          const formattedContent = formatContent(insight.content);
           
           return (
             <Card 
               key={insight.id} 
-              className={`${getCardStyle(insight.priority)} hover:shadow-xl hover:-translate-y-1 transition-all duration-300 rounded-xl border-0 shadow-lg h-[320px] flex flex-col`}
+              className={`${getCardStyle(insight.priority)} hover:shadow-lg hover:-translate-y-1 transition-all duration-300 rounded-xl border-0 shadow-md h-[280px] flex flex-col`}
             >
-              <CardHeader className="pb-4 flex-shrink-0">
+              <CardHeader className="pb-3 flex-shrink-0">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     <div className="p-2 bg-primary/10 rounded-lg flex-shrink-0">
                       <IconComponent className="h-5 w-5 text-primary" />
                     </div>
-                    <CardTitle className="text-lg font-bold text-foreground leading-tight line-clamp-2">
+                    <CardTitle className="text-base font-bold text-foreground leading-tight">
                       {insight.title}
                     </CardTitle>
                   </div>
                   <Badge 
-                    className={`${badgeInfo.className} text-xs font-medium px-3 py-1 rounded-full border flex-shrink-0`}
+                    className={`${badgeInfo.className} text-xs font-medium px-2 py-1 rounded-full border flex-shrink-0`}
                   >
                     {badgeInfo.label}
                   </Badge>
                 </div>
               </CardHeader>
-              <CardContent className="flex-1 overflow-hidden">
-                <div className="text-muted-foreground leading-relaxed text-sm line-clamp-8">
-                  {formattedContent.split('\n').map((line, index) => {
-                    if (line.startsWith('• ')) {
-                      return (
-                        <div key={index} className="flex items-start gap-2 mb-2">
-                          <span className="text-primary font-bold text-xs mt-1">•</span>
-                          <span className="flex-1">{line.substring(2)}</span>
-                        </div>
-                      );
-                    }
-                    return line.trim() && (
-                      <p key={index} className="mb-3 last:mb-0">
-                        {line}
-                      </p>
-                    );
-                  })}
+              
+              <CardContent className="flex-1 flex flex-col justify-between overflow-hidden">
+                <div className="space-y-3">
+                  {/* Executive Summary */}
+                  <div className="font-semibold text-foreground text-sm leading-tight">
+                    {insight.executiveSummary}
+                  </div>
+                  
+                  {/* Truncated Preview */}
+                  <div className="text-muted-foreground text-sm leading-relaxed line-clamp-4">
+                    {insight.truncatedPreview.split('\n').slice(0, 3).map((line, index) => 
+                      line.trim() && (
+                        <p key={index} className="mb-2 last:mb-0">
+                          {line.replace(/^\s*[\-\*\+]\s*/, '• ')}
+                        </p>
+                      )
+                    )}
+                  </div>
+                </div>
+                
+                {/* See More Button */}
+                <div className="pt-3 border-t border-border">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="w-full text-primary hover:text-primary hover:bg-primary/5 font-medium"
+                    onClick={() => handleSeeMore(insight)}
+                  >
+                    See More
+                  </Button>
                 </div>
               </CardContent>
             </Card>
           );
         })}
       </div>
+
+      {/* Detail Modal */}
+      <InsightDetailModal 
+        isOpen={showDetailModal}
+        onClose={() => setShowDetailModal(false)}
+        insight={selectedInsight}
+      />
     </div>
   );
 }
