@@ -112,17 +112,21 @@ export function AIChatAssistant() {
 
     try {
       // Get comprehensive practice data for context
-      const [sourcesResult, monthlyResult, visitsResult, campaignsResult] = await Promise.all([
+      const [sourcesResult, monthlyResult, visitsResult, campaignsResult, deliveriesResult, tagsResult] = await Promise.all([
         supabase.from('patient_sources').select('*').eq('created_by', user?.id),
         supabase.from('monthly_patients').select('*').eq('user_id', user?.id),
         supabase.from('marketing_visits').select('*').eq('user_id', user?.id),
-        supabase.from('campaigns').select('*').eq('created_by', user?.id)
+        supabase.from('campaigns').select('*').eq('created_by', user?.id),
+        supabase.from('campaign_deliveries').select('*').eq('created_by', user?.id),
+        supabase.from('source_tags').select('*').eq('user_id', user?.id)
       ]);
 
       const sources = sourcesResult.data || [];
       const monthlyData = monthlyResult.data || [];
       const visits = visitsResult.data || [];
       const campaigns = campaignsResult.data || [];
+      const deliveries = deliveriesResult.data || [];
+      const tags = tagsResult.data || [];
 
       const { data, error } = await supabase.functions.invoke('ai-assistant', {
         body: {
@@ -134,6 +138,8 @@ export function AIChatAssistant() {
               monthly_data: monthlyData,
               visits: visits,
               campaigns: campaigns,
+              deliveries: deliveries,
+              tags: tags,
               analytics: {
                 total_sources: sources.length,
                 total_referrals: monthlyData.reduce((sum, m) => sum + (m.patient_count || 0), 0),
@@ -145,18 +151,53 @@ export function AIChatAssistant() {
                   acc[s.source_type] = (acc[s.source_type] || 0) + 1;
                   return acc;
                 }, {} as Record<string, number>),
+                geographic_distribution: sources.reduce((acc, s) => {
+                  if (s.address) {
+                    const city = s.address.split(',')[1]?.trim() || 'Unknown';
+                    acc[city] = (acc[city] || 0) + 1;
+                  }
+                  return acc;
+                }, {} as Record<string, number>),
                 recent_visits: visits.filter(v => {
                   const visitDate = new Date(v.visit_date);
                   const thirtyDaysAgo = new Date();
                   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
                   return visitDate >= thirtyDaysAgo;
                 }).length,
+                campaign_performance: {
+                  total_campaigns: campaigns.length,
+                  active_campaigns: campaigns.filter(c => c.status === 'Active').length,
+                  completed_deliveries: deliveries.filter(d => d.delivery_status === 'Completed').length,
+                  pending_deliveries: deliveries.filter(d => d.delivery_status === 'Not Started' || d.delivery_status === 'In Progress').length
+                },
+                source_performance: sources.map(source => {
+                  const sourceData = monthlyData.filter(m => m.source_id === source.id);
+                  const totalReferrals = sourceData.reduce((sum, m) => sum + (m.patient_count || 0), 0);
+                  const recentReferrals = sourceData.filter(m => {
+                    const monthDate = new Date(m.year_month + '-01');
+                    const threeMonthsAgo = new Date();
+                    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+                    return monthDate >= threeMonthsAgo;
+                  }).reduce((sum, m) => sum + (m.patient_count || 0), 0);
+                  
+                  return {
+                    name: source.name,
+                    type: source.source_type,
+                    total_referrals: totalReferrals,
+                    recent_referrals: recentReferrals,
+                    city: source.address?.split(',')[1]?.trim() || 'Unknown'
+                  };
+                }),
                 last_6_months_trend: monthlyData.filter(m => {
                   const monthDate = new Date(m.year_month + '-01');
                   const sixMonthsAgo = new Date();
                   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
                   return monthDate >= sixMonthsAgo;
-                })
+                }),
+                tag_analysis: tags.reduce((acc, tag) => {
+                  acc[tag.tag_name] = (acc[tag.tag_name] || 0) + 1;
+                  return acc;
+                }, {} as Record<string, number>)
               }
             },
             conversation_history: messages.slice(-5)

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, CheckCircle, TrendingUp, Target, Users, Activity, Zap, Brain, RefreshCw, BarChart3, MapPin, Calendar } from 'lucide-react';
+import { AlertTriangle, CheckCircle, TrendingUp, Target, Users, Activity, Zap, Brain, RefreshCw, BarChart3, MapPin, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -11,15 +11,18 @@ interface AIInsight {
   id: string;
   type: 'summary' | 'action' | 'improvement' | 'alert';
   title: string;
+  summary: string;
   content: string;
   priority: 'high' | 'medium' | 'low';
   icon: any;
+  actionableSteps?: string[];
 }
 
 export function AIDataAnalysis() {
   const [insights, setInsights] = useState<AIInsight[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasAnalysis, setHasAnalysis] = useState(false);
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const { user } = useAuth();
 
   const generateAIAnalysis = async () => {
@@ -30,10 +33,11 @@ export function AIDataAnalysis() {
 
     try {
       // Fetch comprehensive business data
-      const [sourcesResult, monthlyResult, visitsResult, businessProfileResult] = await Promise.all([
+      const [sourcesResult, monthlyResult, visitsResult, campaignsResult, businessProfileResult] = await Promise.all([
         supabase.from('patient_sources').select('*').eq('created_by', user.id),
         supabase.from('monthly_patients').select('*').eq('user_id', user.id),
         supabase.from('marketing_visits').select('*').eq('user_id', user.id),
+        supabase.from('campaigns').select('*').eq('created_by', user.id),
         supabase.functions.invoke('ai-business-context', {
           body: { action: 'get' },
           headers: {
@@ -45,20 +49,45 @@ export function AIDataAnalysis() {
       const sources = sourcesResult.data || [];
       const monthlyData = monthlyResult.data || [];
       const visits = visitsResult.data || [];
+      const campaigns = campaignsResult.data || [];
       const businessProfile = businessProfileResult.data?.profile || {};
 
       // Prepare comprehensive data for AI analysis
+      const currentMonth = new Date().toISOString().slice(0, 7);
       const analysisData = {
         business_profile: businessProfile,
         sources: sources,
         monthly_data: monthlyData,
         visits: visits,
+        campaigns: campaigns,
         total_sources: sources.length,
         total_referrals: monthlyData.reduce((sum, m) => sum + (m.patient_count || 0), 0),
+        active_sources_this_month: monthlyData.filter(m => 
+          m.year_month === currentMonth && m.patient_count > 0
+        ).length,
         source_types: sources.reduce((acc, s) => {
           acc[s.source_type] = (acc[s.source_type] || 0) + 1;
           return acc;
         }, {} as Record<string, number>),
+        geographic_distribution: sources.reduce((acc, s) => {
+          if (s.address) {
+            const city = s.address.split(',')[1]?.trim() || 'Unknown';
+            acc[city] = (acc[city] || 0) + 1;
+          }
+          return acc;
+        }, {} as Record<string, number>),
+        recent_visits: visits.filter(v => {
+          const visitDate = new Date(v.visit_date);
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          return visitDate >= thirtyDaysAgo;
+        }),
+        campaign_performance: campaigns.map(c => ({
+          name: c.name,
+          status: c.status,
+          type: c.campaign_type,
+          delivery_method: c.delivery_method
+        })),
         last_6_months: monthlyData.filter(m => {
           const monthDate = new Date(m.year_month + '-01');
           const sixMonthsAgo = new Date();
@@ -75,15 +104,25 @@ export function AIDataAnalysis() {
             analysis_data: analysisData,
             analysis_type: 'business_intelligence'
           },
-          prompt: `Analyze the complete business data and provide 4-6 comprehensive insights covering:
-1. Referral source distribution and concentration risk
-2. Performance trends and seasonal patterns  
-3. Geographic distribution and market penetration
-4. Source quality and reliability analysis
-5. Specific actionable recommendations with data points
-6. Risk factors and improvement opportunities
+          prompt: `Analyze the complete business data and provide 4-6 comprehensive insights. For each insight, provide a JSON object with this exact structure:
 
-Focus on specific data-driven insights, not generic advice. Include actual numbers and percentages where relevant.`,
+{
+  "title": "Clear, descriptive title (max 60 characters)",
+  "summary": "2-3 sentence nutshell summary with key metrics",
+  "content": "Detailed analysis with specific data points, percentages, and trends",
+  "priority": "high|medium|low",
+  "actionable_steps": ["Step 1", "Step 2", "Step 3"]
+}
+
+Focus on:
+1. Referral source distribution and concentration risk analysis
+2. Performance trends and seasonal patterns identification  
+3. Geographic distribution and market penetration gaps
+4. Source quality and reliability assessment
+5. Specific ROI and growth opportunities with data
+6. Risk factors and immediate improvement actions
+
+Return ONLY a JSON array of 4-6 insight objects. Use actual numbers from the data: ${analysisData.total_referrals} total referrals, ${analysisData.active_sources_this_month} active sources this month, ${analysisData.total_sources} total sources.`,
         },
         headers: {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
@@ -94,36 +133,46 @@ Focus on specific data-driven insights, not generic advice. Include actual numbe
 
       // Parse AI response and create insight cards
       const aiContent = data.content || '';
-      const sections = aiContent.split(/\d+\./);
+      let parsedInsights: any[] = [];
+      
+      try {
+        // Try to parse as JSON first
+        parsedInsights = JSON.parse(aiContent);
+      } catch {
+        // Fallback: Parse structured text response
+        console.log('Falling back to text parsing');
+        const sections = aiContent.split(/\d+\./);
+        parsedInsights = sections.slice(1).map((section, index) => {
+          const lines = section.trim().split('\n');
+          const title = lines[0]?.replace(/[:,-].*/, '').trim() || `Analysis ${index + 1}`;
+          const content = lines.slice(1).join('\n').trim() || section.trim();
+          
+          return {
+            title,
+            summary: content.split('.').slice(0, 2).join('.') + '.',
+            content,
+            priority: content.toLowerCase().includes('risk') ? 'high' : 
+                     content.toLowerCase().includes('opportunity') ? 'medium' : 'low',
+            actionable_steps: []
+          };
+        });
+      }
       
       const generatedInsights: AIInsight[] = [];
       const icons = [BarChart3, TrendingUp, MapPin, Target, AlertTriangle, Brain];
       const types = ['summary', 'improvement', 'alert', 'action'] as const;
 
-      sections.slice(1).forEach((section, index) => {
-        if (section.trim() && index < 6) {
-          const lines = section.trim().split('\n');
-          const title = lines[0]?.replace(/[:,-].*/, '').trim() || `Analysis ${index + 1}`;
-          const content = lines.slice(1).join('\n').trim() || section.trim();
-          
-          // Determine priority based on keywords
-          let priority: 'high' | 'medium' | 'low' = 'medium';
-          if (content.toLowerCase().includes('risk') || content.toLowerCase().includes('concern') || 
-              content.toLowerCase().includes('urgent') || content.toLowerCase().includes('critical')) {
-            priority = 'high';
-          } else if (content.toLowerCase().includes('opportunity') || content.toLowerCase().includes('growth')) {
-            priority = 'medium';
-          } else if (content.toLowerCase().includes('good') || content.toLowerCase().includes('strong')) {
-            priority = 'low';
-          }
-
+      parsedInsights.forEach((insight, index) => {
+        if (insight.title && insight.content && index < 6) {
           generatedInsights.push({
             id: (index + 1).toString(),
             type: types[index % types.length],
-            title: title,
-            content: content,
-            priority: priority,
-            icon: icons[index % icons.length]
+            title: insight.title,
+            summary: insight.summary || insight.content.split('.').slice(0, 2).join('.') + '.',
+            content: insight.content,
+            priority: insight.priority || 'medium',
+            icon: icons[index % icons.length],
+            actionableSteps: insight.actionable_steps || []
           });
         }
       });
@@ -164,6 +213,18 @@ Focus on specific data-driven insights, not generic advice. Include actual numbe
       case 'low': return 'border-l-4 border-l-muted-foreground';
       default: return '';
     }
+  };
+
+  const toggleCardExpansion = (cardId: string) => {
+    setExpandedCards(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(cardId)) {
+        newSet.delete(cardId);
+      } else {
+        newSet.add(cardId);
+      }
+      return newSet;
+    });
   };
 
   if (!hasAnalysis && !loading) {
@@ -238,21 +299,70 @@ Focus on specific data-driven insights, not generic advice. Include actual numbe
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {insights.map((insight) => {
           const IconComponent = insight.icon;
+          const isExpanded = expandedCards.has(insight.id);
+          
           return (
-            <Card key={insight.id} className={`${getCardBorderClass(insight.priority)} hover:shadow-md transition-shadow`}>
-              <CardHeader>
+            <Card key={insight.id} className={`${getCardBorderClass(insight.priority)} hover:shadow-md transition-all duration-200`}>
+              <CardHeader className="pb-3">
                 <CardTitle className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <IconComponent className="h-5 w-5 text-primary" />
-                    {insight.title}
+                    <span className="line-clamp-2">{insight.title}</span>
                   </div>
-                  <Badge variant={getPriorityColor(insight.priority) as any} className="text-xs">
+                  <Badge variant={getPriorityColor(insight.priority) as any} className="text-xs flex-shrink-0">
                     {insight.priority.toUpperCase()}
                   </Badge>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground leading-relaxed whitespace-pre-line">{insight.content}</p>
+              <CardContent className="space-y-4">
+                {/* Nutshell Summary */}
+                <div className="text-sm text-muted-foreground leading-relaxed">
+                  {insight.summary}
+                </div>
+                
+                {/* Expandable Content */}
+                {isExpanded && (
+                  <div className="space-y-4">
+                    <div className="text-sm leading-relaxed whitespace-pre-line">
+                      {insight.content}
+                    </div>
+                    
+                    {/* Actionable Steps */}
+                    {insight.actionableSteps && insight.actionableSteps.length > 0 && (
+                      <div className="bg-muted/30 rounded-lg p-3">
+                        <h4 className="text-sm font-medium mb-2">Action Steps:</h4>
+                        <ul className="text-sm space-y-1">
+                          {insight.actionableSteps.map((step, index) => (
+                            <li key={index} className="flex items-start gap-2">
+                              <span className="text-primary font-medium">{index + 1}.</span>
+                              <span>{step}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* More/Less Button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => toggleCardExpansion(insight.id)}
+                  className="w-full h-8 text-xs"
+                >
+                  {isExpanded ? (
+                    <>
+                      <ChevronUp className="h-3 w-3 mr-1" />
+                      Show Less
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="h-3 w-3 mr-1" />
+                      Show More
+                    </>
+                  )}
+                </Button>
               </CardContent>
             </Card>
           );
