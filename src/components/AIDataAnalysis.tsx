@@ -104,25 +104,22 @@ export function AIDataAnalysis() {
             analysis_data: analysisData,
             analysis_type: 'business_intelligence'
           },
-          prompt: `Analyze the complete business data and provide 4-6 comprehensive insights. For each insight, provide a JSON object with this exact structure:
+          prompt: `Analyze the complete business data and provide 4-6 comprehensive insights. Format each insight as:
 
-{
-  "title": "Clear, descriptive title (max 60 characters)",
-  "summary": "2-3 sentence nutshell summary with key metrics",
-  "content": "Detailed analysis with specific data points, percentages, and trends",
-  "priority": "high|medium|low",
-  "actionable_steps": ["Step 1", "Step 2", "Step 3"]
-}
+1. **Insight Title**
+Key summary with specific metrics and trends.
+
+Detailed analysis with specific data points, percentages, and actionable recommendations.
 
 Focus on:
-1. Referral source distribution and concentration risk analysis
-2. Performance trends and seasonal patterns identification  
-3. Geographic distribution and market penetration gaps
-4. Source quality and reliability assessment
-5. Specific ROI and growth opportunities with data
-6. Risk factors and immediate improvement actions
+- Referral source distribution and concentration risk analysis
+- Performance trends and seasonal patterns identification  
+- Geographic distribution and market penetration gaps
+- Source quality and reliability assessment
+- Specific ROI and growth opportunities with data
+- Risk factors and immediate improvement actions
 
-Return ONLY a JSON array of 4-6 insight objects. Use actual numbers from the data: ${analysisData.total_referrals} total referrals, ${analysisData.active_sources_this_month} active sources this month, ${analysisData.total_sources} total sources.`,
+Use actual numbers from the data: ${analysisData.total_referrals} total referrals, ${analysisData.active_sources_this_month} active sources this month, ${analysisData.total_sources} total sources.`,
         },
         headers: {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
@@ -137,22 +134,34 @@ Return ONLY a JSON array of 4-6 insight objects. Use actual numbers from the dat
       
       try {
         // Try to parse as JSON first
-        parsedInsights = JSON.parse(aiContent);
+        // Try to parse as JSON first
+        if (aiContent.startsWith('[') || aiContent.startsWith('{')) {
+          parsedInsights = JSON.parse(aiContent);
+        } else {
+          throw new Error('Not JSON format');
+        }
       } catch {
         // Fallback: Parse structured text response
         console.log('Falling back to text parsing');
-        const sections = aiContent.split(/\d+\./);
+        const sections = aiContent.split(/\d+\.\s*/);
         parsedInsights = sections.slice(1).map((section, index) => {
-          const lines = section.trim().split('\n');
-          const title = lines[0]?.replace(/[:,-].*/, '').trim() || `Analysis ${index + 1}`;
+          const lines = section.trim().split('\n').filter(line => line.trim());
+          const title = lines[0]?.replace(/[*:,-].*/, '').replace(/\*\*/g, '').trim() || `Insight ${index + 1}`;
           const content = lines.slice(1).join('\n').trim() || section.trim();
+          
+          // Clean up markdown formatting
+          const cleanContent = content
+            .replace(/\*\*(.*?)\*\*/g, '$1')  // Remove **bold** formatting
+            .replace(/^\s*[-•]\s*/gm, '• ')   // Normalize bullet points
+            .replace(/\n\s*\n/g, '\n')       // Remove extra line breaks
+            .trim();
           
           return {
             title,
-            summary: content.split('.').slice(0, 2).join('.') + '.',
-            content,
-            priority: content.toLowerCase().includes('risk') ? 'high' : 
-                     content.toLowerCase().includes('opportunity') ? 'medium' : 'low',
+            summary: cleanContent.split('.').slice(0, 2).join('.') + (cleanContent.includes('.') ? '.' : ''),
+            content: cleanContent,
+            priority: cleanContent.toLowerCase().includes('risk') || cleanContent.toLowerCase().includes('critical') ? 'high' : 
+                     cleanContent.toLowerCase().includes('opportunity') || cleanContent.toLowerCase().includes('improve') ? 'medium' : 'low',
             actionable_steps: []
           };
         });
@@ -324,7 +333,48 @@ Return ONLY a JSON array of 4-6 insight objects. Use actual numbers from the dat
                 {isExpanded && (
                   <div className="space-y-4">
                     <div className="text-sm leading-relaxed whitespace-pre-line">
-                      {insight.content}
+                      {insight.content.split('\n').map((line, idx) => {
+                        // Handle markdown-style formatting
+                        if (line.trim().startsWith('**') && line.trim().endsWith('**')) {
+                          const cleanLine = line.replace(/^\*\*|\*\*$/g, '').trim();
+                          return (
+                            <h4 key={idx} className="font-semibold text-foreground mb-2 mt-3 first:mt-0">
+                              {cleanLine}
+                            </h4>
+                          );
+                        }
+                        
+                        // Handle bullet points
+                        if (line.trim().startsWith('•') || line.trim().startsWith('-')) {
+                          return (
+                            <div key={idx} className="flex items-start gap-2 mb-1">
+                              <span className="text-primary mt-1">•</span>
+                              <span>{line.replace(/^[•-]\s*/, '').trim()}</span>
+                            </div>
+                          );
+                        }
+                        
+                        // Handle bold text within lines
+                        const parts = line.split(/(\*\*.*?\*\*)/g);
+                        const formattedLine = parts.map((part, partIdx) => {
+                          if (part.startsWith('**') && part.endsWith('**')) {
+                            return (
+                              <strong key={partIdx} className="font-semibold text-foreground">
+                                {part.replace(/^\*\*|\*\*$/g, '')}
+                              </strong>
+                            );
+                          }
+                          return part;
+                        });
+                        
+                        return line.trim() ? (
+                          <p key={idx} className="mb-2 last:mb-0">
+                            {formattedLine}
+                          </p>
+                        ) : (
+                          <br key={idx} />
+                        );
+                      })}
                     </div>
                     
                     {/* Actionable Steps */}

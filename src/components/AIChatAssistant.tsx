@@ -320,9 +320,50 @@ export function AIChatAssistant() {
                         {formatTime(message.timestamp)}
                       </span>
                     </div>
-                    <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                      {message.content}
-                    </p>
+                    <div className="text-sm whitespace-pre-wrap leading-relaxed">
+                      {message.content.split('\n').map((line, idx) => {
+                        // Handle markdown-style formatting
+                        if (line.trim().startsWith('**') && line.trim().endsWith('**')) {
+                          const cleanLine = line.replace(/^\*\*|\*\*$/g, '').trim();
+                          return (
+                            <h4 key={idx} className="font-semibold text-foreground mb-2 mt-3 first:mt-0">
+                              {cleanLine}
+                            </h4>
+                          );
+                        }
+                        
+                        // Handle bullet points
+                        if (line.trim().startsWith('•') || line.trim().startsWith('-')) {
+                          return (
+                            <div key={idx} className="flex items-start gap-2 mb-1">
+                              <span className="text-primary mt-1">•</span>
+                              <span>{line.replace(/^[•-]\s*/, '').trim()}</span>
+                            </div>
+                          );
+                        }
+                        
+                        // Handle bold text within lines
+                        const parts = line.split(/(\*\*.*?\*\*)/g);
+                        const formattedLine = parts.map((part, partIdx) => {
+                          if (part.startsWith('**') && part.endsWith('**')) {
+                            return (
+                              <strong key={partIdx} className="font-semibold text-foreground">
+                                {part.replace(/^\*\*|\*\*$/g, '')}
+                              </strong>
+                            );
+                          }
+                          return part;
+                        });
+                        
+                        return line.trim() ? (
+                          <p key={idx} className="mb-2 last:mb-0">
+                            {formattedLine}
+                          </p>
+                        ) : (
+                          <br key={idx} />
+                        );
+                      })}
+                    </div>
                   </div>
                   
                   {message.role === 'user' && (
