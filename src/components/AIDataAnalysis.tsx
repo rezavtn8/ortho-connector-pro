@@ -308,15 +308,15 @@ Focus on specific data-driven insights, not generic advice. Include actual numbe
             const typeInfo = getInsightType(insight.type);
             const formattedContent = formatContent(insight.content);
             const isExpanded = expandedCards.has(insight.id);
-            const shouldTruncate = formattedContent.length > 180;
+            const shouldTruncate = formattedContent.length > 150;
             const displayContent = shouldTruncate && !isExpanded 
-              ? formattedContent.substring(0, 180) + "..." 
+              ? formattedContent.substring(0, 150) + "..." 
               : formattedContent;
             
             return (
               <Card 
                 key={insight.id} 
-                className={`${getCardStyle(insight.priority)} hover:shadow-xl hover:-translate-y-2 transition-all duration-300 rounded-2xl shadow-md h-[300px] flex flex-col group`}
+                className={`${getCardStyle(insight.priority)} hover:shadow-xl hover:-translate-y-2 transition-all duration-300 rounded-2xl shadow-md ${isExpanded ? 'h-auto' : 'h-[300px]'} flex flex-col group`}
               >
                 <CardHeader className="pb-3 flex-shrink-0">
                   <div className="flex items-start justify-between gap-3 mb-2">
@@ -328,7 +328,7 @@ Focus on specific data-driven insights, not generic advice. Include actual numbe
                         <div className={`text-xs font-medium uppercase tracking-wider mb-1 ${typeInfo.color}`}>
                           {typeInfo.label}
                         </div>
-                        <CardTitle className="text-xl font-bold text-foreground leading-tight line-clamp-2">
+                        <CardTitle className="text-xl font-bold text-foreground leading-tight">
                           {insight.title}
                         </CardTitle>
                       </div>
@@ -345,8 +345,8 @@ Focus on specific data-driven insights, not generic advice. Include actual numbe
                 </CardHeader>
                 
                 <CardContent className="flex-1 overflow-hidden flex flex-col">
-                  <div className="text-gray-600 dark:text-gray-300 leading-relaxed text-sm flex-1">
-                    <p className="font-light">
+                  <div className={`text-gray-600 dark:text-gray-300 leading-relaxed text-sm ${isExpanded ? 'flex-1' : 'flex-1 overflow-hidden'}`}>
+                    <p className="font-light whitespace-pre-wrap">
                       {displayContent}
                     </p>
                   </div>
