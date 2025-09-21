@@ -56,16 +56,16 @@ export function Creator({ onPageChange, onSourceSelect }: CreatorProps) {
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="dashboard" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 max-w-md">
-          <TabsTrigger value="dashboard" className="flex items-center gap-2">
+        <TabsList className="grid w-full grid-cols-3 max-w-md" variant="pills">
+          <TabsTrigger value="dashboard" variant="pills" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             Dashboard
           </TabsTrigger>
-          <TabsTrigger value="studio" className="flex items-center gap-2">
+          <TabsTrigger value="studio" variant="pills" className="flex items-center gap-2">
             <Sparkles className="h-4 w-4" />
             AI Studio
           </TabsTrigger>
-          <TabsTrigger value="templates" className="flex items-center gap-2">
+          <TabsTrigger value="templates" variant="pills" className="flex items-center gap-2">
             <Library className="h-4 w-4" />
             Templates
           </TabsTrigger>

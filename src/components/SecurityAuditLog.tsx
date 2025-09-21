@@ -303,7 +303,7 @@ export function SecurityAuditLog() {
       
       <CardContent>
         <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-4" variant="default">
             <TabsTrigger value="all">All Time</TabsTrigger>
             <TabsTrigger value="today">Today</TabsTrigger>
             <TabsTrigger value="week">This Week</TabsTrigger>

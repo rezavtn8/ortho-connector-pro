@@ -111,9 +111,9 @@ export function AIContentStudio({ businessProfile }: AIContentStudioProps) {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="chat" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="chat">AI Chat</TabsTrigger>
-              <TabsTrigger value="templates">Quick Templates</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2" variant="pills">
+              <TabsTrigger value="chat" variant="pills">AI Chat</TabsTrigger>
+              <TabsTrigger value="templates" variant="pills">Quick Templates</TabsTrigger>
             </TabsList>
 
             <TabsContent value="chat" className="space-y-4">

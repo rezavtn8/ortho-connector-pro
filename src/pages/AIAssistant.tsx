@@ -57,10 +57,10 @@ export function AIAssistant({ onPageChange, onSourceSelect }: AIAssistantProps =
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="chat">AI Chat</TabsTrigger>
-          <TabsTrigger value="setup">Settings</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3" variant="pills">
+          <TabsTrigger value="overview" variant="pills">Overview</TabsTrigger>
+          <TabsTrigger value="chat" variant="pills">AI Chat</TabsTrigger>
+          <TabsTrigger value="setup" variant="pills">Settings</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">

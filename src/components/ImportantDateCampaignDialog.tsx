@@ -529,10 +529,10 @@ Your Dental Team`;
               <CardContent>
                 {aiContent ? (
                   <Tabs defaultValue="email" className="w-full">
-                    <TabsList className="grid w-full grid-cols-3 bg-muted/50">
-                      <TabsTrigger value="email" className="text-xs">📧 Email</TabsTrigger>
-                      <TabsTrigger value="social" className="text-xs">📱 Social</TabsTrigger>
-                      <TabsTrigger value="print" className="text-xs">🖨️ Print</TabsTrigger>
+                    <TabsList className="grid w-full grid-cols-3" variant="compact">
+                      <TabsTrigger value="email" variant="compact" className="text-xs">📧 Email</TabsTrigger>
+                      <TabsTrigger value="social" variant="compact" className="text-xs">📱 Social</TabsTrigger>
+                      <TabsTrigger value="print" variant="compact" className="text-xs">🖨️ Print</TabsTrigger>
                     </TabsList>
                     
                     <TabsContent value="email" className="space-y-3 mt-4">

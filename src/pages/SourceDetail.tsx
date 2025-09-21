@@ -593,13 +593,13 @@ export function SourceDetail({ onPageChange, sourceId }: SourceDetailProps = {})
 
       {/* Details */}
       <Tabs defaultValue="details" className="w-full">
-        <TabsList className={cn("grid w-full", source.source_type === 'Office' ? "grid-cols-5" : "grid-cols-4")}>
-          <TabsTrigger value="details">Details</TabsTrigger>
-          <TabsTrigger value="monthly">Monthly History</TabsTrigger>
-          <TabsTrigger value="changelog">Change Log</TabsTrigger>
-          <TabsTrigger value="tags">Tags</TabsTrigger>
+        <TabsList className={cn("grid w-full", source.source_type === 'Office' ? "grid-cols-5" : "grid-cols-4")} variant="underline">
+          <TabsTrigger value="details" variant="underline">Details</TabsTrigger>
+          <TabsTrigger value="monthly" variant="underline">Monthly History</TabsTrigger>
+          <TabsTrigger value="changelog" variant="underline">Change Log</TabsTrigger>
+          <TabsTrigger value="tags" variant="underline">Tags</TabsTrigger>
           {source.source_type === 'Office' && (
-            <TabsTrigger value="visits">Marketing Visits</TabsTrigger>
+            <TabsTrigger value="visits" variant="underline">Marketing Visits</TabsTrigger>
           )}
         </TabsList>
 

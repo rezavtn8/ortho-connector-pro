@@ -258,7 +258,7 @@ export function CampaignDetailDialog({ campaign, open, onOpenChange, onCampaignU
         </DialogHeader>
 
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-3" variant="default">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="deliveries">Deliveries ({deliveries.length})</TabsTrigger>
             <TabsTrigger value="materials">Materials</TabsTrigger>

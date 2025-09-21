@@ -329,12 +329,12 @@ export const AddOfficeDialog: React.FC<AddOfficeDialogProps> = ({ onOfficeAdded 
         </DialogHeader>
 
         <Tabs defaultValue="manual" className="w-full mt-4">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
-            <TabsTrigger value="manual" className="flex items-center gap-2">
+          <TabsList className="grid w-full grid-cols-2 mb-6" variant="underline">
+            <TabsTrigger value="manual" variant="underline" className="flex items-center gap-2">
               <Plus className="w-4 h-4" />
               Manual Entry
             </TabsTrigger>
-            <TabsTrigger value="import" className="flex items-center gap-2">
+            <TabsTrigger value="import" variant="underline" className="flex items-center gap-2">
               <Upload className="w-4 h-4" />
               Import from File
             </TabsTrigger>
