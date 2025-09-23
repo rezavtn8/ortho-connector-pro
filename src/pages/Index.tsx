@@ -43,30 +43,28 @@ const Index = () => {
   }
 
   return (
-    <BrowserRouter>
-      <Layout>
-        <ErrorBoundary level="section">
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/sources" element={<Sources />} />
-            <Route path="/sources/:sourceId" element={<SourceDetail />} />
-            <Route path="/offices" element={<Offices />} />
-            <Route path="/marketing-visits" element={<MarketingVisits />} />
-            <Route path="/campaigns" element={<Campaigns />} />
-            <Route path="/discover" element={<Discover />} />
-            <Route path="/reviews" element={<Reviews />} />
-            <Route path="/map-view" element={<MapView />} />
-            <Route path="/analytics" element={<Analytics />} />
-            <Route path="/ai-assistant" element={<AIAssistant />} />
-            <Route path="/creator" element={<Creator />} />
-            <Route path="/logs" element={<Logs />} />
-            <Route path="/settings" element={<Settings />} />
-          </Routes>
-        </ErrorBoundary>
-        <SessionTimeoutWarning />
-      </Layout>
-    </BrowserRouter>
+    <Layout>
+      <ErrorBoundary level="section">
+        <Routes>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/sources" element={<Sources />} />
+          <Route path="/sources/:sourceId" element={<SourceDetail />} />
+          <Route path="/offices" element={<Offices />} />
+          <Route path="/marketing-visits" element={<MarketingVisits />} />
+          <Route path="/campaigns" element={<Campaigns />} />
+          <Route path="/discover" element={<Discover />} />
+          <Route path="/reviews" element={<Reviews />} />
+          <Route path="/map-view" element={<MapView />} />
+          <Route path="/analytics" element={<Analytics />} />
+          <Route path="/ai-assistant" element={<AIAssistant />} />
+          <Route path="/creator" element={<Creator />} />
+          <Route path="/logs" element={<Logs />} />
+          <Route path="/settings" element={<Settings />} />
+        </Routes>
+      </ErrorBoundary>
+      <SessionTimeoutWarning />
+    </Layout>
   );
 };
 
