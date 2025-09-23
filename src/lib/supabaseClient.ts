@@ -27,16 +27,15 @@ const retryWithBackoff = async <T>(
   throw new Error('Max retries exceeded');
 };
 
-// Simple resilient client that just wraps the original
 export const resilientSupabase = {
-  from: (table: string) => supabase.from(table),
-  rpc: (fn: string, args?: any) => retryWithBackoff(() => supabase.rpc(fn, args)),
+  from: (table: any) => supabase.from(table),
+  rpc: (fn: any, args?: any) => supabase.rpc(fn, args),
   auth: supabase.auth,
   original: supabase,
   healthCheck: async (): Promise<boolean> => {
     try {
-      await supabase.from('user_profiles').select('id').limit(1);
-      return true;
+      const { error } = await supabase.from('user_profiles').select('id').limit(1);
+      return !error;
     } catch {
       return false;
     }

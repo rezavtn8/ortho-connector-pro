@@ -25,16 +25,17 @@ export function useResilientQuery<T>({
 
   // Monitor network status
   useEffect(() => {
-    const handleOnline = () => {
+    const handleOnline = async () => {
       setConnectionStatus('checking');
-      // Check if Supabase is actually reachable
-      supabase.from('user_profiles').select('id').limit(1).then(() => {
+      try {
+        // Check if Supabase is actually reachable
+        await supabase.from('user_profiles').select('id').limit(1);
         setConnectionStatus('online');
         // Refetch all queries when connection is restored
         queryClient.invalidateQueries();
-      }).catch(() => {
+      } catch {
         setConnectionStatus('offline');
-      });
+      }
     };
 
     const handleOffline = () => setConnectionStatus('offline');

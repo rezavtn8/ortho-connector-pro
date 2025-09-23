@@ -2,7 +2,8 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { usePatientSourcesResilient } from '@/hooks/useResilientQuery';
+import { useResilientQuery } from '@/hooks/useResilientQuery';
+import { supabase } from '@/integrations/supabase/client';
 import { ResilientErrorBoundary } from '@/components/ResilientErrorBoundary';
 import { 
   Building2, 
@@ -17,7 +18,20 @@ import {
 } from 'lucide-react';
 
 function OfficesContent() {
-  const { data: offices, isLoading, error, retry, isOffline } = usePatientSourcesResilient();
+  const { data: offices, isLoading, error, retry, isOffline } = useResilientQuery({
+    queryKey: ['patient-sources'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('patient_sources')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      return data || [];
+    },
+    fallbackData: [],
+    retryMessage: 'Refreshing offices...'
+  });
 
   const officeData = offices?.filter(office => office.source_type === 'Office') || [];
 

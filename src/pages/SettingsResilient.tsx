@@ -5,9 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/hooks/use-toast';
+import { useProfileDataResilient } from '@/hooks/useResilientQuery';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { useProfileDataResilient } from '@/hooks/useResilientQuery';
 import { ResilientErrorBoundary } from '@/components/ResilientErrorBoundary';
 import { 
   MapPin,
