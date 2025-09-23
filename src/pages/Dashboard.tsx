@@ -1,32 +1,19 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PatientSource, MonthlyPatients, formatYearMonth } from '@/lib/database.types';
-import { getCurrentYearMonth, now, nowISO } from '@/lib/dateSync';
-import { supabase } from '@/integrations/supabase/client';
+import { formatYearMonth } from '@/lib/database.types';
+import { getCurrentYearMonth } from '@/lib/dateSync';
 import { 
   Home,
   TrendingUp,
   Users, 
-  Building,
   Building2,
   Globe,
   MessageSquare,
-  BarChart3,
-  Calendar,
-  DollarSign,
-  ArrowUpRight,
-  ArrowDownRight,
-  UserPlus
+  BarChart3
 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-// Navigation is handled internally, no need for React Router
-import { usePagination } from '@/hooks/usePagination';
 import { SkeletonCard } from '@/components/ui/skeleton-card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useOptimizedArray } from '@/hooks/useOptimizedState';
-import { useRealtimeSubscription } from '@/hooks/useRealtimeSubscription';
-import { useCleanup } from '@/hooks/useCleanup';
 import { 
   ResponsiveContainer, 
   LineChart, 
@@ -36,6 +23,8 @@ import {
   CartesianGrid, 
   Tooltip 
 } from 'recharts';
+import { useDashboardData, useDashboardStats } from '@/hooks/useDashboardData';
+import { useNavigate } from 'react-router-dom';
 
 interface SourceGroupData {
   name: string;
@@ -48,11 +37,13 @@ interface SourceGroupData {
 }
 
 interface PatientTrendChartProps {
-  monthlyData: MonthlyPatients[];
-  sources: PatientSource[];
+  monthlyData: Array<{
+    year_month: string;
+    patient_count: number;
+  }>;
 }
 
-function PatientTrendChart({ monthlyData, sources }: PatientTrendChartProps) {
+function PatientTrendChart({ monthlyData }: PatientTrendChartProps) {
   // Get last 6 months of data
   const now = new Date();
   const last6Months = Array.from({ length: 6 }, (_, i) => {
@@ -108,112 +99,16 @@ function PatientTrendChart({ monthlyData, sources }: PatientTrendChartProps) {
   );
 }
 
-import { useNavigate } from 'react-router-dom';
-
-interface DashboardProps {}
-
 export function Dashboard() {
   const navigate = useNavigate();
-  const { 
-    array: sources, 
-    replaceArray: setSources 
-  } = useOptimizedArray<PatientSource>();
-  
-  const { 
-    array: monthlyData, 
-    replaceArray: setMonthlyData 
-  } = useOptimizedArray<MonthlyPatients>();
-  
-  const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
-  const { safeSetTimeout } = useCleanup();
+  const { data, isLoading, error } = useDashboardData();
+  const stats = useDashboardStats();
   const currentMonth = getCurrentYearMonth();
-
-  // Paginated recent activity
-  const recentActivity = usePagination({
-    tableName: 'monthly_patients',
-    pageSize: 10,
-    selectFields: `
-      *,
-      patient_sources!inner(
-        name,
-        source_type
-      )
-    `,
-    orderBy: { column: 'updated_at', ascending: false },
-    filters: {}
-  });
-
-  // Optimized data loading with cleanup and realtime subscriptions
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true);
-      
-      // Use Promise.allSettled for better error handling
-      const [sourcesResult, monthlyResult, allMonthlyResult] = await Promise.allSettled([
-        supabase.from('patient_sources').select('*').order('name'),
-        supabase.from('monthly_patients').select('*').eq('year_month', currentMonth),
-        supabase.from('monthly_patients').select('*')
-      ]);
-
-      // Handle sources data
-      if (sourcesResult.status === 'fulfilled' && !sourcesResult.value.error) {
-        setSources(sourcesResult.value.data || []);
-      } else if (sourcesResult.status === 'rejected' || sourcesResult.value.error) {
-        console.error('Sources error:', sourcesResult);
-        setSources([]);
-      }
-
-      // Handle monthly data
-      if (allMonthlyResult.status === 'fulfilled' && !allMonthlyResult.value.error) {
-        setMonthlyData(allMonthlyResult.value.data || []);
-      } else if (allMonthlyResult.status === 'rejected' || allMonthlyResult.value.error) {
-        console.error('Monthly data error:', allMonthlyResult);
-        setMonthlyData([]);
-      }
-
-    } catch (error: any) {
-      console.error('Dashboard error:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load dashboard data",
-        variant: "destructive",
-      });
-      setSources([]);
-      setMonthlyData([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [currentMonth, setSources, setMonthlyData, toast]);
-
-  // Handle realtime updates
-  const handleRealtimeUpdate = useCallback(() => {
-    console.log('Dashboard: Realtime update received');
-    safeSetTimeout(() => {
-      loadData();
-      recentActivity.refresh();
-    }, 100); // Debounce updates
-  }, [loadData, recentActivity, safeSetTimeout]);
-
-  // Set up realtime subscriptions
-  useRealtimeSubscription({
-    subscriptions: [
-      { table: 'patient_sources' },
-      { table: 'monthly_patients' }
-    ],
-    onUpdate: handleRealtimeUpdate,
-    channelName: 'dashboard-updates'
-  });
-
-  // Initial data load
-  useEffect(() => {
-    loadData();
-    recentActivity.loadPage(0, true);
-  }, [loadData]);
-
 
   // Memoized calculations for better performance
   const getSourceGroupData = useMemo((): SourceGroupData[] => {
+    if (!data) return [];
+    
     const groups = [
       {
         name: 'Dental Offices',
@@ -236,10 +131,10 @@ export function Dashboard() {
     ];
 
     return groups.map(group => {
-      const groupSources = sources.filter(source => group.types.includes(source.source_type));
+      const groupSources = data.sources.filter(source => group.types.includes(source.source_type));
       const sourceIds = groupSources.map(s => s.id);
       
-      const groupMonthlyData = monthlyData.filter(m => sourceIds.includes(m.source_id));
+      const groupMonthlyData = data.monthlyData.filter(m => sourceIds.includes(m.source_id));
       const thisMonthData = groupMonthlyData.filter(m => m.year_month === currentMonth);
       
       return {
@@ -249,19 +144,9 @@ export function Dashboard() {
         thisMonth: thisMonthData.reduce((sum, m) => sum + m.patient_count, 0)
       };
     });
-  }, [sources, monthlyData, currentMonth]);
+  }, [data, currentMonth]);
 
-  // Memoized stats calculations
-  const stats = useMemo(() => ({
-    totalSources: sources.length,
-    activeSources: sources.filter(source => source.is_active).length,
-    totalPatients: monthlyData.reduce((sum, m) => sum + m.patient_count, 0),
-    thisMonthPatients: monthlyData
-      .filter(m => m.year_month === currentMonth)
-      .reduce((sum, m) => sum + m.patient_count, 0)
-  }), [sources, monthlyData, currentMonth]);
-
-  if (loading) {
+  if (isLoading || !stats) {
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
@@ -490,7 +375,7 @@ export function Dashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <PatientTrendChart monthlyData={monthlyData} sources={sources} />
+            <PatientTrendChart monthlyData={data?.monthlyData || []} />
           </CardContent>
         </Card>
       </div>
@@ -503,59 +388,50 @@ export function Dashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5" />
-              Recent Patient Updates
+              Recent Activity
             </CardTitle>
             <CardDescription>
-              Latest changes to patient counts across all sources
+              Latest patient count updates from your sources
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {recentActivity.data.length === 0 && !recentActivity.loading ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  No recent activity to display
+              {data?.recentActivity.length === 0 ? (
+                <div className="text-center py-8">
+                  <TrendingUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <p className="text-muted-foreground">No recent activity to display</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Start adding patient counts to see updates here
+                  </p>
                 </div>
               ) : (
-                recentActivity.data.map((activity: any) => (
-                  <div key={activity.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                    <div className="flex-1">
-                      <div className="font-medium">
-                        {activity.patient_sources?.name || 'Unknown Source'}
+                data?.recentActivity.map((activity) => (
+                  <div key={activity.id} className="flex items-center justify-between p-3 bg-card rounded-lg border">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-primary/10 rounded-lg">
+                        {activity.source_type === 'Office' ? (
+                          <Building2 className="h-4 w-4 text-primary" />
+                        ) : activity.source_type === 'Google' || activity.source_type === 'Yelp' ? (
+                          <Globe className="h-4 w-4 text-primary" />
+                        ) : (
+                          <MessageSquare className="h-4 w-4 text-primary" />
+                        )}
                       </div>
-                      <div className="text-sm text-muted-foreground">
-                        {activity.patient_sources?.source_type} • {formatYearMonth(activity.year_month)}
+                      <div>
+                        <p className="font-medium">{activity.source_name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {formatYearMonth(activity.year_month)}
+                        </p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="font-semibold text-primary">
-                        {activity.patient_count} patients
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {new Date(activity.updated_at).toLocaleDateString()}
-                      </div>
+                      <p className="font-semibold">{activity.patient_count} patients</p>
+                      <p className="text-xs text-muted-foreground">
+                        Updated {new Date(activity.updated_at).toLocaleDateString()}
+                      </p>
                     </div>
                   </div>
                 ))
-              )}
-              
-              {recentActivity.hasMore && (
-                <div className="flex justify-center pt-4">
-                  <Button 
-                    onClick={recentActivity.loadMore} 
-                    disabled={recentActivity.loading}
-                    variant="outline"
-                    className="gap-2"
-                  >
-                    {recentActivity.loading ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                        Loading...
-                      </>
-                    ) : (
-                      <>Load More Activity</>
-                    )}
-                  </Button>
-                </div>
               )}
             </div>
           </CardContent>

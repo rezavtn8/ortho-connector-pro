@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, RefreshCw, Building2, Users, TrendingUp, Calendar } from "lucide-react";
 import { useMapboxToken } from '@/hooks/useMapboxToken';
-import { useMapData } from '@/hooks/useMapData';
+import { useOffices } from '@/hooks/useOffices';
 import { useIsMobile } from '@/hooks/use-mobile';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
@@ -14,7 +14,16 @@ export function MapView({ height = "600px" }: { height?: string }) {
   const isMobile = useIsMobile();
   
   const { token: mapboxToken, isLoading: tokenLoading } = useMapboxToken();
-  const { offices, clinic, isLoading: dataLoading } = useMapData();
+  const { data: offices = [], isLoading: dataLoading } = useOffices();
+  
+  // For now, we'll use a mock clinic - in production this would come from user profile
+  const clinic = {
+    id: 'clinic-1',
+    name: 'My Clinic',
+    address: 'Sample Address',
+    latitude: 40.7128,
+    longitude: -74.0060
+  };
   
   const isLoading = tokenLoading || dataLoading;
 
