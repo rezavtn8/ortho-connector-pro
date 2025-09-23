@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AIBusinessSetup } from '@/components/AIBusinessSetup';
 import { AIUsageDashboard } from '@/components/AIUsageDashboard';
-import { BusinessAnalysisControl } from '@/components/BusinessAnalysisControl';
+import { SimplifiedBusinessAnalysis } from '@/components/SimplifiedBusinessAnalysis';
 import { AIChatAssistant } from '@/components/AIChatAssistant';
 import { Bot, MessageSquare, Mail, FileText, BarChart3, Settings, Activity, Building2, User, Network, Palette, TrendingUp, Zap } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -109,7 +109,7 @@ export function AIAssistant() {
               <Zap className="h-5 w-5 text-primary" />
               <h3 className="text-lg font-semibold">AI Business Analysis</h3>
             </div>
-            <BusinessAnalysisControl />
+            <SimplifiedBusinessAnalysis />
           </div>
 
           {/* Quick Actions Grid */}
