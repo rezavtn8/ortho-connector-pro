@@ -405,44 +405,37 @@ All colors MUST be HSL.
     animation: glow 0.3s ease-in-out;
   }
 
-  /* Page Title Styles */
+  /* Page Title Styles - Modern & Sleek */
   .page-title {
     background: var(--gradient-title);
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-size: 200% 100%;
-    animation: title-glow 3s ease-in-out infinite alternate;
+    animation: title-shimmer 4s ease-in-out infinite;
     /* Prevent flash of unstyled text */
     color: transparent;
+    font-weight: 600;
+    letter-spacing: -0.025em;
   }
 
-  @keyframes title-glow {
-    0% {
-      filter: drop-shadow(0 0 8px hsl(185 85% 25% / 0.5));
+  @keyframes title-shimmer {
+    0%, 100% {
       background-position: 0% 50%;
     }
-    100% {
-      filter: drop-shadow(0 0 12px hsl(185 75% 30% / 0.7));
+    50% {
       background-position: 100% 50%;
     }
   }
 
   .title-icon {
-    color: hsl(185 85% 25%);
-    filter: drop-shadow(0 0 6px hsl(185 85% 25% / 0.4));
-    animation: icon-pulse 2s ease-in-out infinite;
+    color: hsl(185 75% 35%);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  @keyframes icon-pulse {
-    0%, 100% {
-      transform: scale(1);
-      filter: drop-shadow(0 0 6px hsl(185 85% 25% / 0.4));
-    }
-    50% {
-      transform: scale(1.05);
-      filter: drop-shadow(0 0 10px hsl(185 75% 30% / 0.6));
-    }
+  .title-icon:hover {
+    color: hsl(185 85% 25%);
+    transform: scale(1.05);
   }
 
   /* Performance & Accessibility - Respect user preferences */

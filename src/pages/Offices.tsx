@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Building2, ArrowUpDown, Filter, Loader2 } from 'lucide-react';
+import { Building, ArrowUpDown, Filter, Loader2 } from 'lucide-react';
 import { PatientSource, MonthlyPatients } from '@/lib/database.types';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -311,9 +311,9 @@ export function Offices() {
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex flex-col space-y-3 mb-8">
-        <div className="flex items-center gap-3">
-          <Building2 className="h-8 w-8 title-icon" />
-          <h1 className="text-4xl font-bold page-title">Offices</h1>
+        <div className="flex items-center gap-3 mb-2">
+          <Building className="h-8 w-8 title-icon" />
+          <h1 className="text-4xl font-bold page-title">Partner Offices</h1>
         </div>
         <p className="text-muted-foreground text-lg">
           Discover and connect with nearby medical practices
@@ -350,7 +350,7 @@ export function Offices() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Building2 className="w-5 h-5" />
+              <Building className="w-5 h-5" />
               Office Performance
             </CardTitle>
           </CardHeader>

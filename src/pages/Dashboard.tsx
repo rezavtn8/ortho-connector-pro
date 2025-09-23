@@ -4,7 +4,21 @@ import { Button } from '@/components/ui/button';
 import { PatientSource, MonthlyPatients, formatYearMonth } from '@/lib/database.types';
 import { getCurrentYearMonth, now, nowISO } from '@/lib/dateSync';
 import { supabase } from '@/integrations/supabase/client';
-import { TrendingUp, Building2, Users, Globe, MessageSquare, BarChart3, LayoutDashboard } from 'lucide-react';
+import { 
+  Home,
+  TrendingUp,
+  Users, 
+  Building,
+  Building2,
+  Globe,
+  MessageSquare,
+  BarChart3,
+  Calendar,
+  DollarSign,
+  ArrowUpRight,
+  ArrowDownRight,
+  UserPlus
+} from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 // Navigation is handled internally, no need for React Router
 import { usePagination } from '@/hooks/usePagination';
@@ -324,8 +338,8 @@ export function Dashboard({ onPageChange }: DashboardProps = {}) {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col space-y-3 mb-8">
-        <div className="flex items-center gap-3">
-          <LayoutDashboard className="h-8 w-8 title-icon" />
+        <div className="flex items-center gap-3 mb-2">
+          <Home className="h-8 w-8 title-icon" />
           <h1 className="text-4xl font-bold page-title">Dashboard</h1>
         </div>
         <p className="text-muted-foreground text-lg">

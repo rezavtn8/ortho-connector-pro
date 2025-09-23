@@ -23,7 +23,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CalendarIcon, Plus, Search, Star, Camera, FileText, Download, Filter, Loader2 } from 'lucide-react';
+import { UserPlus, Plus, Eye, MapPin, Calendar as CalendarIcon, Search, Star, Filter, Download, FileText, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -343,9 +343,9 @@ export function MarketingVisits() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col space-y-3 mb-8">
-        <div className="flex items-center gap-3">
-          <Camera className="h-8 w-8 title-icon" />
-          <h1 className="text-4xl font-bold page-title">Marketing Visits</h1>
+        <div className="flex items-center gap-3 mb-2">
+          <UserPlus className="h-8 w-8 title-icon" />
+          <h1 className="text-4xl font-bold page-title">Outreach Visits</h1>
         </div>
         <p className="text-muted-foreground text-lg">
           Track and manage office visits and outreach activities
