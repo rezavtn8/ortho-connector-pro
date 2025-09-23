@@ -13,7 +13,7 @@ interface CreatorProps {
   onSourceSelect?: (sourceId: string) => void;
 }
 
-export function Creator({ onPageChange, onSourceSelect }: CreatorProps) {
+export function Creator() {
   const [businessProfile, setBusinessProfile] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();

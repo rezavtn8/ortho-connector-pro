@@ -7,11 +7,9 @@ import { useIsMobile } from '@/hooks/use-mobile';
 
 interface LayoutProps {
   children: React.ReactNode;
-  currentPage?: string;
-  onPageChange?: (page: string) => void;
 }
 
-export function Layout({ children, currentPage, onPageChange }: LayoutProps) {
+export function Layout({ children }: LayoutProps) {
   const isMobile = useIsMobile();
 
   return (
@@ -22,7 +20,7 @@ export function Layout({ children, currentPage, onPageChange }: LayoutProps) {
             <p className="text-sm text-muted-foreground">Navigation temporarily unavailable</p>
           </div>
         }>
-          <AppSidebar currentPage={currentPage || 'dashboard'} onPageChange={onPageChange || (() => {})} />
+          <AppSidebar />
         </ErrorBoundary>
         
         <main className="flex-1 flex flex-col">

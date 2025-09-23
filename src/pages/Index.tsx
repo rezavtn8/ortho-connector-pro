@@ -1,5 +1,6 @@
 // src/pages/Index.tsx
-import React, { useState } from 'react';
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { AuthForm } from '@/components/AuthForm';
 import { Layout } from '@/components/Layout';
@@ -20,11 +21,10 @@ import { Discover } from '@/pages/Discover';
 import { Logs } from '@/pages/Logs';
 import { AIAssistant } from '@/pages/AIAssistant';
 import { Creator } from '@/pages/Creator';
+import { useState } from 'react';
 
 const Index = () => {
   const { user, loading } = useAuth();
-  const [currentPage, setCurrentPage] = useState('dashboard');
-  const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const [showAuth, setShowAuth] = useState(false);
 
   if (loading) {
@@ -42,49 +42,31 @@ const Index = () => {
     return <LandingPage onGetStarted={() => setShowAuth(true)} showAuth={showAuth} />;
   }
 
-  const renderPage = () => {
-    // Handle source detail view
-    if (currentPage === 'source-detail' && selectedSourceId) {
-      return (
-        <ErrorBoundary level="component">
-          <SourceDetail onPageChange={setCurrentPage} sourceId={selectedSourceId} />
-        </ErrorBoundary>
-      );
-    }
-
-    const pageComponents = {
-      'dashboard': Dashboard,
-      'sources': Sources,
-      'offices': Offices,
-      'marketing-visits': MarketingVisits,
-      'campaigns': Campaigns,
-      'discover': Discover,
-      'reviews': Reviews,
-      'map-view': MapView,
-      'analytics': Analytics,
-      'ai-assistant': AIAssistant,
-      'creator': Creator,
-      'logs': Logs,
-      'settings': Settings,
-    };
-
-    const PageComponent = pageComponents[currentPage as keyof typeof pageComponents] || Dashboard;
-
-    return (
-      <ErrorBoundary level="component">
-        <PageComponent 
-          onPageChange={setCurrentPage} 
-          onSourceSelect={setSelectedSourceId}
-        />
-      </ErrorBoundary>
-    );
-  };
-
   return (
-    <Layout currentPage={currentPage} onPageChange={setCurrentPage}>
-      {renderPage()}
-      <SessionTimeoutWarning />
-    </Layout>
+    <BrowserRouter>
+      <Layout>
+        <ErrorBoundary level="section">
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/sources" element={<Sources />} />
+            <Route path="/sources/:sourceId" element={<SourceDetail />} />
+            <Route path="/offices" element={<Offices />} />
+            <Route path="/marketing-visits" element={<MarketingVisits />} />
+            <Route path="/campaigns" element={<Campaigns />} />
+            <Route path="/discover" element={<Discover />} />
+            <Route path="/reviews" element={<Reviews />} />
+            <Route path="/map-view" element={<MapView />} />
+            <Route path="/analytics" element={<Analytics />} />
+            <Route path="/ai-assistant" element={<AIAssistant />} />
+            <Route path="/creator" element={<Creator />} />
+            <Route path="/logs" element={<Logs />} />
+            <Route path="/settings" element={<Settings />} />
+          </Routes>
+        </ErrorBoundary>
+        <SessionTimeoutWarning />
+      </Layout>
+    </BrowserRouter>
   );
 };
 

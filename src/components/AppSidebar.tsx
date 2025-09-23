@@ -33,50 +33,48 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { NexoraLogo } from '@/components/NexoraLogo';
 import { useIsMobile } from '@/hooks/use-mobile';
-
-interface AppSidebarProps {
-  currentPage: string;
-  onPageChange: (page: string) => void;
-}
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const mainNavItems = [
-  { id: 'dashboard', title: 'Dashboard', icon: Home },
-  { id: 'sources', title: 'Patient Sources', icon: Users },
-  { id: 'offices', title: 'Partner Offices', icon: Building },
-  { id: 'analytics', title: 'Reports', icon: TrendingUp },
-  { id: 'ai-assistant', title: 'AI Assistant', icon: Bot },
-  { id: 'creator', title: 'Creator', icon: Palette },
+  { id: 'dashboard', title: 'Dashboard', icon: Home, path: '/dashboard' },
+  { id: 'sources', title: 'Patient Sources', icon: Users, path: '/sources' },
+  { id: 'offices', title: 'Partner Offices', icon: Building, path: '/offices' },
+  { id: 'analytics', title: 'Reports', icon: TrendingUp, path: '/analytics' },
+  { id: 'ai-assistant', title: 'AI Assistant', icon: Bot, path: '/ai-assistant' },
+  { id: 'creator', title: 'Creator', icon: Palette, path: '/creator' },
 ];
 
 const managementItems = [
-  { id: 'marketing-visits', title: 'Outreach Visits', icon: UserPlus },
-  { id: 'campaigns', title: 'Campaigns', icon: Calendar },
-  { id: 'discover', title: 'Find Offices', icon: Search },
-  { id: 'reviews', title: 'Reviews', icon: MessageSquare },
-  { id: 'map-view', title: 'Map', icon: MapPin },
+  { id: 'marketing-visits', title: 'Outreach Visits', icon: UserPlus, path: '/marketing-visits' },
+  { id: 'campaigns', title: 'Campaigns', icon: Calendar, path: '/campaigns' },
+  { id: 'discover', title: 'Find Offices', icon: Search, path: '/discover' },
+  { id: 'reviews', title: 'Reviews', icon: MessageSquare, path: '/reviews' },
+  { id: 'map-view', title: 'Map', icon: MapPin, path: '/map-view' },
 ];
 
 const systemItems = [
-  { id: 'logs', title: 'Activity Logs', icon: Activity },
-  { id: 'settings', title: 'Settings', icon: Settings },
+  { id: 'logs', title: 'Activity Logs', icon: Activity, path: '/logs' },
+  { id: 'settings', title: 'Settings', icon: Settings, path: '/settings' },
 ];
 
-export function AppSidebar({ currentPage, onPageChange }: AppSidebarProps) {
+export function AppSidebar() {
   const { user, signOut } = useAuth();
   const { state, setOpenMobile } = useSidebar();
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  const isActive = (itemId: string) => currentPage === itemId;
+  const isActive = (path: string) => location.pathname === path;
 
-  const getNavClass = (itemId: string) => 
-    isActive(itemId) ? "bg-primary text-primary-foreground font-medium" : "hover:bg-muted/50";
+  const getNavClass = (path: string) => 
+    isActive(path) ? "bg-primary text-primary-foreground font-medium" : "hover:bg-muted/50";
 
   const handleSignOut = async () => {
     await signOut();
   };
 
-  const handlePageChange = (page: string) => {
-    onPageChange(page);
+  const handleNavigation = (path: string) => {
+    navigate(path);
     // Auto-close sidebar on mobile after navigation
     if (isMobile) {
       setOpenMobile(false);
@@ -110,11 +108,11 @@ export function AppSidebar({ currentPage, onPageChange }: AppSidebarProps) {
                 <SidebarMenuItem key={item.id}>
                   <SidebarMenuButton 
                     asChild
-                    className={getNavClass(item.id)}
+                    className={getNavClass(item.path)}
                   >
                     <button 
-                      onClick={() => handlePageChange(item.id)}
-                      className="flex items-center w-full min-h-[44px]"
+                      onClick={() => handleNavigation(item.path)}
+                      className="flex items-center w-full min-h-[44px] transition-smooth"
                     >
                       <item.icon className="mr-2 h-4 w-4" />
                       {!isCollapsed && <span>{item.title}</span>}
@@ -134,11 +132,11 @@ export function AppSidebar({ currentPage, onPageChange }: AppSidebarProps) {
                 <SidebarMenuItem key={item.id}>
                   <SidebarMenuButton 
                     asChild
-                    className={getNavClass(item.id)}
+                    className={getNavClass(item.path)}
                   >
                     <button 
-                      onClick={() => handlePageChange(item.id)}
-                      className="flex items-center w-full min-h-[44px]"
+                      onClick={() => handleNavigation(item.path)}
+                      className="flex items-center w-full min-h-[44px] transition-smooth"
                     >
                       <item.icon className="mr-2 h-4 w-4" />
                       {!isCollapsed && <span>{item.title}</span>}
@@ -158,11 +156,11 @@ export function AppSidebar({ currentPage, onPageChange }: AppSidebarProps) {
                 <SidebarMenuItem key={item.id}>
                   <SidebarMenuButton 
                     asChild
-                    className={getNavClass(item.id)}
+                    className={getNavClass(item.path)}
                   >
                     <button 
-                      onClick={() => handlePageChange(item.id)}
-                      className="flex items-center w-full min-h-[44px]"
+                      onClick={() => handleNavigation(item.path)}
+                      className="flex items-center w-full min-h-[44px] transition-smooth"
                     >
                       <item.icon className="mr-2 h-4 w-4" />
                       {!isCollapsed && <span>{item.title}</span>}
@@ -188,7 +186,7 @@ export function AppSidebar({ currentPage, onPageChange }: AppSidebarProps) {
             variant="ghost" 
             size="sm" 
             onClick={handleSignOut}
-            className="gap-1 min-h-[44px] shrink-0"
+            className="gap-1 min-h-[44px] shrink-0 transition-smooth hover:bg-destructive/10 hover:text-destructive"
           >
             <LogOut className="w-4 h-4" />
             {!isCollapsed && <span>Sign Out</span>}

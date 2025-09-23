@@ -108,12 +108,12 @@ function PatientTrendChart({ monthlyData, sources }: PatientTrendChartProps) {
   );
 }
 
-interface DashboardProps {
-  onPageChange?: (page: string) => void;
-  onSourceSelect?: (sourceId: string) => void;
-}
+import { useNavigate } from 'react-router-dom';
 
-export function Dashboard({ onPageChange }: DashboardProps = {}) {
+interface DashboardProps {}
+
+export function Dashboard() {
+  const navigate = useNavigate();
   const { 
     array: sources, 
     replaceArray: setSources 
@@ -402,7 +402,7 @@ export function Dashboard({ onPageChange }: DashboardProps = {}) {
 
         <Card 
           className="cursor-pointer hover:shadow-lg transition-all duration-200"
-          onClick={() => onPageChange?.('analytics')}
+          onClick={() => navigate('/analytics')}
         >
           <CardHeader className="pb-2 sm:pb-3">
             <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
@@ -432,9 +432,9 @@ export function Dashboard({ onPageChange }: DashboardProps = {}) {
               className="cursor-pointer hover:shadow-lg transition-all duration-200 border-l-4 border-l-transparent hover:border-l-current"
               onClick={() => {
                 if (group.name === 'Dental Offices') {
-                  onPageChange?.('offices');
+                  navigate('/offices');
                 } else {
-                  onPageChange?.('sources');
+                  navigate('/sources');
                 }
               }}
             >
@@ -471,7 +471,7 @@ export function Dashboard({ onPageChange }: DashboardProps = {}) {
           <h2 className="text-lg sm:text-xl font-semibold">Analytics Overview</h2>
           <Button 
             variant="outline"
-            onClick={() => onPageChange?.('analytics')}
+            onClick={() => navigate('/analytics')}
             className="gap-2"
           >
             <BarChart3 className="w-4 h-4" />

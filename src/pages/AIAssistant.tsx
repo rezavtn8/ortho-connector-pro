@@ -10,12 +10,10 @@ import { Bot, MessageSquare, Mail, FileText, BarChart3, Settings, Activity, Buil
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 
-interface AIAssistantProps {
-  onPageChange?: (page: string) => void;
-  onSourceSelect?: (sourceId: string) => void;
-}
+import { useNavigate } from 'react-router-dom';
 
-export function AIAssistant({ onPageChange, onSourceSelect }: AIAssistantProps = {}) {
+export function AIAssistant() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   const [businessProfile, setBusinessProfile] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -145,7 +143,7 @@ export function AIAssistant({ onPageChange, onSourceSelect }: AIAssistantProps =
                 <p className="text-sm text-muted-foreground mb-4">
                   Create AI-powered marketing campaigns based on your practice data.
                 </p>
-                <Button className="w-full" variant="outline" onClick={() => onPageChange?.('campaigns')}>
+                <Button className="w-full" variant="outline" onClick={() => navigate('/campaigns')}>
                   <Mail className="h-4 w-4 mr-2" />
                   Create Campaign
                 </Button>
@@ -163,7 +161,7 @@ export function AIAssistant({ onPageChange, onSourceSelect }: AIAssistantProps =
                 <p className="text-sm text-muted-foreground mb-4">
                   Generate marketing materials tailored to your practice's brand and voice.
                 </p>
-                <Button className="w-full" variant="outline" onClick={() => onPageChange?.('creator')}>
+                <Button className="w-full" variant="outline" onClick={() => navigate('/creator')}>
                   <Palette className="h-4 w-4 mr-2" />
                   Create Content
                 </Button>
@@ -181,7 +179,7 @@ export function AIAssistant({ onPageChange, onSourceSelect }: AIAssistantProps =
                 <p className="text-sm text-muted-foreground mb-4">
                   AI-powered responses to reviews that match your practice's voice.
                 </p>
-                <Button className="w-full" variant="outline" onClick={() => onPageChange?.('reviews')}>
+                <Button className="w-full" variant="outline" onClick={() => navigate('/reviews')}>
                   <MessageSquare className="h-4 w-4 mr-2" />
                   Manage Reviews
                 </Button>

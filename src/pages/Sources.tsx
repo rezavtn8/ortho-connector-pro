@@ -29,17 +29,14 @@ import { PatientCountEditor } from '@/components/PatientCountEditor';
 import { SourceCard } from '@/components/SourceCard';
 import { useIsMobile } from '@/hooks/use-mobile';
 
-interface SourcesProps {
-  onPageChange?: (page: string) => void;
-  onSourceSelect?: (sourceId: string) => void;
-}
+import { useNavigate } from 'react-router-dom';
 
-export function Sources({ onPageChange, onSourceSelect }: SourcesProps = {}) {
+export function Sources() {
+  const navigate = useNavigate();
   const { toast } = useToast();
   
   const handleViewSource = (sourceId: string) => {
-    onSourceSelect?.(sourceId);
-    onPageChange?.('source-detail');
+    navigate(`/sources/${sourceId}`);
   };
   const isMobile = useIsMobile();
   const [sources, setSources] = useState<PatientSource[]>([]);

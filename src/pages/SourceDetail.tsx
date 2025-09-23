@@ -52,13 +52,12 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { AddressSearch } from '@/components/AddressSearch';
 
-interface SourceDetailProps {
-  onPageChange?: (page: string) => void;
-  sourceId?: string;
-}
+import { useNavigate, useParams } from 'react-router-dom';
 
-export function SourceDetail({ onPageChange, sourceId }: SourceDetailProps = {}) {
-  const onBack = () => onPageChange?.('sources');
+export function SourceDetail() {
+  const navigate = useNavigate();
+  const { sourceId } = useParams<{ sourceId: string }>();
+  const onBack = () => navigate('/sources');
   const [source, setSource] = useState<PatientSource | null>(null);
   const [tags, setTags] = useState<SourceTag[]>([]);
   const [monthlyData, setMonthlyData] = useState<MonthlyPatients[]>([]);
