@@ -12,7 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Search, Edit, Eye, Building2, Globe, MessageSquare, Star, Trash2, Check, X, Power } from 'lucide-react';
+import { Plus, Search, Edit, Eye, Building2, Globe, MessageSquare, Star, Trash2, Check, X, Power, Users } from 'lucide-react';
 // Navigation is handled internally, no need for React Router
 import { ImportDataDialog } from '@/components/ImportDataDialog';
 import { PatientSource, MonthlyPatients, SOURCE_TYPE_CONFIG, SourceType } from '@/lib/database.types';
@@ -583,11 +583,14 @@ export function Sources({ onPageChange, onSourceSelect }: SourcesProps = {}) {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header */} 
-      <div className="flex flex-col space-y-2">
-        <h1 className="text-3xl font-bold">Referral Sources</h1>
-        <p className="text-muted-foreground">
-          Manage your referral sources and channels
+      {/* Header */}
+      <div className="flex flex-col space-y-3 mb-8">
+        <div className="flex items-center gap-3">
+          <Users className="h-8 w-8 title-icon" />
+          <h1 className="text-4xl font-bold page-title">Sources</h1>
+        </div>
+        <p className="text-muted-foreground text-lg">
+          Manage your referral sources and relationships
         </p>
       </div>
 

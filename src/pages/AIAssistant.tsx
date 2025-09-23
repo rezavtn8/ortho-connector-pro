@@ -50,9 +50,12 @@ export function AIAssistant({ onPageChange, onSourceSelect }: AIAssistantProps =
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col space-y-2">
-        <h1 className="text-3xl font-bold">AI Assistant</h1>
-        <p className="text-muted-foreground">
+      <div className="flex flex-col space-y-3 mb-8">
+        <div className="flex items-center gap-3">
+          <Bot className="h-8 w-8 title-icon" />
+          <h1 className="text-4xl font-bold page-title">AI Assistant</h1>
+        </div>
+        <p className="text-muted-foreground text-lg">
           Intelligent automation and insights for your practice
         </p>
       </div>

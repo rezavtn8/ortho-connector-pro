@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
-import { Sparkles, Library, BarChart3 } from 'lucide-react';
+import { Sparkles, Library, BarChart3, Palette } from 'lucide-react';
 
 interface CreatorProps {
   onPageChange?: (page: string) => void;
@@ -47,10 +47,13 @@ export function Creator({ onPageChange, onSourceSelect }: CreatorProps) {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col space-y-2">
-        <h1 className="text-3xl font-bold">Content Creator</h1>
-        <p className="text-muted-foreground">
-          Create professional marketing materials with AI-powered tools and templates
+      <div className="flex flex-col space-y-3 mb-8">
+        <div className="flex items-center gap-3">
+          <Palette className="h-8 w-8 title-icon" />
+          <h1 className="text-4xl font-bold page-title">Creator</h1>
+        </div>
+        <p className="text-muted-foreground text-lg">
+          AI-powered content creation tools for your practice
         </p>
       </div>
 

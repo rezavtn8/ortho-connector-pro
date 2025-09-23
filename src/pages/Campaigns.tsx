@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Users, Calendar } from 'lucide-react';
+import { Plus, Users, Calendar, Mail } from 'lucide-react';
 import { CreateCampaignDialog } from '@/components/CreateCampaignDialog';
 import { CampaignDetailDialog } from '@/components/CampaignDetailDialog';
 import { UnifiedCampaignDialog } from '@/components/UnifiedCampaignDialog';
@@ -159,10 +159,13 @@ export function Campaigns() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col space-y-2">
-        <h1 className="text-3xl font-bold">Campaign Center</h1>
-        <p className="text-muted-foreground">
-          Create seasonal campaigns or manage ongoing outreach to referral offices
+      <div className="flex flex-col space-y-3 mb-8">
+        <div className="flex items-center gap-3">
+          <Mail className="h-8 w-8 title-icon" />
+          <h1 className="text-4xl font-bold page-title">Campaigns</h1>
+        </div>
+        <p className="text-muted-foreground text-lg">
+          Create and manage your marketing campaigns
         </p>
       </div>
 

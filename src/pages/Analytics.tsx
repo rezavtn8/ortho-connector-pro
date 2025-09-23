@@ -301,10 +301,13 @@ export function Analytics() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col space-y-2">
-        <h1 className="text-3xl font-bold">Analytics</h1>
-        <p className="text-muted-foreground">
-          Track patient source performance and trends
+      <div className="flex flex-col space-y-3 mb-8">
+        <div className="flex items-center gap-3">
+          <BarChart3 className="h-8 w-8 title-icon" />
+          <h1 className="text-4xl font-bold page-title">Analytics</h1>
+        </div>
+        <p className="text-muted-foreground text-lg">
+          Performance insights and data visualization for your practice
         </p>
       </div>
 
