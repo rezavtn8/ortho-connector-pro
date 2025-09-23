@@ -149,13 +149,14 @@ export function Dashboard() {
   if (isLoading || !stats) {
     return (
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Dashboard
-            </h1>
-            <p className="text-muted-foreground">Loading your patient referral data...</p>
+        <div className="flex flex-col space-y-3 mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <Home className="h-8 w-8 title-icon" />
+            <h1 className="text-4xl font-bold page-title">Dashboard</h1>
           </div>
+          <p className="text-muted-foreground text-lg">
+            Loading your patient referral data...
+          </p>
         </div>
         
         {/* Overview Stats Skeleton */}
