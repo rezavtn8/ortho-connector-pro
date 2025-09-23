@@ -81,6 +81,8 @@ const initialNotificationSettings: NotificationSettings = {
 };
 
 export function Settings() {
+  // Redirect to resilient settings
+  window.location.replace('/settings-resilient');
   const { user, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState('profile');
   const [clinicSettings, setClinicSettings] = useState<ClinicSettings>(initialClinicSettings);

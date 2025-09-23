@@ -24,6 +24,7 @@ import {
   Tooltip 
 } from 'recharts';
 import { useDashboardData, useDashboardStats } from '@/hooks/useDashboardData';
+import { ResilientErrorBoundary } from '@/components/ResilientErrorBoundary';
 import { useNavigate } from 'react-router-dom';
 
 interface SourceGroupData {
@@ -99,7 +100,7 @@ function PatientTrendChart({ monthlyData }: PatientTrendChartProps) {
   );
 }
 
-export function Dashboard() {
+function DashboardContent() {
   const navigate = useNavigate();
   const { data, isLoading, error } = useDashboardData();
   const stats = useDashboardStats();
@@ -439,5 +440,13 @@ export function Dashboard() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export function Dashboard() {
+  return (
+    <ResilientErrorBoundary showNetworkStatus>
+      <DashboardContent />
+    </ResilientErrorBoundary>
   );
 }

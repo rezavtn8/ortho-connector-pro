@@ -31,53 +31,69 @@ export function useDashboardData() {
   return useQuery({
     queryKey: ['dashboard-data'],
     queryFn: async () => {
-      const currentMonth = getCurrentYearMonth();
-      
-      // Single optimized query with joins for all dashboard data
-      const [sourcesResult, monthlyResult, recentResult] = await Promise.all([
-        supabase
-          .from('patient_sources')
-          .select('id, name, source_type, is_active')
-          .order('name'),
-        
-        supabase
-          .from('monthly_patients')
-          .select('id, source_id, year_month, patient_count, updated_at'),
-        
-        supabase
-          .from('monthly_patients')
-          .select(`
-            id,
-            source_id,
-            year_month,
-            patient_count,
-            updated_at,
-            patient_sources!inner(
-              name,
-              source_type
-            )
-          `)
-          .gte('updated_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
-          .order('updated_at', { ascending: false })
-          .limit(10)
-      ]);
+      try {
+        // Single optimized query with joins for all dashboard data
+        const [sourcesResult, monthlyResult, recentResult] = await Promise.all([
+          supabase
+            .from('patient_sources')
+            .select('id, name, source_type, is_active')
+            .order('name'),
+          
+          supabase
+            .from('monthly_patients')
+            .select('id, source_id, year_month, patient_count, updated_at'),
+          
+          supabase
+            .from('monthly_patients')
+            .select(`
+              id,
+              source_id,
+              year_month,
+              patient_count,
+              updated_at,
+              patient_sources!inner(
+                name,
+                source_type
+              )
+            `)
+            .gte('updated_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+            .order('updated_at', { ascending: false })
+            .limit(10)
+        ]);
 
-      if (sourcesResult.error) throw sourcesResult.error;
-      if (monthlyResult.error) throw monthlyResult.error;
-      if (recentResult.error) throw recentResult.error;
+        if (sourcesResult.error) throw sourcesResult.error;
+        if (monthlyResult.error) throw monthlyResult.error;
+        if (recentResult.error) throw recentResult.error;
 
-      const recentActivity = recentResult.data?.map(item => ({
-        ...item,
-        source_name: item.patient_sources.name,
-        source_type: item.patient_sources.source_type
-      })) || [];
+        const recentActivity = recentResult.data?.map(item => ({
+          ...item,
+          source_name: item.patient_sources.name,
+          source_type: item.patient_sources.source_type
+        })) || [];
 
-      return {
-        sources: sourcesResult.data || [],
-        monthlyData: monthlyResult.data || [],
-        recentActivity
-      };
+        return {
+          sources: sourcesResult.data || [],
+          monthlyData: monthlyResult.data || [],
+          recentActivity
+        };
+      } catch (error) {
+        console.error('Dashboard data error:', error);
+        // Return fallback data instead of throwing
+        return {
+          sources: [],
+          monthlyData: [],
+          recentActivity: []
+        };
+      }
     },
+    retry: (failureCount, error: any) => {
+      // Don't retry on authentication errors
+      if (error?.message?.includes('Authentication') || error?.message?.includes('JWT')) {
+        return false;
+      }
+      return failureCount < 3;
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
   });
