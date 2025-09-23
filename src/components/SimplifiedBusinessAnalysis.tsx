@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { 
   Play, 
   RefreshCw, 
@@ -15,7 +16,9 @@ import {
   Users,
   Building2,
   Calendar,
-  Target
+  Target,
+  ChevronRight,
+  Sparkles
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -27,6 +30,9 @@ interface BusinessInsight {
   priority: 'high' | 'medium' | 'low';
   summary: string;
   recommendation: string;
+  detailedAnalysis: string;
+  keyMetrics: string[];
+  actionItems: string[];
   icon: React.ComponentType<any>;
 }
 
@@ -83,9 +89,12 @@ export function SimplifiedBusinessAnalysis() {
           // If parsing fails, create a simple insight from the text
           setInsights([{
             title: "Business Analysis",
-            priority: "medium",
+            priority: "medium" as const,
             summary: data.generated_text.substring(0, 150) + "...",
             recommendation: "Review the full analysis details.",
+            detailedAnalysis: data.generated_text,
+            keyMetrics: ["Analysis Available", "Generated from Cache", "Full Report Ready"],
+            actionItems: ["Review the complete analysis", "Take action on recommendations", "Schedule follow-up analysis"],
             icon: BarChart3
           }]);
         }
@@ -217,18 +226,34 @@ export function SimplifiedBusinessAnalysis() {
     // Source Distribution Analysis
     const totalSources = sources.length;
     const activeSources = sources.filter(s => s.is_active).length;
+    const inactiveSources = totalSources - activeSources;
     const sourceTypes = sources.reduce((acc, s) => {
       acc[s.source_type] = (acc[s.source_type] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
 
+    const activeRate = Math.round((activeSources/(totalSources || 1))*100);
+    
     insights.push({
-      title: "Source Portfolio Health",
+      title: "Referral Network Analysis",
       priority: totalSources < 5 ? 'high' : totalSources < 15 ? 'medium' : 'low',
-      summary: `You have ${totalSources} total sources with ${activeSources} currently active (${Math.round((activeSources/(totalSources || 1))*100)}% active rate).`,
+      summary: `${totalSources} referral sources with ${activeRate}% active engagement rate`,
       recommendation: totalSources < 10 ? 
-        "Focus on expanding your referral network to reduce dependency risks." : 
-        "Maintain regular communication with your strong referral network.",
+        "Expand your referral network to reduce dependency risks" : 
+        "Maintain regular communication with your strong network",
+      detailedAnalysis: `Your practice currently manages ${totalSources} referral sources, of which ${activeSources} are actively contributing referrals (${activeRate}% engagement rate). ${inactiveSources > 0 ? `${inactiveSources} sources appear inactive and may benefit from re-engagement efforts.` : 'All sources are currently active, indicating strong relationship management.'} The distribution across source types shows: ${Object.entries(sourceTypes).map(([type, count]) => `${type}: ${count} sources`).join(', ')}. ${totalSources < 10 ? 'A network of fewer than 10 sources creates vulnerability to referral fluctuations.' : 'Your network size provides good stability against individual source variations.'}`,
+      keyMetrics: [
+        `${totalSources} Total Sources`,
+        `${activeRate}% Active Rate`,
+        `${Object.keys(sourceTypes).length} Source Types`,
+        `${inactiveSources} Inactive Sources`
+      ],
+      actionItems: [
+        totalSources < 10 ? "Identify and cultivate 3-5 new referral sources" : "Maintain quarterly check-ins with all sources",
+        inactiveSources > 0 ? `Re-engage ${inactiveSources} inactive sources with targeted outreach` : "Continue current engagement strategies",
+        "Track monthly referral patterns to identify trending sources",
+        "Develop source-specific communication strategies based on preferences"
+      ],
       icon: Building2
     });
 
@@ -242,13 +267,29 @@ export function SimplifiedBusinessAnalysis() {
       })
       .reduce((sum, p) => sum + (p.patient_count || 0), 0);
 
+    const recentActivity = Math.round((recentPatients/(totalPatients || 1))*100);
+    const monthlyAverage = totalPatients > 0 ? Math.round(totalPatients / Math.max(patients.length, 1)) : 0;
+
     insights.push({
       title: "Patient Volume Trends",
       priority: recentPatients > totalPatients * 0.4 ? 'low' : 'medium',
-      summary: `${totalPatients} total patients tracked with ${recentPatients} in the last 3 months (${Math.round((recentPatients/(totalPatients || 1))*100)}% recent activity).`,
+      summary: `${totalPatients} patients tracked with ${recentActivity}% activity in recent months`,
       recommendation: recentPatients < totalPatients * 0.3 ? 
-        "Recent referral activity is below historical averages - consider reaching out to key sources." :
-        "Maintain current referral relationship strategies.",
+        "Recent referral activity is below average - reach out to key sources" :
+        "Maintain current referral relationship strategies",
+      detailedAnalysis: `Your practice has tracked ${totalPatients} total patient referrals across ${patients.length} reporting periods, with ${recentPatients} patients (${recentActivity}%) referred in the last 3 months. The monthly average is approximately ${monthlyAverage} patients. ${recentActivity < 30 ? 'Recent activity is significantly below historical averages, suggesting potential issues with referral flow that require immediate attention.' : recentActivity < 50 ? 'Recent activity is moderately below average, indicating some fluctuation in referral patterns that should be monitored.' : 'Recent activity aligns well with historical patterns, showing consistent referral flow.'} This trend analysis helps identify seasonal patterns and source performance variations.`,
+      keyMetrics: [
+        `${totalPatients} Total Patients`,
+        `${recentPatients} Recent (3mo)`,
+        `${monthlyAverage}/mo Average`,
+        `${recentActivity}% Recent Activity`
+      ],
+      actionItems: [
+        recentActivity < 40 ? "Schedule immediate check-ins with top 3 referral sources" : "Continue monitoring monthly trends",
+        "Implement patient tracking system for source attribution accuracy",
+        "Analyze seasonal patterns to predict and prepare for volume changes",
+        "Create monthly referral performance dashboard for proactive management"
+      ],
       icon: TrendingUp
     });
 
@@ -256,14 +297,28 @@ export function SimplifiedBusinessAnalysis() {
     const totalVisits = visits.length;
     const completedVisits = visits.filter(v => v.visited).length;
     const completionRate = totalVisits > 0 ? Math.round((completedVisits/(totalVisits || 1))*100) : 0;
+    const pendingVisits = totalVisits - completedVisits;
 
     insights.push({
-      title: "Marketing Engagement",
+      title: "Marketing Outreach Performance",
       priority: completionRate < 70 ? 'high' : completionRate < 85 ? 'medium' : 'low',
-      summary: `${completedVisits} of ${totalVisits} planned marketing visits completed (${completionRate}% completion rate).`,
+      summary: `${completionRate}% visit completion rate with ${pendingVisits} visits pending`,
       recommendation: completionRate < 80 ? 
-        "Improve visit completion rate by scheduling more systematically and following up on missed visits." :
-        "Excellent marketing visit completion - maintain this engagement level.",
+        "Improve visit scheduling and follow-up processes" :
+        "Excellent completion rate - maintain current approach",
+      detailedAnalysis: `Your marketing outreach shows ${completedVisits} completed visits out of ${totalVisits} planned (${completionRate}% completion rate), with ${pendingVisits} visits still pending. ${completionRate >= 85 ? 'This excellent completion rate demonstrates strong organizational skills and commitment to relationship building.' : completionRate >= 70 ? 'Your completion rate is above average but has room for improvement through better scheduling and follow-up systems.' : 'The low completion rate suggests systemic issues with visit planning or execution that need immediate attention.'} Consistent marketing visits are crucial for maintaining referral relationships and discovering new opportunities. ${totalVisits === 0 ? 'Consider implementing a systematic marketing visit program to strengthen referral relationships.' : ''}`,
+      keyMetrics: [
+        `${completedVisits}/${totalVisits} Visits`,
+        `${completionRate}% Completion Rate`,
+        `${pendingVisits} Pending Visits`,
+        `${Math.round(totalVisits/Math.max(1, new Date().getMonth() + 1))} Visits/Month`
+      ],
+      actionItems: [
+        completionRate < 80 ? "Implement systematic visit scheduling and reminder system" : "Continue current visit management approach",
+        pendingVisits > 0 ? `Schedule and complete ${pendingVisits} pending visits within 30 days` : "Plan next quarter's visit schedule",
+        "Track visit outcomes and follow-up requirements in CRM",
+        "Set monthly visit targets based on source priority and relationship status"
+      ],
       icon: Users
     });
 
@@ -272,13 +327,28 @@ export function SimplifiedBusinessAnalysis() {
       .sort(([,a], [,b]) => (b as number) - (a as number))
       .slice(0, 3);
 
+    const diversificationScore = Object.keys(sourceTypes).length;
+
     insights.push({
-      title: "Source Diversification",
-      priority: topSourceTypes.length < 3 ? 'medium' : 'low',
-      summary: `Top source types: ${topSourceTypes.map(([type, count]) => `${type} (${count})`).join(', ')}.`,
-      recommendation: topSourceTypes.length < 3 ? 
-        "Consider diversifying your referral sources across more practice types for better stability." :
-        "Good diversification across multiple source types.",
+      title: "Portfolio Diversification Strategy", 
+      priority: diversificationScore < 3 ? 'medium' : 'low',
+      summary: `${diversificationScore} source types with balanced distribution across specialties`,
+      recommendation: diversificationScore < 3 ? 
+        "Diversify across more practice types for stability" :
+        "Well-diversified portfolio - monitor for balance shifts",
+      detailedAnalysis: `Your referral portfolio spans ${diversificationScore} different source types, with the top contributors being: ${topSourceTypes.map(([type, count]) => `${type} (${count} sources, ${Math.round((Number(count)/totalSources)*100)}%)`).join(', ')}. ${diversificationScore < 3 ? 'Limited diversification creates vulnerability to specialty-specific market changes or relationship disruptions. Consider expanding into complementary practice types.' : diversificationScore < 5 ? 'Good diversification provides stability, though monitoring the balance between types ensures no single specialty dominates your referral flow.' : 'Excellent diversification across multiple specialties provides strong protection against market fluctuations.'} Source type diversity should align with your practice capabilities and patient demographics for optimal results.`,
+      keyMetrics: [
+        `${diversificationScore} Source Types`,
+        `${Number(topSourceTypes[0]?.[1]) || 0} Largest Category`,
+        `${Math.round((Number(topSourceTypes[0]?.[1] || 0) / Math.max(totalSources, 1)) * 100)}% Concentration`,
+        `${totalSources - Number(topSourceTypes[0]?.[1] || 0)} Other Sources`
+      ],
+      actionItems: [
+        diversificationScore < 3 ? "Research and target 2-3 new specialty types for referral development" : "Monitor current source type balance quarterly",
+        "Analyze patient outcomes by source type to identify highest-value partnerships", 
+        "Develop specialty-specific marketing materials and visit strategies",
+        "Track source type performance trends to guide future networking priorities"
+      ],
       icon: Target
     });
 
@@ -288,10 +358,23 @@ export function SimplifiedBusinessAnalysis() {
   const generateOfflineAnalysis = (): BusinessInsight[] => {
     return [
       {
-        title: "Practice Overview",
-        priority: "medium",
-        summary: "Analysis running in offline mode with limited data access.",
-        recommendation: "Ensure stable internet connection and try again for comprehensive insights.",
+        title: "System Status Check",
+        priority: "medium" as const,
+        summary: "Analysis running in offline mode with limited data access",
+        recommendation: "Ensure stable internet connection and try again for comprehensive insights",
+        detailedAnalysis: "The system is currently operating in offline mode, which limits our ability to access your latest practice data and generate comprehensive AI-powered insights. This may be due to network connectivity issues, server maintenance, or data synchronization delays. While offline, basic functionality remains available, but real-time analysis and AI enhancements are temporarily unavailable.",
+        keyMetrics: [
+          "Offline Mode Active",
+          "Limited Data Access",
+          "Basic Functions Available",
+          "AI Analysis Unavailable"
+        ],
+        actionItems: [
+          "Check your internet connection stability",
+          "Try refreshing the page or reloading the application",
+          "Contact support if the issue persists for more than 15 minutes",
+          "Review cached data for previously generated insights"
+        ],
         icon: AlertCircle
       }
     ];
@@ -433,7 +516,7 @@ export function SimplifiedBusinessAnalysis() {
           
           <div className="grid gap-4">
             {insights.map((insight, index) => (
-              <Card key={index} className="border-l-4 border-l-primary">
+              <Card key={index} className="border-l-4 border-l-primary hover:shadow-md transition-shadow">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-base">
                     <insight.icon className="h-4 w-4 text-primary" />
@@ -443,13 +526,85 @@ export function SimplifiedBusinessAnalysis() {
                     </Badge>
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-sm font-medium text-foreground mb-2">
+                <CardContent className="space-y-3">
+                  <p className="text-sm font-medium text-foreground">
                     {insight.summary}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    <span className="font-medium">Recommendation:</span> {insight.recommendation}
+                    <span className="font-medium">Quick Fix:</span> {insight.recommendation}
                   </p>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" size="sm" className="w-full justify-between group">
+                        <span className="flex items-center gap-2">
+                          <Sparkles className="h-4 w-4 text-primary" />
+                          See Detailed Analysis
+                        </span>
+                        <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                          <insight.icon className="h-5 w-5 text-primary" />
+                          {insight.title}
+                          <Badge variant={getPriorityVariant(insight.priority)}>
+                            {insight.priority} priority
+                          </Badge>
+                        </DialogTitle>
+                      </DialogHeader>
+                      
+                      <div className="space-y-6">
+                        {/* AI Analysis Section */}
+                        <div>
+                          <h4 className="font-semibold mb-3 flex items-center gap-2">
+                            <Sparkles className="h-4 w-4 text-primary" />
+                            AI Analysis
+                          </h4>
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            {insight.detailedAnalysis}
+                          </p>
+                        </div>
+
+                        {/* Key Metrics */}
+                        <div>
+                          <h4 className="font-semibold mb-3 flex items-center gap-2">
+                            <BarChart3 className="h-4 w-4 text-primary" />
+                            Key Metrics
+                          </h4>
+                          <div className="grid grid-cols-2 gap-3">
+                            {insight.keyMetrics.map((metric, i) => (
+                              <div key={i} className="bg-muted/50 rounded-lg p-3">
+                                <p className="text-sm font-medium">{metric}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Action Items */}
+                        <div>
+                          <h4 className="font-semibold mb-3 flex items-center gap-2">
+                            <CheckCircle2 className="h-4 w-4 text-primary" />
+                            Recommended Actions
+                          </h4>
+                          <div className="space-y-2">
+                            {insight.actionItems.map((action, i) => (
+                              <div key={i} className="flex items-start gap-3 p-3 bg-primary/5 rounded-lg">
+                                <div className="h-1.5 w-1.5 rounded-full bg-primary mt-2 flex-shrink-0" />
+                                <p className="text-sm">{action}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end pt-4 border-t">
+                          <Badge variant="outline" className="text-xs">
+                            Generated by AI • {format(lastRun || new Date(), 'MMM d, h:mm a')}
+                          </Badge>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </CardContent>
               </Card>
             ))}
