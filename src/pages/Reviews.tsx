@@ -421,18 +421,23 @@ export function Reviews() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">Reviews</h2>
-          <p className="text-muted-foreground">Manage and respond to Google reviews</p>
+      <div className="flex flex-col space-y-3 mb-8">
+        <div className="flex items-center gap-3">
+          <MessageSquare className="h-8 w-8 title-icon" />
+          <h1 className="text-4xl font-bold page-title">Reviews</h1>
         </div>
+        <p className="text-muted-foreground text-lg">
+          Manage and respond to Google reviews
+        </p>
+      </div>
+
+      {/* Refresh Button */}
+      <div className="flex justify-end">
         <Button onClick={() => fetchReviews()} disabled={loading || !placeId} className="hover-scale transition-all duration-300">
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
           Refresh Reviews
         </Button>
       </div>
-
-      {/* API Limitation Notice */}
       <Card className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
         <CardHeader className="pb-3">
           <CardTitle className="text-amber-800 dark:text-amber-200 flex items-center gap-2">

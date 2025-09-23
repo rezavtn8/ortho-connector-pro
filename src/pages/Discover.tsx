@@ -456,45 +456,47 @@ export const Discover = () => {
   return (
     <div className="container mx-auto p-6 max-w-7xl">
       {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent mb-2">
-              Discovery Assistant
-            </h1>
-            <p className="text-muted-foreground">
-              Smart discovery tool to find and connect with dental offices in your area
-            </p>
-          </div>
-          {currentSession && (
-            <Button 
-              onClick={handleStartOver}
-              variant="outline"
-              className="flex items-center gap-2"
-            >
-              <RefreshCw className="w-4 h-4" />
-              New Search
-            </Button>
-          )}
+      <div className="flex flex-col space-y-3 mb-8">
+        <div className="flex items-center gap-3">
+          <Search className="h-8 w-8 title-icon" />
+          <h1 className="text-4xl font-bold page-title">Discovery</h1>
         </div>
+        <p className="text-muted-foreground text-lg">
+          Smart discovery tool to find and connect with dental offices in your area
+        </p>
+      </div>
 
-        {!canDiscover && nextRefreshDate && (
-          <Card className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-amber-600" />
-                <p className="text-sm text-amber-800 dark:text-amber-200">
-                  Weekly discovery limit reached. Next discovery available: {nextRefreshDate.toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric'
-                  })}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+      {/* Action Button */}
+      <div className="flex justify-end mb-6">
+        {currentSession && (
+          <Button 
+            onClick={handleStartOver}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            New Search
+          </Button>
         )}
       </div>
+
+      {/* Rate Limit Notice */}
+      {!canDiscover && nextRefreshDate && (
+        <Card className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800 mb-6">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-600" />
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                Weekly discovery limit reached. Next discovery available: {nextRefreshDate.toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric'
+                })}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Main Content */}
       <div className="animate-fade-in">

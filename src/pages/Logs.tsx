@@ -306,16 +306,24 @@ export function Logs() {
 
   return (
     <div className="space-y-3 animate-fade-in">
-      {/* Compact Header with inline filters */}
+      {/* Header */}
+      <div className="flex flex-col space-y-3 mb-8">
+        <div className="flex items-center gap-3">
+          <Activity className="h-8 w-8 title-icon" />
+          <h1 className="text-4xl font-bold page-title">Activity Logs</h1>
+        </div>
+        <p className="text-muted-foreground text-lg">
+          Track all patient count changes and system activities
+        </p>
+      </div>
+      {/* Filters Section */}
       <div className="flex items-center justify-between gap-4 bg-muted/30 p-3 rounded-lg">
         <div>
-          <h1 className="text-xl font-bold">All Activity</h1>
-          <span className="text-xs text-muted-foreground">
-            {filteredLogs.length} of {allLogs.length} activities
+          <span className="text-sm font-medium">All Activity</span>
+          <span className="text-xs text-muted-foreground ml-2">
+            ({filteredLogs.length} of {allLogs.length} activities)
           </span>
         </div>
-        
-        {/* Inline Filters */}
         <div className="flex items-center gap-2">
           <div className="relative">
             <Search className="w-3 h-3 absolute left-2 top-2.5 text-muted-foreground" />

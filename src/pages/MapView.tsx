@@ -6,13 +6,13 @@ export function MapView() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <MapPin className="w-8 h-8 text-blue-600" />
-          Map View
-        </h1>
-        <p className="text-muted-foreground">
-          View your clinic and referring offices
+      <div className="flex flex-col space-y-3 mb-8">
+        <div className="flex items-center gap-3">
+          <MapPin className="h-8 w-8 title-icon" />
+          <h1 className="text-4xl font-bold page-title">Map View</h1>
+        </div>
+        <p className="text-muted-foreground text-lg">
+          View your clinic and referring offices on an interactive map
         </p>
       </div>
 

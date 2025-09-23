@@ -33,7 +33,8 @@ import {
   Eye,
   EyeOff,
   Loader2,
-  Edit
+  Edit,
+  Settings as SettingsIcon
 } from 'lucide-react';
 
 type UserRole = 'Front Desk' | 'Marketing Rep' | 'Manager';
@@ -335,11 +336,15 @@ export function Settings() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">Settings</h2>
-          <p className="text-muted-foreground">Manage your account and clinic preferences</p>
+      {/* Header */}
+      <div className="flex flex-col space-y-3 mb-8">
+        <div className="flex items-center gap-3">
+          <SettingsIcon className="h-8 w-8 title-icon" />
+          <h1 className="text-4xl font-bold page-title">Settings</h1>
         </div>
+        <p className="text-muted-foreground text-lg">
+          Manage your account and clinic preferences
+        </p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

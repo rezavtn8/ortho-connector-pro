@@ -341,17 +341,26 @@ export function MarketingVisits() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Marketing Visits</h1>
-          <p className="text-muted-foreground">Track and manage office visits and outreach activities</p>
+      {/* Header */}
+      <div className="flex flex-col space-y-3 mb-8">
+        <div className="flex items-center gap-3">
+          <Camera className="h-8 w-8 title-icon" />
+          <h1 className="text-4xl font-bold page-title">Marketing Visits</h1>
         </div>
+        <p className="text-muted-foreground text-lg">
+          Track and manage office visits and outreach activities
+        </p>
+      </div>
+
+      {/* Action Button */}
+      <div className="flex justify-end">
         <Button onClick={() => setShowForm(true)} className="gap-2">
           <Plus className="w-4 h-4" />
           Add Visit
         </Button>
       </div>
 
+      {/* Add Visit Form */}
       {showForm && (
         <Card>
           <CardHeader>

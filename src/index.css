@@ -70,8 +70,8 @@ All colors MUST be HSL.
     --transition-spring: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 
     /* Page Title Gradients */
-    --gradient-title: linear-gradient(135deg, hsl(185 75% 35%), hsl(185 65% 50%), hsl(185 55% 65%));
-    --gradient-title-glow: linear-gradient(135deg, hsl(185 75% 35%), hsl(185 65% 50%), hsl(185 55% 65%)) 1;
+    --gradient-title: linear-gradient(135deg, hsl(185 85% 25%), hsl(185 75% 30%), hsl(185 65% 35%));
+    --gradient-title-glow: linear-gradient(135deg, hsl(185 85% 25%), hsl(185 75% 30%), hsl(185 65% 35%)) 1;
 
     --radius: 0.5rem;
 
@@ -411,34 +411,37 @@ All colors MUST be HSL.
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
+    background-size: 200% 100%;
     animation: title-glow 3s ease-in-out infinite alternate;
+    /* Prevent flash of unstyled text */
+    color: transparent;
   }
 
   @keyframes title-glow {
     0% {
-      filter: drop-shadow(0 0 8px hsl(185 75% 35% / 0.4));
+      filter: drop-shadow(0 0 8px hsl(185 85% 25% / 0.5));
       background-position: 0% 50%;
     }
     100% {
-      filter: drop-shadow(0 0 12px hsl(185 65% 50% / 0.6));
+      filter: drop-shadow(0 0 12px hsl(185 75% 30% / 0.7));
       background-position: 100% 50%;
     }
   }
 
   .title-icon {
-    color: hsl(var(--primary));
-    filter: drop-shadow(0 0 6px hsl(185 75% 35% / 0.3));
+    color: hsl(185 85% 25%);
+    filter: drop-shadow(0 0 6px hsl(185 85% 25% / 0.4));
     animation: icon-pulse 2s ease-in-out infinite;
   }
 
   @keyframes icon-pulse {
     0%, 100% {
       transform: scale(1);
-      filter: drop-shadow(0 0 6px hsl(185 75% 35% / 0.3));
+      filter: drop-shadow(0 0 6px hsl(185 85% 25% / 0.4));
     }
     50% {
       transform: scale(1.05);
-      filter: drop-shadow(0 0 10px hsl(185 65% 50% / 0.5));
+      filter: drop-shadow(0 0 10px hsl(185 75% 30% / 0.6));
     }
   }
 
