@@ -7,6 +7,8 @@ import { Layout } from '@/components/Layout';
 import { LandingPage } from '@/components/LandingPage';
 import { SessionTimeoutWarning } from '@/components/SessionTimeoutWarning';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { SuspenseWrapper } from '@/components/SuspenseWrapper';
+import { usePrefetch } from '@/hooks/usePrefetch';
 import { Dashboard } from '@/pages/Dashboard';
 import { Sources } from '@/pages/Sources';
 import { Offices } from '@/pages/Offices';
@@ -26,6 +28,7 @@ import { useState } from 'react';
 const Index = () => {
   const { user, loading } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
+  const { prefetchDashboardData, prefetchOfficesList, prefetchAnalytics, prefetchCampaigns } = usePrefetch();
 
   if (loading) {
     return (
@@ -47,20 +50,118 @@ const Index = () => {
       <ErrorBoundary level="section">
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard/*" element={<Dashboard />} />
-          <Route path="/sources/*" element={<Sources />} />
-          <Route path="/sources/:sourceId/*" element={<SourceDetail />} />
-          <Route path="/offices/*" element={<Offices />} />
-          <Route path="/marketing-visits/*" element={<MarketingVisits />} />
-          <Route path="/campaigns/*" element={<Campaigns />} />
-          <Route path="/discover/*" element={<Discover />} />
-          <Route path="/reviews/*" element={<Reviews />} />
-          <Route path="/map-view/*" element={<MapView />} />
-          <Route path="/analytics/*" element={<Analytics />} />
-          <Route path="/ai-assistant/*" element={<AIAssistant />} />
-          <Route path="/creator/*" element={<Creator />} />
-          <Route path="/logs/*" element={<Logs />} />
-          <Route path="/settings/*" element={<Settings />} />
+          <Route 
+            path="/dashboard/*" 
+            element={
+              <SuspenseWrapper type="page">
+                <Dashboard />
+              </SuspenseWrapper>
+            } 
+          />
+          <Route 
+            path="/sources/*" 
+            element={
+              <SuspenseWrapper type="page">
+                <Sources />
+              </SuspenseWrapper>
+            } 
+          />
+          <Route 
+            path="/sources/:sourceId/*" 
+            element={
+              <SuspenseWrapper type="page">
+                <SourceDetail />
+              </SuspenseWrapper>
+            } 
+          />
+          <Route 
+            path="/offices/*" 
+            element={
+              <SuspenseWrapper type="page">
+                <Offices />
+              </SuspenseWrapper>
+            } 
+          />
+          <Route 
+            path="/marketing-visits/*" 
+            element={
+              <SuspenseWrapper type="page">
+                <MarketingVisits />
+              </SuspenseWrapper>
+            } 
+          />
+          <Route 
+            path="/campaigns/*" 
+            element={
+              <SuspenseWrapper type="page">
+                <Campaigns />
+              </SuspenseWrapper>
+            } 
+          />
+          <Route 
+            path="/discover/*" 
+            element={
+              <SuspenseWrapper type="page">
+                <Discover />
+              </SuspenseWrapper>
+            } 
+          />
+          <Route 
+            path="/reviews/*" 
+            element={
+              <SuspenseWrapper type="page">
+                <Reviews />
+              </SuspenseWrapper>
+            } 
+          />
+          <Route 
+            path="/map-view/*" 
+            element={
+              <SuspenseWrapper type="page">
+                <MapView />
+              </SuspenseWrapper>
+            } 
+          />
+          <Route 
+            path="/analytics/*" 
+            element={
+              <SuspenseWrapper type="page">
+                <Analytics />
+              </SuspenseWrapper>
+            } 
+          />
+          <Route 
+            path="/ai-assistant/*" 
+            element={
+              <SuspenseWrapper type="page">
+                <AIAssistant />
+              </SuspenseWrapper>
+            } 
+          />
+          <Route 
+            path="/creator/*" 
+            element={
+              <SuspenseWrapper type="page">
+                <Creator />
+              </SuspenseWrapper>
+            } 
+          />
+          <Route 
+            path="/logs/*" 
+            element={
+              <SuspenseWrapper type="page">
+                <Logs />
+              </SuspenseWrapper>
+            } 
+          />
+          <Route 
+            path="/settings/*" 
+            element={
+              <SuspenseWrapper type="page">
+                <Settings />
+              </SuspenseWrapper>
+            } 
+          />
         </Routes>
       </ErrorBoundary>
       <SessionTimeoutWarning />

@@ -34,6 +34,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { NexoraLogo } from '@/components/NexoraLogo';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { usePrefetch } from '@/hooks/usePrefetch';
 
 const mainNavItems = [
   { id: 'dashboard', title: 'Dashboard', icon: Home, path: '/dashboard' },
@@ -63,6 +64,13 @@ export function AppSidebar() {
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const location = useLocation();
+  const { 
+    prefetchDashboardData, 
+    prefetchOfficesList, 
+    prefetchAnalytics, 
+    prefetchCampaigns, 
+    prefetchMarketingVisits 
+  } = usePrefetch();
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -78,6 +86,28 @@ export function AppSidebar() {
     // Auto-close sidebar on mobile after navigation
     if (isMobile) {
       setOpenMobile(false);
+    }
+  };
+
+  const handleMouseEnter = (path: string) => {
+    // Prefetch data based on the route
+    switch (path) {
+      case '/dashboard':
+        prefetchDashboardData();
+        break;
+      case '/offices':
+      case '/sources':
+        prefetchOfficesList();
+        break;
+      case '/analytics':
+        prefetchAnalytics();
+        break;
+      case '/campaigns':
+        prefetchCampaigns();
+        break;
+      case '/marketing-visits':
+        prefetchMarketingVisits();
+        break;
     }
   };
 
@@ -110,10 +140,11 @@ export function AppSidebar() {
                     asChild
                     className={getNavClass(item.path)}
                   >
-                    <button 
-                      onClick={() => handleNavigation(item.path)}
-                      className="flex items-center w-full min-h-[44px] transition-smooth"
-                    >
+                     <button 
+                       onClick={() => handleNavigation(item.path)}
+                       onMouseEnter={() => handleMouseEnter(item.path)}
+                       className="flex items-center w-full min-h-[44px] transition-smooth"
+                     >
                       <item.icon className="mr-2 h-4 w-4" />
                       {!isCollapsed && <span>{item.title}</span>}
                     </button>
@@ -134,10 +165,11 @@ export function AppSidebar() {
                     asChild
                     className={getNavClass(item.path)}
                   >
-                    <button 
-                      onClick={() => handleNavigation(item.path)}
-                      className="flex items-center w-full min-h-[44px] transition-smooth"
-                    >
+                     <button 
+                       onClick={() => handleNavigation(item.path)}
+                       onMouseEnter={() => handleMouseEnter(item.path)}
+                       className="flex items-center w-full min-h-[44px] transition-smooth"
+                     >
                       <item.icon className="mr-2 h-4 w-4" />
                       {!isCollapsed && <span>{item.title}</span>}
                     </button>
@@ -158,10 +190,11 @@ export function AppSidebar() {
                     asChild
                     className={getNavClass(item.path)}
                   >
-                    <button 
-                      onClick={() => handleNavigation(item.path)}
-                      className="flex items-center w-full min-h-[44px] transition-smooth"
-                    >
+                     <button 
+                       onClick={() => handleNavigation(item.path)}
+                       onMouseEnter={() => handleMouseEnter(item.path)}
+                       className="flex items-center w-full min-h-[44px] transition-smooth"
+                     >
                       <item.icon className="mr-2 h-4 w-4" />
                       {!isCollapsed && <span>{item.title}</span>}
                     </button>

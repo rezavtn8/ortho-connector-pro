@@ -6,6 +6,7 @@ import { MapPin, Phone, Mail, Globe, Star, TrendingUp, TrendingDown, Users, Exte
 // Navigation is handled internally, no need for React Router
 import { PatientSource, SourceTag } from '@/lib/database.types';
 import { SafeText } from '@/components/SafeText';
+import { usePrefetch } from '@/hooks/usePrefetch';
 
 type OfficeScore = 'Strong' | 'Moderate' | 'Sporadic' | 'Cold';
 
@@ -30,8 +31,14 @@ export const OfficeCard: React.FC<OfficeCardProps> = ({
   onEdit,
   onNavigateToSource
 }) => {
+  const { prefetchOfficeDetails } = usePrefetch();
+  
   const handleCardClick = () => {
     onNavigateToSource?.(office.id);
+  };
+
+  const handleMouseEnter = () => {
+    prefetchOfficeDetails(office.id);
   };
 
   const scoreColors = {
