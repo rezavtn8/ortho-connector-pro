@@ -299,78 +299,74 @@ export function Analytics() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Header */}
+      <div className="flex flex-col space-y-2">
+        <h1 className="text-3xl font-bold">Analytics</h1>
+        <p className="text-muted-foreground">
+          Track patient source performance and trends
+        </p>
+      </div>
+
+      {/* Controls */}
       <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Analytics</h1>
-          <p className="text-muted-foreground">
-            Track patient source performance and trends
-          </p>
+        <div className="flex gap-4">
+          <Select value={selectedType} onValueChange={(v) => setSelectedType(v as any)}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="All Categories" />
+            </SelectTrigger>
+            <SelectContent className="bg-background border z-50">
+              <SelectItem value="all">All Categories</SelectItem>
+              <SelectItem value="online">
+                <span className="flex items-center gap-2">
+                  <span>🌐</span>
+                  Online Sources
+                </span>
+              </SelectItem>
+              <SelectItem value="offices">
+                <span className="flex items-center gap-2">
+                  <span>🏢</span>
+                  Offices
+                </span>
+              </SelectItem>
+              <SelectItem value="insurance">
+                <span className="flex items-center gap-2">
+                  <span>📋</span>
+                  Insurance
+                </span>
+              </SelectItem>
+              <SelectItem value="word-of-mouth">
+                <span className="flex items-center gap-2">
+                  <span>💬</span>
+                  Word of Mouth
+                </span>
+              </SelectItem>
+              <SelectItem value="other">
+                <span className="flex items-center gap-2">
+                  <span>📌</span>
+                  Other
+                </span>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={selectedPeriod} onValueChange={(v) => setSelectedPeriod(v as '3m' | '6m' | '12m' | 'all')}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Time Period" />
+            </SelectTrigger>
+            <SelectContent className="bg-background border z-50">
+              <SelectItem value="3m">Last 3 Months</SelectItem>
+              <SelectItem value="6m">Last 6 Months</SelectItem>
+              <SelectItem value="12m">Last 12 Months</SelectItem>
+              <SelectItem value="all">All Time</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <Button onClick={exportData} variant="outline">
           <Download className="w-4 h-4 mr-2" />
           Export Data
         </Button>
       </div>
-
-      {/* Filters */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex gap-4">
-            <Select value={selectedType} onValueChange={(v) => setSelectedType(v as any)}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="All Categories" />
-              </SelectTrigger>
-              <SelectContent className="bg-background border z-50">
-                <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="online">
-                  <span className="flex items-center gap-2">
-                    <span>🌐</span>
-                    Online Sources
-                  </span>
-                </SelectItem>
-                <SelectItem value="offices">
-                  <span className="flex items-center gap-2">
-                    <span>🏢</span>
-                    Offices
-                  </span>
-                </SelectItem>
-                <SelectItem value="insurance">
-                  <span className="flex items-center gap-2">
-                    <span>📋</span>
-                    Insurance
-                  </span>
-                </SelectItem>
-                <SelectItem value="word-of-mouth">
-                  <span className="flex items-center gap-2">
-                    <span>💬</span>
-                    Word of Mouth
-                  </span>
-                </SelectItem>
-                <SelectItem value="other">
-                  <span className="flex items-center gap-2">
-                    <span>📌</span>
-                    Other
-                  </span>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={selectedPeriod} onValueChange={(v) => setSelectedPeriod(v as '3m' | '6m' | '12m' | 'all')}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Time Period" />
-              </SelectTrigger>
-              <SelectContent className="bg-background border z-50">
-                <SelectItem value="3m">Last 3 Months</SelectItem>
-                <SelectItem value="6m">Last 6 Months</SelectItem>
-                <SelectItem value="12m">Last 12 Months</SelectItem>
-                <SelectItem value="all">All Time</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -443,62 +439,37 @@ export function Analytics() {
         </Card>
       </div>
 
-      {/* Charts */}
+      {/* Analytics Tabs */}
       <Tabs defaultValue="trends" className="w-full">
-        <div className="flex gap-6">
-          <div className="w-64 shrink-0">
-            <TabsList className="flex flex-col h-auto w-full p-2 bg-card border">
-              {/* Core Analytics */}
-              <div className="w-full mb-2">
-                <div className="text-xs font-medium text-muted-foreground px-3 py-2 uppercase tracking-wider">
-                  Core Analytics
-                </div>
-                <TabsTrigger value="trends" className="w-full justify-start px-3 py-3 text-left">
-                  <BarChart3 className="w-4 h-4 mr-3" />
-                  Trends Overview
-                </TabsTrigger>
-                <TabsTrigger value="distribution" className="w-full justify-start px-3 py-3 text-left">
-                  <PieChart className="w-4 h-4 mr-3" />
-                  Source Distribution
-                </TabsTrigger>
-              </div>
+        <TabsList className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 w-full max-w-4xl" variant="pills">
+          <TabsTrigger value="trends" variant="pills" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            <span className="hidden sm:inline">Trends</span>
+          </TabsTrigger>
+          <TabsTrigger value="distribution" variant="pills" className="flex items-center gap-2">
+            <PieChart className="h-4 w-4" />
+            <span className="hidden sm:inline">Distribution</span>
+          </TabsTrigger>
+          <TabsTrigger value="performance" variant="pills" className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4" />
+            <span className="hidden sm:inline">Top Performers</span>
+          </TabsTrigger>
+          <TabsTrigger value="growing" variant="pills" className="flex items-center gap-2">
+            <ArrowUp className="h-4 w-4" />
+            <span className="hidden sm:inline">Growing</span>
+          </TabsTrigger>
+          <TabsTrigger value="declining" variant="pills" className="flex items-center gap-2">
+            <ArrowDown className="h-4 w-4" />
+            <span className="hidden sm:inline">Declining</span>
+          </TabsTrigger>
+          <TabsTrigger value="outreach" variant="pills" className="flex items-center gap-2">
+            <Target className="h-4 w-4" />
+            <span className="hidden sm:inline">Outreach</span>
+          </TabsTrigger>
+        </TabsList>
 
-              {/* Performance Analytics */}
-              <div className="w-full mb-2">
-                <div className="text-xs font-medium text-muted-foreground px-3 py-2 uppercase tracking-wider border-t pt-4">
-                  Performance
-                </div>
-                <TabsTrigger value="performance" className="w-full justify-start px-3 py-3 text-left">
-                  <TrendingUp className="w-4 h-4 mr-3" />
-                  Top Performers
-                </TabsTrigger>
-                <TabsTrigger value="growing" className="w-full justify-start px-3 py-3 text-left">
-                  <ArrowUp className="w-4 h-4 mr-3" />
-                  Growing Sources
-                </TabsTrigger>
-                <TabsTrigger value="declining" className="w-full justify-start px-3 py-3 text-left">
-                  <ArrowDown className="w-4 h-4 mr-3" />
-                  Declining Sources
-                </TabsTrigger>
-              </div>
-
-              {/* Marketing & Outreach */}
-              <div className="w-full">
-                <div className="text-xs font-medium text-muted-foreground px-3 py-2 uppercase tracking-wider border-t pt-4">
-                  Marketing
-                </div>
-                <TabsTrigger value="marketing" className="w-full justify-start px-3 py-3 text-left">
-                  <Target className="w-4 h-4 mr-3" />
-                  Outreach Analytics
-                </TabsTrigger>
-              </div>
-            </TabsList>
-          </div>
-
-          <div className="flex-1">
-            <div className="bg-card border rounded-lg p-6">
-
-                <TabsContent value="trends" className="space-y-4">
+        <div className="mt-6">
+          <TabsContent value="trends" className="space-y-4">
                   <Card>
             <CardHeader>
               <CardTitle>Monthly Patient Trends</CardTitle>
@@ -873,8 +844,6 @@ export function Analytics() {
             </CardContent>
           </Card>
         </TabsContent>
-            </div>
-          </div>
         </div>
       </Tabs>
     </div>

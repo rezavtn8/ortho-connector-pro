@@ -323,15 +323,11 @@ export function Dashboard({ onPageChange }: DashboardProps = {}) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            Dashboard
-          </h1>
-          <p className="text-muted-foreground">
-            Overview of your patient referral sources
-          </p>
-        </div>
+      <div className="flex flex-col space-y-2">
+        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <p className="text-muted-foreground">
+          Overview of your patient referral sources
+        </p>
       </div>
 
       {/* Mobile-optimized Overview Stats */}

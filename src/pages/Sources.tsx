@@ -582,13 +582,25 @@ export function Sources({ onPageChange, onSourceSelect }: SourcesProps = {}) {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Referral Sources</h1>
-          <p className="text-muted-foreground">
-            Manage your referral sources and channels
-          </p>
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */} 
+      <div className="flex flex-col space-y-2">
+        <h1 className="text-3xl font-bold">Referral Sources</h1>
+        <p className="text-muted-foreground">
+          Manage your referral sources and channels
+        </p>
+      </div>
+
+      {/* Controls */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search sources by name or address..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
         </div>
         <div className="flex gap-3">
           <ImportDataDialog onImportComplete={loadData} />
@@ -596,40 +608,37 @@ export function Sources({ onPageChange, onSourceSelect }: SourcesProps = {}) {
         </div>
       </div>
 
-      {/* Search */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search sources by name or address..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Sources organized by type */}
+      {/* Sources Tabs */}
       <Tabs defaultValue="online" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="online">Online Sources</TabsTrigger>
-          <TabsTrigger value="offices">Offices</TabsTrigger>
-          <TabsTrigger value="other">Other Sources</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 max-w-md" variant="pills">
+          <TabsTrigger value="online" variant="pills" className="flex items-center gap-2">
+            <Globe className="h-4 w-4" />
+            Online
+          </TabsTrigger>
+          <TabsTrigger value="offices" variant="pills" className="flex items-center gap-2">
+            <Building2 className="h-4 w-4" />
+            Offices
+          </TabsTrigger>
+          <TabsTrigger value="other" variant="pills" className="flex items-center gap-2">
+            <MessageSquare className="h-4 w-4" />
+            Other
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="online" className="space-y-4">
-          {renderSourceTable(filterSources(onlineSourceTypes), "Online Sources", Globe)}
-        </TabsContent>
+        <div className="mt-6">
 
-        <TabsContent value="offices" className="space-y-4">
-          {renderSourceTable(filterSources(officeSourceTypes), "Offices", Building2)}
-        </TabsContent>
+          <TabsContent value="online" className="space-y-4">
+            {renderSourceTable(filterSources(onlineSourceTypes), "Online Sources", Globe)}
+          </TabsContent>
 
-        <TabsContent value="other" className="space-y-4">
-          {renderSourceTable(filterSources(otherSourceTypes), "Other Sources", MessageSquare)}
-        </TabsContent>
+          <TabsContent value="offices" className="space-y-4">
+            {renderSourceTable(filterSources(officeSourceTypes), "Offices", Building2)}
+          </TabsContent>
+
+          <TabsContent value="other" className="space-y-4">
+            {renderSourceTable(filterSources(otherSourceTypes), "Other Sources", MessageSquare)}
+          </TabsContent>
+        </div>
       </Tabs>
     </div>
   );

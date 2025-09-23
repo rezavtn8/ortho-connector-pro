@@ -308,15 +308,21 @@ export function Offices() {
 
   return (
     <TooltipProvider>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-foreground">Offices</h1>
-          <div className="flex items-center gap-4">
-            <div className="text-sm text-muted-foreground">
-              Showing {displayedOffices.length} of {filteredAndSortedOffices.length} office{filteredAndSortedOffices.length !== 1 ? 's' : ''}
-            </div>
-          </div>
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
+      <div className="flex flex-col space-y-2">
+        <h1 className="text-3xl font-bold">Offices</h1>
+        <p className="text-muted-foreground">
+          Track and analyze your referring office performance
+        </p>
+      </div>
+
+      {/* Stats */}
+      <div className="flex justify-between items-center">
+        <div className="text-sm text-muted-foreground">
+          Showing {displayedOffices.length} of {filteredAndSortedOffices.length} office{filteredAndSortedOffices.length !== 1 ? 's' : ''}
         </div>
+      </div>
 
         {/* Tier Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

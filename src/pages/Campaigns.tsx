@@ -157,91 +157,69 @@ export function Campaigns() {
   }
 
   return (
-    <div className="space-y-6 p-6 max-w-7xl mx-auto">
-      {/* Streamlined Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <Calendar className="w-6 h-6 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-semibold text-foreground">Campaign Center</h1>
-            <p className="text-sm text-muted-foreground">
-              Create seasonal campaigns or manage ongoing outreach to referral offices
-            </p>
-          </div>
-        </div>
-        
-        <Button 
-          onClick={() => activeTab === 'important-dates' ? setImportantDateDialogOpen(true) : setUnifiedCampaignOpen(true)}
-          className="gap-2 shadow-sm"
-        >
-          <Plus className="w-4 h-4" />
-          {activeTab === 'important-dates' ? 'Create Seasonal Campaign' : 'New Campaign'}
-        </Button>
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
+      <div className="flex flex-col space-y-2">
+        <h1 className="text-3xl font-bold">Campaign Center</h1>
+        <p className="text-muted-foreground">
+          Create seasonal campaigns or manage ongoing outreach to referral offices
+        </p>
       </div>
 
-      {/* Unified Navigation & Content */}
-      <Card className="overflow-hidden">
-        <div className="border-b bg-muted/30">
-          <div className="flex items-center justify-between p-4">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
-              <TabsList className="bg-background border">
-                <TabsTrigger value="important-dates" className="gap-2">
-                  <Calendar className="w-4 h-4" />
-                  Seasonal Opportunities
-                </TabsTrigger>
-                <TabsTrigger value="campaigns" className="gap-2">
-                  <Users className="w-4 h-4" />
-                  My Campaigns ({filteredCampaigns.length})
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-            
+      {/* Main Content Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <TabsList className="grid w-full grid-cols-2 max-w-md" variant="pills">
+            <TabsTrigger value="important-dates" variant="pills" className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              Seasonal
+            </TabsTrigger>
+            <TabsTrigger value="campaigns" variant="pills" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              My Campaigns ({filteredCampaigns.length})
+            </TabsTrigger>
+          </TabsList>
+          
+          <div className="flex items-center gap-2">
             {activeTab === 'campaigns' && (
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <Input
-                    placeholder="Search campaigns..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-48 h-9"
-                  />
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-32 h-9">
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="Draft">Draft</SelectItem>
-                      <SelectItem value="Scheduled">Scheduled</SelectItem>
-                      <SelectItem value="In Progress">In Progress</SelectItem>
-                      <SelectItem value="Completed">Completed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setCreateDialogOpen(true)}
-                  size="sm" 
-                  className="gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Traditional
-                </Button>
-              </div>
+              <>
+                <Input
+                  placeholder="Search campaigns..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-48 h-9"
+                />
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-32 h-9">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="Draft">Draft</SelectItem>
+                    <SelectItem value="Scheduled">Scheduled</SelectItem>
+                    <SelectItem value="In Progress">In Progress</SelectItem>
+                    <SelectItem value="Completed">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </>
             )}
+            <Button 
+              onClick={() => activeTab === 'important-dates' ? setImportantDateDialogOpen(true) : setUnifiedCampaignOpen(true)}
+              className="gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              {activeTab === 'important-dates' ? 'Create Seasonal Campaign' : 'New Campaign'}
+            </Button>
           </div>
         </div>
 
-        <div className="p-6">
-          {activeTab === 'important-dates' && (
+        <div className="mt-6">
+          <TabsContent value="important-dates" className="space-y-6">
             <ImportantDatesCalendar onDateSelected={handleImportantDateSelected} />
-          )}
+          </TabsContent>
           
-          {activeTab === 'campaigns' && (
-            <>
-              {filteredCampaigns.length === 0 ? (
+          <TabsContent value="campaigns" className="space-y-6">
+            {filteredCampaigns.length === 0 ? (
                 <div className="text-center py-16">
                   <div className="mx-auto w-24 h-24 bg-muted/50 rounded-full flex items-center justify-center mb-6">
                     <Calendar className="w-12 h-12 text-muted-foreground" />
@@ -364,14 +342,13 @@ export function Campaigns() {
                           View Calendar
                         </Button>
                       </div>
-                    </div>
-                  )}
-                </div>
+                     </div>
+                   )}
+                 </div>
               )}
-            </>
-          )}
+          </TabsContent>
           
-          {activeTab === 'calendar' && (
+          <TabsContent value="calendar" className="space-y-6">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <Button 
@@ -410,9 +387,9 @@ export function Campaigns() {
                 }}
               />
             </div>
-          )}
+          </TabsContent>
         </div>
-      </Card>
+      </Tabs>
 
       {/* Create Unified Campaign Dialog */}
       <UnifiedCampaignDialog

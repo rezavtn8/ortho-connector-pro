@@ -49,11 +49,12 @@ export function AIAssistant({ onPageChange, onSourceSelect }: AIAssistantProps =
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">AI Assistant</h2>
-          <p className="text-muted-foreground">Intelligent automation and insights for your practice</p>
-        </div>
+      {/* Header */}
+      <div className="flex flex-col space-y-2">
+        <h1 className="text-3xl font-bold">AI Assistant</h1>
+        <p className="text-muted-foreground">
+          Intelligent automation and insights for your practice
+        </p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -211,9 +212,9 @@ export function AIAssistant({ onPageChange, onSourceSelect }: AIAssistantProps =
 
         <TabsContent value="setup" className="space-y-6">
           <Tabs defaultValue="business" className="space-y-6">
-            <TabsList>
-              <TabsTrigger value="business">Business Setup</TabsTrigger>
-              <TabsTrigger value="usage">Usage Dashboard</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 max-w-md" variant="pills">
+              <TabsTrigger value="business" variant="pills">Business Setup</TabsTrigger>
+              <TabsTrigger value="usage" variant="pills">Usage Dashboard</TabsTrigger>
             </TabsList>
             
             <TabsContent value="business">
