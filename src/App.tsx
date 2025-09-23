@@ -54,20 +54,20 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
-            <Route path="/dashboard" element={<Index />} />
-            <Route path="/sources" element={<Index />} />
-            <Route path="/sources/:sourceId" element={<Index />} />
-            <Route path="/offices" element={<Index />} />
-            <Route path="/marketing-visits" element={<Index />} />
-            <Route path="/campaigns" element={<Index />} />
-            <Route path="/discover" element={<Index />} />
-            <Route path="/reviews" element={<Index />} />
-            <Route path="/map-view" element={<Index />} />
-            <Route path="/analytics" element={<Index />} />
-            <Route path="/ai-assistant" element={<Index />} />
-            <Route path="/creator" element={<Index />} />
-            <Route path="/logs" element={<Index />} />
-            <Route path="/settings" element={<Index />} />
+            <Route path="/dashboard/*" element={<Index />} />
+            <Route path="/sources/*" element={<Index />} />
+            <Route path="/sources/:sourceId/*" element={<Index />} />
+            <Route path="/offices/*" element={<Index />} />
+            <Route path="/marketing-visits/*" element={<Index />} />
+            <Route path="/campaigns/*" element={<Index />} />
+            <Route path="/discover/*" element={<Index />} />
+            <Route path="/reviews/*" element={<Index />} />
+            <Route path="/map-view/*" element={<Index />} />
+            <Route path="/analytics/*" element={<Index />} />
+            <Route path="/ai-assistant/*" element={<Index />} />
+            <Route path="/creator/*" element={<Index />} />
+            <Route path="/logs/*" element={<Index />} />
+            <Route path="/settings/*" element={<Index />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
