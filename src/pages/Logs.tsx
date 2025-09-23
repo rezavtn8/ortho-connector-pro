@@ -286,11 +286,14 @@ export function Logs() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Activity Logs</h1>
-            <p className="text-muted-foreground">Track all patient count changes and system activities</p>
+        <div className="flex flex-col space-y-3 mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <Activity className="h-8 w-8 title-icon" />
+            <h1 className="text-4xl font-bold page-title">Activity Logs</h1>
           </div>
+          <p className="text-muted-foreground text-lg">
+            Track all patient count changes and system activities
+          </p>
         </div>
         <Card>
           <CardContent className="p-8">

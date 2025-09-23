@@ -454,12 +454,12 @@ export const Discover = () => {
   };
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col space-y-3 mb-8">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 mb-2">
           <Search className="h-8 w-8 title-icon" />
-          <h1 className="text-4xl font-bold page-title">Discovery</h1>
+          <h1 className="text-4xl font-bold page-title">Find Offices</h1>
         </div>
         <p className="text-muted-foreground text-lg">
           Smart discovery tool to find and connect with dental offices in your area
