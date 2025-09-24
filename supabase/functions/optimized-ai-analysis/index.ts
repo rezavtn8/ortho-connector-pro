@@ -138,47 +138,35 @@ function buildAnalysisPrompt(context: any): string {
   const totalSources = sources.length;
   const totalPatients = patients.reduce((sum: number, p: any) => sum + (p.patient_count || 0), 0);
   const totalVisits = visits.length;
+  const avgPatients = totalPatients / Math.max(patients.length, 1);
 
-  // Calculate critical metrics for deeper analysis
-  const recentPatients = patients.slice(0, 6);
-  const avgPatientsPerMonth = totalPatients / Math.max(patients.length, 1);
-  const sourceTypes = sources.reduce((acc: any, s: any) => {
-    acc[s.source_type] = (acc[s.source_type] || 0) + 1;
-    return acc;
-  }, {});
+  return `You are a healthcare business consultant. Perform a CRITICAL ANALYSIS of this practice's referral network. Identify specific problems and actionable solutions.
 
-  return `You are a healthcare business consultant. Perform a CRITICAL ANALYSIS of this practice's referral network. Identify specific problems, inefficiencies, and missed opportunities. Be direct about what's not working.
-
-Return exactly 4 critical insights in this JSON format:
+Return exactly 4 insights in this JSON format:
 
 {
   "insights": [
     {
-      "title": "Critical Issue or Opportunity Title",
-      "priority": "high|medium|low",
-      "summary": "Direct assessment of the problem or opportunity with specific data points",
-      "recommendation": "Specific action plan with measurable steps and timeline"
+      "title": "Critical Issue Title",
+      "priority": "high|medium|low", 
+      "summary": "Direct problem assessment with data",
+      "recommendation": "Specific action plan with timeline"
     }
   ]
 }
 
-PRACTICE DATA FOR CRITICAL ANALYSIS:
-- Total Sources: ${totalSources} referral sources
-- Source Diversity: ${Object.keys(sourceTypes).join(', ')} (${Object.entries(sourceTypes).map(([type, count]) => `${count} ${type}`).join(', ')})
-- Patient Volume: ${totalPatients} total patients (avg ${avgPatientsPerMonth.toFixed(1)} per month)
-- Marketing Activity: ${totalVisits} planned visits
-- Recent Trend: ${recentPatients.map((p: any) => `${p.year_month}: ${p.patient_count}`).join(' → ')}
+PRACTICE DATA:
+- Sources: ${totalSources} referral sources
+- Total Patients: ${totalPatients} (avg ${avgPatients.toFixed(1)} per month)
+- Marketing Visits: ${totalVisits} planned visits
 
-SOURCE PERFORMANCE:
-${sources.slice(0, 12).map((s: any) => `- ${s.name} (${s.source_type}${s.google_rating ? `, ${s.google_rating}★` : ''})`).join('\n')}
+SOURCE BREAKDOWN:
+${sources.map((s: any) => `- ${s.name} (${s.source_type})`).slice(0, 10).join('\n')}
 
-CRITICAL ANALYSIS REQUIREMENTS:
-1. **Identify the biggest problem** holding back referral growth
-2. **Find underperforming sources** that need immediate attention  
-3. **Spot missed opportunities** in the current referral mix
-4. **Provide specific action plans** with measurable outcomes
+PATIENT TRENDS:
+${patients.slice(0, 6).map((p: any) => `- ${p.year_month}: ${p.patient_count} patients`).join('\n')}
 
-Focus on PROBLEMS, GAPS, and ACTIONABLE SOLUTIONS. Don't just describe what's happening - explain what's wrong and how to fix it. Each recommendation should include specific next steps and expected results.`;
+Focus on identifying PROBLEMS, GAPS, and specific SOLUTIONS. Each recommendation should include actionable next steps and measurable outcomes. Be direct about what needs to change.`;
 }
 
 serve(handler);

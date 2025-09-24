@@ -176,8 +176,8 @@ serve(async (req) => {
     const sourcePerformance = Object.keys(monthlyBySource).map(sourceId => {
       const sourceRecords = monthlyBySource[sourceId];
       const recentRecords = sourceRecords.slice(0, 6); // Last 6 months
-      const totalRecent = recentRecords.reduce((sum, record) => sum + record.patient_count, 0);
-      const totalAll = sourceRecords.reduce((sum, record) => sum + record.patient_count, 0);
+      const totalRecent = recentRecords.reduce((sum: number, record: any) => sum + record.patient_count, 0);
+      const totalAll = sourceRecords.reduce((sum: number, record: any) => sum + record.patient_count, 0);
       const office = userData.offices.find(o => o.id === sourceId);
       
       return {
@@ -344,7 +344,7 @@ User Question: ${question}
     console.error('Error in gemini-insights function:', error);
     return new Response(
       JSON.stringify({ 
-        error: error.message,
+        error: (error as Error).message,
         details: 'Failed to process AI insights request'
       }),
       {
