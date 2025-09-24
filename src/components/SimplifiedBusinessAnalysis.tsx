@@ -82,6 +82,8 @@ export function SimplifiedBusinessAnalysis() {
           if (parsed.insights && Array.isArray(parsed.insights)) {
             setInsights(parsed.insights.map((insight: any) => ({
               ...insight,
+              keyMetrics: insight.keyMetrics || [],
+              actionItems: insight.actionItems || [],
               icon: getInsightIcon(insight.title)
             })));
           }
@@ -573,11 +575,11 @@ export function SimplifiedBusinessAnalysis() {
                             Key Metrics
                           </h4>
                           <div className="grid grid-cols-2 gap-3">
-                            {insight.keyMetrics.map((metric, i) => (
+                            {insight.keyMetrics?.map((metric, i) => (
                               <div key={i} className="bg-muted/50 rounded-lg p-3">
                                 <p className="text-sm font-medium">{metric}</p>
                               </div>
-                            ))}
+                            )) || <p className="text-sm text-muted-foreground">No metrics available</p>}
                           </div>
                         </div>
 
@@ -588,12 +590,12 @@ export function SimplifiedBusinessAnalysis() {
                             Recommended Actions
                           </h4>
                           <div className="space-y-2">
-                            {insight.actionItems.map((action, i) => (
+                            {insight.actionItems?.map((action, i) => (
                               <div key={i} className="flex items-start gap-3 p-3 bg-primary/5 rounded-lg">
                                 <div className="h-1.5 w-1.5 rounded-full bg-primary mt-2 flex-shrink-0" />
                                 <p className="text-sm">{action}</p>
                               </div>
-                            ))}
+                            )) || <p className="text-sm text-muted-foreground">No actions available</p>}
                           </div>
                         </div>
 
