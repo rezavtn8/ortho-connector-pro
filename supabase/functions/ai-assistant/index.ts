@@ -426,7 +426,7 @@ BUSINESS CONTEXT:
 - Practice: ${business_persona?.practice_name || 'Healthcare Practice'}
 - Owner: ${business_persona?.owner_name || 'Healthcare Professional'}
 - Communication Style: ${communication_style || 'professional'}
-- Focus: Fast, practical advice based on real practice data
+- Focus: Fast, practical advice based on real practice data`;
 
     default:
       return basePrompt + `
