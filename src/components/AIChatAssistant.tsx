@@ -164,19 +164,19 @@ export function AIChatAssistant() {
         aiContentResult,
         aiTemplatesResult
       ] = await Promise.all([
-        supabase.from('patient_sources').select('*').eq('created_by', user?.id),
-        supabase.from('monthly_patients').select('*').eq('user_id', user?.id).order('year_month', { ascending: false }),
-        supabase.from('user_profiles').select('*').eq('user_id', user?.id).single(),
-        supabase.from('clinics').select('*').eq('owner_id', user?.id).maybeSingle(),
-        supabase.from('marketing_visits').select('*').eq('user_id', user?.id).order('visit_date', { ascending: false }).limit(50),
-        supabase.from('campaigns').select('*').eq('created_by', user?.id).order('created_at', { ascending: false }).limit(20),
-        supabase.from('campaign_deliveries').select('*').eq('created_by', user?.id).order('created_at', { ascending: false }).limit(30),
-        supabase.from('discovered_offices').select('*').eq('discovered_by', user?.id).order('created_at', { ascending: false }).limit(50),
-        supabase.from('review_status').select('*').eq('user_id', user?.id).order('created_at', { ascending: false }).limit(30),
-        supabase.from('source_tags').select('*').eq('user_id', user?.id),
-        supabase.from('ai_business_profiles').select('*').eq('user_id', user?.id).single(),
-        supabase.from('ai_generated_content').select('*').eq('user_id', user?.id).order('created_at', { ascending: false }).limit(20),
-        supabase.from('ai_response_templates').select('*').eq('user_id', user?.id).limit(20)
+        supabase.from('patient_sources').select('id, name, source_type, is_active, created_at, address').eq('created_by', user?.id).order('created_at', { ascending: false }).limit(50),
+        supabase.from('monthly_patients').select('id, source_id, year_month, patient_count, updated_at').eq('user_id', user?.id).order('year_month', { ascending: false }).limit(50),
+        supabase.from('user_profiles').select('id, email, first_name, last_name, role, clinic_id').eq('user_id', user?.id).single(),
+        supabase.from('clinics').select('id, name, address, latitude, longitude').eq('owner_id', user?.id).maybeSingle(),
+        supabase.from('marketing_visits').select('id, office_id, visit_date, visited, star_rating, rep_name').eq('user_id', user?.id).order('visit_date', { ascending: false }).limit(50),
+        supabase.from('campaigns').select('id, name, status, campaign_type, created_at').eq('created_by', user?.id).order('created_at', { ascending: false }).limit(50),
+        supabase.from('campaign_deliveries').select('id, campaign_id, office_id, delivery_status, created_at').eq('created_by', user?.id).order('created_at', { ascending: false }).limit(50),
+        supabase.from('discovered_offices').select('id, name, address, office_type, rating, imported').eq('discovered_by', user?.id).order('created_at', { ascending: false }).limit(50),
+        supabase.from('review_status').select('id, status, needs_attention, created_at').eq('user_id', user?.id).order('created_at', { ascending: false }).limit(50),
+        supabase.from('source_tags').select('id, source_id, tag_name, created_at').eq('user_id', user?.id).order('created_at', { ascending: false }).limit(50),
+        supabase.from('ai_business_profiles').select('id, business_persona, specialties, target_audience').eq('user_id', user?.id).single(),
+        supabase.from('ai_generated_content').select('id, content_type, status, created_at').eq('user_id', user?.id).order('created_at', { ascending: false }).limit(50),
+        supabase.from('ai_response_templates').select('id, template_name, template_type, is_active').eq('user_id', user?.id).order('created_at', { ascending: false }).limit(50)
       ]);
 
       const sources = sourcesResult.data || [];

@@ -567,7 +567,7 @@ export function AIContentCreator({ businessProfile }: AIContentCreatorProps) {
               </CardContent>
             </Card>
             
-        {templates.map((template) => (
+            {templates.map((template) => (
           <Card key={template.id} className="hover:shadow-lg transition-all duration-300 cursor-pointer group border-2 hover:border-primary/20">
             <CardHeader className="text-center pb-4 bg-gradient-to-br from-gray-50 to-white">
               <div className="flex justify-center mb-3">
