@@ -116,10 +116,14 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('System Prompt:', systemPrompt);
     console.log('User Prompt:', userPrompt);
 
-    // Make OpenAI API call (primary: gpt-4.1-2025-04-14)
-    let modelUsed = 'gpt-4.1-2025-04-14';
+    // Use gpt-4o-mini for fast chat responses
+    let modelUsed = 'gpt-4o-mini';
     let generatedContent = '';
     let tokensUsed = 0;
+
+    // Add timeout for faster responses
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -133,56 +137,26 @@ const handler = async (req: Request): Promise<Response> => {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        // gpt-4.1+ uses max_completion_tokens and does not support temperature
-        max_completion_tokens: 1200,
+        max_tokens: task_type === 'practice_consultation' ? 300 : 800, // Limit chat responses
+        temperature: 0.7,
       }),
+      signal: controller.signal,
     });
+
+    clearTimeout(timeoutId);
 
     console.log('OpenAI Response Status:', response.status);
 
-    if (response.ok) {
-      const data = await response.json();
-      generatedContent = (data.choices?.[0]?.message?.content || '').toString();
-      tokensUsed = data.usage?.total_tokens || 0;
-      console.log('Generated Content (primary gpt-4.1):', generatedContent?.slice(0, 200));
-    } else {
+    if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error('OpenAI API Error (primary):', errorData);
+      console.error('OpenAI API Error:', errorData);
+      throw new Error(`OpenAI API error: ${response.status}`);
     }
 
-    // Fallback: if primary failed or returned empty, retry with legacy gpt-4o-mini (supports temperature/max_tokens)
-    if (!generatedContent || !generatedContent.trim()) {
-      console.warn('Primary model empty/failed, retrying with gpt-4o-mini');
-      modelUsed = 'gpt-4o-mini';
-      const response2 = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: modelUsed,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
-          ],
-          max_tokens: 800,
-          temperature: 0.7,
-        }),
-      });
-
-      console.log('Fallback OpenAI Response Status:', response2.status);
-      if (!response2.ok) {
-        const errorData2 = await response2.json().catch(() => ({}));
-        console.error('Fallback OpenAI API Error:', errorData2);
-        throw new Error(`OpenAI API error (fallback)`);
-      }
-
-      const data2 = await response2.json();
-      generatedContent = (data2.choices?.[0]?.message?.content || '').toString();
-      console.log('Generated Content (fallback gpt-4o-mini):', generatedContent?.slice(0, 200));
-      tokensUsed += data2.usage?.total_tokens || 0;
-    }
+    const data = await response.json();
+    generatedContent = (data.choices?.[0]?.message?.content || '').toString();
+    tokensUsed = data.usage?.total_tokens || 0;
+    console.log('Generated Content (gpt-4o-mini):', generatedContent?.slice(0, 150));
 
     const estimatedCost = calculateCost(tokensUsed, modelUsed);
 
@@ -438,26 +412,21 @@ BUSINESS CONTEXT:
     case 'practice_consultation':
       return `You are an AI practice management consultant specializing in healthcare referral optimization.
 
-CONSULTATION GUIDELINES:
-- Provide concise, actionable advice in exactly 2-3 paragraphs
-- First paragraph: Direct answer to the question with key insight
-- Second paragraph: Supporting data analysis and context
-- Third paragraph (if needed): Specific actionable recommendations
-- Use real practice data whenever possible
+CRITICAL RESPONSE REQUIREMENTS:
+- MAXIMUM 150 words total
+- Exactly 2 short paragraphs only
+- First paragraph: Direct answer with key insight (2-3 sentences)
+- Second paragraph: 1-2 specific actionable recommendations
+- Use bullet points for multiple recommendations
+- NO lengthy explanations or background information
 - Be conversational but professional
-- Focus on practical, implementable solutions
-
-RESPONSE LENGTH REQUIREMENT:
-- Maximum 3 paragraphs
-- Each paragraph 3-5 sentences
-- Total response under 300 words
-- Prioritize actionable insights over lengthy explanations
+- Focus on immediate actionable advice
 
 BUSINESS CONTEXT:
 - Practice: ${business_persona?.practice_name || 'Healthcare Practice'}
 - Owner: ${business_persona?.owner_name || 'Healthcare Professional'}
 - Communication Style: ${communication_style || 'professional'}
-- Focus: Practical advice based on real practice data and performance metrics`;
+- Focus: Fast, practical advice based on real practice data
 
     default:
       return basePrompt + `
