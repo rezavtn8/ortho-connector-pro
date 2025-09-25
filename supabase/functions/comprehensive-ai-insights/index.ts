@@ -156,7 +156,7 @@ serve(async (req) => {
         response_data: { insights_count: insights.insights?.length || 0 }
       });
 
-    return new Response(JSON.stringify({
+    return createCorsResponse(JSON.stringify({
       insights: insights.insights || [],
       metadata: {
         generated_at: new Date().toISOString(),
@@ -170,27 +170,6 @@ serve(async (req) => {
           discovered_offices: context.discovered_offices?.length || 0,
           reviews: context.reviews?.length || 0
         }
-      }
-    }), {
-    return createCorsResponse(JSON.stringify({
-      insights,
-      trends,
-      segments,
-      scores,
-      recommendations,
-      summary,
-      risk_analysis,
-      benchmarks: {
-        averages: {
-          referrals_per_source: segments.length > 0 ? totalPatients / segments.length : 0,
-          sources_active_monthly: segments.filter(s => s.value > 0).length
-        }
-      },
-      meta: {
-        generated_at: new Date().toISOString(),
-        data_points: monthlyData.length,
-        total_sources: segments.length,
-        analysis_period: `${getStartOfRange(monthYear)} to ${monthYear}`
       }
     }), {
       headers: { 'Content-Type': 'application/json' }
