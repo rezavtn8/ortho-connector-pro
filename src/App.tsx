@@ -10,23 +10,30 @@ import { AppStateProvider } from "@/contexts/AppStateContext";
 import { queryClient } from "@/lib/queryClient";
 import Index from "./pages/Index";
 
-const App = () => (
-  <AppErrorBoundary>
-    <QueryClientProvider client={queryClient}>
+// Inner component that needs Router context
+function AppContent() {
+  return (
+    <AppErrorBoundary>
       <AppStateProvider>
         <TooltipProvider>
           <ConnectionMonitor />
           <Toaster />
           <Sonner />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/*" element={<Index />} />
-            </Routes>
-          </BrowserRouter>
+          <Routes>
+            <Route path="/*" element={<Index />} />
+          </Routes>
         </TooltipProvider>
       </AppStateProvider>
-    </QueryClientProvider>
-  </AppErrorBoundary>
+    </AppErrorBoundary>
+  );
+}
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <BrowserRouter>
+      <AppContent />
+    </BrowserRouter>
+  </QueryClientProvider>
 );
 
 export default App;
