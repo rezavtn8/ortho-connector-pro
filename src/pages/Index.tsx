@@ -6,7 +6,7 @@ import { AuthForm } from '@/components/AuthForm';
 import { Layout } from '@/components/Layout';
 import { LandingPage } from '@/components/LandingPage';
 import { SessionTimeoutWarning } from '@/components/SessionTimeoutWarning';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { PageErrorBoundary } from '@/components/AppErrorBoundary';
 import { SuspenseWrapper } from '@/components/SuspenseWrapper';
 import { usePrefetch } from '@/hooks/usePrefetch';
 import { Dashboard } from '@/pages/Dashboard';
@@ -24,6 +24,21 @@ import { Logs } from '@/pages/Logs';
 import AIAssistant from '@/pages/AIAssistant';
 import { Creator } from '@/pages/Creator';
 import { useState } from 'react';
+
+// Helper component to wrap routes with error boundaries
+const ProtectedRoute = ({ 
+  children, 
+  pageName 
+}: { 
+  children: React.ReactNode; 
+  pageName: string; 
+}) => (
+  <PageErrorBoundary pageName={pageName}>
+    <SuspenseWrapper type="page">
+      {children}
+    </SuspenseWrapper>
+  </PageErrorBoundary>
+);
 
 const Index = () => {
   const { user, loading } = useAuth();
@@ -47,123 +62,121 @@ const Index = () => {
 
   return (
     <Layout>
-      <ErrorBoundary level="section">
-        <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route 
-            path="/dashboard/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <Dashboard />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/sources/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <Sources />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/sources/:sourceId/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <SourceDetail />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/offices/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <Offices />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/marketing-visits/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <MarketingVisits />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/campaigns/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <Campaigns />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/discover/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <Discover />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/reviews/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <Reviews />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/map-view/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <MapView />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/analytics/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <Analytics />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/ai-assistant/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <AIAssistant />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/creator/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <Creator />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/logs/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <Logs />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/settings/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <Settings />
-              </SuspenseWrapper>
-            } 
-          />
-        </Routes>
-      </ErrorBoundary>
+      <Routes>
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route 
+          path="/dashboard/*" 
+          element={
+            <ProtectedRoute pageName="Dashboard">
+              <Dashboard />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/sources/*" 
+          element={
+            <ProtectedRoute pageName="Sources">
+              <Sources />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/sources/:sourceId/*" 
+          element={
+            <ProtectedRoute pageName="Source Detail">
+              <SourceDetail />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/offices/*" 
+          element={
+            <ProtectedRoute pageName="Offices">
+              <Offices />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/marketing-visits/*" 
+          element={
+            <ProtectedRoute pageName="Marketing Visits">
+              <MarketingVisits />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/campaigns/*" 
+          element={
+            <ProtectedRoute pageName="Campaigns">
+              <Campaigns />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/discover/*" 
+          element={
+            <ProtectedRoute pageName="Discover">
+              <Discover />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/reviews/*" 
+          element={
+            <ProtectedRoute pageName="Reviews">
+              <Reviews />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/map-view/*" 
+          element={
+            <ProtectedRoute pageName="Map View">
+              <MapView />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/analytics/*" 
+          element={
+            <ProtectedRoute pageName="Analytics">
+              <Analytics />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/ai-assistant/*" 
+          element={
+            <ProtectedRoute pageName="AI Assistant">
+              <AIAssistant />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/creator/*" 
+          element={
+            <ProtectedRoute pageName="Creator">
+              <Creator />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/logs/*" 
+          element={
+            <ProtectedRoute pageName="Logs">
+              <Logs />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/settings/*" 
+          element={
+            <ProtectedRoute pageName="Settings">
+              <Settings />
+            </ProtectedRoute>
+          } 
+        />
+      </Routes>
       <SessionTimeoutWarning />
     </Layout>
   );
