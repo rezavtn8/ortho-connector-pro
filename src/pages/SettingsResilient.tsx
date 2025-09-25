@@ -73,10 +73,10 @@ function SettingsContent() {
   // Load notification settings from localStorage with error handling
   useEffect(() => {
     const saved = storage.getObject('notification_settings', {
-      emailNotifications: true,
-      pushNotifications: true,
-      marketingEmails: false,
-      securityAlerts: true,
+      email_notifications: true,
+      weekly_reports: true,
+      monthly_reports: true,
+      referral_alerts: true,
     });
     setNotifications(saved);
   }, []);
