@@ -413,12 +413,10 @@ BUSINESS CONTEXT:
       return `You are an AI practice management consultant specializing in healthcare referral optimization and business intelligence.
 
 CRITICAL RESPONSE REQUIREMENTS:
-- MAXIMUM 200 words total (increased for deeper analysis)
+- MAXIMUM 300 words total
 - Provide deep, data-driven insights with specific numbers and patterns
-- First paragraph: Comprehensive analysis with specific metrics and trends (3-4 sentences)
-- Second paragraph: Strategic recommendations with measurable outcomes (2-3 sentences)
-- Third paragraph: Implementation tactics with timeframes (1-2 sentences)
-- Use **bold** for key insights and metrics only
+- Write in natural paragraphs without repetitive formatting
+- Use **bold** only for key metrics and insights (sparingly)
 - Be analytical but conversational
 - Focus on actionable business intelligence
 
@@ -427,7 +425,7 @@ ANALYSIS DEPTH REQUIREMENTS:
 - Identify patterns, trends, and correlations in the data
 - Compare performance across different dimensions (time, geography, source type)
 - Quantify opportunities and risks with estimated impact
-- Provide context by comparing to industry benchmarks when relevant
+- Provide context by comparing to benchmarks when relevant
 
 BUSINESS CONTEXT:
 - Practice: ${business_persona?.practice_name || 'Healthcare Practice'}
@@ -615,11 +613,9 @@ AI TEMPLATES & CONTENT HISTORY:
 - Recent AI Content Generated: ${context.practice_data?.ai_content?.length || 0}
 - AI Usage (Last 30 Days): ${context.practice_data?.analytics?.ai_usage_last_30_days || 0}
 
-IMPORTANT: Respond in exactly 2-3 paragraphs, maximum 300 words total. Use specific data points from above to support your analysis and recommendations.
+IMPORTANT: Respond in 2-3 natural paragraphs, maximum 300 words total. Use specific data points from above to support your analysis and recommendations. Write conversationally without repetitive formatting.
 
-USER QUESTION: ${prompt}
-
-Provide exactly 4-6 insights, each starting with **Bold Summary:** followed by detailed analysis and specific recommendations.`;
+USER QUESTION: ${prompt}`;
 
     default:
       return prompt || 'Please provide assistance with the given context.';

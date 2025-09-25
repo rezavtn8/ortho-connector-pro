@@ -117,13 +117,29 @@ export function AIChatAssistant() {
         monthlyResult, 
         userProfileResult,
         clinicResult,
-        visitsResult
+        visitsResult,
+        campaignsResult,
+        campaignDeliveriesResult,
+        discoveredOfficesResult,
+        reviewStatusResult,
+        sourceTagsResult,
+        aiBusinessProfileResult,
+        aiContentResult,
+        aiTemplatesResult
       ] = await Promise.all([
         supabase.from('patient_sources').select('*').eq('created_by', user?.id),
         supabase.from('monthly_patients').select('*').eq('user_id', user?.id).order('year_month', { ascending: false }),
         supabase.from('user_profiles').select('*').eq('user_id', user?.id).single(),
         supabase.from('clinics').select('*').eq('owner_id', user?.id).maybeSingle(),
-        supabase.from('marketing_visits').select('*').eq('user_id', user?.id).order('visit_date', { ascending: false }).limit(50)
+        supabase.from('marketing_visits').select('*').eq('user_id', user?.id).order('visit_date', { ascending: false }).limit(50),
+        supabase.from('campaigns').select('*').eq('created_by', user?.id).order('created_at', { ascending: false }).limit(20),
+        supabase.from('campaign_deliveries').select('*').eq('created_by', user?.id).order('created_at', { ascending: false }).limit(30),
+        supabase.from('discovered_offices').select('*').eq('discovered_by', user?.id).order('created_at', { ascending: false }).limit(50),
+        supabase.from('review_status').select('*').eq('user_id', user?.id).order('created_at', { ascending: false }).limit(30),
+        supabase.from('source_tags').select('*').eq('user_id', user?.id),
+        supabase.from('ai_business_profiles').select('*').eq('user_id', user?.id).single(),
+        supabase.from('ai_generated_content').select('*').eq('user_id', user?.id).order('created_at', { ascending: false }).limit(20),
+        supabase.from('ai_response_templates').select('*').eq('user_id', user?.id).limit(20)
       ]);
 
       const sources = sourcesResult.data || [];
@@ -131,6 +147,14 @@ export function AIChatAssistant() {
       const userProfile = userProfileResult.data;
       const clinic = clinicResult.data;
       const visits = visitsResult.data || [];
+      const campaigns = campaignsResult.data || [];
+      const campaignDeliveries = campaignDeliveriesResult.data || [];
+      const discoveredOffices = discoveredOfficesResult.data || [];
+      const reviewStatus = reviewStatusResult.data || [];
+      const sourceTags = sourceTagsResult.data || [];
+      const aiBusinessProfile = aiBusinessProfileResult.data;
+      const aiContent = aiContentResult.data || [];
+      const aiTemplates = aiTemplatesResult.data || [];
 
       // Calculate comprehensive analytics for deeper insights
       const currentMonth = new Date().toISOString().slice(0, 7);
@@ -184,27 +208,77 @@ export function AIChatAssistant() {
           completed_visits: visits.filter(v => v.visited).length,
           avg_rating: visits.filter(v => v.star_rating).reduce((sum, v) => sum + (v.star_rating || 0), 0) / visits.filter(v => v.star_rating).length || 0,
           recent_visits: visits.filter(v => new Date(v.visit_date) >= new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length
+        },
+        
+        // Campaign metrics
+        campaign_metrics: {
+          total_campaigns: campaigns.length,
+          active_campaigns: campaigns.filter(c => c.status === 'Active').length,
+          completed_campaigns: campaigns.filter(c => c.status === 'Completed').length,
+          draft_campaigns: campaigns.filter(c => c.status === 'Draft').length,
+          total_deliveries: campaignDeliveries.length,
+          completed_deliveries: campaignDeliveries.filter(d => d.delivery_status === 'Completed').length
+        },
+        
+        // Discovery metrics
+        discovery_metrics: {
+          total_discovered: discoveredOffices.length,
+          imported_offices: discoveredOffices.filter(d => d.imported).length,
+          office_types: discoveredOffices.reduce((acc, d) => {
+            acc[d.office_type] = (acc[d.office_type] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>),
+          avg_rating: discoveredOffices.filter(d => d.rating).reduce((sum, d) => sum + (d.rating || 0), 0) / discoveredOffices.filter(d => d.rating).length || 0
+        },
+        
+        // Review metrics
+        review_metrics: {
+          total_reviews: reviewStatus.length,
+          needs_attention: reviewStatus.filter(r => r.needs_attention).length,
+          review_statuses: reviewStatus.reduce((acc, r) => {
+            acc[r.status] = (acc[r.status] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>)
+        },
+        
+        // AI usage metrics
+        ai_metrics: {
+          total_content_generated: aiContent.length,
+          active_templates: aiTemplates.filter(t => t.is_active).length,
+          template_types: aiTemplates.reduce((acc, t) => {
+            acc[t.template_type] = (acc[t.template_type] || 0) + 1;
+            return acc;
+          }, {} as Record<string, number>)
         }
       };
 
       const { data, error } = await supabase.functions.invoke('ai-assistant', {
         body: {
           task_type: 'practice_consultation',
-          context: {
-            business_profile: businessProfile,
-            practice_data: {
-              // Comprehensive data for deep analysis
-              sources: sources,
-              monthly_data: monthlyData,
-              user_profile: userProfile,
-              clinic_info: clinic,
-              marketing_visits: visits,
-              
-              // Rich analytics for deeper insights
-              analytics: analytics
+            context: {
+              business_profile: businessProfile || aiBusinessProfile,
+              practice_data: {
+                // Core practice data
+                sources: sources,
+                monthly_data: monthlyData,
+                user_profile: userProfile,
+                clinic_info: clinic,
+                marketing_visits: visits,
+                
+                // Extended data for comprehensive analysis
+                campaigns: campaigns,
+                campaign_deliveries: campaignDeliveries,
+                discovered_offices: discoveredOffices,
+                reviews: reviewStatus,
+                source_tags: sourceTags,
+                ai_content: aiContent,
+                ai_templates: aiTemplates,
+                
+                // Rich analytics for deeper insights
+                analytics: analytics
+              },
+              conversation_history: messages.slice(-3) // Last 3 messages for better context
             },
-            conversation_history: messages.slice(-3) // Last 3 messages for better context
-          },
           prompt: content,
         },
         headers: {
