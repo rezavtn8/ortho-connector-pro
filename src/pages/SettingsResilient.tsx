@@ -21,6 +21,7 @@ import {
   CheckCircle,
   WifiOff
 } from 'lucide-react';
+import { storage } from '@/lib/storage';
 
 interface ClinicSettings {
   clinic_name: string;
@@ -69,16 +70,15 @@ function SettingsContent() {
     setLocalProfile(profile);
   }, [profile]);
 
-  // Load notification settings from localStorage
+  // Load notification settings from localStorage with error handling
   useEffect(() => {
-    const saved = localStorage.getItem('notification_settings');
-    if (saved) {
-      try {
-        setNotifications(JSON.parse(saved));
-      } catch (error) {
-        console.error('Error loading notification settings:', error);
-      }
-    }
+    const saved = storage.getObject('notification_settings', {
+      emailNotifications: true,
+      pushNotifications: true,
+      marketingEmails: false,
+      securityAlerts: true,
+    });
+    setNotifications(saved);
   }, []);
 
   const loadClinicSettings = async (clinicId: string) => {
@@ -235,7 +235,7 @@ function SettingsContent() {
 
   const saveNotificationSettings = async () => {
     try {
-      localStorage.setItem('notification_settings', JSON.stringify(notifications));
+      storage.setItem('notification_settings', notifications);
       toast({
         title: 'Success',
         description: 'Notification preferences saved',

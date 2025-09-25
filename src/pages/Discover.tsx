@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { storage, STORAGE_KEYS } from '@/lib/storage';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -59,23 +60,11 @@ interface UserProfile {
 
 export const Discover = () => {
   const [currentSession, setCurrentSession] = useState<DiscoverySession | null>(() => {
-    // Restore session from localStorage on component mount
-    try {
-      const saved = localStorage.getItem('discoverySession');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
+    return storage.getObject(STORAGE_KEYS.DISCOVERY_SESSION, null);
   });
   
   const [discoveredOffices, setDiscoveredOffices] = useState<DiscoveredOffice[]>(() => {
-    // Restore offices from localStorage on component mount
-    try {
-      const saved = localStorage.getItem('discoveredOffices');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
+    return storage.getObject(STORAGE_KEYS.DISCOVERED_OFFICES, []);
   });
   
   const [isLoading, setIsLoading] = useState(false);
@@ -90,17 +79,17 @@ export const Discover = () => {
   // Persist results to localStorage whenever they change
   useEffect(() => {
     if (currentSession) {
-      localStorage.setItem('discoverySession', JSON.stringify(currentSession));
+      storage.setItem(STORAGE_KEYS.DISCOVERY_SESSION, currentSession);
     } else {
-      localStorage.removeItem('discoverySession');
+      storage.removeItem(STORAGE_KEYS.DISCOVERY_SESSION);
     }
   }, [currentSession]);
 
   useEffect(() => {
     if (discoveredOffices.length > 0) {
-      localStorage.setItem('discoveredOffices', JSON.stringify(discoveredOffices));
+      storage.setItem(STORAGE_KEYS.DISCOVERED_OFFICES, discoveredOffices);
     } else {
-      localStorage.removeItem('discoveredOffices');
+      storage.removeItem(STORAGE_KEYS.DISCOVERED_OFFICES);
     }
   }, [discoveredOffices]);
 
@@ -448,9 +437,9 @@ export const Discover = () => {
     console.log('🔄 handleStartOver: Clearing all discovery results and starting fresh');
     setCurrentSession(null);
     setDiscoveredOffices([]);
-    // Clear localStorage as well
-    localStorage.removeItem('discoverySession');
-    localStorage.removeItem('discoveredOffices');
+    // Clear storage as well
+    storage.removeItem(STORAGE_KEYS.DISCOVERY_SESSION);
+    storage.removeItem(STORAGE_KEYS.DISCOVERED_OFFICES);
   };
 
   return (

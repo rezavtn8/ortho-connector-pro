@@ -7,6 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { MessageSquare, Send, Bot, User, Lightbulb, BarChart3, FileText, Users, AlertTriangle, TrendingUp, Target } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useAIChatMessages } from '@/contexts/AppStateContext';
 import { toast } from '@/hooks/use-toast';
 
 interface ChatMessage {
@@ -19,56 +20,25 @@ interface ChatMessage {
 
 export function AIChatAssistant() {
   const { user } = useAuth();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const { messages, setMessages } = useAIChatMessages();
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [businessProfile, setBusinessProfile] = useState<any>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  // Load messages from localStorage on component mount
+  // Initialize with welcome message if no messages exist
   useEffect(() => {
-    if (user) {
-      const storageKey = `ai-chat-messages-${user.id}`;
-      const savedMessages = localStorage.getItem(storageKey);
-      if (savedMessages) {
-        try {
-          const parsed = JSON.parse(savedMessages);
-          const messagesWithDates = parsed.map((msg: any) => ({
-            ...msg,
-            timestamp: new Date(msg.timestamp)
-          }));
-          setMessages(messagesWithDates);
-        } catch (error) {
-          console.error('Error loading saved messages:', error);
-          // Set default welcome message if parsing fails
-          setMessages([{
-            id: '1',
-            role: 'assistant',
-            content: "Hi! I'm your AI practice assistant. I can help you analyze your referral patterns, suggest growth strategies, create marketing content, and answer questions about your practice data. What would you like to explore today?",
-            timestamp: new Date(),
-            type: 'general'
-          }]);
-        }
-      } else {
-        // Set default welcome message for new users
-        setMessages([{
-          id: '1',
-          role: 'assistant',
-          content: "Hi! I'm your AI practice assistant. I can help you analyze your referral patterns, suggest growth strategies, create marketing content, and answer questions about your practice data. What would you like to explore today?",
-          timestamp: new Date(),
-          type: 'general'
-        }]);
-      }
+    if (messages.length === 0) {
+      const welcomeMessage = [{
+        id: '1',
+        role: 'assistant' as const,
+        content: "Hi! I'm your AI practice assistant. I can help you analyze your referral patterns, suggest growth strategies, create marketing content, and answer questions about your practice data. What would you like to explore today?",
+        timestamp: new Date(),
+        type: 'general' as const
+      }];
+      setMessages(welcomeMessage);
     }
-  }, [user]);
-
-  // Save messages to localStorage whenever messages change
-  useEffect(() => {
-    if (user && messages.length > 0) {
-      const storageKey = `ai-chat-messages-${user.id}`;
-      localStorage.setItem(storageKey, JSON.stringify(messages));
-    }
-  }, [messages, user]);
+  }, [messages.length, setMessages]);
 
   const quickActions = [
     {
@@ -143,7 +113,7 @@ export function AIChatAssistant() {
       timestamp: new Date()
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    setMessages([...messages, userMessage]);
     setInputMessage('');
     setIsLoading(true);
 
@@ -334,7 +304,7 @@ export function AIChatAssistant() {
               content.toLowerCase().includes('suggest') || content.toLowerCase().includes('recommend') ? 'suggestion' : 'general'
       };
 
-      setMessages(prev => [...prev, assistantMessage]);
+      setMessages([...messages, assistantMessage]);
     } catch (error: any) {
       console.error('Error calling AI assistant:', error);
       toast({
@@ -350,7 +320,7 @@ export function AIChatAssistant() {
         timestamp: new Date()
       };
 
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages([...messages, errorMessage]);
     } finally {
       setIsLoading(false);
     }
