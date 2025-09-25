@@ -300,7 +300,7 @@ export function AIChatAssistant() {
   };
 
   return (
-    <Card className="h-[600px] flex flex-col">
+    <Card className="h-[600px] flex flex-col overflow-hidden">
       <CardHeader className="flex-shrink-0">
         <CardTitle className="flex items-center gap-2">
           <MessageSquare className="h-5 w-5 text-primary" />
@@ -308,16 +308,16 @@ export function AIChatAssistant() {
         </CardTitle>
       </CardHeader>
       
-      <CardContent className="flex-1 flex flex-col space-y-4 p-6">
+      <CardContent className="flex-1 flex flex-col space-y-4 p-6 min-h-0">
         {/* Chat Messages */}
-        <ScrollArea className="flex-1 pr-4" ref={scrollAreaRef}>
-          <div className="space-y-4">
+        <ScrollArea className="flex-1 w-full" ref={scrollAreaRef}>
+          <div className="space-y-4 pr-4">
             {messages.map((message) => {
               const IconComponent = getMessageIcon(message);
               return (
                 <div
                   key={message.id}
-                  className={`flex gap-3 ${
+                  className={`flex gap-3 w-full ${
                     message.role === 'user' ? 'justify-end' : 'justify-start'
                   }`}
                 >
@@ -328,7 +328,7 @@ export function AIChatAssistant() {
                   )}
                   
                   <div
-                    className={`max-w-[80%] rounded-lg p-4 ${
+                    className={`max-w-[calc(100%-3rem)] min-w-0 rounded-lg p-4 break-words ${
                       message.role === 'user'
                         ? 'bg-primary text-primary-foreground'
                         : 'bg-muted'
@@ -336,11 +336,11 @@ export function AIChatAssistant() {
                   >
                     <div className="flex items-start justify-between gap-2 mb-1">
                       {getMessageBadge(message)}
-                      <span className="text-xs opacity-70">
+                      <span className="text-xs opacity-70 flex-shrink-0">
                         {formatTime(message.timestamp)}
                       </span>
                     </div>
-                    <div className="text-sm whitespace-pre-wrap leading-relaxed">
+                    <div className="text-sm whitespace-pre-wrap leading-relaxed break-words">
                       {formatMessageContent(message.content)}
                     </div>
                   </div>
@@ -355,11 +355,11 @@ export function AIChatAssistant() {
             })}
             
             {isLoading && (
-              <div className="flex gap-3 justify-start">
+              <div className="flex gap-3 justify-start w-full">
                 <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
                   <Bot className="h-4 w-4 text-primary" />
                 </div>
-                <div className="bg-muted rounded-lg p-4 max-w-[80%]">
+                <div className="bg-muted rounded-lg p-4 max-w-[calc(100%-3rem)] min-w-0 break-words">
                   <div className="flex items-center space-x-2">
                     <div className="animate-pulse flex space-x-1">
                       <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
