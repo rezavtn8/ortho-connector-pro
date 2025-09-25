@@ -12,17 +12,21 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let supabaseClient;
+  let user;
+
   try {
-    const supabaseClient = createClient(
+    supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     );
 
-    const { data: { user } } = await supabaseClient.auth.getUser();
-    if (!user) {
+    const { data: { user: authUser } } = await supabaseClient.auth.getUser();
+    if (!authUser) {
       throw new Error('Unauthorized');
     }
+    user = authUser;
 
     console.log('Comprehensive AI Insights function called for user:', user.id);
 
@@ -40,50 +44,96 @@ serve(async (req) => {
 
     // Build comprehensive analysis prompt
     const prompt = buildComprehensivePrompt(context);
-    console.log('Prompt prepared, calling GPT-5...');
+    console.log('Prompt prepared, calling OpenAI...');
 
-    const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-5-2025-08-07',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an expert healthcare business consultant and data analyst with 20+ years of experience helping medical practices optimize their referral networks, patient acquisition, and operational efficiency. You have deep expertise in healthcare marketing, practice management, and data-driven decision making.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        max_completion_tokens: 2000,
-        response_format: { type: "json_object" }
-      }),
-    });
+    // Add timeout to prevent hanging
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 second timeout
 
-    if (!openAIResponse.ok) {
-      const errorText = await openAIResponse.text();
-      console.error('OpenAI API error:', errorText);
-      throw new Error(`OpenAI API error: ${openAIResponse.status} ${errorText}`);
-    }
-
-    const openAIData = await openAIResponse.json();
-    console.log('GPT-5 response received');
-
-    const content = openAIData.choices[0].message.content;
-    console.log('Content preview:', content.substring(0, 100) + '...');
-
-    // Parse the JSON response
+    let openAIData;
     let insights;
+
     try {
-      insights = JSON.parse(content);
-    } catch (parseError) {
-      console.error('Failed to parse AI response as JSON:', parseError);
-      throw new Error('Invalid AI response format');
+      const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini', // Use faster model for better reliability
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an expert healthcare business consultant. Analyze the provided practice data and return ONLY valid JSON with insights. No additional text, explanations, or formatting - just pure JSON.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          max_tokens: 1500,
+          temperature: 0.7,
+          response_format: { type: "json_object" }
+        }),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!openAIResponse.ok) {
+        const errorText = await openAIResponse.text();
+        console.error('OpenAI API error:', openAIResponse.status, errorText);
+        throw new Error(`OpenAI API error: ${openAIResponse.status}`);
+      }
+
+      openAIData = await openAIResponse.json();
+      console.log('OpenAI response received successfully');
+
+      const content = openAIData.choices?.[0]?.message?.content;
+      if (!content) {
+        console.error('No content in OpenAI response:', openAIData);
+        throw new Error('No content received from OpenAI');
+      }
+
+      console.log('Content length:', content.length);
+      console.log('Content preview:', content.substring(0, 200) + '...');
+
+      // Parse the JSON response with better error handling
+      try {
+        insights = JSON.parse(content.trim());
+        console.log('JSON parsed successfully, insights count:', insights.insights?.length || 0);
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError);
+        console.error('Raw content:', content);
+        
+        // Try to extract JSON from potentially malformed response
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            insights = JSON.parse(jsonMatch[0]);
+            console.log('Recovered JSON from match, insights count:', insights.insights?.length || 0);
+          } catch (secondParseError) {
+            console.error('Failed to parse recovered JSON:', secondParseError);
+            throw new Error('Unable to parse AI response as valid JSON');
+          }
+        } else {
+          throw new Error('No valid JSON found in AI response');
+        }
+      }
+
+      if (!insights.insights || !Array.isArray(insights.insights)) {
+        console.error('Invalid insights structure:', insights);
+        throw new Error('AI response missing required insights array');
+      }
+
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        console.error('OpenAI request timed out');
+        throw new Error('AI analysis timed out - please try again');
+      }
+      throw fetchError;
     }
 
     // Track AI usage
@@ -92,9 +142,9 @@ serve(async (req) => {
       .insert({
         user_id: user.id,
         task_type: 'comprehensive_business_analysis',
-        model_used: 'gpt-5-2025-08-07',
+        model_used: 'gpt-4o-mini',
         tokens_used: openAIData.usage?.total_tokens || 0,
-        estimated_cost: (openAIData.usage?.total_tokens || 0) * 0.00002,
+        estimated_cost: (openAIData.usage?.total_tokens || 0) * 0.000005, // gpt-4o-mini pricing
         success: true,
         request_data: { context_summary: 'comprehensive_platform_data' },
         response_data: { insights_count: insights.insights?.length || 0 }
@@ -104,7 +154,7 @@ serve(async (req) => {
       insights: insights.insights || [],
       metadata: {
         generated_at: new Date().toISOString(),
-        model_used: 'gpt-5-2025-08-07',
+        model_used: 'gpt-4o-mini',
         tokens_used: openAIData.usage?.total_tokens || 0,
         data_points: {
           sources: context.sources?.length || 0,
@@ -121,6 +171,28 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error('Error in comprehensive-ai-insights function:', error);
+    
+    // Track failed usage
+    try {
+      if (supabaseClient && user) {
+        await supabaseClient
+          .from('ai_usage_tracking')
+          .insert({
+            user_id: user.id,
+            task_type: 'comprehensive_business_analysis',
+            model_used: 'gpt-4o-mini',
+            tokens_used: 0,
+            estimated_cost: 0,
+            success: false,
+            error_message: error.message,
+            request_data: { error: 'analysis_failed' },
+            response_data: null
+          });
+      }
+    } catch (trackingError) {
+      console.error('Failed to track error:', trackingError);
+    }
+    
     return new Response(JSON.stringify({ 
       error: error.message || 'Failed to generate insights',
       fallback: true 
@@ -171,8 +243,8 @@ function buildComprehensivePrompt(context: any): string {
   return `Analyze this comprehensive healthcare practice data and identify the 3-5 most critical business insights. Be specific, actionable, and focus on problems, opportunities, and strategic recommendations.
 
 **PRACTICE OVERVIEW:**
-- Practice: ${clinic_info?.name || 'Healthcare Practice'}
-- Business Profile: ${business_profile?.specialties?.join(', ') || 'General Practice'}
+- Practice: ${clinic_info?.name || business_profile?.business_persona?.practice_name || 'Healthcare Practice'}
+- Specialties: ${business_profile?.specialties?.join(', ') || 'General Practice'}
 - Communication Style: ${business_profile?.communication_style || 'Professional'}
 
 **KEY METRICS:**
@@ -184,38 +256,6 @@ function buildComprehensivePrompt(context: any): string {
 - Reviews: ${reviews.length} tracked, ${needsAttentionReviews} need attention
 - AI Usage: ${ai_usage_history.length} recent uses
 
-**DETAILED DATA FOR ANALYSIS:**
-
-Referral Sources (${sources.length}):
-${sources.slice(0, 10).map((s: any) => 
-  `- ${s.name} (${s.source_type}): ${s.is_active ? 'Active' : 'Inactive'}, Rating: ${s.google_rating || 'N/A'}`
-).join('\n')}
-
-Monthly Patient Data (${monthly_data.length} records):
-${monthly_data.slice(-6).map((m: any) => 
-  `- ${m.year_month}: ${m.patient_count} patients`
-).join('\n')}
-
-Recent Marketing Visits (${visits.length}):
-${visits.slice(-5).map((v: any) => 
-  `- ${v.visit_date}: ${v.visited ? 'Completed' : 'Pending'}, Type: ${v.visit_type}, Rating: ${v.star_rating || 'N/A'}`
-).join('\n')}
-
-Campaign Performance (${campaigns.length}):
-${campaigns.slice(-3).map((c: any) => 
-  `- ${c.name}: Status ${c.status}, Type: ${c.campaign_type}, Deliveries: ${campaign_deliveries.filter((d: any) => d.campaign_id === c.id).length}`
-).join('\n')}
-
-Discovered Opportunities (${discovered_offices.length}):
-${discovered_offices.slice(0, 5).map((d: any) => 
-  `- ${d.name}: ${d.office_type}, Rating: ${d.rating || 'N/A'}, ${d.imported ? 'Imported' : 'Not Imported'}`
-).join('\n')}
-
-Reviews Status (${reviews.length}):
-${reviews.slice(-3).map((r: any) => 
-  `- Status: ${r.status}, Needs Attention: ${r.needs_attention ? 'Yes' : 'No'}`
-).join('\n')}
-
 **ANALYSIS REQUIREMENTS:**
 1. Identify 3-5 critical business insights based on patterns, problems, and opportunities in the data
 2. Each insight must be SPECIFIC to this practice's data - not generic advice
@@ -224,12 +264,13 @@ ${reviews.slice(-3).map((r: any) =>
 5. Provide specific recommendations with measurable outcomes
 6. Prioritize insights by business impact (high/medium/low)
 
-**RESPONSE FORMAT (JSON only):**
+**CRITICAL: Return ONLY valid JSON. No explanations, no markdown, no additional text.**
+
 {
   "insights": [
     {
       "title": "Specific Problem/Opportunity Title",
-      "priority": "high|medium|low",
+      "priority": "high",
       "summary": "One sentence specific problem statement with key numbers",
       "recommendation": "Specific action to take with expected outcome",
       "detailedAnalysis": "Detailed explanation of the issue, why it matters, and supporting data points from the analysis",

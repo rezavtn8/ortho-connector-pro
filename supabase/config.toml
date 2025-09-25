@@ -9,6 +9,9 @@ verify_jwt = false
 [functions.get-mapbox-token]
 verify_jwt = false
 
+[functions.comprehensive-ai-insights]
+verify_jwt = true
+
 [functions.discover-nearby-offices]
 verify_jwt = true
 

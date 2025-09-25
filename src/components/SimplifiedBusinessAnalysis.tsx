@@ -178,7 +178,7 @@ export function SimplifiedBusinessAnalysis() {
           status: 'generated',
           metadata: { 
             method: 'comprehensive_ai',
-            model_used: 'gpt-5-2025-08-07',
+            model_used: 'gpt-4o-mini',
             data_points: aiResponse.metadata?.data_points || {}
           },
         });
@@ -188,7 +188,7 @@ export function SimplifiedBusinessAnalysis() {
 
       toast({
         title: "AI Analysis Complete",
-        description: `Generated ${processedInsights.length} dynamic insights using GPT-5.`,
+        description: `Generated ${processedInsights.length} dynamic insights using GPT-4o-mini.`,
       });
 
     } catch (error: any) {
@@ -382,7 +382,7 @@ export function SimplifiedBusinessAnalysis() {
           <div className="space-y-4">
             <div>
               <p className="text-muted-foreground">
-                Dynamic AI analysis powered by GPT-5 that examines your complete practice data - referral sources, patient trends, campaigns, discovered offices, reviews, and marketing activities - to identify critical opportunities and provide actionable recommendations.
+                Dynamic AI analysis powered by GPT-4o-mini that examines your complete practice data - referral sources, patient trends, campaigns, discovered offices, reviews, and marketing activities - to identify critical opportunities and provide actionable recommendations.
               </p>
             </div>
 
