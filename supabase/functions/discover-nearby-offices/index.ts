@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { validateGoogleApiKey, createApiKeyErrorResponse } from "../_shared/google-api-validation.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -98,10 +99,13 @@ serve(async (req) => {
     // Rate limiting temporarily disabled for testing
     console.log('Rate limiting disabled - proceeding with API call');
 
-    // Call Google Places API
+    // Get and validate Google Places API key
     const googleApiKey = Deno.env.get('GOOGLE_MAPS_API_KEY');
-    if (!googleApiKey) {
-      throw new Error('Google Maps API key not configured');
+    console.log(`discover-nearby-offices: Processing discovery request [${crypto.randomUUID().substring(0, 8)}]`);
+    
+    const validation = validateGoogleApiKey(googleApiKey, 'discovery-request');
+    if (!validation.isValid) {
+      throw new Error(validation.userMessage || 'Google Maps API configuration error');
     }
 
     // Create discovery session to track this search
