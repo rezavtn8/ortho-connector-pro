@@ -27,7 +27,7 @@ export function AIChatAssistant() {
   const [isLoading, setIsLoading] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  // Initialize with welcome message if no messages exist
+  // Initialize with welcome message if no messages exist and ensure timestamps are proper Date objects
   useEffect(() => {
     if (messages.length === 0) {
       const welcomeMessage = [{
@@ -38,6 +38,18 @@ export function AIChatAssistant() {
         type: 'general' as const
       }];
       setMessages(welcomeMessage);
+    } else {
+      // Ensure all existing messages have proper Date objects for timestamps
+      const messagesWithValidTimestamps = messages.map(message => ({
+        ...message,
+        timestamp: message.timestamp instanceof Date ? message.timestamp : new Date(message.timestamp)
+      }));
+      
+      // Only update if we actually converted some timestamps
+      const hasInvalidTimestamps = messages.some(m => !(m.timestamp instanceof Date));
+      if (hasInvalidTimestamps) {
+        setMessages(messagesWithValidTimestamps);
+      }
     }
   }, [messages.length, setMessages]);
 
@@ -174,11 +186,24 @@ export function AIChatAssistant() {
     handleSendMessage(prompt);
   };
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+  const formatTime = (date: Date | string | number) => {
+    try {
+      // Ensure we have a proper Date object
+      const dateObj = date instanceof Date ? date : new Date(date);
+      
+      // Check if the date is valid
+      if (isNaN(dateObj.getTime())) {
+        return 'Invalid time';
+      }
+      
+      return dateObj.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch (error) {
+      console.warn('Error formatting time:', error, 'Input:', date);
+      return 'Invalid time';
+    }
   };
 
   const getMessageIcon = (message: ChatMessage) => {
