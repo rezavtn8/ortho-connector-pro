@@ -8,6 +8,7 @@ import { MessageSquare, Send, Bot, User, Lightbulb, BarChart3, FileText, Users, 
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useAIChatMessages } from '@/contexts/AppStateContext';
+import { useUnifiedAIData } from '@/hooks/useUnifiedAIData';
 import { toast } from '@/hooks/use-toast';
 
 interface ChatMessage {
@@ -21,9 +22,9 @@ interface ChatMessage {
 export function AIChatAssistant() {
   const { user } = useAuth();
   const { messages, setMessages } = useAIChatMessages();
+  const { data: unifiedData, loading: dataLoading, fetchAllData } = useUnifiedAIData();
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [businessProfile, setBusinessProfile] = useState<any>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   // Initialize with welcome message if no messages exist
@@ -73,9 +74,12 @@ export function AIChatAssistant() {
     }
   ];
 
+  // Load unified data when component mounts
   useEffect(() => {
-    loadBusinessProfile();
-  }, [user]);
+    if (user && !unifiedData) {
+      fetchAllData();
+    }
+  }, [user, unifiedData, fetchAllData]);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -83,28 +87,21 @@ export function AIChatAssistant() {
     }
   }, [messages]);
 
-  const loadBusinessProfile = async () => {
-    if (!user) return;
-
-    try {
-      const { data, error } = await supabase.functions.invoke('ai-business-context', {
-        body: { action: 'get' },
-        headers: {
-          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-        },
-      });
-
-      if (!error && data.profile) {
-        setBusinessProfile(data.profile);
-      }
-    } catch (error: any) {
-      console.error('Error loading business profile:', error);
-    }
-  };
+  // Business profile is now part of unified data
+  const businessProfile = unifiedData?.business_profile;
 
   const handleSendMessage = async (messageContent?: string) => {
     const content = messageContent || inputMessage.trim();
     if (!content || isLoading) return;
+
+    if (!user) {
+      toast({
+        title: 'Authentication Required',
+        description: 'Please log in to use AI chat features.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -118,174 +115,21 @@ export function AIChatAssistant() {
     setIsLoading(true);
 
     try {
-      // Get comprehensive practice data for deeper analysis
-      const [
-        sourcesResult, 
-        monthlyResult, 
-        userProfileResult,
-        clinicResult,
-        visitsResult,
-        campaignsResult,
-        campaignDeliveriesResult,
-        discoveredOfficesResult,
-        reviewStatusResult,
-        sourceTagsResult,
-        aiBusinessProfileResult,
-        aiContentResult,
-        aiTemplatesResult
-      ] = await Promise.all([
-        supabase.from('patient_sources').select('id, name, source_type, is_active, created_at, address').eq('created_by', user?.id).order('created_at', { ascending: false }).limit(50),
-        supabase.from('monthly_patients').select('id, source_id, year_month, patient_count, updated_at').eq('user_id', user?.id).order('year_month', { ascending: false }).limit(50),
-        supabase.from('user_profiles').select('id, email, first_name, last_name, role, clinic_id').eq('user_id', user?.id).single(),
-        supabase.from('clinics').select('id, name, address, latitude, longitude').eq('owner_id', user?.id).maybeSingle(),
-        supabase.from('marketing_visits').select('id, office_id, visit_date, visited, star_rating, rep_name').eq('user_id', user?.id).order('visit_date', { ascending: false }).limit(50),
-        supabase.from('campaigns').select('id, name, status, campaign_type, created_at').eq('created_by', user?.id).order('created_at', { ascending: false }).limit(50),
-        supabase.from('campaign_deliveries').select('id, campaign_id, office_id, delivery_status, created_at').eq('created_by', user?.id).order('created_at', { ascending: false }).limit(50),
-        supabase.from('discovered_offices').select('id, name, address, office_type, rating, imported').eq('discovered_by', user?.id).order('created_at', { ascending: false }).limit(50),
-        supabase.from('review_status').select('id, status, needs_attention, created_at').eq('user_id', user?.id).order('created_at', { ascending: false }).limit(50),
-        supabase.from('source_tags').select('id, source_id, tag_name, created_at').eq('user_id', user?.id).order('created_at', { ascending: false }).limit(50),
-        supabase.from('ai_business_profiles').select('id, business_persona, specialties, target_audience').eq('user_id', user?.id).single(),
-        supabase.from('ai_generated_content').select('id, content_type, status, created_at').eq('user_id', user?.id).order('created_at', { ascending: false }).limit(50),
-        supabase.from('ai_response_templates').select('id, template_name, template_type, is_active').eq('user_id', user?.id).order('created_at', { ascending: false }).limit(50)
-      ]);
+      // Ensure we have unified data
+      const data = unifiedData || await fetchAllData();
+      
+      if (!data) {
+        throw new Error('Failed to load practice data');
+      }
 
-      const sources = sourcesResult.data || [];
-      const monthlyData = monthlyResult.data || [];
-      const userProfile = userProfileResult.data;
-      const clinic = clinicResult.data;
-      const visits = visitsResult.data || [];
-      const campaigns = campaignsResult.data || [];
-      const campaignDeliveries = campaignDeliveriesResult.data || [];
-      const discoveredOffices = discoveredOfficesResult.data || [];
-      const reviewStatus = reviewStatusResult.data || [];
-      const sourceTags = sourceTagsResult.data || [];
-      const aiBusinessProfile = aiBusinessProfileResult.data;
-      const aiContent = aiContentResult.data || [];
-      const aiTemplates = aiTemplatesResult.data || [];
-
-      // Calculate comprehensive analytics for deeper insights
-      const currentMonth = new Date().toISOString().slice(0, 7);
-      const lastMonth = new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().slice(0, 7);
-      const last6Months = Array.from({length: 6}, (_, i) => {
-        const date = new Date();
-        date.setMonth(date.getMonth() - i);
-        return date.toISOString().slice(0, 7);
-      });
-
-      const analytics = {
-        // Source metrics
-        total_sources: sources.length,
-        active_sources: sources.filter(s => s.is_active).length,
-        source_distribution: sources.reduce((acc, s) => {
-          acc[s.source_type] = (acc[s.source_type] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>),
-        
-        // Referral metrics
-        total_referrals_ytd: monthlyData.reduce((sum, m) => sum + (m.patient_count || 0), 0),
-        current_month_referrals: monthlyData.filter(m => m.year_month === currentMonth).reduce((sum, m) => sum + (m.patient_count || 0), 0),
-        last_month_referrals: monthlyData.filter(m => m.year_month === lastMonth).reduce((sum, m) => sum + (m.patient_count || 0), 0),
-        
-        // Performance trends
-        monthly_trends: last6Months.map(month => ({
-          month,
-          referrals: monthlyData.filter(m => m.year_month === month).reduce((sum, m) => sum + (m.patient_count || 0), 0),
-          active_sources: monthlyData.filter(m => m.year_month === month && m.patient_count > 0).length
-        })),
-        
-        // Top performers
-        top_sources: sources.map(source => {
-          const sourceReferrals = monthlyData.filter(m => m.source_id === source.id).reduce((sum, m) => sum + (m.patient_count || 0), 0);
-          const recent6MonthsReferrals = monthlyData.filter(m => m.source_id === source.id && last6Months.includes(m.year_month)).reduce((sum, m) => sum + (m.patient_count || 0), 0);
-          return { ...source, total_referrals: sourceReferrals, recent_referrals: recent6MonthsReferrals };
-        }).sort((a, b) => b.total_referrals - a.total_referrals).slice(0, 10),
-        
-        // Geographic insights
-        geographic_distribution: sources.reduce((acc, s) => {
-          if (s.address) {
-            const city = s.address.split(',')[1]?.trim() || 'Unknown';
-            acc[city] = (acc[city] || 0) + 1;
-          }
-          return acc;
-        }, {} as Record<string, number>),
-        
-        // Marketing visit metrics
-        visit_metrics: {
-          total_visits: visits.length,
-          completed_visits: visits.filter(v => v.visited).length,
-          avg_rating: visits.filter(v => v.star_rating).reduce((sum, v) => sum + (v.star_rating || 0), 0) / visits.filter(v => v.star_rating).length || 0,
-          recent_visits: visits.filter(v => new Date(v.visit_date) >= new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length
-        },
-        
-        // Campaign metrics
-        campaign_metrics: {
-          total_campaigns: campaigns.length,
-          active_campaigns: campaigns.filter(c => c.status === 'Active').length,
-          completed_campaigns: campaigns.filter(c => c.status === 'Completed').length,
-          draft_campaigns: campaigns.filter(c => c.status === 'Draft').length,
-          total_deliveries: campaignDeliveries.length,
-          completed_deliveries: campaignDeliveries.filter(d => d.delivery_status === 'Completed').length
-        },
-        
-        // Discovery metrics
-        discovery_metrics: {
-          total_discovered: discoveredOffices.length,
-          imported_offices: discoveredOffices.filter(d => d.imported).length,
-          office_types: discoveredOffices.reduce((acc, d) => {
-            acc[d.office_type] = (acc[d.office_type] || 0) + 1;
-            return acc;
-          }, {} as Record<string, number>),
-          avg_rating: discoveredOffices.filter(d => d.rating).reduce((sum, d) => sum + (d.rating || 0), 0) / discoveredOffices.filter(d => d.rating).length || 0
-        },
-        
-        // Review metrics
-        review_metrics: {
-          total_reviews: reviewStatus.length,
-          needs_attention: reviewStatus.filter(r => r.needs_attention).length,
-          review_statuses: reviewStatus.reduce((acc, r) => {
-            acc[r.status] = (acc[r.status] || 0) + 1;
-            return acc;
-          }, {} as Record<string, number>)
-        },
-        
-        // AI usage metrics
-        ai_metrics: {
-          total_content_generated: aiContent.length,
-          active_templates: aiTemplates.filter(t => t.is_active).length,
-          template_types: aiTemplates.reduce((acc, t) => {
-            acc[t.template_type] = (acc[t.template_type] || 0) + 1;
-            return acc;
-          }, {} as Record<string, number>)
-        }
-      };
-
-      const { data, error } = await supabase.functions.invoke('ai-assistant', {
+      const { data: aiResponse, error } = await supabase.functions.invoke('ai-assistant', {
         body: {
           task_type: 'practice_consultation',
-            context: {
-              business_profile: businessProfile || aiBusinessProfile,
-              practice_data: {
-                // Core practice data
-                sources: sources,
-                monthly_data: monthlyData,
-                user_profile: userProfile,
-                clinic_info: clinic,
-                marketing_visits: visits,
-                
-                // Extended data for comprehensive analysis
-                campaigns: campaigns,
-                campaign_deliveries: campaignDeliveries,
-                discovered_offices: discoveredOffices,
-                reviews: reviewStatus,
-                source_tags: sourceTags,
-                ai_content: aiContent,
-                ai_templates: aiTemplates,
-                
-                // Rich analytics for deeper insights
-                analytics: analytics
-              },
-              conversation_history: messages.slice(-3) // Last 3 messages for better context
-            },
+          context: {
+            business_profile: businessProfile,
+            practice_data: data,
+            conversation_history: messages.slice(-3) // Last 3 messages for better context
+          },
           prompt: content,
         },
         headers: {
@@ -298,7 +142,7 @@ export function AIChatAssistant() {
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: data.content || 'I apologize, but I encountered an issue processing your request. Please try again.',
+        content: aiResponse.content || 'I apologize, but I encountered an issue processing your request. Please try again.',
         timestamp: new Date(),
         type: content.toLowerCase().includes('analyz') || content.toLowerCase().includes('data') ? 'analysis' : 
               content.toLowerCase().includes('suggest') || content.toLowerCase().includes('recommend') ? 'suggestion' : 'general'

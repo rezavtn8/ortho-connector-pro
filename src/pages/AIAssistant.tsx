@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Brain, MessageSquare, Settings, Sparkles, BarChart3 } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Brain, MessageSquare, Settings, Sparkles, BarChart3, Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { useUnifiedAIData } from '@/hooks/useUnifiedAIData';
 import { SimplifiedBusinessAnalysis } from '@/components/SimplifiedBusinessAnalysis';
 import { AIChatAssistant } from '@/components/AIChatAssistant';
 import { AIBusinessSetup } from '@/components/AIBusinessSetup';
@@ -12,33 +13,10 @@ import { AIUsageDashboard } from '@/components/AIUsageDashboard';
 
 export default function AIAssistant() {
   const { user } = useAuth();
-  const [businessProfile, setBusinessProfile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: unifiedData, loading: dataLoading } = useUnifiedAIData();
 
-  useEffect(() => {
-    if (user) {
-      loadBusinessProfile();
-    }
-  }, [user]);
-
-  const loadBusinessProfile = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke('ai-business-context', {
-        body: { action: 'get' },
-        headers: {
-          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-        },
-      });
-
-      if (!error && data?.profile) {
-        setBusinessProfile(data.profile);
-      }
-    } catch (error) {
-      console.error('Failed to load business profile:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Business profile is now part of unified data
+  const businessProfile = unifiedData?.business_profile;
 
   if (!user) {
     return (
@@ -46,6 +24,24 @@ export default function AIAssistant() {
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">AI Assistant</h1>
           <p className="text-muted-foreground">Please log in to access AI features.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (dataLoading) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center space-y-4">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+            <div>
+              <h3 className="text-lg font-semibold">Loading AI Assistant</h3>
+              <p className="text-muted-foreground">
+                Loading your practice data for AI analysis...
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -62,6 +58,14 @@ export default function AIAssistant() {
           </p>
         </div>
       </div>
+
+      {!unifiedData && (
+        <Alert>
+          <AlertDescription>
+            Loading practice data for AI features. This may take a moment...
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList className="grid w-full grid-cols-4">
