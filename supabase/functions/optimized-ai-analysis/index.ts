@@ -1,15 +1,18 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { handleCorsPreflightRequest, createCorsResponse, validateOrigin, createOriginErrorResponse } from "../_shared/cors-config.ts";
 
 const handler = async (req: Request): Promise<Response> => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return handleCorsPreflightRequest(req, ['POST']);
+  }
+
+  // Validate origin for browser requests
+  const { isValid: originValid, origin } = validateOrigin(req);
+  if (!originValid) {
+    return createOriginErrorResponse(origin);
   }
 
   const startTime = Date.now();
@@ -38,10 +41,10 @@ const handler = async (req: Request): Promise<Response> => {
     const { data: { user } } = await supabase.auth.getUser(token);
 
     if (!user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      return createCorsResponse(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
+        headers: { 'Content-Type': 'application/json' },
+      }, req);
     }
 
     const { context } = await req.json();
@@ -109,26 +112,26 @@ const handler = async (req: Request): Promise<Response> => {
         success: true,
       });
 
-    return new Response(JSON.stringify({
+    return createCorsResponse(JSON.stringify({
       content: generatedContent,
       usage: {
         tokens_used: tokensUsed,
         execution_time_ms: Date.now() - startTime,
       }
     }), {
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
-    });
+      headers: { 'Content-Type': 'application/json' },
+    }, req);
 
   } catch (error: any) {
     console.error('Error in optimized-ai-analysis:', error);
 
-    return new Response(JSON.stringify({ 
+    return createCorsResponse(JSON.stringify({ 
       error: error.message,
       details: 'Analysis failed - check function logs for details'
     }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
-    });
+      headers: { 'Content-Type': 'application/json' },
+    }, req);
   }
 };
 

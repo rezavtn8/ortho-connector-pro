@@ -1,11 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { handleCorsPreflightRequest, createCorsResponse, validateOrigin, createOriginErrorResponse } from "../_shared/cors-config.ts";
 
 interface UserData {
   offices: any[];
@@ -25,8 +21,15 @@ interface UserData {
 }
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return handleCorsPreflightRequest(req, ['POST']);
+  }
+
+  // Validate origin for browser requests
+  const { isValid: originValid, origin } = validateOrigin(req);
+  if (!originValid) {
+    return createOriginErrorResponse(origin);
   }
 
   try {
@@ -318,7 +321,7 @@ User Question: ${question}
 
     const aiResponse = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated';
 
-    return new Response(
+    return createCorsResponse(
       JSON.stringify({
         response: aiResponse,
         dataContext: {
@@ -336,21 +339,21 @@ User Question: ${question}
         }
       }),
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+        headers: { 'Content-Type': 'application/json' },
+      }, req
     );
 
   } catch (error) {
     console.error('Error in gemini-insights function:', error);
-    return new Response(
+    return createCorsResponse(
       JSON.stringify({ 
         error: (error as Error).message,
         details: 'Failed to process AI insights request'
       }),
       {
         status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+        headers: { 'Content-Type': 'application/json' },
+      }, req
     );
   }
 });
