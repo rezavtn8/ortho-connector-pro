@@ -18,12 +18,17 @@ import {
   Calendar,
   Target,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  Brain,
+  Zap,
+  Eye,
+  Shield
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { format, subMonths } from 'date-fns';
+import { useUnifiedAIData } from '@/hooks/useUnifiedAIData';
 
 interface BusinessInsight {
   title: string;
@@ -45,6 +50,7 @@ interface AnalysisCache {
 
 export function SimplifiedBusinessAnalysis() {
   const { user } = useAuth();
+  const { data: unifiedData, loading: dataLoading, fetchAllData } = useUnifiedAIData();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [insights, setInsights] = useState<BusinessInsight[]>([]);
   const [cachedAnalysis, setCachedAnalysis] = useState<AnalysisCache | null>(null);
@@ -106,77 +112,61 @@ export function SimplifiedBusinessAnalysis() {
     }
   };
 
-  const runDirectAnalysis = async () => {
+  const runComprehensiveAnalysis = async () => {
     if (!user) return;
 
     setIsAnalyzing(true);
     setError(null);
 
     try {
-      console.log('Starting direct business analysis...');
+      console.log('Starting comprehensive AI analysis...');
 
-      // Get practice data directly from database
-      const [sourcesResult, patientsResult, visitsResult] = await Promise.all([
-        supabase
-          .from('patient_sources')
-          .select('*')
-          .eq('created_by', user.id),
-        supabase
-          .from('monthly_patients')
-          .select('*')
-          .eq('user_id', user.id),
-        supabase
-          .from('marketing_visits')
-          .select('*')
-          .eq('user_id', user.id)
-      ]);
-
-      // Handle database errors gracefully
-      if (sourcesResult.error || patientsResult.error || visitsResult.error) {
-        console.error('Database query errors:', {
-          sources: sourcesResult.error,
-          patients: patientsResult.error,
-          visits: visitsResult.error
-        });
-        
-        // Generate offline analysis if data queries fail
-        return generateOfflineAnalysis();
+      // Fetch all unified data first
+      const data = unifiedData || await fetchAllData();
+      
+      if (!data) {
+        throw new Error('Failed to load platform data');
       }
 
-      const sources = sourcesResult.data || [];
-      const patients = patientsResult.data || [];
-      const visits = visitsResult.data || [];
-
-      console.log('Data loaded successfully:', { 
-        sources: sources.length, 
-        patients: patients.length, 
-        visits: visits.length 
+      console.log('Comprehensive data loaded:', {
+        sources: data.sources.length,
+        monthly_data: data.monthly_data.length,
+        visits: data.visits.length,
+        campaigns: data.campaigns.length,
+        discovered_offices: data.discovered_offices.length,
+        reviews: data.reviews.length,
+        ai_usage: data.ai_usage_history.length
       });
 
-      // Generate insights directly without AI (as fallback)
-      const generatedInsights = generateDirectInsights(sources, patients, visits);
-      
-      // Try to enhance with AI if possible
-      let aiEnhancedInsights = generatedInsights;
-      
-      try {
-        const aiResponse = await callOptimizedAI(sources, patients, visits);
-        if (aiResponse?.insights && Array.isArray(aiResponse.insights)) {
-          aiEnhancedInsights = aiResponse.insights.map((insight: any) => ({
-            ...insight,
-            icon: getInsightIcon(insight.title)
-          }));
-        }
-      } catch (aiError) {
-        console.warn('AI enhancement failed, using direct analysis:', aiError);
-        // Continue with direct insights
+      // Call the comprehensive AI insights function
+      const { data: aiResponse, error: aiError } = await supabase.functions.invoke('comprehensive-ai-insights', {
+        body: { context: data },
+        headers: {
+          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+      });
+
+      if (aiError) {
+        console.error('AI analysis error:', aiError);
+        throw new Error('AI analysis failed: ' + aiError.message);
       }
+
+      if (!aiResponse?.insights || !Array.isArray(aiResponse.insights)) {
+        throw new Error('Invalid AI response format');
+      }
+
+      // Process insights with icons
+      const processedInsights = aiResponse.insights.map((insight: any) => ({
+        ...insight,
+        icon: getInsightIcon(insight.title)
+      }));
 
       // Cache the results
       const analysisText = JSON.stringify({ 
-        insights: aiEnhancedInsights,
+        insights: processedInsights,
         generated_at: new Date().toISOString(),
-        method: 'enhanced'
+        method: 'comprehensive_ai',
+        metadata: aiResponse.metadata
       });
 
       await supabase
@@ -187,34 +177,31 @@ export function SimplifiedBusinessAnalysis() {
           generated_text: analysisText,
           status: 'generated',
           metadata: { 
-            method: 'enhanced',
-            data_points: {
-              sources: sources.length,
-              patients: patients.length,
-              visits: visits.length
-            }
+            method: 'comprehensive_ai',
+            model_used: 'gpt-5-2025-08-07',
+            data_points: aiResponse.metadata?.data_points || {}
           },
         });
 
-      setInsights(aiEnhancedInsights);
+      setInsights(processedInsights);
       setLastRun(new Date());
 
       toast({
-        title: "Analysis Complete",
-        description: `Generated ${aiEnhancedInsights.length} business insights successfully.`,
+        title: "AI Analysis Complete",
+        description: `Generated ${processedInsights.length} dynamic insights using GPT-5.`,
       });
 
     } catch (error: any) {
-      console.error('Analysis failed:', error);
+      console.error('Comprehensive analysis failed:', error);
       setError(error.message);
       
-      // Generate basic offline analysis as ultimate fallback
-      const fallbackInsights = generateOfflineAnalysis();
+      // Generate fallback analysis
+      const fallbackInsights = generateFallbackAnalysis(unifiedData);
       setInsights(fallbackInsights);
       
       toast({
-        title: "Analysis Completed (Offline Mode)",
-        description: "Generated basic analysis using available data.",
+        title: "Analysis Completed (Fallback Mode)",
+        description: "Generated insights using available data.",
         variant: "default",
       });
     } finally {
@@ -222,198 +209,109 @@ export function SimplifiedBusinessAnalysis() {
     }
   };
 
-  const generateDirectInsights = (sources: any[], patients: any[], visits: any[]) => {
+  const generateFallbackAnalysis = (data: any): BusinessInsight[] => {
+    if (!data) {
+      return [
+        {
+          title: "Data Loading Required",
+          priority: "high" as const,
+          summary: "Platform data needs to be loaded for comprehensive analysis",
+          recommendation: "Refresh the page or check your connection to load practice data",
+          detailedAnalysis: "The system requires access to your practice data to generate meaningful insights. This includes referral sources, patient volumes, marketing visits, campaigns, and other platform activities. Without this data, we cannot provide specific recommendations tailored to your practice's performance.",
+          keyMetrics: [
+            "No Data Available", 
+            "Analysis Blocked",
+            "Connection Required",
+            "Refresh Needed"
+          ],
+          actionItems: [
+            "Refresh the page to reload data",
+            "Check internet connection stability", 
+            "Verify you're logged in correctly",
+            "Contact support if data loading persists"
+          ],
+          icon: AlertCircle
+        }
+      ];
+    }
+
+    // Generate basic insights from available data
     const insights: BusinessInsight[] = [];
+    const { sources = [], analytics = {} } = data;
 
-    // Source Distribution Analysis
-    const totalSources = sources.length;
-    const activeSources = sources.filter(s => s.is_active).length;
-    const inactiveSources = totalSources - activeSources;
-    const sourceTypes = sources.reduce((acc, s) => {
-      acc[s.source_type] = (acc[s.source_type] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    const activeRate = Math.round((activeSources/(totalSources || 1))*100);
-    
-    insights.push({
-      title: "Referral Network Analysis",
-      priority: totalSources < 5 ? 'high' : totalSources < 15 ? 'medium' : 'low',
-      summary: `${totalSources} referral sources with ${activeRate}% active engagement rate`,
-      recommendation: totalSources < 10 ? 
-        "Expand your referral network to reduce dependency risks" : 
-        "Maintain regular communication with your strong network",
-      detailedAnalysis: `Your practice currently manages ${totalSources} referral sources, of which ${activeSources} are actively contributing referrals (${activeRate}% engagement rate). ${inactiveSources > 0 ? `${inactiveSources} sources appear inactive and may benefit from re-engagement efforts.` : 'All sources are currently active, indicating strong relationship management.'} The distribution across source types shows: ${Object.entries(sourceTypes).map(([type, count]) => `${type}: ${count} sources`).join(', ')}. ${totalSources < 10 ? 'A network of fewer than 10 sources creates vulnerability to referral fluctuations.' : 'Your network size provides good stability against individual source variations.'}`,
-      keyMetrics: [
-        `${totalSources} Total Sources`,
-        `${activeRate}% Active Rate`,
-        `${Object.keys(sourceTypes).length} Source Types`,
-        `${inactiveSources} Inactive Sources`
-      ],
-      actionItems: [
-        totalSources < 10 ? "Identify and cultivate 3-5 new referral sources" : "Maintain quarterly check-ins with all sources",
-        inactiveSources > 0 ? `Re-engage ${inactiveSources} inactive sources with targeted outreach` : "Continue current engagement strategies",
-        "Track monthly referral patterns to identify trending sources",
-        "Develop source-specific communication strategies based on preferences"
-      ],
-      icon: Building2
-    });
-
-    // Performance Trends
-    const totalPatients = patients.reduce((sum, p) => sum + (p.patient_count || 0), 0);
-    const recentPatients = patients
-      .filter(p => {
-        const monthDate = new Date(p.year_month + '-01');
-        const threeMonthsAgo = subMonths(new Date(), 3);
-        return monthDate >= threeMonthsAgo;
-      })
-      .reduce((sum, p) => sum + (p.patient_count || 0), 0);
-
-    const recentActivity = Math.round((recentPatients/(totalPatients || 1))*100);
-    const monthlyAverage = totalPatients > 0 ? Math.round(totalPatients / Math.max(patients.length, 1)) : 0;
-
-    insights.push({
-      title: "Patient Volume Trends",
-      priority: recentPatients > totalPatients * 0.4 ? 'low' : 'medium',
-      summary: `${totalPatients} patients tracked with ${recentActivity}% activity in recent months`,
-      recommendation: recentPatients < totalPatients * 0.3 ? 
-        "Recent referral activity is below average - reach out to key sources" :
-        "Maintain current referral relationship strategies",
-      detailedAnalysis: `Your practice has tracked ${totalPatients} total patient referrals across ${patients.length} reporting periods, with ${recentPatients} patients (${recentActivity}%) referred in the last 3 months. The monthly average is approximately ${monthlyAverage} patients. ${recentActivity < 30 ? 'Recent activity is significantly below historical averages, suggesting potential issues with referral flow that require immediate attention.' : recentActivity < 50 ? 'Recent activity is moderately below average, indicating some fluctuation in referral patterns that should be monitored.' : 'Recent activity aligns well with historical patterns, showing consistent referral flow.'} This trend analysis helps identify seasonal patterns and source performance variations.`,
-      keyMetrics: [
-        `${totalPatients} Total Patients`,
-        `${recentPatients} Recent (3mo)`,
-        `${monthlyAverage}/mo Average`,
-        `${recentActivity}% Recent Activity`
-      ],
-      actionItems: [
-        recentActivity < 40 ? "Schedule immediate check-ins with top 3 referral sources" : "Continue monitoring monthly trends",
-        "Implement patient tracking system for source attribution accuracy",
-        "Analyze seasonal patterns to predict and prepare for volume changes",
-        "Create monthly referral performance dashboard for proactive management"
-      ],
-      icon: TrendingUp
-    });
-
-    // Marketing Activity
-    const totalVisits = visits.length;
-    const completedVisits = visits.filter(v => v.visited).length;
-    const completionRate = totalVisits > 0 ? Math.round((completedVisits/(totalVisits || 1))*100) : 0;
-    const pendingVisits = totalVisits - completedVisits;
-
-    insights.push({
-      title: "Marketing Outreach Performance",
-      priority: completionRate < 70 ? 'high' : completionRate < 85 ? 'medium' : 'low',
-      summary: `${completionRate}% visit completion rate with ${pendingVisits} visits pending`,
-      recommendation: completionRate < 80 ? 
-        "Improve visit scheduling and follow-up processes" :
-        "Excellent completion rate - maintain current approach",
-      detailedAnalysis: `Your marketing outreach shows ${completedVisits} completed visits out of ${totalVisits} planned (${completionRate}% completion rate), with ${pendingVisits} visits still pending. ${completionRate >= 85 ? 'This excellent completion rate demonstrates strong organizational skills and commitment to relationship building.' : completionRate >= 70 ? 'Your completion rate is above average but has room for improvement through better scheduling and follow-up systems.' : 'The low completion rate suggests systemic issues with visit planning or execution that need immediate attention.'} Consistent marketing visits are crucial for maintaining referral relationships and discovering new opportunities. ${totalVisits === 0 ? 'Consider implementing a systematic marketing visit program to strengthen referral relationships.' : ''}`,
-      keyMetrics: [
-        `${completedVisits}/${totalVisits} Visits`,
-        `${completionRate}% Completion Rate`,
-        `${pendingVisits} Pending Visits`,
-        `${Math.round(totalVisits/Math.max(1, new Date().getMonth() + 1))} Visits/Month`
-      ],
-      actionItems: [
-        completionRate < 80 ? "Implement systematic visit scheduling and reminder system" : "Continue current visit management approach",
-        pendingVisits > 0 ? `Schedule and complete ${pendingVisits} pending visits within 30 days` : "Plan next quarter's visit schedule",
-        "Track visit outcomes and follow-up requirements in CRM",
-        "Set monthly visit targets based on source priority and relationship status"
-      ],
-      icon: Users
-    });
-
-    // Source Quality Assessment
-    const topSourceTypes = Object.entries(sourceTypes)
-      .sort(([,a], [,b]) => (b as number) - (a as number))
-      .slice(0, 3);
-
-    const diversificationScore = Object.keys(sourceTypes).length;
-
-    insights.push({
-      title: "Portfolio Diversification Strategy", 
-      priority: diversificationScore < 3 ? 'medium' : 'low',
-      summary: `${diversificationScore} source types with balanced distribution across specialties`,
-      recommendation: diversificationScore < 3 ? 
-        "Diversify across more practice types for stability" :
-        "Well-diversified portfolio - monitor for balance shifts",
-      detailedAnalysis: `Your referral portfolio spans ${diversificationScore} different source types, with the top contributors being: ${topSourceTypes.map(([type, count]) => `${type} (${count} sources, ${Math.round((Number(count)/totalSources)*100)}%)`).join(', ')}. ${diversificationScore < 3 ? 'Limited diversification creates vulnerability to specialty-specific market changes or relationship disruptions. Consider expanding into complementary practice types.' : diversificationScore < 5 ? 'Good diversification provides stability, though monitoring the balance between types ensures no single specialty dominates your referral flow.' : 'Excellent diversification across multiple specialties provides strong protection against market fluctuations.'} Source type diversity should align with your practice capabilities and patient demographics for optimal results.`,
-      keyMetrics: [
-        `${diversificationScore} Source Types`,
-        `${Number(topSourceTypes[0]?.[1]) || 0} Largest Category`,
-        `${Math.round((Number(topSourceTypes[0]?.[1] || 0) / Math.max(totalSources, 1)) * 100)}% Concentration`,
-        `${totalSources - Number(topSourceTypes[0]?.[1] || 0)} Other Sources`
-      ],
-      actionItems: [
-        diversificationScore < 3 ? "Research and target 2-3 new specialty types for referral development" : "Monitor current source type balance quarterly",
-        "Analyze patient outcomes by source type to identify highest-value partnerships", 
-        "Develop specialty-specific marketing materials and visit strategies",
-        "Track source type performance trends to guide future networking priorities"
-      ],
-      icon: Target
-    });
+    if (sources.length === 0) {
+      insights.push({
+        title: "Referral Network Development Needed",
+        priority: "high" as const,
+        summary: "No referral sources found - practice needs to establish referral relationships",
+        recommendation: "Start building your referral network by identifying and connecting with 5-10 target practices",
+        detailedAnalysis: "Your practice currently has no tracked referral sources, which represents a significant opportunity for growth. Building a strong referral network is essential for sustainable patient acquisition and practice growth. Focus on identifying complementary practices in your area and establishing professional relationships.",
+        keyMetrics: [
+          "0 Referral Sources",
+          "Growth Opportunity", 
+          "Network Building Required",
+          "Patient Acquisition Risk"
+        ],
+        actionItems: [
+          "Identify 10 target practices for referral relationships",
+          "Schedule introduction meetings with key practices",
+          "Develop referral tracking system",
+          "Create professional referral materials"
+        ],
+        icon: Building2
+      });
+    } else {
+      insights.push({
+        title: "Basic Network Analysis",
+        priority: "medium" as const,
+        summary: `${sources.length} referral sources tracked - analysis limited without AI enhancement`,
+        recommendation: "Use comprehensive AI analysis for detailed insights and recommendations",
+        detailedAnalysis: `Your practice has ${sources.length} referral sources in the system. For detailed performance analysis, optimization recommendations, and strategic insights, the comprehensive AI analysis provides deeper examination of patterns, opportunities, and specific action items tailored to your data.`,
+        keyMetrics: [
+          `${sources.length} Sources Tracked`,
+          "Basic Data Available",
+          "AI Enhancement Needed", 
+          "Detailed Analysis Pending"
+        ],
+        actionItems: [
+          "Run comprehensive AI analysis for detailed insights",
+          "Review source performance data",
+          "Update source information regularly",
+          "Monitor referral patterns monthly"
+        ],
+        icon: BarChart3
+      });
+    }
 
     return insights;
   };
 
-  const generateOfflineAnalysis = (): BusinessInsight[] => {
-    return [
-      {
-        title: "System Status Check",
-        priority: "medium" as const,
-        summary: "Analysis running in offline mode with limited data access",
-        recommendation: "Ensure stable internet connection and try again for comprehensive insights",
-        detailedAnalysis: "The system is currently operating in offline mode, which limits our ability to access your latest practice data and generate comprehensive AI-powered insights. This may be due to network connectivity issues, server maintenance, or data synchronization delays. While offline, basic functionality remains available, but real-time analysis and AI enhancements are temporarily unavailable.",
-        keyMetrics: [
-          "Offline Mode Active",
-          "Limited Data Access",
-          "Basic Functions Available",
-          "AI Analysis Unavailable"
-        ],
-        actionItems: [
-          "Check your internet connection stability",
-          "Try refreshing the page or reloading the application",
-          "Contact support if the issue persists for more than 15 minutes",
-          "Review cached data for previously generated insights"
-        ],
-        icon: AlertCircle
-      }
-    ];
-  };
-
-  const callOptimizedAI = async (sources: any[], patients: any[], visits: any[]) => {
-    const context = {
-      sources: sources.slice(0, 20), // Limit data size
-      patients: patients.slice(0, 50),
-      visits: visits.slice(0, 30),
-      analysis_timestamp: new Date().toISOString()
-    };
-
-    const { data, error } = await supabase.functions.invoke('optimized-ai-analysis', {
-      body: { context },
-      headers: {
-        Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-      },
-    });
-
-    if (error) throw error;
-    return data?.content ? JSON.parse(data.content) : null;
-  };
-
   const getInsightIcon = (title: string) => {
-    if (title.toLowerCase().includes('source')) return Building2;
-    if (title.toLowerCase().includes('trend') || title.toLowerCase().includes('performance')) return TrendingUp;
-    if (title.toLowerCase().includes('marketing') || title.toLowerCase().includes('engagement')) return Users;
-    if (title.toLowerCase().includes('diversif') || title.toLowerCase().includes('quality')) return Target;
-    return BarChart3;
+    const titleLower = title.toLowerCase();
+    
+    // AI and smart insights
+    if (titleLower.includes('ai') || titleLower.includes('smart') || titleLower.includes('intelligent')) return Brain;
+    if (titleLower.includes('opportunity') || titleLower.includes('missed') || titleLower.includes('potential')) return Zap;
+    if (titleLower.includes('discovery') || titleLower.includes('discovered') || titleLower.includes('found')) return Eye;
+    if (titleLower.includes('risk') || titleLower.includes('vulnerability') || titleLower.includes('threat')) return Shield;
+    
+    // Traditional categories
+    if (titleLower.includes('referral') || titleLower.includes('network') || titleLower.includes('source')) return Building2;
+    if (titleLower.includes('patient') || titleLower.includes('volume') || titleLower.includes('trend')) return TrendingUp;
+    if (titleLower.includes('marketing') || titleLower.includes('visit') || titleLower.includes('outreach')) return Users;
+    if (titleLower.includes('campaign') || titleLower.includes('delivery') || titleLower.includes('email')) return Target;
+    if (titleLower.includes('review') || titleLower.includes('rating') || titleLower.includes('reputation')) return CheckCircle2;
+    if (titleLower.includes('portfolio') || titleLower.includes('diversification') || titleLower.includes('balance')) return BarChart3;
+    if (titleLower.includes('system') || titleLower.includes('status') || titleLower.includes('data')) return AlertCircle;
+    
+    return Sparkles; // Default for dynamic AI insights
   };
 
   const formatAnalysisAge = (date: Date) => {
     const now = new Date();
     const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
     
-    if (diffInHours < 1) return 'Just generated';
+    if (diffInHours < 1) return 'Just now';
     if (diffInHours < 24) return `${diffInHours} hours ago`;
     if (diffInHours < 48) return 'Yesterday';
     return format(date, 'MMM d, yyyy');
@@ -433,203 +331,195 @@ export function SimplifiedBusinessAnalysis() {
       {/* Control Panel */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-primary" />
-              Business Intelligence Analysis
-            </div>
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <CardTitle className="flex items-center gap-2">
+                <Brain className="h-5 w-5 text-primary" />
+                AI Business Analysis
+              </CardTitle>
               {lastRun && (
-                <Badge variant="outline" className="flex items-center gap-1">
+                <div className="flex items-center gap-1 text-sm text-muted-foreground">
                   <Clock className="h-3 w-3" />
-                  {formatAnalysisAge(lastRun)}
-                </Badge>
+                  Last run: {formatAnalysisAge(lastRun)}
+                </div>
               )}
             </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Generate actionable insights about your practice performance, referral patterns, and growth opportunities.
-          </p>
-          
-          {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                {error}
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {!cachedAnalysis && !error && (
-            <Alert>
-              <BarChart3 className="h-4 w-4" />
-              <AlertDescription>
-                Ready to analyze your practice data. Click "Run Analysis" to get started.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          <div className="flex gap-3">
-            <Button 
-              onClick={runDirectAnalysis}
-              disabled={isAnalyzing}
-              className="flex-1"
-            >
-              {isAnalyzing ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Analyzing...
-                </>
-              ) : (
-                <>
-                  <Play className="h-4 w-4 mr-2" />
-                  {insights.length > 0 ? 'Run New Analysis' : 'Run Analysis'}
-                </>
-              )}
-            </Button>
-            
-            {cachedAnalysis && (
+            <div className="flex items-center gap-2">
               <Button 
-                variant="outline" 
-                onClick={loadCachedAnalysis}
-                disabled={isAnalyzing}
+                onClick={runComprehensiveAnalysis}
+                disabled={isAnalyzing || dataLoading}
+                className="w-full sm:w-auto"
+                size="lg"
               >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh Cache
+                {isAnalyzing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    AI Analyzing...
+                  </>
+                ) : (
+                  <>
+                    <Brain className="mr-2 h-4 w-4" />
+                    AI Analysis
+                  </>
+                )}
               </Button>
+              
+              {cachedAnalysis && (
+                <Button 
+                  onClick={loadCachedAnalysis}
+                  variant="outline"
+                  size="sm"
+                  disabled={isAnalyzing}
+                >
+                  <RefreshCw className="mr-2 h-3 w-3" />
+                  Refresh
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div>
+              <p className="text-muted-foreground">
+                Dynamic AI analysis powered by GPT-5 that examines your complete practice data - referral sources, patient trends, campaigns, discovered offices, reviews, and marketing activities - to identify critical opportunities and provide actionable recommendations.
+              </p>
+            </div>
+
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Analysis Error: {error}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {dataLoading && (
+              <Alert>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <AlertDescription>
+                  Loading platform data for comprehensive analysis...
+                </AlertDescription>
+              </Alert>
             )}
           </div>
         </CardContent>
       </Card>
 
       {/* Analysis Results */}
-      {insights.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">Business Insights</h3>
-            {lastRun && (
-              <Badge variant="secondary">
-                Updated {formatAnalysisAge(lastRun)}
-              </Badge>
-            )}
-          </div>
-          
-          <div className="grid gap-4">
-            {insights.map((insight, index) => (
-              <Card key={index} className="border-l-4 border-l-primary hover:shadow-md transition-shadow">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <insight.icon className="h-4 w-4 text-primary" />
-                    {insight.title}
-                    <Badge variant={getPriorityVariant(insight.priority)}>
-                      {insight.priority}
-                    </Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <p className="text-sm font-medium text-foreground">
-                    {insight.summary}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    <span className="font-medium">Quick Fix:</span> {insight.recommendation}
-                  </p>
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button variant="ghost" size="sm" className="w-full justify-between group">
-                        <span className="flex items-center gap-2">
-                          <Sparkles className="h-4 w-4 text-primary" />
-                          See Detailed Analysis
-                        </span>
-                        <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                      <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                          <insight.icon className="h-5 w-5 text-primary" />
-                          {insight.title}
-                          <Badge variant={getPriorityVariant(insight.priority)}>
-                            {insight.priority} priority
-                          </Badge>
-                        </DialogTitle>
-                      </DialogHeader>
-                      
-                      <div className="space-y-6">
-                        {/* AI Analysis Section */}
-                        <div>
-                          <h4 className="font-semibold mb-3 flex items-center gap-2">
-                            <Sparkles className="h-4 w-4 text-primary" />
-                            AI Analysis
-                          </h4>
-                          <p className="text-sm text-muted-foreground leading-relaxed">
-                            {insight.detailedAnalysis}
-                          </p>
-                        </div>
-
-                        {/* Key Metrics */}
-                        <div>
-                          <h4 className="font-semibold mb-3 flex items-center gap-2">
-                            <BarChart3 className="h-4 w-4 text-primary" />
-                            Key Metrics
-                          </h4>
-                          <div className="grid grid-cols-2 gap-3">
-                            {insight.keyMetrics?.map((metric, i) => (
-                              <div key={i} className="bg-muted/50 rounded-lg p-3">
-                                <p className="text-sm font-medium">{metric}</p>
-                              </div>
-                            )) || <p className="text-sm text-muted-foreground">No metrics available</p>}
-                          </div>
-                        </div>
-
-                        {/* Action Items */}
-                        <div>
-                          <h4 className="font-semibold mb-3 flex items-center gap-2">
-                            <CheckCircle2 className="h-4 w-4 text-primary" />
-                            Recommended Actions
-                          </h4>
-                          <div className="space-y-2">
-                            {insight.actionItems?.map((action, i) => (
-                              <div key={i} className="flex items-start gap-3 p-3 bg-primary/5 rounded-lg">
-                                <div className="h-1.5 w-1.5 rounded-full bg-primary mt-2 flex-shrink-0" />
-                                <p className="text-sm">{action}</p>
-                              </div>
-                            )) || <p className="text-sm text-muted-foreground">No actions available</p>}
-                          </div>
-                        </div>
-
-                        <div className="flex justify-end pt-4 border-t">
-                          <Badge variant="outline" className="text-xs">
-                            Generated by AI • {format(lastRun || new Date(), 'MMM d, h:mm a')}
-                          </Badge>
-                        </div>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Loading State */}
-      {isAnalyzing && (
+      {isAnalyzing ? (
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-center space-y-4 flex-col">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <div className="text-center">
-                <p className="font-medium">Analyzing Your Practice Data</p>
-                <p className="text-sm text-muted-foreground">
-                  Processing sources, patient data, and marketing activities...
+          <CardContent className="py-8">
+            <div className="text-center space-y-4">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+              <div>
+                <h3 className="text-lg font-semibold">AI Analysis in Progress</h3>
+                <p className="text-muted-foreground">
+                  GPT-5 is examining your practice data to identify critical business insights...
                 </p>
               </div>
             </div>
           </CardContent>
         </Card>
-      )}
+      ) : insights.length > 0 ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {insights.map((insight, index) => (
+            <Card key={index} className="relative group hover:shadow-md transition-shadow">
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    <insight.icon className="h-5 w-5 text-primary" />
+                    <Badge variant={getPriorityVariant(insight.priority) as any}>
+                      {insight.priority}
+                    </Badge>
+                  </div>
+                </div>
+                <CardTitle className="text-base leading-tight">
+                  {insight.title}
+                </CardTitle>
+              </CardHeader>
+              
+              <CardContent className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  {insight.summary}
+                </p>
+                
+                <div className="p-3 bg-muted/50 rounded-md">
+                  <p className="text-sm font-medium text-primary">
+                    {insight.recommendation}
+                  </p>
+                </div>
+
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="w-full group">
+                      View Details
+                      <ChevronRight className="ml-1 h-3 w-3 transition-transform group-hover:translate-x-1" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        <insight.icon className="h-5 w-5 text-primary" />
+                        {insight.title}
+                        <Badge variant={getPriorityVariant(insight.priority) as any}>
+                          {insight.priority}
+                        </Badge>
+                      </DialogTitle>
+                    </DialogHeader>
+                    
+                    <div className="space-y-6">
+                      <div>
+                        <h4 className="font-semibold mb-2">Summary</h4>
+                        <p className="text-muted-foreground">{insight.summary}</p>
+                      </div>
+
+                      <div>
+                        <h4 className="font-semibold mb-2">Recommendation</h4>
+                        <div className="p-3 bg-primary/5 border border-primary/20 rounded-md">
+                          <p className="text-primary font-medium">{insight.recommendation}</p>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="font-semibold mb-3">Detailed Analysis</h4>
+                        <p className="text-sm leading-relaxed">{insight.detailedAnalysis}</p>
+                      </div>
+
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                          <h4 className="font-semibold mb-3">Key Metrics</h4>
+                          <div className="space-y-2">
+                            {insight.keyMetrics.map((metric, idx) => (
+                              <div key={idx} className="flex items-center gap-2">
+                                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                <span className="text-sm">{metric}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <h4 className="font-semibold mb-3">Action Items</h4>
+                          <div className="space-y-2">
+                            {insight.actionItems.map((action, idx) => (
+                              <div key={idx} className="flex items-start gap-2">
+                                <Target className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                                <span className="text-sm">{action}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
