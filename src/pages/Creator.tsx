@@ -1,12 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ContentDashboard } from '@/components/ContentDashboard';
-import { AIContentStudio } from '@/components/AIContentStudio';
-import { TemplateLibrary } from '@/components/TemplateLibrary';
+import { AIContentCreator } from '@/components/AIContentCreator';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent } from '@/components/ui/card';
-import { Sparkles, Library, BarChart3, Palette } from 'lucide-react';
+import { Palette } from 'lucide-react';
 
 interface CreatorProps {
   onPageChange?: (page: string) => void;
@@ -57,37 +53,8 @@ export function Creator() {
         </p>
       </div>
 
-      {/* Main Content Tabs */}
-      <Tabs defaultValue="dashboard" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 max-w-md" variant="pills">
-          <TabsTrigger value="dashboard" variant="pills" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            Dashboard
-          </TabsTrigger>
-          <TabsTrigger value="studio" variant="pills" className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4" />
-            AI Studio
-          </TabsTrigger>
-          <TabsTrigger value="templates" variant="pills" className="flex items-center gap-2">
-            <Library className="h-4 w-4" />
-            Templates
-          </TabsTrigger>
-        </TabsList>
-
-        <div className="mt-6">
-          <TabsContent value="dashboard" className="space-y-6">
-            <ContentDashboard businessProfile={businessProfile} />
-          </TabsContent>
-
-          <TabsContent value="studio" className="space-y-6">
-            <AIContentStudio businessProfile={businessProfile} />
-          </TabsContent>
-
-          <TabsContent value="templates" className="space-y-6">
-            <TemplateLibrary businessProfile={businessProfile} />
-          </TabsContent>
-        </div>
-      </Tabs>
+      {/* AI Content Creator */}
+      <AIContentCreator businessProfile={businessProfile} />
     </div>
   );
 }
