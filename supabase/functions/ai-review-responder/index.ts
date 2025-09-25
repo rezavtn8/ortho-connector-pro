@@ -1,10 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { handleCorsPreflightRequest, createCorsResponse, validateOrigin, createOriginErrorResponse } from "../_shared/cors-config.ts";
 
 interface ReviewResponseRequest {
   google_review_id: string;
@@ -15,7 +11,7 @@ interface ReviewResponseRequest {
 
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return handleCorsPreflightRequest(req, ['POST']);
   }
 
   try {
@@ -35,10 +31,10 @@ const handler = async (req: Request): Promise<Response> => {
     const { data: { user } } = await supabase.auth.getUser(token);
 
     if (!user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      return createCorsResponse(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
+        headers: { 'Content-Type': 'application/json' },
+      }, req);
     }
 
     const { google_review_id, action, response_text, quality_rating }: ReviewResponseRequest = await req.json();
@@ -82,13 +78,13 @@ const handler = async (req: Request): Promise<Response> => {
         .select()
         .single();
 
-      return new Response(JSON.stringify({
+      return createCorsResponse(JSON.stringify({
         response_text: aiData.content,
         content_id: savedResponse?.id,
         usage: aiData.usage,
       }), {
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
+        headers: { 'Content-Type': 'application/json' },
+      }, req);
     }
 
     if (action === 'save' && response_text) {
@@ -106,12 +102,12 @@ const handler = async (req: Request): Promise<Response> => {
         .select()
         .single();
 
-      return new Response(JSON.stringify({
+      return createCorsResponse(JSON.stringify({
         content_id: savedResponse?.id,
         status: 'saved',
       }), {
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
+        headers: { 'Content-Type': 'application/json' },
+      }, req);
     }
 
     if (action === 'approve' && quality_rating) {
@@ -138,25 +134,25 @@ const handler = async (req: Request): Promise<Response> => {
         .order('created_at', { ascending: false })
         .limit(1);
 
-      return new Response(JSON.stringify({
+      return createCorsResponse(JSON.stringify({
         status: 'approved',
         quality_rating,
       }), {
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
+        headers: { 'Content-Type': 'application/json' },
+      }, req);
     }
 
-    return new Response(JSON.stringify({ error: 'Invalid action' }), {
+    return createCorsResponse(JSON.stringify({ error: 'Invalid action' }), {
       status: 400,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
-    });
+      headers: { 'Content-Type': 'application/json' },
+    }, req);
 
   } catch (error: any) {
     console.error('Error in ai-review-responder:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return createCorsResponse(JSON.stringify({ error: error.message }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
-    });
+      headers: { 'Content-Type': 'application/json' },
+    }, req);
   }
 };
 

@@ -1,12 +1,17 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts"
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS'
-}
+import { handleCorsPreflightRequest, createCorsResponse, validateOrigin, createOriginErrorResponse } from "../_shared/cors-config.ts"
 
 serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return handleCorsPreflightRequest(req, ['GET']);
+  }
+
+  // Validate origin for browser requests
+  const { isValid: originValid, origin } = validateOrigin(req);
+  if (!originValid) {
+    return createOriginErrorResponse(origin);
+  }
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })

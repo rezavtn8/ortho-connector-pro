@@ -1,15 +1,21 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { handleCorsPreflightRequest, createCorsResponse, validateOrigin, createOriginErrorResponse } from "../_shared/cors-config.ts";
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return handleCorsPreflightRequest(req, ['POST']);
+  }
+
+  // Validate origin for browser requests
+  const { isValid: originValid, origin } = validateOrigin(req);
+  if (!originValid) {
+    return createOriginErrorResponse(origin);
+  }
+  if (req.method === 'OPTIONS') {
+    return handleCorsPreflightRequest(req, ['POST']);
   }
 
   let supabaseClient;
@@ -166,8 +172,29 @@ serve(async (req) => {
         }
       }
     }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return createCorsResponse(JSON.stringify({
+      insights,
+      trends,
+      segments,
+      scores,
+      recommendations,
+      summary,
+      risk_analysis,
+      benchmarks: {
+        averages: {
+          referrals_per_source: segments.length > 0 ? totalPatients / segments.length : 0,
+          sources_active_monthly: segments.filter(s => s.value > 0).length
+        }
+      },
+      meta: {
+        generated_at: new Date().toISOString(),
+        data_points: monthlyData.length,
+        total_sources: segments.length,
+        analysis_period: `${getStartOfRange(monthYear)} to ${monthYear}`
+      }
+    }), {
+      headers: { 'Content-Type': 'application/json' }
+    }, req);
 
   } catch (error: any) {
     console.error('Error in comprehensive-ai-insights function:', error);
@@ -193,13 +220,13 @@ serve(async (req) => {
       console.error('Failed to track error:', trackingError);
     }
     
-    return new Response(JSON.stringify({ 
+    return createCorsResponse(JSON.stringify({ 
       error: error.message || 'Failed to generate insights',
       fallback: true 
     }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+      headers: { 'Content-Type': 'application/json' },
+    }, req);
   }
 });
 

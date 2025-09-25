@@ -1,11 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { handleCorsPreflightRequest, createCorsResponse, validateOrigin, createOriginErrorResponse } from "../_shared/cors-config.ts";
 
 interface EmailRequest {
   offices: Array<{
@@ -28,7 +24,7 @@ interface EmailRequest {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return handleCorsPreflightRequest(req, ['POST']);
   }
 
   try {
@@ -378,7 +374,7 @@ serve(async (req) => {
 
     console.log(`Successfully generated ${generatedEmails.length} emails with complete platform data`);
 
-    return new Response(JSON.stringify({ 
+    return createCorsResponse(JSON.stringify({ 
       success: true,
       emails: generatedEmails,
       total_generated: generatedEmails.length,
@@ -387,17 +383,17 @@ serve(async (req) => {
         'monthly_patients', 'marketing_visits', 'campaigns', 'campaign_deliveries'
       ]
     }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+      headers: { 'Content-Type': 'application/json' },
+    }, req);
 
   } catch (error) {
     console.error('Error in comprehensive email generation:', error);
-    return new Response(JSON.stringify({ 
+    return createCorsResponse(JSON.stringify({ 
       success: false,
       error: (error as Error).message 
     }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+      headers: { 'Content-Type': 'application/json' },
+    }, req);
   }
 });

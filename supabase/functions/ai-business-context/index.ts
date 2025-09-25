@@ -1,10 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { handleCorsPreflightRequest, createCorsResponse, validateOrigin, createOriginErrorResponse } from "../_shared/cors-config.ts";
 
 interface BusinessContextRequest {
   action: 'build' | 'get' | 'update';
@@ -19,8 +15,15 @@ interface BusinessContextRequest {
 }
 
 const handler = async (req: Request): Promise<Response> => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return handleCorsPreflightRequest(req, ['POST']);
+  }
+
+  // Validate origin for browser requests
+  const { isValid: originValid, origin } = validateOrigin(req);
+  if (!originValid) {
+    return createOriginErrorResponse(origin);
   }
 
   try {
@@ -40,10 +43,10 @@ const handler = async (req: Request): Promise<Response> => {
     const { data: { user } } = await supabase.auth.getUser(token);
 
     if (!user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      return createCorsResponse(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
+        headers: { 'Content-Type': 'application/json' },
+      }, req);
     }
 
     const { action, updates }: BusinessContextRequest = await req.json();
@@ -56,9 +59,9 @@ const handler = async (req: Request): Promise<Response> => {
         .eq('user_id', user.id)
         .single();
 
-      return new Response(JSON.stringify({ profile }), {
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
+      return createCorsResponse(JSON.stringify({ profile }), {
+        headers: { 'Content-Type': 'application/json' },
+      }, req);
     }
 
     if (action === 'update' && updates) {
@@ -77,9 +80,9 @@ const handler = async (req: Request): Promise<Response> => {
 
       if (error) throw error;
 
-      return new Response(JSON.stringify({ profile: data }), {
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
+      return createCorsResponse(JSON.stringify({ profile: data }), {
+        headers: { 'Content-Type': 'application/json' },
+      }, req);
     }
 
     if (action === 'build') {
@@ -187,22 +190,22 @@ const handler = async (req: Request): Promise<Response> => {
       }
 
       console.log('Business context built successfully');
-      return new Response(JSON.stringify({ profile, generated: true }), {
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
+      return createCorsResponse(JSON.stringify({ profile, generated: true }), {
+        headers: { 'Content-Type': 'application/json' },
+      }, req);
     }
 
-    return new Response(JSON.stringify({ error: 'Invalid action' }), {
+    return createCorsResponse(JSON.stringify({ error: 'Invalid action' }), {
       status: 400,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
-    });
+      headers: { 'Content-Type': 'application/json' },
+    }, req);
 
   } catch (error: any) {
     console.error('Error in ai-business-context:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return createCorsResponse(JSON.stringify({ error: error.message }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
-    });
+      headers: { 'Content-Type': 'application/json' },
+    }, req);
   }
 };
 

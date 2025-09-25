@@ -1,11 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { handleCorsPreflightRequest, createCorsResponse, validateOrigin, createOriginErrorResponse } from "../_shared/cors-config.ts";
 
 interface AIRequest {
   task_type: 'email_generation' | 'review_response' | 'content_creation' | 'analysis' | 'comprehensive_analysis' | 'business_intelligence' | 'structured_report' | 'practice_consultation';
@@ -20,7 +16,7 @@ interface AIRequest {
 
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return handleCorsPreflightRequest(req, ['POST']);
   }
 
   const startTime = Date.now();
@@ -47,10 +43,10 @@ const handler = async (req: Request): Promise<Response> => {
     const { data: { user } } = await supabase.auth.getUser(token);
 
     if (!user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      return createCorsResponse(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
+        headers: { 'Content-Type': 'application/json' },
+      }, req);
     }
 
     const { task_type, context, prompt, parameters }: AIRequest = await req.json();
@@ -189,7 +185,7 @@ const handler = async (req: Request): Promise<Response> => {
       .select()
       .single();
 
-    return new Response(JSON.stringify({
+    return createCorsResponse(JSON.stringify({
       content: generatedContent,
       content_id: contentRecord?.id,
       usage: {
@@ -198,8 +194,8 @@ const handler = async (req: Request): Promise<Response> => {
         execution_time_ms: Date.now() - startTime,
       }
     }), {
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
-    });
+      headers: { 'Content-Type': 'application/json' },
+    }, req);
 
   } catch (error: any) {
     console.error('Error in ai-assistant:', error);
@@ -237,10 +233,10 @@ const handler = async (req: Request): Promise<Response> => {
       console.error('Error tracking failed usage:', trackingError);
     }
 
-    return new Response(JSON.stringify({ error: error.message }), {
+    return createCorsResponse(JSON.stringify({ error: error.message }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
-    });
+      headers: { 'Content-Type': 'application/json' },
+    }, req);
   }
 };
 
