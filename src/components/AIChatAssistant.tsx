@@ -111,23 +111,81 @@ export function AIChatAssistant() {
     setIsLoading(true);
 
     try {
-      // Get focused practice data for fast responses - key metrics only
+      // Get comprehensive practice data for deeper analysis
       const [
         sourcesResult, 
         monthlyResult, 
         userProfileResult,
-        clinicResult
+        clinicResult,
+        visitsResult
       ] = await Promise.all([
-        supabase.from('patient_sources').select('id, name, source_type, is_active, address, latitude, longitude').eq('created_by', user?.id).limit(20),
-        supabase.from('monthly_patients').select('source_id, year_month, patient_count').eq('user_id', user?.id).order('year_month', { ascending: false }).limit(12),
-        supabase.from('user_profiles').select('first_name, last_name, job_title, clinic_name').eq('user_id', user?.id).single(),
-        supabase.from('clinics').select('name, address').eq('owner_id', user?.id).maybeSingle()
+        supabase.from('patient_sources').select('*').eq('created_by', user?.id),
+        supabase.from('monthly_patients').select('*').eq('user_id', user?.id).order('year_month', { ascending: false }),
+        supabase.from('user_profiles').select('*').eq('user_id', user?.id).single(),
+        supabase.from('clinics').select('*').eq('owner_id', user?.id).maybeSingle(),
+        supabase.from('marketing_visits').select('*').eq('user_id', user?.id).order('visit_date', { ascending: false }).limit(50)
       ]);
 
       const sources = sourcesResult.data || [];
       const monthlyData = monthlyResult.data || [];
       const userProfile = userProfileResult.data;
       const clinic = clinicResult.data;
+      const visits = visitsResult.data || [];
+
+      // Calculate comprehensive analytics for deeper insights
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      const lastMonth = new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().slice(0, 7);
+      const last6Months = Array.from({length: 6}, (_, i) => {
+        const date = new Date();
+        date.setMonth(date.getMonth() - i);
+        return date.toISOString().slice(0, 7);
+      });
+
+      const analytics = {
+        // Source metrics
+        total_sources: sources.length,
+        active_sources: sources.filter(s => s.is_active).length,
+        source_distribution: sources.reduce((acc, s) => {
+          acc[s.source_type] = (acc[s.source_type] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>),
+        
+        // Referral metrics
+        total_referrals_ytd: monthlyData.reduce((sum, m) => sum + (m.patient_count || 0), 0),
+        current_month_referrals: monthlyData.filter(m => m.year_month === currentMonth).reduce((sum, m) => sum + (m.patient_count || 0), 0),
+        last_month_referrals: monthlyData.filter(m => m.year_month === lastMonth).reduce((sum, m) => sum + (m.patient_count || 0), 0),
+        
+        // Performance trends
+        monthly_trends: last6Months.map(month => ({
+          month,
+          referrals: monthlyData.filter(m => m.year_month === month).reduce((sum, m) => sum + (m.patient_count || 0), 0),
+          active_sources: monthlyData.filter(m => m.year_month === month && m.patient_count > 0).length
+        })),
+        
+        // Top performers
+        top_sources: sources.map(source => {
+          const sourceReferrals = monthlyData.filter(m => m.source_id === source.id).reduce((sum, m) => sum + (m.patient_count || 0), 0);
+          const recent6MonthsReferrals = monthlyData.filter(m => m.source_id === source.id && last6Months.includes(m.year_month)).reduce((sum, m) => sum + (m.patient_count || 0), 0);
+          return { ...source, total_referrals: sourceReferrals, recent_referrals: recent6MonthsReferrals };
+        }).sort((a, b) => b.total_referrals - a.total_referrals).slice(0, 10),
+        
+        // Geographic insights
+        geographic_distribution: sources.reduce((acc, s) => {
+          if (s.address) {
+            const city = s.address.split(',')[1]?.trim() || 'Unknown';
+            acc[city] = (acc[city] || 0) + 1;
+          }
+          return acc;
+        }, {} as Record<string, number>),
+        
+        // Marketing visit metrics
+        visit_metrics: {
+          total_visits: visits.length,
+          completed_visits: visits.filter(v => v.visited).length,
+          avg_rating: visits.filter(v => v.star_rating).reduce((sum, v) => sum + (v.star_rating || 0), 0) / visits.filter(v => v.star_rating).length || 0,
+          recent_visits: visits.filter(v => new Date(v.visit_date) >= new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)).length
+        }
+      };
 
       const { data, error } = await supabase.functions.invoke('ai-assistant', {
         body: {
@@ -135,27 +193,17 @@ export function AIChatAssistant() {
           context: {
             business_profile: businessProfile,
             practice_data: {
-              // Essential data only for fast responses
+              // Comprehensive data for deep analysis
               sources: sources,
               monthly_data: monthlyData,
               user_profile: userProfile,
               clinic_info: clinic,
+              marketing_visits: visits,
               
-              // Key analytics only
-              analytics: {
-                total_sources: sources.length,
-                total_referrals: monthlyData.reduce((sum, m) => sum + (m.patient_count || 0), 0),
-                active_sources_this_month: monthlyData.filter(m => {
-                  const currentMonth = new Date().toISOString().slice(0, 7);
-                  return m.year_month === currentMonth && m.patient_count > 0;
-                }).length,
-                source_types: sources.reduce((acc, s) => {
-                  acc[s.source_type] = (acc[s.source_type] || 0) + 1;
-                  return acc;
-                }, {} as Record<string, number>)
-              }
+              // Rich analytics for deeper insights
+              analytics: analytics
             },
-            conversation_history: messages.slice(-2) // Only last 2 messages for context
+            conversation_history: messages.slice(-3) // Last 3 messages for better context
           },
           prompt: content,
         },
@@ -221,6 +269,23 @@ export function AIChatAssistant() {
     }
   };
 
+  const formatMessageContent = (content: string) => {
+    // Remove markdown and replace with styled components
+    const parts = content.split(/(\*\*[^*]+\*\*)/g);
+    
+    return parts.map((part, index) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        const text = part.slice(2, -2);
+        return (
+          <span key={index} className="font-semibold text-primary">
+            {text}
+          </span>
+        );
+      }
+      return part;
+    });
+  };
+
   const getMessageBadge = (message: ChatMessage) => {
     if (message.role === 'user') return null;
     
@@ -275,9 +340,9 @@ export function AIChatAssistant() {
                         {formatTime(message.timestamp)}
                       </span>
                     </div>
-                    <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                      {message.content}
-                    </p>
+                    <div className="text-sm whitespace-pre-wrap leading-relaxed">
+                      {formatMessageContent(message.content)}
+                    </div>
                   </div>
                   
                   {message.role === 'user' && (
