@@ -18,20 +18,57 @@ interface ChatMessage {
 }
 
 export function AIChatAssistant() {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: '1',
-      role: 'assistant',
-      content: "Hi! I'm your AI practice assistant. I can help you analyze your referral patterns, suggest growth strategies, create marketing content, and answer questions about your practice data. What would you like to explore today?",
-      timestamp: new Date(),
-      type: 'general'
-    }
-  ]);
+  const { user } = useAuth();
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [businessProfile, setBusinessProfile] = useState<any>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const { user } = useAuth();
+
+  // Load messages from localStorage on component mount
+  useEffect(() => {
+    if (user) {
+      const storageKey = `ai-chat-messages-${user.id}`;
+      const savedMessages = localStorage.getItem(storageKey);
+      if (savedMessages) {
+        try {
+          const parsed = JSON.parse(savedMessages);
+          const messagesWithDates = parsed.map((msg: any) => ({
+            ...msg,
+            timestamp: new Date(msg.timestamp)
+          }));
+          setMessages(messagesWithDates);
+        } catch (error) {
+          console.error('Error loading saved messages:', error);
+          // Set default welcome message if parsing fails
+          setMessages([{
+            id: '1',
+            role: 'assistant',
+            content: "Hi! I'm your AI practice assistant. I can help you analyze your referral patterns, suggest growth strategies, create marketing content, and answer questions about your practice data. What would you like to explore today?",
+            timestamp: new Date(),
+            type: 'general'
+          }]);
+        }
+      } else {
+        // Set default welcome message for new users
+        setMessages([{
+          id: '1',
+          role: 'assistant',
+          content: "Hi! I'm your AI practice assistant. I can help you analyze your referral patterns, suggest growth strategies, create marketing content, and answer questions about your practice data. What would you like to explore today?",
+          timestamp: new Date(),
+          type: 'general'
+        }]);
+      }
+    }
+  }, [user]);
+
+  // Save messages to localStorage whenever messages change
+  useEffect(() => {
+    if (user && messages.length > 0) {
+      const storageKey = `ai-chat-messages-${user.id}`;
+      localStorage.setItem(storageKey, JSON.stringify(messages));
+    }
+  }, [messages, user]);
 
   const quickActions = [
     {
