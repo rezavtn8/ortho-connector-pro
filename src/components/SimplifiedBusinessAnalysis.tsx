@@ -83,28 +83,35 @@ export function SimplifiedBusinessAnalysis() {
         setCachedAnalysis(data);
         setLastRun(new Date(data.created_at));
         
-        try {
-          const parsed = JSON.parse(data.generated_text);
-          if (parsed.insights && Array.isArray(parsed.insights)) {
-            setInsights(parsed.insights.map((insight: any) => ({
-              ...insight,
-              keyMetrics: insight.keyMetrics || [],
-              actionItems: insight.actionItems || [],
-              icon: getInsightIcon(insight.title)
-            })));
+        // Check if analysis is recent (less than 4 hours old) to avoid excessive AI usage
+        const analysisAge = new Date().getTime() - new Date(data.created_at).getTime();
+        const fourHours = 4 * 60 * 60 * 1000;
+        
+        if (analysisAge < fourHours) {
+          console.log('Using recent cached analysis to avoid excessive AI usage');
+          try {
+            const parsed = JSON.parse(data.generated_text);
+            if (parsed.insights && Array.isArray(parsed.insights)) {
+              setInsights(parsed.insights.map((insight: any) => ({
+                ...insight,
+                keyMetrics: insight.keyMetrics || [],
+                actionItems: insight.actionItems || [],
+                icon: getInsightIcon(insight.title)
+              })));
+            }
+          } catch {
+            // If parsing fails, create a simple insight from the text
+            setInsights([{
+              title: "Business Analysis",
+              priority: "medium" as const,
+              summary: data.generated_text.substring(0, 150) + "...",
+              recommendation: "Review the full analysis details.",
+              detailedAnalysis: data.generated_text,
+              keyMetrics: ["Analysis Available", "Generated from Cache", "Full Report Ready"],
+              actionItems: ["Review the complete analysis", "Take action on recommendations", "Schedule follow-up analysis"],
+              icon: BarChart3
+            }]);
           }
-        } catch {
-          // If parsing fails, create a simple insight from the text
-          setInsights([{
-            title: "Business Analysis",
-            priority: "medium" as const,
-            summary: data.generated_text.substring(0, 150) + "...",
-            recommendation: "Review the full analysis details.",
-            detailedAnalysis: data.generated_text,
-            keyMetrics: ["Analysis Available", "Generated from Cache", "Full Report Ready"],
-            actionItems: ["Review the complete analysis", "Take action on recommendations", "Schedule follow-up analysis"],
-            icon: BarChart3
-          }]);
         }
       }
     } catch (error) {
@@ -114,6 +121,20 @@ export function SimplifiedBusinessAnalysis() {
 
   const runComprehensiveAnalysis = async () => {
     if (!user) return;
+    
+    // Check if we have recent analysis to avoid excessive AI usage
+    if (cachedAnalysis) {
+      const analysisAge = new Date().getTime() - new Date(cachedAnalysis.created_at).getTime();
+      const fourHours = 4 * 60 * 60 * 1000;
+      
+      if (analysisAge < fourHours) {
+        toast({
+          title: "Recent Analysis Available",
+          description: "Using cached analysis from the last 4 hours to optimize AI usage.",
+        });
+        return;
+      }
+    }
 
     setIsAnalyzing(true);
     setError(null);
@@ -379,31 +400,41 @@ export function SimplifiedBusinessAnalysis() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <div>
-              <p className="text-muted-foreground">
-                Dynamic AI analysis powered by GPT-4o-mini that examines your complete practice data - referral sources, patient trends, campaigns, discovered offices, reviews, and marketing activities - to identify critical opportunities and provide actionable recommendations.
-              </p>
+            <div className="space-y-4">
+              <div>
+                <p className="text-muted-foreground">
+                  AI-powered analysis that examines your practice data to identify critical opportunities. Analysis is cached for 4 hours to optimize AI usage and costs.
+                </p>
+              </div>
+
+              {error && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Analysis Error: {error}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {dataLoading && (
+                <Alert>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <AlertDescription>
+                    Loading platform data for comprehensive analysis...
+                  </AlertDescription>
+                </Alert>
+              )}
+              
+              {lastRun && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground p-3 bg-muted/50 rounded-md">
+                  <Clock className="h-4 w-4" />
+                  <span>
+                    Last analysis: {formatAnalysisAge(lastRun)} • 
+                    Next analysis available: {formatAnalysisAge(new Date(lastRun.getTime() + 4 * 60 * 60 * 1000))}
+                  </span>
+                </div>
+              )}
             </div>
-
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  Analysis Error: {error}
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {dataLoading && (
-              <Alert>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <AlertDescription>
-                  Loading platform data for comprehensive analysis...
-                </AlertDescription>
-              </Alert>
-            )}
-          </div>
         </CardContent>
       </Card>
 
