@@ -171,15 +171,9 @@ export function AIContentCreator({ businessProfile }: AIContentCreatorProps) {
         currentData = await fetchAllData();
       }
 
-      const { data, error } = await supabase.functions.invoke('ai-assistant', {
+      const { data, error } = await supabase.functions.invoke('unified-ai-service', {
         body: {
-          task_type: 'content_creation',
-          context: {
-            business_profile: businessProfile || currentData?.business_profile,
-            practice_data: currentData,
-            template_info: template,
-            practice_info: practiceInfo
-          },
+          task_type: 'content',
           prompt: `Generate personalized content for a ${template.type} template for ${practiceInfo.practiceName || 'the practice'}. 
           
           Practice Details:
@@ -188,13 +182,22 @@ export function AIContentCreator({ businessProfile }: AIContentCreatorProps) {
           - Specialty: ${practiceInfo.specialty}
           - Description: ${practiceInfo.practiceDescription}
           
+          Template: ${selectedTemplate.type} - ${selectedTemplate.title}
+          Description: ${selectedTemplate.description}
+          
           Create engaging, professional content with:
           - Headline: Catchy and under 8 words
           - Subheading: Descriptive and under 15 words
           - Body: 2-3 sentences, warm and professional
           - Call to Action: Clear and actionable
           
-          Make it personal and reflect the practice's expertise. Use the practice data to create relevant, data-driven content.`
+          Make it personal and reflect the practice's expertise. Use the practice data to create relevant, data-driven content.`,
+          context: {
+            business_profile: businessProfile || currentData?.business_profile,
+            practice_data: currentData,
+            template_info: template,
+            practice_info: practiceInfo
+          },
         },
         headers: {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
@@ -203,8 +206,12 @@ export function AIContentCreator({ businessProfile }: AIContentCreatorProps) {
 
       if (error) throw error;
 
+      if (!data?.success) {
+        throw new Error(data?.error || 'Content generation failed');
+      }
+
       // Parse AI response
-      const aiContent = data.content || data.response || '';
+      const aiContent = data.data || '';
       const parsedContent = {
         headline: extractSection(aiContent, 'headline') || template.content.headline,
         subheading: extractSection(aiContent, 'subheading') || template.content.subheading,

@@ -221,9 +221,10 @@ export function Reviews() {
     });
 
     try {
-      const { data, error } = await supabase.functions.invoke('ai-assistant', {
+      const { data, error } = await supabase.functions.invoke('unified-ai-service', {
         body: {
-          task_type: 'review_response',
+          task_type: 'content',
+          prompt: `Generate a professional response to this review: "${review.text}"`,
           context: {
             google_review_id: reviewId,
             reviewer_name: review.author_name,
@@ -240,12 +241,18 @@ export function Reviews() {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        throw new Error(error.message || 'Review response generation failed');
+      }
+
+      if (!data?.success) {
+        throw new Error(data?.error || 'Review response generation failed');
+      }
 
       // Show the response in the dialog
       setAiResponseDialog(prev => ({
         ...prev,
-        content: data.content,
+        content: data.data,
         loading: false
       }));
 

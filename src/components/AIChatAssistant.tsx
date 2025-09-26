@@ -134,27 +134,33 @@ export function AIChatAssistant() {
         throw new Error('Failed to load practice data');
       }
 
-      const { data: aiResponse, error } = await supabase.functions.invoke('ai-assistant', {
+      const { data: aiResponse, error } = await supabase.functions.invoke('unified-ai-service', {
         body: {
-          task_type: 'practice_consultation',
+          task_type: 'chat',
+          prompt: content,
           context: {
             business_profile: businessProfile,
             practice_data: data,
             conversation_history: messages.slice(-3) // Last 3 messages for better context
           },
-          prompt: content,
         },
         headers: {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        throw new Error(error.message || 'AI service error');
+      }
+
+      if (!aiResponse?.success) {
+        throw new Error(aiResponse?.error || 'AI service failed');
+      }
 
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: aiResponse.content || 'I apologize, but I encountered an issue processing your request. Please try again.',
+        content: aiResponse.data || 'I apologize, but I encountered an issue processing your request. Please try again.',
         timestamp: new Date(),
         type: content.toLowerCase().includes('analyz') || content.toLowerCase().includes('data') ? 'analysis' : 
               content.toLowerCase().includes('suggest') || content.toLowerCase().includes('recommend') ? 'suggestion' : 'general'

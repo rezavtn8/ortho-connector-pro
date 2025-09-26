@@ -582,8 +582,9 @@ export function WelcomeBooklet({ isOpen, onClose, businessProfile }: WelcomeBook
 
 Make all content professional, welcoming, and specific to ${bookletData.specialty || 'healthcare'} care. Ensure testimonials are realistic but anonymized.`;
 
-      const { data, error } = await supabase.functions.invoke('ai-assistant', {
+      const { data, error } = await supabase.functions.invoke('unified-ai-service', {
         body: { 
+          task_type: 'content',
           prompt,
           context: businessProfile || {}
         },
@@ -592,12 +593,19 @@ Make all content professional, welcoming, and specific to ${bookletData.specialt
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        throw new Error(error.message || 'Content generation failed');
+      }
 
-      if (data?.generatedText) {
+      if (!data?.success) {
+        throw new Error(data?.error || 'Content generation failed');
+      }
+
+      if (data?.data) {
         try {
           // Extract JSON from the response
-          const jsonMatch = data.generatedText.match(/\{[\s\S]*\}/);
+          const responseText = data.data;
+          const jsonMatch = responseText.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             const generatedData = JSON.parse(jsonMatch[0]);
             setBookletData(prev => ({

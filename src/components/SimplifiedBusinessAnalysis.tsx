@@ -159,9 +159,13 @@ export function SimplifiedBusinessAnalysis() {
         ai_usage: data.ai_usage_history.length
       });
 
-      // Call the comprehensive AI insights function
-      const { data: aiResponse, error: aiError } = await supabase.functions.invoke('comprehensive-ai-insights', {
-        body: { context: data },
+      // Call the unified AI service for analysis
+      const { data: aiResponse, error: aiError } = await supabase.functions.invoke('unified-ai-service', {
+        body: { 
+          task_type: 'analysis',
+          prompt: 'Analyze my practice data and provide comprehensive business insights with actionable recommendations',
+          context: data 
+        },
         headers: {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
         },
@@ -172,12 +176,42 @@ export function SimplifiedBusinessAnalysis() {
         throw new Error('AI analysis failed: ' + aiError.message);
       }
 
-      if (!aiResponse?.insights || !Array.isArray(aiResponse.insights)) {
-        throw new Error('Invalid AI response format');
+      if (!aiResponse?.success) {
+        throw new Error(aiResponse?.error || 'Invalid AI response format');
+      }
+
+      const responseData = aiResponse.data;
+      let insights;
+
+      // Try to parse as JSON if it's a string
+      if (typeof responseData === 'string') {
+        try {
+          const parsed = JSON.parse(responseData);
+          insights = parsed.insights || [parsed]; // Handle both formats
+        } catch {
+          // If parsing fails, create a single insight from the text
+          insights = [{
+            title: "AI Business Analysis",
+            priority: "medium",
+            summary: responseData.substring(0, 200) + "...",
+            recommendation: "Review the complete analysis for detailed insights.",
+            detailedAnalysis: responseData,
+            keyMetrics: ["AI Generated", "Comprehensive Analysis", "Data-Driven"],
+            actionItems: ["Review insights", "Implement recommendations", "Monitor progress"]
+          }];
+        }
+      } else if (responseData?.insights) {
+        insights = responseData.insights;
+      } else {
+        insights = [responseData]; // Single insight object
+      }
+
+      if (!insights || !Array.isArray(insights)) {
+        throw new Error('No valid insights generated');
       }
 
       // Process insights with icons
-      const processedInsights = aiResponse.insights.map((insight: any) => ({
+      const processedInsights = insights.map((insight: any) => ({
         ...insight,
         icon: getInsightIcon(insight.title)
       }));

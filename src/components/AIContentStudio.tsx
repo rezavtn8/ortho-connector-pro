@@ -54,25 +54,31 @@ export function AIContentStudio({ businessProfile }: AIContentStudioProps) {
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('ai-assistant', {
+      const { data, error } = await supabase.functions.invoke('unified-ai-service', {
         body: {
-          task_type: 'content_creation',
+          task_type: 'content',
+          prompt: inputMessage,
           context: {
             business_profile: businessProfile,
             conversation_history: messages.slice(-5), // Last 5 messages for context
           },
-          prompt: inputMessage,
         },
         headers: {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        throw new Error(error.message || 'Content generation failed');
+      }
+
+      if (!data?.success) {
+        throw new Error(data?.error || 'Content generation failed');
+      }
 
       const assistantMessage: ChatMessage = {
         role: 'assistant',
-        content: data.content || 'I apologize, but I encountered an issue generating content. Please try again.',
+        content: data.data || 'I apologize, but I encountered an issue generating content. Please try again.',
         timestamp: new Date(),
       };
 
