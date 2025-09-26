@@ -7,6 +7,7 @@ import { RefreshCw, TrendingUp, Users, Star, AlertCircle, Brain } from 'lucide-r
 import { useAIAnalysis } from '@/hooks/useAIAnalysis';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export function AIAnalysisTab() {
   const { analysis, loading, error, refreshAnalysis } = useAIAnalysis();
