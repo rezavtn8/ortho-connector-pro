@@ -1,7 +1,11 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { handleCorsPreflightRequest, createCorsResponse, validateOrigin, createOriginErrorResponse } from "../_shared/cors-config.ts";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 interface EmailRequest {
   offices: Array<{
@@ -24,7 +28,7 @@ interface EmailRequest {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return handleCorsPreflightRequest(req, ['POST']);
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
@@ -126,7 +130,7 @@ serve(async (req) => {
       
       // Office-specific campaign history
       const officeCampaigns = allCampaigns?.filter(c => 
-        c.campaign_deliveries?.some((d: any) => d.office_id === office.id)
+        c.campaign_deliveries?.some(d => d.office_id === office.id)
       ) || [];
 
       // Office details from sources
@@ -374,7 +378,7 @@ serve(async (req) => {
 
     console.log(`Successfully generated ${generatedEmails.length} emails with complete platform data`);
 
-    return createCorsResponse(JSON.stringify({ 
+    return new Response(JSON.stringify({ 
       success: true,
       emails: generatedEmails,
       total_generated: generatedEmails.length,
@@ -383,17 +387,17 @@ serve(async (req) => {
         'monthly_patients', 'marketing_visits', 'campaigns', 'campaign_deliveries'
       ]
     }), {
-      headers: { 'Content-Type': 'application/json' },
-    }, req);
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
 
   } catch (error) {
     console.error('Error in comprehensive email generation:', error);
-    return createCorsResponse(JSON.stringify({ 
+    return new Response(JSON.stringify({ 
       success: false,
-      error: (error as Error).message 
+      error: error.message 
     }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    }, req);
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });

@@ -1,168 +1,233 @@
-import React, { memo, useState } from 'react';
-import { useDataPrefetch } from '@/hooks/useDataPrefetch';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Brain, MessageSquare, Settings, Sparkles, BarChart3, Loader2 } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
-import { useUnifiedAIData } from '@/hooks/useUnifiedAIData';
-import { AIAnalysisText } from '@/components/AIAnalysisText';
-import { AIChatAssistant } from '@/components/AIChatAssistant';
 import { AIBusinessSetup } from '@/components/AIBusinessSetup';
 import { AIUsageDashboard } from '@/components/AIUsageDashboard';
-import { ComponentPerformance } from '@/components/performance/PerformanceMonitor';
+import { SimplifiedBusinessAnalysis } from '@/components/SimplifiedBusinessAnalysis';
+import { AIChatAssistant } from '@/components/AIChatAssistant';
+import { Bot, MessageSquare, Mail, FileText, BarChart3, Settings, Activity, Building2, User, Network, Palette, TrendingUp, Zap } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 
-const AIAssistant = memo(() => {
-  const { user } = useAuth();
-  const { data: unifiedData, loading: dataLoading } = useUnifiedAIData();
+import { useNavigate } from 'react-router-dom';
+
+export function AIAssistant() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
-  const { prefetchOnHover } = useDataPrefetch();
+  const [businessProfile, setBusinessProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
 
-  // Business profile is now part of unified data
-  const businessProfile = unifiedData?.business_profile;
+  useEffect(() => {
+    loadBusinessProfile();
+  }, [user]);
 
-  if (!user) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">AI Assistant</h1>
-          <p className="text-muted-foreground">Please log in to access AI features.</p>
-        </div>
-      </div>
-    );
-  }
+  const loadBusinessProfile = async () => {
+    if (!user) return;
 
-  if (dataLoading) {
-    return (
-      <ComponentPerformance name="AIAssistant">
-        <div className="container mx-auto p-6">
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="text-center space-y-4">
-              <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-              <div>
-                <h3 className="text-lg font-semibold">Loading AI Assistant</h3>
-                <p className="text-muted-foreground">
-                  Loading your practice data for AI analysis...
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </ComponentPerformance>
-    );
-  }
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-business-context', {
+        body: { action: 'get' },
+        headers: {
+          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+      });
+
+      if (!error && data.profile) {
+        setBusinessProfile(data.profile);
+      }
+    } catch (error: any) {
+      console.error('Error loading business profile:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <ComponentPerformance name="AIAssistant">
-      <div className="container mx-auto p-6 space-y-6">
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
+      <div className="flex flex-col space-y-3 mb-8">
         <div className="flex items-center gap-3">
-          <Brain className="h-8 w-8 text-primary" />
-          <div>
-            <h1 className="text-3xl font-bold">AI Assistant</h1>
-            <p className="text-muted-foreground">
-              AI-powered business intelligence and automated assistance for your practice
-            </p>
-          </div>
+          <Bot className="h-8 w-8 title-icon" />
+          <h1 className="text-4xl font-bold page-title">AI Assistant</h1>
         </div>
+        <p className="text-muted-foreground text-lg">
+          Intelligent automation and insights for your practice
+        </p>
+      </div>
 
-        {!unifiedData && (
-          <Alert>
-            <AlertDescription>
-              Loading practice data for AI features. This may take a moment...
-            </AlertDescription>
-          </Alert>
-        )}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3" variant="pills">
+          <TabsTrigger value="overview" variant="pills">Overview</TabsTrigger>
+          <TabsTrigger value="chat" variant="pills">AI Chat</TabsTrigger>
+          <TabsTrigger value="setup" variant="pills">Settings</TabsTrigger>
+        </TabsList>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger 
-              value="overview" 
-              className="flex items-center gap-2"
-              onMouseEnter={() => prefetchOnHover('/ai-assistant')}
-            >
-              <Sparkles className="h-4 w-4" />
-              Analysis
-            </TabsTrigger>
-            <TabsTrigger 
-              value="chat" 
-              className="flex items-center gap-2"
-              onMouseEnter={() => prefetchOnHover('/ai-assistant')}
-            >
-              <MessageSquare className="h-4 w-4" />
-              Chat
-            </TabsTrigger>
-            <TabsTrigger 
-              value="setup" 
-              className="flex items-center gap-2"
-              onMouseEnter={() => prefetchOnHover('/ai-assistant')}
-            >
-              <Settings className="h-4 w-4" />
-              Setup
-            </TabsTrigger>
-            <TabsTrigger 
-              value="usage" 
-              className="flex items-center gap-2"
-              onMouseEnter={() => prefetchOnHover('/ai-assistant')}
-            >
-              <BarChart3 className="h-4 w-4" />
-              Usage
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="overview" className="space-y-6">
-            {businessProfile && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    Business Profile
-                    <Badge variant="secondary">Active</Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid md:grid-cols-2 gap-4 text-sm">
+        <TabsContent value="overview" className="space-y-6">
+          {/* Business Profile Section */}
+          {businessProfile?.business_persona && (
+            <Card className="border-primary/20 bg-primary/5">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Building2 className="h-5 w-5 text-primary" />
+                  {businessProfile.business_persona.practice_name}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="flex items-center gap-2">
+                    <User className="h-4 w-4 text-muted-foreground" />
                     <div>
-                      <span className="font-medium">Practice:</span> {businessProfile.business_persona?.practice_name || 'Not set'}
-                    </div>
-                    <div>
-                      <span className="font-medium">Communication Style:</span> {businessProfile.communication_style || 'Professional'}
-                    </div>
-                    <div>
-                      <span className="font-medium">Specialties:</span> {businessProfile.specialties?.join(', ') || 'General Practice'}
-                    </div>
-                    <div>
-                      <span className="font-medium">Target Audience:</span> {businessProfile.target_audience || 'Healthcare professionals'}
+                      <p className="text-sm font-medium">Practice Owner</p>
+                      <p className="text-sm text-muted-foreground">{businessProfile.business_persona.owner_name}</p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            )}
-
-            <AIAnalysisText />
-          </TabsContent>
-
-          {activeTab === 'chat' && (
-            <TabsContent value="chat">
-              <AIChatAssistant />
-            </TabsContent>
+                  <div className="flex items-center gap-2">
+                    <Network className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">Referral Network</p>
+                      <p className="text-sm text-muted-foreground">{businessProfile.business_persona.referral_network_size} sources</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Settings className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">Communication Style</p>
+                      <p className="text-sm text-muted-foreground capitalize">{businessProfile.communication_style?.replace('-', ' & ') || 'Professional'}</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           )}
 
-          {activeTab === 'setup' && (
-            <TabsContent value="setup">
+          {/* AI Insights Section */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-primary" />
+              <h3 className="text-lg font-semibold">AI Business Analysis</h3>
+            </div>
+            <SimplifiedBusinessAnalysis />
+          </div>
+
+          {/* Quick Actions Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => setActiveTab('chat')}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Bot className="h-5 w-5 text-primary" />
+                  AI Consultation
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Chat with AI for personalized insights and recommendations about your practice.
+                </p>
+                <Button className="w-full">
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Start Chat
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="hover:shadow-md transition-shadow">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Mail className="h-5 w-5 text-primary" />
+                  Smart Campaigns
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Create AI-powered marketing campaigns based on your practice data.
+                </p>
+                <Button className="w-full" variant="outline" onClick={() => navigate('/campaigns')}>
+                  <Mail className="h-4 w-4 mr-2" />
+                  Create Campaign
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="hover:shadow-md transition-shadow">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-primary" />
+                  Content Studio
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Generate marketing materials tailored to your practice's brand and voice.
+                </p>
+                <Button className="w-full" variant="outline" onClick={() => navigate('/creator')}>
+                  <Palette className="h-4 w-4 mr-2" />
+                  Create Content
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="hover:shadow-md transition-shadow">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5 text-primary" />
+                  Review Manager
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  AI-powered responses to reviews that match your practice's voice.
+                </p>
+                <Button className="w-full" variant="outline" onClick={() => navigate('/reviews')}>
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Manage Reviews
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="hover:shadow-md transition-shadow">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-primary" />
+                  Usage Analytics
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Monitor AI usage, costs, and performance metrics for optimization.
+                </p>
+                <Button className="w-full" variant="outline" onClick={() => setActiveTab('setup')}>
+                  <Activity className="h-4 w-4 mr-2" />
+                  View Usage
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+
+        <TabsContent value="chat" className="space-y-6">
+          <AIChatAssistant />
+        </TabsContent>
+
+        <TabsContent value="setup" className="space-y-6">
+          <Tabs defaultValue="business" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-2 max-w-md" variant="pills">
+              <TabsTrigger value="business" variant="pills">Business Setup</TabsTrigger>
+              <TabsTrigger value="usage" variant="pills">Usage Dashboard</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="business">
               <AIBusinessSetup />
             </TabsContent>
-          )}
-
-          {activeTab === 'usage' && (
+            
             <TabsContent value="usage">
               <AIUsageDashboard />
             </TabsContent>
-          )}
-        </Tabs>
-      </div>
-    </ComponentPerformance>
+          </Tabs>
+        </TabsContent>
+      </Tabs>
+    </div>
   );
-});
-
-AIAssistant.displayName = 'AIAssistant';
-export default AIAssistant;
+}

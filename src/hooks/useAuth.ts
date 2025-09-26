@@ -38,24 +38,15 @@ export function useAuth() {
   const activityTimeoutRef = useRef<number | null>(null);
 
   const getRateLimitData = (): RateLimitData => {
-    try {
-      const stored = localStorage.getItem(RATE_LIMIT_KEY);
-      if (!stored) {
-        return { attempts: 0, lockoutUntil: null, lastAttempt: 0 };
-      }
-      return JSON.parse(stored);
-    } catch (error) {
-      console.error('Error reading rate limit data:', error);
+    const stored = localStorage.getItem(RATE_LIMIT_KEY);
+    if (!stored) {
       return { attempts: 0, lockoutUntil: null, lastAttempt: 0 };
     }
+    return JSON.parse(stored);
   };
 
   const setRateLimitData = (data: RateLimitData) => {
-    try {
-      localStorage.setItem(RATE_LIMIT_KEY, JSON.stringify(data));
-    } catch (error) {
-      console.error('Error saving rate limit data:', error);
-    }
+    localStorage.setItem(RATE_LIMIT_KEY, JSON.stringify(data));
   };
 
   const checkLockoutStatus = () => {
@@ -107,24 +98,15 @@ export function useAuth() {
 
   // Session timeout management
   const getSessionActivity = (): SessionTimeoutData => {
-    try {
-      const stored = localStorage.getItem(SESSION_ACTIVITY_KEY);
-      if (!stored) {
-        return { lastActivity: timestamp(), warningShown: false };
-      }
-      return JSON.parse(stored);
-    } catch (error) {
-      console.error('Error reading session activity:', error);
+    const stored = localStorage.getItem(SESSION_ACTIVITY_KEY);
+    if (!stored) {
       return { lastActivity: timestamp(), warningShown: false };
     }
+    return JSON.parse(stored);
   };
 
   const setSessionActivity = (data: SessionTimeoutData) => {
-    try {
-      localStorage.setItem(SESSION_ACTIVITY_KEY, JSON.stringify(data));
-    } catch (error) {
-      console.error('Error saving session activity:', error);
-    }
+    localStorage.setItem(SESSION_ACTIVITY_KEY, JSON.stringify(data));
   };
 
   const clearSessionTimeouts = useCallback(() => {
@@ -147,11 +129,7 @@ export function useAuth() {
   const handleSessionTimeout = useCallback(async () => {
     clearSessionTimeouts();
     await supabase.auth.signOut();
-    try {
-      localStorage.removeItem(SESSION_ACTIVITY_KEY);
-    } catch (error) {
-      console.error('Error removing session activity:', error);
-    }
+    localStorage.removeItem(SESSION_ACTIVITY_KEY);
   }, [clearSessionTimeouts]);
 
   const showWarningModal = useCallback(() => {
@@ -217,11 +195,7 @@ export function useAuth() {
         } else {
           // Clear session timeout on logout
           clearSessionTimeouts();
-          try {
-            localStorage.removeItem(SESSION_ACTIVITY_KEY);
-          } catch (error) {
-            console.error('Error removing session activity on logout:', error);
-          }
+          localStorage.removeItem(SESSION_ACTIVITY_KEY);
         }
       }
     );

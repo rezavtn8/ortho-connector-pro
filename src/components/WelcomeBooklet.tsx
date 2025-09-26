@@ -582,9 +582,8 @@ export function WelcomeBooklet({ isOpen, onClose, businessProfile }: WelcomeBook
 
 Make all content professional, welcoming, and specific to ${bookletData.specialty || 'healthcare'} care. Ensure testimonials are realistic but anonymized.`;
 
-      const { data, error } = await supabase.functions.invoke('unified-ai-service', {
+      const { data, error } = await supabase.functions.invoke('ai-assistant', {
         body: { 
-          task_type: 'content',
           prompt,
           context: businessProfile || {}
         },
@@ -593,19 +592,12 @@ Make all content professional, welcoming, and specific to ${bookletData.specialt
         },
       });
 
-      if (error) {
-        throw new Error(error.message || 'Content generation failed');
-      }
+      if (error) throw error;
 
-      if (!data?.success) {
-        throw new Error(data?.error || 'Content generation failed');
-      }
-
-      if (data?.data) {
+      if (data?.generatedText) {
         try {
           // Extract JSON from the response
-          const responseText = data.data;
-          const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+          const jsonMatch = data.generatedText.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             const generatedData = JSON.parse(jsonMatch[0]);
             setBookletData(prev => ({
@@ -682,7 +674,7 @@ Make all content professional, welcoming, and specific to ${bookletData.specialt
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 gap-0">
         <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-xl font-semibold">Welcome Booklet</h2>
+          <h2 className="text-xl font-semibold">Welcome Booklet Creator</h2>
           <Button
             variant="ghost"
             size="sm"

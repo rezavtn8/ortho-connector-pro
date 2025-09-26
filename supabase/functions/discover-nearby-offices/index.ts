@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { validateGoogleApiKey, createApiKeyErrorResponse } from "../_shared/google-api-validation.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -99,13 +98,10 @@ serve(async (req) => {
     // Rate limiting temporarily disabled for testing
     console.log('Rate limiting disabled - proceeding with API call');
 
-    // Get and validate Google Places API key
+    // Call Google Places API
     const googleApiKey = Deno.env.get('GOOGLE_MAPS_API_KEY');
-    console.log(`discover-nearby-offices: Processing discovery request [${crypto.randomUUID().substring(0, 8)}]`);
-    
-    const validation = validateGoogleApiKey(googleApiKey, 'discovery-request');
-    if (!validation.isValid) {
-      throw new Error(validation.userMessage || 'Google Maps API configuration error');
+    if (!googleApiKey) {
+      throw new Error('Google Maps API key not configured');
     }
 
     // Create discovery session to track this search
@@ -177,7 +173,7 @@ serve(async (req) => {
           
           if (textData.status === 'OK' && textData.results) {
             // Filter for dental-related results
-            const dentalResults = textData.results.filter((place: any) => {
+            const dentalResults = textData.results.filter(place => {
               const name = place.name.toLowerCase();
               const types = place.types || [];
               return name.includes('dental') || name.includes('dentist') || 
@@ -396,7 +392,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: (error as Error).message,
+        error: error.message,
         canRefresh: true
       }),
       {

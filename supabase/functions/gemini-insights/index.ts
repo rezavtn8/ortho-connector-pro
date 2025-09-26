@@ -1,7 +1,11 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { handleCorsPreflightRequest, createCorsResponse, validateOrigin, createOriginErrorResponse } from "../_shared/cors-config.ts";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 interface UserData {
   offices: any[];
@@ -21,15 +25,8 @@ interface UserData {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return handleCorsPreflightRequest(req, ['POST']);
-  }
-
-  // Validate origin for browser requests
-  const { isValid: originValid, origin } = validateOrigin(req);
-  if (!originValid) {
-    return createOriginErrorResponse(origin);
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
@@ -179,8 +176,8 @@ serve(async (req) => {
     const sourcePerformance = Object.keys(monthlyBySource).map(sourceId => {
       const sourceRecords = monthlyBySource[sourceId];
       const recentRecords = sourceRecords.slice(0, 6); // Last 6 months
-      const totalRecent = recentRecords.reduce((sum: number, record: any) => sum + record.patient_count, 0);
-      const totalAll = sourceRecords.reduce((sum: number, record: any) => sum + record.patient_count, 0);
+      const totalRecent = recentRecords.reduce((sum, record) => sum + record.patient_count, 0);
+      const totalAll = sourceRecords.reduce((sum, record) => sum + record.patient_count, 0);
       const office = userData.offices.find(o => o.id === sourceId);
       
       return {
@@ -321,7 +318,7 @@ User Question: ${question}
 
     const aiResponse = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated';
 
-    return createCorsResponse(
+    return new Response(
       JSON.stringify({
         response: aiResponse,
         dataContext: {
@@ -339,21 +336,21 @@ User Question: ${question}
         }
       }),
       {
-        headers: { 'Content-Type': 'application/json' },
-      }, req
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
     );
 
   } catch (error) {
     console.error('Error in gemini-insights function:', error);
-    return createCorsResponse(
+    return new Response(
       JSON.stringify({ 
-        error: (error as Error).message,
+        error: error.message,
         details: 'Failed to process AI insights request'
       }),
       {
         status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      }, req
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
     );
   }
 });

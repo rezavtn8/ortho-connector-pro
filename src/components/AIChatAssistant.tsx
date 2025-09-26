@@ -1,537 +1,427 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { 
-  MessageSquare, 
-  Send, 
-  Bot, 
-  User, 
-  Lightbulb, 
-  BarChart3, 
-  FileText, 
-  Users,
-  RefreshCw,
-  Edit3,
-  Loader2,
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
-  MoreVertical
-} from 'lucide-react';
+import { MessageSquare, Send, Bot, User, Lightbulb, BarChart3, FileText, Users, AlertTriangle, TrendingUp, Target } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
-import { chatStorage, ChatMessage } from '@/lib/chatStorage';
-import { messageQueue } from '@/lib/messageQueue';
-import { useUnifiedAIData } from '@/hooks/useUnifiedAIData';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
-const MESSAGES_PER_LOAD = 10;
-
-// Quick action prompts - limited to 4 most relevant ones
-const QUICK_ACTIONS = [
-  {
-    icon: BarChart3,
-    label: 'Performance Summary',
-    prompt: 'Give me a quick summary of my practice performance this month with key metrics'
-  },
-  {
-    icon: Lightbulb,
-    label: 'Growth Opportunities',
-    prompt: 'Based on my data, what are the top 3 growth opportunities I should focus on?'
-  },
-  {
-    icon: Users,
-    label: 'Top Referrers',
-    prompt: 'Show me my top referral sources and suggest ways to strengthen these relationships'
-  },
-  {
-    icon: FileText,
-    label: 'Action Items',
-    prompt: 'What specific actions should I take this week based on my current data trends?'
-  }
-];
-
-interface TypingIndicatorProps {
-  visible: boolean;
-}
-
-function TypingIndicator({ visible }: TypingIndicatorProps) {
-  if (!visible) return null;
-
-  return (
-    <div className="flex items-center space-x-2 p-3 bg-muted/50 rounded-lg w-fit">
-      <Bot className="h-4 w-4 text-muted-foreground" />
-      <div className="flex space-x-1">
-        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce [animation-delay:-0.3s]" />
-        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce [animation-delay:-0.15s]" />
-        <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" />
-      </div>
-      <span className="text-sm text-muted-foreground">AI is thinking...</span>
-    </div>
-  );
-}
-
-interface MessageStatusProps {
-  status?: 'sending' | 'sent' | 'failed';
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
   timestamp: Date;
-}
-
-function MessageStatus({ status, timestamp }: MessageStatusProps) {
-  const formatTime = (date: Date) => {
-    try {
-      const dateObj = date instanceof Date ? date : new Date(date);
-      if (isNaN(dateObj.getTime())) {
-        return 'Invalid time';
-      }
-      return dateObj.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return 'Invalid time';
-    }
-  };
-
-  return (
-    <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-      <span>{formatTime(timestamp)}</span>
-      {status === 'sending' && <Loader2 className="h-3 w-3 animate-spin" />}
-      {status === 'sent' && <CheckCircle2 className="h-3 w-3 text-green-500" />}
-      {status === 'failed' && <AlertTriangle className="h-3 w-3 text-destructive" />}
-    </div>
-  );
-}
-
-interface ChatMessageBubbleProps {
-  message: ChatMessage;
-  onRetry?: () => void;
-  onEdit?: () => void;
-}
-
-function ChatMessageBubble({ message, onRetry, onEdit }: ChatMessageBubbleProps) {
-  const isUser = message.role === 'user';
-  
-  return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
-      <div className={`max-w-[80%] ${isUser ? 'order-2' : 'order-1'}`}>
-        <div className={`flex items-start gap-2 ${isUser ? 'flex-row-reverse' : ''}`}>
-          <div className={`h-8 w-8 rounded-full flex items-center justify-center ${
-            isUser ? 'bg-primary text-primary-foreground' : 'bg-muted'
-          }`}>
-            {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
-          </div>
-          
-          <div className={`rounded-lg px-4 py-3 ${
-            isUser 
-              ? 'bg-primary text-primary-foreground' 
-              : 'bg-muted text-muted-foreground'
-          }`}>
-            <div className="text-sm leading-relaxed whitespace-pre-wrap">
-              {message.content}
-            </div>
-            
-            <div className={`flex items-center justify-between mt-2 ${
-              isUser ? 'flex-row-reverse' : ''
-            }`}>
-              <MessageStatus status={message.status} timestamp={message.timestamp} />
-              
-              {(message.status === 'failed' || (isUser && onEdit)) && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                      <MoreVertical className="h-3 w-3" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align={isUser ? 'end' : 'start'}>
-                    {message.status === 'failed' && onRetry && (
-                      <DropdownMenuItem onClick={onRetry}>
-                        <RefreshCw className="h-3 w-3 mr-2" />
-                        Retry
-                      </DropdownMenuItem>
-                    )}
-                    {isUser && onEdit && (
-                      <DropdownMenuItem onClick={onEdit}>
-                        <Edit3 className="h-3 w-3 mr-2" />
-                        Edit & Resend
-                      </DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  type?: 'analysis' | 'suggestion' | 'general';
 }
 
 export function AIChatAssistant() {
-  const { user } = useAuth();
-  const { data: unifiedData, loading: dataLoading } = useUnifiedAIData();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      id: '1',
+      role: 'assistant',
+      content: "Hi! I'm your AI practice assistant. I can help you analyze your referral patterns, suggest growth strategies, create marketing content, and answer questions about your practice data. What would you like to explore today?",
+      timestamp: new Date(),
+      type: 'general'
+    }
+  ]);
   const [inputMessage, setInputMessage] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const [hasMoreMessages, setHasMoreMessages] = useState(false);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
-  
+  const [isLoading, setIsLoading] = useState(false);
+  const [businessProfile, setBusinessProfile] = useState<any>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const messageLoadOffset = useRef(0);
+  const { user } = useAuth();
 
-  // Auto-save draft
+  const quickActions = [
+    {
+      label: 'Source distribution analysis',
+      icon: BarChart3,
+      prompt: 'Analyze my referral source distribution by type, geographic location, and performance. Are there concentration risks or gaps?'
+    },
+    {
+      label: 'Identify underperformers',
+      icon: AlertTriangle,
+      prompt: 'Which of my referral sources are underperforming based on historical data? What specific actions should I take for each?'
+    },
+    {
+      label: 'Seasonal patterns & trends',
+      icon: TrendingUp,
+      prompt: 'Analyze my referral patterns over the past year. What seasonal trends do you see and how can I prepare for them?'
+    },
+    {
+      label: 'ROI optimization strategy',
+      icon: Target,
+      prompt: 'Based on my marketing visits and referral data, which sources give the best ROI and deserve more investment?'
+    },
+    {
+      label: 'Market expansion opportunities',
+      icon: Users,
+      prompt: 'Analyze gaps in my referral network. What types of practices or geographic areas should I target for expansion?'
+    },
+    {
+      label: 'Personalized outreach plan',
+      icon: FileText,
+      prompt: 'Create a data-driven outreach plan for my top 5 sources, including specific talking points based on their referral history.'
+    }
+  ];
+
   useEffect(() => {
-    if (!user || !inputMessage.trim()) return;
-
-    const timeout = setTimeout(() => {
-      chatStorage.saveDraft(user.id, inputMessage);
-    }, 1000);
-
-    return () => clearTimeout(timeout);
-  }, [inputMessage, user]);
-
-  // Load initial messages and draft
-  useEffect(() => {
-    if (!user) return;
-
-    loadMessages(true).then(() => {
-      // Load draft message
-      chatStorage.getDraft(user.id).then(draft => {
-        if (draft) {
-          setInputMessage(draft);
-        }
-      });
-    });
+    loadBusinessProfile();
   }, [user]);
 
-  // Initialize with welcome message if needed
   useEffect(() => {
-    if (messages.length === 0 && user) {
-      const practiceDataSummary = unifiedData ? 
-        `I have access to your practice data including ${unifiedData.sources?.length || 0} referral sources, ${unifiedData.monthly_data?.length || 0} months of patient data, and ${unifiedData.visits?.length || 0} recent visits.` : 
-        'I\'m loading your practice data to provide more personalized assistance.';
-
-      const welcomeMessage: ChatMessage = {
-        id: 'welcome',
-        role: 'assistant',
-        content: `Hi! I'm your AI practice assistant with full access to your practice data. ${practiceDataSummary} I can analyze performance trends, identify growth opportunities, suggest referral strategies, and provide actionable insights. What would you like to explore?`,
-        timestamp: new Date(),
-        type: 'general',
-        status: 'sent'
-      };
-      
-      setMessages([welcomeMessage]);
-      if (user) {
-        chatStorage.saveMessage(user.id, welcomeMessage);
-      }
+    if (scrollAreaRef.current) {
+      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
     }
-  }, [messages.length, user, unifiedData]);
+  }, [messages]);
 
-  const loadMessages = async (reset = false) => {
-    if (!user || loadingHistory) return;
+  const loadBusinessProfile = async () => {
+    if (!user) return;
 
-    setLoadingHistory(true);
-    
     try {
-      const offset = reset ? 0 : messageLoadOffset.current;
-      const loadedMessages = await chatStorage.getMessages(user.id, MESSAGES_PER_LOAD, offset);
-      
-      if (reset) {
-        setMessages(loadedMessages);
-        messageLoadOffset.current = loadedMessages.length;
-      } else {
-        setMessages(prev => [...loadedMessages, ...prev]);
-        messageLoadOffset.current += loadedMessages.length;
-      }
-      
-      setHasMoreMessages(loadedMessages.length === MESSAGES_PER_LOAD);
-    } catch (error) {
-      console.error('Error loading messages:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load message history',
-        variant: 'destructive'
+      const { data, error } = await supabase.functions.invoke('ai-business-context', {
+        body: { action: 'get' },
+        headers: {
+          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
       });
-    } finally {
-      setLoadingHistory(false);
+
+      if (!error && data.profile) {
+        setBusinessProfile(data.profile);
+      }
+    } catch (error: any) {
+      console.error('Error loading business profile:', error);
     }
   };
 
-  const scrollToBottom = useCallback(() => {
-    if (scrollAreaRef.current) {
-      const scrollElement = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      if (scrollElement) {
-        scrollElement.scrollTop = scrollElement.scrollHeight;
-      }
-    }
-  }, []);
+  const handleSendMessage = async (messageContent?: string) => {
+    const content = messageContent || inputMessage.trim();
+    if (!content || isLoading) return;
 
-  const handleSendMessage = useCallback(async (content: string, isRetry = false, originalMessageId?: string) => {
-    if (!user || !content.trim()) return;
-
-    const messageContent = content.trim();
-    const messageId = originalMessageId || Date.now().toString();
-
-    // Create optimistic user message
     const userMessage: ChatMessage = {
-      id: messageId,
+      id: Date.now().toString(),
       role: 'user',
-      content: messageContent,
-      timestamp: new Date(),
-      type: 'general',
-      status: 'sending'
+      content,
+      timestamp: new Date()
     };
 
-    // Update UI optimistically
-    if (!isRetry) {
-      setMessages(prev => [...prev, userMessage]);
-      setInputMessage('');
-      if (user) {
-        await chatStorage.saveMessage(user.id, userMessage);
-        chatStorage.clearDraft(user.id);
-      }
-    } else {
-      // Update existing message status for retry
-      setMessages(prev => 
-        prev.map(msg => 
-          msg.id === messageId 
-            ? { ...msg, status: 'sending' as const }
-            : msg
-        )
-      );
+    setMessages(prev => [...prev, userMessage]);
+    setInputMessage('');
+    setIsLoading(true);
+
+    try {
+      // Get comprehensive practice data for context - ALL PLATFORM DATA INCLUDING LOCATIONS & AI SETTINGS
+      const [
+        sourcesResult, 
+        monthlyResult, 
+        visitsResult, 
+        campaignsResult,
+        discoveredResult,
+        reviewsResult,
+        deliveriesResult,
+        usageResult,
+        userProfileResult,
+        clinicResult,
+        activityResult,
+        aiBusinessProfileResult,
+        aiTemplatesResult,
+        aiContentResult
+      ] = await Promise.all([
+        supabase.from('patient_sources').select('*').eq('created_by', user?.id),
+        supabase.from('monthly_patients').select('*').eq('user_id', user?.id),
+        supabase.from('marketing_visits').select('*').eq('user_id', user?.id),
+        supabase.from('campaigns').select('*').eq('created_by', user?.id),
+        supabase.from('discovered_offices').select('*').eq('discovered_by', user?.id),
+        supabase.from('review_status').select('*').eq('user_id', user?.id),
+        supabase.from('campaign_deliveries').select('*').eq('created_by', user?.id),
+        supabase.from('ai_usage_tracking').select('*').eq('user_id', user?.id).order('created_at', { ascending: false }).limit(50),
+        supabase.from('user_profiles').select('*').eq('user_id', user?.id).single(),
+        supabase.from('clinics').select('*').eq('owner_id', user?.id).maybeSingle(),
+        supabase.from('activity_log').select('*').eq('user_id', user?.id).order('created_at', { ascending: false }).limit(100),
+        supabase.from('ai_business_profiles').select('*').eq('user_id', user?.id).maybeSingle(),
+        supabase.from('ai_response_templates').select('*').eq('user_id', user?.id).order('created_at', { ascending: false }).limit(10),
+        supabase.from('ai_generated_content').select('*').eq('user_id', user?.id).order('created_at', { ascending: false }).limit(20)
+      ]);
+
+      const sources = sourcesResult.data || [];
+      const monthlyData = monthlyResult.data || [];
+      const visits = visitsResult.data || [];
+      const campaigns = campaignsResult.data || [];
+      const discoveredOffices = discoveredResult.data || [];
+      const reviews = reviewsResult.data || [];
+      const deliveries = deliveriesResult.data || [];
+      const aiUsage = usageResult.data || [];
+      const userProfile = userProfileResult.data;
+      const clinic = clinicResult.data;
+      const activities = activityResult.data || [];
+      const aiBusinessProfileData = aiBusinessProfileResult.data;
+      const aiTemplates = aiTemplatesResult.data || [];
+      const aiContent = aiContentResult.data || [];
+
+      const { data, error } = await supabase.functions.invoke('ai-assistant', {
+        body: {
+          task_type: 'practice_consultation',
+          context: {
+            business_profile: businessProfile || aiBusinessProfileData,
+            practice_data: {
+              // Core referral data with locations
+              sources: sources,
+              monthly_data: monthlyData,
+              visits: visits,
+              campaigns: campaigns,
+              
+              // Additional platform data
+              discovered_offices: discoveredOffices,
+              reviews: reviews,
+              campaign_deliveries: deliveries,
+              ai_usage_history: aiUsage,
+              ai_templates: aiTemplates,
+              ai_content: aiContent,
+              user_profile: userProfile,
+              clinic_info: clinic,
+              recent_activities: activities,
+              
+              // Computed analytics
+              analytics: {
+                total_sources: sources.length,
+                total_referrals: monthlyData.reduce((sum, m) => sum + (m.patient_count || 0), 0),
+                active_sources_this_month: monthlyData.filter(m => {
+                  const currentMonth = new Date().toISOString().slice(0, 7);
+                  return m.year_month === currentMonth && m.patient_count > 0;
+                }).length,
+                source_types_distribution: sources.reduce((acc, s) => {
+                  acc[s.source_type] = (acc[s.source_type] || 0) + 1;
+                  return acc;
+                }, {} as Record<string, number>),
+                recent_visits: visits.filter(v => {
+                  const visitDate = new Date(v.visit_date);
+                  const thirtyDaysAgo = new Date();
+                  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                  return visitDate >= thirtyDaysAgo;
+                }).length,
+                last_6_months_trend: monthlyData.filter(m => {
+                  const monthDate = new Date(m.year_month + '-01');
+                  const sixMonthsAgo = new Date();
+                  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+                  return monthDate >= sixMonthsAgo;
+                }),
+                discovered_offices_count: discoveredOffices.length,
+                imported_offices: discoveredOffices.filter(d => d.imported).length,
+                pending_reviews: reviews.filter(r => r.needs_attention).length,
+                campaign_delivery_success_rate: deliveries.length > 0 ? 
+                  Math.round((deliveries.filter(d => d.delivery_status === 'Completed').length / deliveries.length) * 100) : 0,
+                ai_usage_last_30_days: aiUsage.filter(u => {
+                  const usageDate = new Date(u.created_at);
+                  const thirtyDaysAgo = new Date();
+                  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                  return usageDate >= thirtyDaysAgo;
+                }).length
+              }
+            },
+            conversation_history: messages.slice(-5)
+          },
+          prompt: content,
+        },
+        headers: {
+          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+
+      const assistantMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: data.content || 'I apologize, but I encountered an issue processing your request. Please try again.',
+        timestamp: new Date(),
+        type: content.toLowerCase().includes('analyz') || content.toLowerCase().includes('data') ? 'analysis' : 
+              content.toLowerCase().includes('suggest') || content.toLowerCase().includes('recommend') ? 'suggestion' : 'general'
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
+    } catch (error: any) {
+      console.error('Error calling AI assistant:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to process your request. Please try again.',
+        variant: 'destructive',
+      });
+
+      const errorMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: 'I apologize, but I encountered an error processing your request. Please try again or contact support if the issue persists.',
+        timestamp: new Date()
+      };
+
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
     }
-
-    scrollToBottom();
-    setIsTyping(true);
-
-    // Add to message queue
-    await messageQueue.addMessage({
-      id: messageId,
-      content: messageContent,
-      userId: user.id,
-      maxRetries: 3,
-      onSuccess: async (response: string) => {
-        const assistantMessage: ChatMessage = {
-          id: Date.now().toString() + '_assistant',
-          role: 'assistant',
-          content: response,
-          timestamp: new Date(),
-          type: 'general',
-          status: 'sent'
-        };
-
-        // Update messages
-        setMessages(prev => {
-          const updated = prev.map(msg => 
-            msg.id === messageId 
-              ? { ...msg, status: 'sent' as const }
-              : msg
-          );
-          return [...updated, assistantMessage];
-        });
-
-        // Save to storage
-        await chatStorage.updateMessage(user.id, messageId, { status: 'sent' });
-        await chatStorage.saveMessage(user.id, assistantMessage);
-        
-        setIsTyping(false);
-        scrollToBottom();
-      },
-      onError: async (error: string) => {
-        console.error('Message failed:', error);
-        
-        // Update message status
-        setMessages(prev =>
-          prev.map(msg => 
-            msg.id === messageId 
-              ? { ...msg, status: 'failed' as const }
-              : msg
-          )
-        );
-
-        await chatStorage.updateMessage(user.id, messageId, { status: 'failed' });
-        
-        setIsTyping(false);
-        
-        toast({
-          title: 'Message Failed',
-          description: error || 'Failed to send message. You can retry from the message menu.',
-          variant: 'destructive'
-        });
-      }
-    });
-
-  }, [user, scrollToBottom]);
+  };
 
   const handleQuickAction = (prompt: string) => {
-    setInputMessage(prompt);
-    textareaRef.current?.focus();
+    handleSendMessage(prompt);
   };
 
-  const handleRetry = (messageId: string) => {
-    const message = messages.find(m => m.id === messageId);
-    if (message) {
-      handleSendMessage(message.content, true, messageId);
-    }
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
-  const handleEdit = (messageId: string) => {
-    const message = messages.find(m => m.id === messageId);
-    if (message) {
-      setInputMessage(message.content);
-      setEditingMessageId(messageId);
-      textareaRef.current?.focus();
-    }
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const getMessageIcon = (message: ChatMessage) => {
+    if (message.role === 'user') return User;
     
-    if (editingMessageId) {
-      // Remove the old message and send new one
-      setMessages(prev => prev.filter(m => m.id !== editingMessageId));
-      chatStorage.deleteMessage(user!.id, editingMessageId);
-      setEditingMessageId(null);
+    switch (message.type) {
+      case 'analysis':
+        return BarChart3;
+      case 'suggestion':
+        return Lightbulb;
+      default:
+        return Bot;
     }
+  };
+
+  const getMessageBadge = (message: ChatMessage) => {
+    if (message.role === 'user') return null;
     
-    handleSendMessage(inputMessage);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e);
-    }
-  };
-
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const element = e.currentTarget;
-    if (element.scrollTop === 0 && hasMoreMessages && !loadingHistory) {
-      loadMessages(false);
+    switch (message.type) {
+      case 'analysis':
+        return <Badge variant="secondary" className="text-xs">Analysis</Badge>;
+      case 'suggestion':
+        return <Badge variant="default" className="text-xs">Suggestion</Badge>;
+      default:
+        return null;
     }
   };
 
   return (
-    <div className="h-full flex flex-col max-w-4xl mx-auto">
-      <Card className="flex-1 flex flex-col">
-        <CardHeader className="border-b">
-          <CardTitle className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5" />
-            AI Practice Assistant
-            {messageQueue.isProcessing() && (
-              <Badge variant="secondary" className="ml-2">
-                <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                Processing
-              </Badge>
-            )}
-            {unifiedData && (
-              <Badge variant="outline" className="ml-2 text-xs">
-                {unifiedData.sources?.length || 0} sources • {unifiedData.monthly_data?.length || 0} months data
-              </Badge>
-            )}
-          </CardTitle>
-        </CardHeader>
-        
-        <CardContent className="flex-1 flex flex-col p-0">
-          <ScrollArea 
-            ref={scrollAreaRef} 
-            className="flex-1 p-4"
-            onScrollCapture={handleScroll}
-          >
-            {loadingHistory && (
-              <div className="text-center py-4">
-                <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-                <p className="text-sm text-muted-foreground mt-2">Loading messages...</p>
+    <Card className="h-[600px] flex flex-col">
+      <CardHeader className="flex-shrink-0">
+        <CardTitle className="flex items-center gap-2">
+          <MessageSquare className="h-5 w-5 text-primary" />
+          AI Practice Assistant
+        </CardTitle>
+      </CardHeader>
+      
+      <CardContent className="flex-1 flex flex-col space-y-4 p-6">
+        {/* Chat Messages */}
+        <ScrollArea className="flex-1 pr-4" ref={scrollAreaRef}>
+          <div className="space-y-4">
+            {messages.map((message) => {
+              const IconComponent = getMessageIcon(message);
+              return (
+                <div
+                  key={message.id}
+                  className={`flex gap-3 ${
+                    message.role === 'user' ? 'justify-end' : 'justify-start'
+                  }`}
+                >
+                  {message.role === 'assistant' && (
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <IconComponent className="h-4 w-4 text-primary" />
+                    </div>
+                  )}
+                  
+                  <div
+                    className={`max-w-[80%] rounded-lg p-4 ${
+                      message.role === 'user'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      {getMessageBadge(message)}
+                      <span className="text-xs opacity-70">
+                        {formatTime(message.timestamp)}
+                      </span>
+                    </div>
+                    <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                      {message.content}
+                    </p>
+                  </div>
+                  
+                  {message.role === 'user' && (
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                      <User className="h-4 w-4 text-primary-foreground" />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            
+            {isLoading && (
+              <div className="flex gap-3 justify-start">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Bot className="h-4 w-4 text-primary" />
+                </div>
+                <div className="bg-muted rounded-lg p-4 max-w-[80%]">
+                  <div className="flex items-center space-x-2">
+                    <div className="animate-pulse flex space-x-1">
+                      <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                      <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    </div>
+                    <span className="text-sm text-muted-foreground">
+                      Analyzing your data...
+                    </span>
+                  </div>
+                </div>
               </div>
             )}
-            
-            <div className="space-y-1">
-              {messages.map((message) => (
-                <ChatMessageBubble
-                  key={message.id}
-                  message={message}
-                  onRetry={message.status === 'failed' ? () => handleRetry(message.id) : undefined}
-                  onEdit={message.role === 'user' ? () => handleEdit(message.id) : undefined}
-                />
-              ))}
-              
-              <TypingIndicator visible={isTyping} />
-            </div>
-          </ScrollArea>
+          </div>
+        </ScrollArea>
 
-          {/* Quick Actions */}
-          <div className="border-t p-4 bg-muted/20">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
-              {QUICK_ACTIONS.map((action, index) => (
+        {/* Quick Actions */}
+        <div className="flex-shrink-0 space-y-3">
+          <p className="text-sm font-medium text-muted-foreground">Business Intelligence Queries:</p>
+          <div className="grid grid-cols-1 gap-2 max-h-32 overflow-y-auto">
+            {quickActions.map((action, index) => {
+              const IconComponent = action.icon;
+              return (
                 <Button
                   key={index}
                   variant="outline"
                   size="sm"
-                  className="h-auto p-3 text-left justify-start"
+                  className="justify-start text-left h-auto p-2"
                   onClick={() => handleQuickAction(action.prompt)}
+                  disabled={isLoading}
                 >
-                  <action.icon className="h-4 w-4 mr-2 shrink-0" />
+                  <IconComponent className="h-3 w-3 mr-2 flex-shrink-0" />
                   <span className="text-xs">{action.label}</span>
                 </Button>
-              ))}
-            </div>
-
-            {/* Message Input */}
-            <form onSubmit={handleSubmit} className="space-y-2">
-              {editingMessageId && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Edit3 className="h-3 w-3" />
-                  <span>Editing message</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setEditingMessageId(null);
-                      setInputMessage('');
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              )}
-              
-              <div className="flex gap-2">
-                <Textarea
-                  ref={textareaRef}
-                  placeholder={editingMessageId ? "Edit your message..." : unifiedData ? 
-                    "Ask about your performance metrics, referral trends, growth opportunities..." : 
-                    "Ask me anything about your practice (loading data for better insights)..."
-                  }
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="min-h-[80px] resize-none"
-                  disabled={isTyping || messageQueue.isProcessing()}
-                />
-                <Button
-                  type="submit"
-                  disabled={!inputMessage.trim() || isTyping || messageQueue.isProcessing()}
-                  className="shrink-0"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
-              
-              <div className="text-xs text-muted-foreground">
-                Press Enter to send, Shift+Enter for new line
-                {messageQueue.getQueueLength() > 0 && (
-                  <span className="ml-2">• {messageQueue.getQueueLength()} messages queued</span>
-                )}
-              </div>
-            </form>
+              );
+            })}
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+
+        {/* Message Input */}
+        <div className="flex-shrink-0 flex space-x-2">
+          <Textarea
+            placeholder="Ask about referral source performance, geographic distribution, seasonal trends, ROI analysis, or any specific practice data insights..."
+            value={inputMessage}
+            onChange={(e) => setInputMessage(e.target.value)}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+              }
+            }}
+            className="min-h-[50px] resize-none"
+            disabled={isLoading}
+          />
+          <Button
+            onClick={() => handleSendMessage()}
+            disabled={!inputMessage.trim() || isLoading}
+            className="px-4"
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

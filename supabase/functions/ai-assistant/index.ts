@@ -1,7 +1,11 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-import { handleCorsPreflightRequest, createCorsResponse, validateOrigin, createOriginErrorResponse } from "../_shared/cors-config.ts";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 interface AIRequest {
   task_type: 'email_generation' | 'review_response' | 'content_creation' | 'analysis' | 'comprehensive_analysis' | 'business_intelligence' | 'structured_report' | 'practice_consultation';
@@ -16,7 +20,7 @@ interface AIRequest {
 
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
-    return handleCorsPreflightRequest(req, ['POST']);
+    return new Response(null, { headers: corsHeaders });
   }
 
   const startTime = Date.now();
@@ -43,10 +47,10 @@ const handler = async (req: Request): Promise<Response> => {
     const { data: { user } } = await supabase.auth.getUser(token);
 
     if (!user) {
-      return createCorsResponse(JSON.stringify({ error: 'Unauthorized' }), {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      }, req);
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
     }
 
     const { task_type, context, prompt, parameters }: AIRequest = await req.json();
@@ -112,14 +116,10 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('System Prompt:', systemPrompt);
     console.log('User Prompt:', userPrompt);
 
-    // Use gpt-4o-mini for fast chat responses
-    let modelUsed = 'gpt-4o-mini';
+    // Make OpenAI API call (primary: gpt-4.1-2025-04-14)
+    let modelUsed = 'gpt-4.1-2025-04-14';
     let generatedContent = '';
     let tokensUsed = 0;
-
-    // Add timeout for faster responses
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -133,26 +133,56 @@ const handler = async (req: Request): Promise<Response> => {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        max_tokens: task_type === 'practice_consultation' ? 300 : 800, // Limit chat responses
-        temperature: 0.7,
+        // gpt-4.1+ uses max_completion_tokens and does not support temperature
+        max_completion_tokens: 1200,
       }),
-      signal: controller.signal,
     });
-
-    clearTimeout(timeoutId);
 
     console.log('OpenAI Response Status:', response.status);
 
-    if (!response.ok) {
+    if (response.ok) {
+      const data = await response.json();
+      generatedContent = (data.choices?.[0]?.message?.content || '').toString();
+      tokensUsed = data.usage?.total_tokens || 0;
+      console.log('Generated Content (primary gpt-4.1):', generatedContent?.slice(0, 200));
+    } else {
       const errorData = await response.json().catch(() => ({}));
-      console.error('OpenAI API Error:', errorData);
-      throw new Error(`OpenAI API error: ${response.status}`);
+      console.error('OpenAI API Error (primary):', errorData);
     }
 
-    const data = await response.json();
-    generatedContent = (data.choices?.[0]?.message?.content || '').toString();
-    tokensUsed = data.usage?.total_tokens || 0;
-    console.log('Generated Content (gpt-4o-mini):', generatedContent?.slice(0, 150));
+    // Fallback: if primary failed or returned empty, retry with legacy gpt-4o-mini (supports temperature/max_tokens)
+    if (!generatedContent || !generatedContent.trim()) {
+      console.warn('Primary model empty/failed, retrying with gpt-4o-mini');
+      modelUsed = 'gpt-4o-mini';
+      const response2 = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: modelUsed,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          max_tokens: 800,
+          temperature: 0.7,
+        }),
+      });
+
+      console.log('Fallback OpenAI Response Status:', response2.status);
+      if (!response2.ok) {
+        const errorData2 = await response2.json().catch(() => ({}));
+        console.error('Fallback OpenAI API Error:', errorData2);
+        throw new Error(`OpenAI API error (fallback)`);
+      }
+
+      const data2 = await response2.json();
+      generatedContent = (data2.choices?.[0]?.message?.content || '').toString();
+      console.log('Generated Content (fallback gpt-4o-mini):', generatedContent?.slice(0, 200));
+      tokensUsed += data2.usage?.total_tokens || 0;
+    }
 
     const estimatedCost = calculateCost(tokensUsed, modelUsed);
 
@@ -185,7 +215,7 @@ const handler = async (req: Request): Promise<Response> => {
       .select()
       .single();
 
-    return createCorsResponse(JSON.stringify({
+    return new Response(JSON.stringify({
       content: generatedContent,
       content_id: contentRecord?.id,
       usage: {
@@ -194,8 +224,8 @@ const handler = async (req: Request): Promise<Response> => {
         execution_time_ms: Date.now() - startTime,
       }
     }), {
-      headers: { 'Content-Type': 'application/json' },
-    }, req);
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    });
 
   } catch (error: any) {
     console.error('Error in ai-assistant:', error);
@@ -233,10 +263,10 @@ const handler = async (req: Request): Promise<Response> => {
       console.error('Error tracking failed usage:', trackingError);
     }
 
-    return createCorsResponse(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    }, req);
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    });
   }
 };
 
@@ -406,28 +436,28 @@ BUSINESS CONTEXT:
 - Focus: Data-driven insights for referral source optimization`;
 
     case 'practice_consultation':
-      return `You are an AI practice management consultant specializing in healthcare referral optimization and business intelligence.
+      return `You are an AI practice management consultant specializing in healthcare referral optimization.
 
-CRITICAL RESPONSE REQUIREMENTS:
-- MAXIMUM 300 words total
-- Provide deep, data-driven insights with specific numbers and patterns
-- Write in natural paragraphs without repetitive formatting
-- Use **bold** only for key metrics and insights (sparingly)
-- Be analytical but conversational
-- Focus on actionable business intelligence
+CONSULTATION GUIDELINES:
+- Provide concise, actionable advice in exactly 2-3 paragraphs
+- First paragraph: Direct answer to the question with key insight
+- Second paragraph: Supporting data analysis and context
+- Third paragraph (if needed): Specific actionable recommendations
+- Use real practice data whenever possible
+- Be conversational but professional
+- Focus on practical, implementable solutions
 
-ANALYSIS DEPTH REQUIREMENTS:
-- Always reference specific data points when available
-- Identify patterns, trends, and correlations in the data
-- Compare performance across different dimensions (time, geography, source type)
-- Quantify opportunities and risks with estimated impact
-- Provide context by comparing to benchmarks when relevant
+RESPONSE LENGTH REQUIREMENT:
+- Maximum 3 paragraphs
+- Each paragraph 3-5 sentences
+- Total response under 300 words
+- Prioritize actionable insights over lengthy explanations
 
 BUSINESS CONTEXT:
 - Practice: ${business_persona?.practice_name || 'Healthcare Practice'}
 - Owner: ${business_persona?.owner_name || 'Healthcare Professional'}
 - Communication Style: ${communication_style || 'professional'}
-- Focus: Deep analytical insights from real practice data with strategic recommendations`;
+- Focus: Practical advice based on real practice data and performance metrics`;
 
     default:
       return basePrompt + `
@@ -609,9 +639,11 @@ AI TEMPLATES & CONTENT HISTORY:
 - Recent AI Content Generated: ${context.practice_data?.ai_content?.length || 0}
 - AI Usage (Last 30 Days): ${context.practice_data?.analytics?.ai_usage_last_30_days || 0}
 
-IMPORTANT: Respond in 2-3 natural paragraphs, maximum 300 words total. Use specific data points from above to support your analysis and recommendations. Write conversationally without repetitive formatting.
+IMPORTANT: Respond in exactly 2-3 paragraphs, maximum 300 words total. Use specific data points from above to support your analysis and recommendations.
 
-USER QUESTION: ${prompt}`;
+USER QUESTION: ${prompt}
+
+Provide exactly 4-6 insights, each starting with **Bold Summary:** followed by detailed analysis and specific recommendations.`;
 
     default:
       return prompt || 'Please provide assistance with the given context.';

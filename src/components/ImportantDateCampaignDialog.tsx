@@ -235,24 +235,17 @@ Generate:
 
 Make it relevant to dental professionals and referral relationships. Keep it professional, warm, and appropriate for healthcare marketing.`;
 
-      const { data, error } = await supabase.functions.invoke('unified-ai-service', {
+      const { data, error } = await supabase.functions.invoke('ai-assistant', {
         body: { 
-          task_type: 'content',
-          prompt: prompt,
-          context: { type: 'campaign_generation' }
+          message: prompt,
+          context_type: 'campaign_generation'
         }
       });
 
-      if (error) {
-        throw new Error(error.message || 'Content generation failed');
-      }
-
-      if (!data?.success) {
-        throw new Error(data?.error || 'Content generation failed');
-      }
+      if (error) throw error;
 
       // Parse the AI response to extract structured content
-      const response = data.data || '';
+      const response = data.response || '';
       
       // Simple parsing - in production, you might want more robust parsing
       const lines = response.split('\n').filter(line => line.trim());

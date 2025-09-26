@@ -1,45 +1,45 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts"
-import { handleCorsPreflightRequest, createCorsResponse, validateOrigin, createOriginErrorResponse } from "../_shared/cors-config.ts"
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS'
+}
 
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return handleCorsPreflightRequest(req, ['GET']);
+    return new Response(null, { headers: corsHeaders })
   }
 
-  // Validate origin for browser requests
-  const { isValid: originValid, origin } = validateOrigin(req);
-  if (!originValid) {
-    return createOriginErrorResponse(origin);
-  }
   try {
     // Get the Mapbox token from environment variables (Supabase secrets)
     const mapboxToken = Deno.env.get('MAPBOX_PUBLIC_TOKEN')
     
     if (!mapboxToken) {
-      return createCorsResponse(
+      return new Response(
         JSON.stringify({ error: 'Mapbox token not configured' }),
         { 
           status: 500, 
-          headers: { 'Content-Type': 'application/json' }
-        }, req
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
       )
     }
 
-    return createCorsResponse(
+    return new Response(
       JSON.stringify({ token: mapboxToken }),
       { 
-        headers: { 'Content-Type': 'application/json' }
-      }, req
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
     )
 
   } catch (error) {
-    return createCorsResponse(
-      JSON.stringify({ error: (error as Error).message }),
+    return new Response(
+      JSON.stringify({ error: error.message }),
       { 
         status: 500, 
-        headers: { 'Content-Type': 'application/json' }
-      }, req
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
     )
   }
 })

@@ -103,7 +103,7 @@ export function useDashboardStats() {
   const { data } = useDashboardData();
   const currentMonth = getCurrentYearMonth();
   
-  if (!data || !data.sources || !data.monthlyData) return null;
+  if (!data) return null;
   
   const { sources, monthlyData } = data;
   

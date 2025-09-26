@@ -1,18 +1,15 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-import { handleCorsPreflightRequest, createCorsResponse, validateOrigin, createOriginErrorResponse } from "../_shared/cors-config.ts";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 const handler = async (req: Request): Promise<Response> => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return handleCorsPreflightRequest(req, ['POST']);
-  }
-
-  // Validate origin for browser requests
-  const { isValid: originValid, origin } = validateOrigin(req);
-  if (!originValid) {
-    return createOriginErrorResponse(origin);
+    return new Response(null, { headers: corsHeaders });
   }
 
   const startTime = Date.now();
@@ -41,10 +38,10 @@ const handler = async (req: Request): Promise<Response> => {
     const { data: { user } } = await supabase.auth.getUser(token);
 
     if (!user) {
-      return createCorsResponse(JSON.stringify({ error: 'Unauthorized' }), {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      }, req);
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
     }
 
     const { context } = await req.json();
@@ -112,26 +109,26 @@ const handler = async (req: Request): Promise<Response> => {
         success: true,
       });
 
-    return createCorsResponse(JSON.stringify({
+    return new Response(JSON.stringify({
       content: generatedContent,
       usage: {
         tokens_used: tokensUsed,
         execution_time_ms: Date.now() - startTime,
       }
     }), {
-      headers: { 'Content-Type': 'application/json' },
-    }, req);
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    });
 
   } catch (error: any) {
     console.error('Error in optimized-ai-analysis:', error);
 
-    return createCorsResponse(JSON.stringify({ 
+    return new Response(JSON.stringify({ 
       error: error.message,
       details: 'Analysis failed - check function logs for details'
     }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    }, req);
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    });
   }
 };
 
@@ -141,35 +138,32 @@ function buildAnalysisPrompt(context: any): string {
   const totalSources = sources.length;
   const totalPatients = patients.reduce((sum: number, p: any) => sum + (p.patient_count || 0), 0);
   const totalVisits = visits.length;
-  const avgPatients = totalPatients / Math.max(patients.length, 1);
 
-  return `You are a healthcare business consultant. Perform a CRITICAL ANALYSIS of this practice's referral network. Identify specific problems and actionable solutions.
-
-Return exactly 4 insights in this JSON format:
+  return `Analyze this healthcare practice data and return exactly 4 insights in this JSON format:
 
 {
   "insights": [
     {
-      "title": "Critical Issue Title",
-      "priority": "high|medium|low", 
-      "summary": "Direct problem assessment with data",
-      "recommendation": "Specific action plan with timeline"
+      "title": "Source Performance Analysis",
+      "priority": "high|medium|low",
+      "summary": "1-2 sentence key finding",
+      "recommendation": "Specific actionable step"
     }
   ]
 }
 
 PRACTICE DATA:
 - Sources: ${totalSources} referral sources
-- Total Patients: ${totalPatients} (avg ${avgPatients.toFixed(1)} per month)
+- Total Patients: ${totalPatients} across all time periods
 - Marketing Visits: ${totalVisits} planned visits
 
 SOURCE BREAKDOWN:
 ${sources.map((s: any) => `- ${s.name} (${s.source_type})`).slice(0, 10).join('\n')}
 
-PATIENT TRENDS:
-${patients.slice(0, 6).map((p: any) => `- ${p.year_month}: ${p.patient_count} patients`).join('\n')}
+PATIENT DISTRIBUTION (Recent months):
+${patients.slice(0, 8).map((p: any) => `- ${p.year_month}: ${p.patient_count} patients`).join('\n')}
 
-Focus on identifying PROBLEMS, GAPS, and specific SOLUTIONS. Each recommendation should include actionable next steps and measurable outcomes. Be direct about what needs to change.`;
+Provide 4 practical business insights focused on referral optimization, performance trends, source quality, and strategic recommendations. Each insight should be specific to this practice's actual data.`;
 }
 
 serve(handler);

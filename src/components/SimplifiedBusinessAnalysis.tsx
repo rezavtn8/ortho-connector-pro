@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { 
-  Brain, 
+  Play, 
   RefreshCw, 
   Clock, 
   TrendingUp, 
@@ -13,21 +15,15 @@ import {
   Loader2,
   Users,
   Building2,
+  Calendar,
   Target,
-  Sparkles,
-  Zap,
-  Eye,
-  Shield,
-  ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Sparkles
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { format, isAfter, subHours } from 'date-fns';
-import { useUnifiedAIData } from '@/hooks/useUnifiedAIData';
-import { BusinessInsightCard } from './BusinessInsightCard';
-import { BusinessAnalysisLoadingSkeleton } from './BusinessAnalysisLoadingSkeleton';
+import { format, subMonths } from 'date-fns';
 
 interface BusinessInsight {
   title: string;
@@ -47,57 +43,27 @@ interface AnalysisCache {
   metadata?: any;
 }
 
-const INSIGHTS_PER_PAGE = 6;
-const CACHE_HOURS = 24;
-const LOCAL_STORAGE_KEY = 'business_analysis_cache';
-
 export function SimplifiedBusinessAnalysis() {
   const { user } = useAuth();
-  const { data: unifiedData, loading: dataLoading, fetchAllData } = useUnifiedAIData();
-  
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [insights, setInsights] = useState<BusinessInsight[]>([]);
+  const [cachedAnalysis, setCachedAnalysis] = useState<AnalysisCache | null>(null);
   const [lastRun, setLastRun] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(0);
-  const [progressiveLoading, setProgressiveLoading] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      loadCachedAnalysis();
-    }
+    loadCachedAnalysis();
   }, [user]);
-
-  // Auto-refresh after 24 hours
-  useEffect(() => {
-    if (lastRun && isAfter(new Date(), new Date(lastRun.getTime() + CACHE_HOURS * 60 * 60 * 1000))) {
-      runAnalysis();
-    }
-  }, [lastRun]);
 
   const loadCachedAnalysis = async () => {
     if (!user) return;
 
     try {
-      // Try localStorage first
-      const localCache = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (localCache) {
-        const cached = JSON.parse(localCache);
-        if (cached.userId === user.id && cached.expiry > Date.now()) {
-          setInsights(cached.insights);
-          setLastRun(new Date(cached.timestamp));
-          console.log('Loaded analysis from localStorage cache');
-          return;
-        }
-      }
-
-      // Then try Supabase
       const { data, error } = await supabase
         .from('ai_generated_content')
         .select('*')
         .eq('user_id', user.id)
-        .eq('content_type', 'analysis')
-        .gte('created_at', new Date(Date.now() - CACHE_HOURS * 60 * 60 * 1000).toISOString())
+        .eq('content_type', 'business_analysis')
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -108,14 +74,31 @@ export function SimplifiedBusinessAnalysis() {
       }
 
       if (data) {
-        const processedInsights = processAnalysisResponse(data.generated_text);
-        if (processedInsights.length > 0) {
-          setInsights(processedInsights);
-          setLastRun(new Date(data.created_at));
-          
-          // Save to localStorage
-          saveToLocalStorage(processedInsights, data.created_at);
-          console.log('Loaded analysis from Supabase cache');
+        setCachedAnalysis(data);
+        setLastRun(new Date(data.created_at));
+        
+        try {
+          const parsed = JSON.parse(data.generated_text);
+          if (parsed.insights && Array.isArray(parsed.insights)) {
+            setInsights(parsed.insights.map((insight: any) => ({
+              ...insight,
+              keyMetrics: insight.keyMetrics || [],
+              actionItems: insight.actionItems || [],
+              icon: getInsightIcon(insight.title)
+            })));
+          }
+        } catch {
+          // If parsing fails, create a simple insight from the text
+          setInsights([{
+            title: "Business Analysis",
+            priority: "medium" as const,
+            summary: data.generated_text.substring(0, 150) + "...",
+            recommendation: "Review the full analysis details.",
+            detailedAnalysis: data.generated_text,
+            keyMetrics: ["Analysis Available", "Generated from Cache", "Full Report Ready"],
+            actionItems: ["Review the complete analysis", "Take action on recommendations", "Schedule follow-up analysis"],
+            icon: BarChart3
+          }]);
         }
       }
     } catch (error) {
@@ -123,317 +106,399 @@ export function SimplifiedBusinessAnalysis() {
     }
   };
 
-  const saveToLocalStorage = (insights: BusinessInsight[], timestamp: string) => {
-    const cache = {
-      userId: user?.id,
-      insights,
-      timestamp,
-      expiry: Date.now() + CACHE_HOURS * 60 * 60 * 1000
-    };
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cache));
-  };
-
-  const processAnalysisResponse = (responseText: string): BusinessInsight[] => {
-    try {
-      // Try to parse as JSON first
-      const parsed = JSON.parse(responseText);
-      let insightData = parsed.insights || parsed.data?.insights || [parsed];
-      
-      if (!Array.isArray(insightData)) {
-        insightData = [insightData];
-      }
-
-      return insightData.map((insight: any) => ({
-        title: insight.title || 'Business Insight',
-        priority: insight.priority || 'medium',
-        summary: insight.summary || insight.description || 'Analysis insight generated',
-        recommendation: insight.recommendation || insight.action || 'Review and implement',
-        detailedAnalysis: insight.detailedAnalysis || insight.details || insight.summary || 'Detailed analysis available',
-        keyMetrics: insight.keyMetrics || insight.metrics || ['Analysis Complete'],
-        actionItems: insight.actionItems || insight.actions || ['Review insights'],
-        icon: getInsightIcon(insight.title || 'insight')
-      }));
-    } catch {
-      // If parsing fails, create a single insight from the text
-      return [{
-        title: "AI Business Analysis",
-        priority: "medium" as const,
-        summary: responseText.substring(0, 200) + "...",
-        recommendation: "Review the complete analysis for detailed insights.",
-        detailedAnalysis: responseText,
-        keyMetrics: ["AI Generated", "Comprehensive Analysis", "Data-Driven"],
-        actionItems: ["Review insights", "Implement recommendations", "Monitor progress"],
-        icon: Brain
-      }];
-    }
-  };
-
-  const limitDataForAPI = (data: any) => {
-    if (!data) return null;
-
-    return {
-      ...data,
-      sources: (data.sources || []).slice(0, 50), // Limit to 50 sources
-      monthly_data: (data.monthly_data || [])
-        .filter((item: any) => {
-          const itemDate = new Date(item.year_month + '-01');
-          const cutoff = subHours(new Date(), 24 * 30 * 12); // 12 months
-          return itemDate >= cutoff;
-        })
-        .slice(0, 100), // Limit monthly data
-      visits: (data.visits || []).slice(0, 20),
-      campaigns: (data.campaigns || []).slice(0, 10),
-      reviews: (data.reviews || []).slice(0, 15)
-    };
-  };
-
-  const runAnalysis = async (forceRefresh = false) => {
+  const runDirectAnalysis = async () => {
     if (!user) return;
-    
-    // Check cache unless force refresh
-    if (!forceRefresh && insights.length > 0 && lastRun) {
-      const cacheAge = new Date().getTime() - lastRun.getTime();
-      if (cacheAge < CACHE_HOURS * 60 * 60 * 1000) {
-        toast({
-          title: "Recent Analysis Available",
-          description: "Using recent analysis. Click refresh to generate new insights.",
-        });
-        return;
-      }
-    }
 
     setIsAnalyzing(true);
-    setProgressiveLoading(true);
     setError(null);
 
     try {
-      console.log('Starting AI business analysis...');
+      console.log('Starting direct business analysis...');
 
-      // Get unified data (fetch if missing)
-      let rawData = unifiedData;
-      if (!rawData) {
-        const fetched = await fetchAllData();
-        rawData = fetched;
+      // Get practice data directly from database
+      const [sourcesResult, patientsResult, visitsResult] = await Promise.all([
+        supabase
+          .from('patient_sources')
+          .select('*')
+          .eq('created_by', user.id),
+        supabase
+          .from('monthly_patients')
+          .select('*')
+          .eq('user_id', user.id),
+        supabase
+          .from('marketing_visits')
+          .select('*')
+          .eq('user_id', user.id)
+      ]);
+
+      // Handle database errors gracefully
+      if (sourcesResult.error || patientsResult.error || visitsResult.error) {
+        console.error('Database query errors:', {
+          sources: sourcesResult.error,
+          patients: patientsResult.error,
+          visits: visitsResult.error
+        });
+        
+        // Generate offline analysis if data queries fail
+        return generateOfflineAnalysis();
       }
-      if (!rawData) {
-        throw new Error('No practice data available for analysis');
-      }
 
-      // Limit data sent to API
-      const limitedData = limitDataForAPI(rawData);
+      const sources = sourcesResult.data || [];
+      const patients = patientsResult.data || [];
+      const visits = visitsResult.data || [];
 
-      console.log('Limited data for analysis:', {
-        sources: limitedData?.sources?.length || 0,
-        monthly_data: limitedData?.monthly_data?.length || 0,
-        visits: limitedData?.visits?.length || 0,
-        campaigns: limitedData?.campaigns?.length || 0,
-        reviews: limitedData?.reviews?.length || 0
+      console.log('Data loaded successfully:', { 
+        sources: sources.length, 
+        patients: patients.length, 
+        visits: visits.length 
       });
 
-      // Call unified AI service
-      const { data: aiResponse, error: aiError } = await supabase.functions.invoke('unified-ai-service', {
-        body: { 
-          task_type: 'analysis',
-          taskType: 'analysis',
-          prompt: 'Analyze my practice data and provide 4-6 comprehensive business insights with actionable recommendations. Focus on the most critical opportunities and issues.',
-          context: limitedData,
-          parameters: {
-            max_tokens: 1000
-          }
-        },
-        headers: {
-          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-        },
-      });
-
-      if (aiError) {
-        throw new Error(`AI service error: ${aiError.message}`);
-      }
-
-      if (!aiResponse?.success) {
-        throw new Error(aiResponse?.error || 'AI analysis failed');
-      }
-
-      const responseText = typeof aiResponse.data === 'string' 
-        ? aiResponse.data 
-        : (aiResponse.data?.content ?? aiResponse.data?.text ?? JSON.stringify(aiResponse.data));
-
-      const processedInsights = processAnalysisResponse(responseText);
+      // Generate insights directly without AI (as fallback)
+      const generatedInsights = generateDirectInsights(sources, patients, visits);
       
-      if (processedInsights.length === 0) {
-        throw new Error('No insights generated from AI response');
+      // Try to enhance with AI if possible
+      let aiEnhancedInsights = generatedInsights;
+      
+      try {
+        const aiResponse = await callOptimizedAI(sources, patients, visits);
+        if (aiResponse?.insights && Array.isArray(aiResponse.insights)) {
+          aiEnhancedInsights = aiResponse.insights.map((insight: any) => ({
+            ...insight,
+            icon: getInsightIcon(insight.title)
+          }));
+        }
+      } catch (aiError) {
+        console.warn('AI enhancement failed, using direct analysis:', aiError);
+        // Continue with direct insights
       }
 
-      // Save to Supabase
+      // Cache the results
       const analysisText = JSON.stringify({ 
-        insights: processedInsights,
+        insights: aiEnhancedInsights,
         generated_at: new Date().toISOString(),
-        method: 'unified_ai_service'
+        method: 'enhanced'
       });
 
       await supabase
         .from('ai_generated_content')
         .insert({
           user_id: user.id,
-          content_type: 'analysis',
+          content_type: 'business_analysis',
           generated_text: analysisText,
           status: 'generated',
           metadata: { 
-            method: 'unified_ai_service',
-            model_used: 'gpt-4o-mini',
-            insights_count: processedInsights.length,
+            method: 'enhanced',
             data_points: {
-              sources: limitedData?.sources?.length || 0,
-              months: limitedData?.monthly_data?.length || 0,
-              visits: limitedData?.visits?.length || 0
+              sources: sources.length,
+              patients: patients.length,
+              visits: visits.length
             }
           },
         });
 
-      // Save to localStorage
-      saveToLocalStorage(processedInsights, new Date().toISOString());
-      
-      setInsights(processedInsights);
+      setInsights(aiEnhancedInsights);
       setLastRun(new Date());
-      setCurrentPage(0);
 
       toast({
-        title: "AI Analysis Complete",
-        description: `Generated ${processedInsights.length} insights using advanced AI analysis.`,
+        title: "Analysis Complete",
+        description: `Generated ${aiEnhancedInsights.length} business insights successfully.`,
       });
 
     } catch (error: any) {
       console.error('Analysis failed:', error);
       setError(error.message);
       
+      // Generate basic offline analysis as ultimate fallback
+      const fallbackInsights = generateOfflineAnalysis();
+      setInsights(fallbackInsights);
+      
       toast({
-        title: "Analysis Failed",
-        description: error.message || "Please try again or contact support.",
-        variant: "destructive",
+        title: "Analysis Completed (Offline Mode)",
+        description: "Generated basic analysis using available data.",
+        variant: "default",
       });
     } finally {
       setIsAnalyzing(false);
-      setProgressiveLoading(false);
     }
   };
 
-  const retryAnalysis = () => {
-    setError(null);
-    runAnalysis(true);
+  const generateDirectInsights = (sources: any[], patients: any[], visits: any[]) => {
+    const insights: BusinessInsight[] = [];
+
+    // Source Distribution Analysis
+    const totalSources = sources.length;
+    const activeSources = sources.filter(s => s.is_active).length;
+    const inactiveSources = totalSources - activeSources;
+    const sourceTypes = sources.reduce((acc, s) => {
+      acc[s.source_type] = (acc[s.source_type] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const activeRate = Math.round((activeSources/(totalSources || 1))*100);
+    
+    insights.push({
+      title: "Referral Network Analysis",
+      priority: totalSources < 5 ? 'high' : totalSources < 15 ? 'medium' : 'low',
+      summary: `${totalSources} referral sources with ${activeRate}% active engagement rate`,
+      recommendation: totalSources < 10 ? 
+        "Expand your referral network to reduce dependency risks" : 
+        "Maintain regular communication with your strong network",
+      detailedAnalysis: `Your practice currently manages ${totalSources} referral sources, of which ${activeSources} are actively contributing referrals (${activeRate}% engagement rate). ${inactiveSources > 0 ? `${inactiveSources} sources appear inactive and may benefit from re-engagement efforts.` : 'All sources are currently active, indicating strong relationship management.'} The distribution across source types shows: ${Object.entries(sourceTypes).map(([type, count]) => `${type}: ${count} sources`).join(', ')}. ${totalSources < 10 ? 'A network of fewer than 10 sources creates vulnerability to referral fluctuations.' : 'Your network size provides good stability against individual source variations.'}`,
+      keyMetrics: [
+        `${totalSources} Total Sources`,
+        `${activeRate}% Active Rate`,
+        `${Object.keys(sourceTypes).length} Source Types`,
+        `${inactiveSources} Inactive Sources`
+      ],
+      actionItems: [
+        totalSources < 10 ? "Identify and cultivate 3-5 new referral sources" : "Maintain quarterly check-ins with all sources",
+        inactiveSources > 0 ? `Re-engage ${inactiveSources} inactive sources with targeted outreach` : "Continue current engagement strategies",
+        "Track monthly referral patterns to identify trending sources",
+        "Develop source-specific communication strategies based on preferences"
+      ],
+      icon: Building2
+    });
+
+    // Performance Trends
+    const totalPatients = patients.reduce((sum, p) => sum + (p.patient_count || 0), 0);
+    const recentPatients = patients
+      .filter(p => {
+        const monthDate = new Date(p.year_month + '-01');
+        const threeMonthsAgo = subMonths(new Date(), 3);
+        return monthDate >= threeMonthsAgo;
+      })
+      .reduce((sum, p) => sum + (p.patient_count || 0), 0);
+
+    const recentActivity = Math.round((recentPatients/(totalPatients || 1))*100);
+    const monthlyAverage = totalPatients > 0 ? Math.round(totalPatients / Math.max(patients.length, 1)) : 0;
+
+    insights.push({
+      title: "Patient Volume Trends",
+      priority: recentPatients > totalPatients * 0.4 ? 'low' : 'medium',
+      summary: `${totalPatients} patients tracked with ${recentActivity}% activity in recent months`,
+      recommendation: recentPatients < totalPatients * 0.3 ? 
+        "Recent referral activity is below average - reach out to key sources" :
+        "Maintain current referral relationship strategies",
+      detailedAnalysis: `Your practice has tracked ${totalPatients} total patient referrals across ${patients.length} reporting periods, with ${recentPatients} patients (${recentActivity}%) referred in the last 3 months. The monthly average is approximately ${monthlyAverage} patients. ${recentActivity < 30 ? 'Recent activity is significantly below historical averages, suggesting potential issues with referral flow that require immediate attention.' : recentActivity < 50 ? 'Recent activity is moderately below average, indicating some fluctuation in referral patterns that should be monitored.' : 'Recent activity aligns well with historical patterns, showing consistent referral flow.'} This trend analysis helps identify seasonal patterns and source performance variations.`,
+      keyMetrics: [
+        `${totalPatients} Total Patients`,
+        `${recentPatients} Recent (3mo)`,
+        `${monthlyAverage}/mo Average`,
+        `${recentActivity}% Recent Activity`
+      ],
+      actionItems: [
+        recentActivity < 40 ? "Schedule immediate check-ins with top 3 referral sources" : "Continue monitoring monthly trends",
+        "Implement patient tracking system for source attribution accuracy",
+        "Analyze seasonal patterns to predict and prepare for volume changes",
+        "Create monthly referral performance dashboard for proactive management"
+      ],
+      icon: TrendingUp
+    });
+
+    // Marketing Activity
+    const totalVisits = visits.length;
+    const completedVisits = visits.filter(v => v.visited).length;
+    const completionRate = totalVisits > 0 ? Math.round((completedVisits/(totalVisits || 1))*100) : 0;
+    const pendingVisits = totalVisits - completedVisits;
+
+    insights.push({
+      title: "Marketing Outreach Performance",
+      priority: completionRate < 70 ? 'high' : completionRate < 85 ? 'medium' : 'low',
+      summary: `${completionRate}% visit completion rate with ${pendingVisits} visits pending`,
+      recommendation: completionRate < 80 ? 
+        "Improve visit scheduling and follow-up processes" :
+        "Excellent completion rate - maintain current approach",
+      detailedAnalysis: `Your marketing outreach shows ${completedVisits} completed visits out of ${totalVisits} planned (${completionRate}% completion rate), with ${pendingVisits} visits still pending. ${completionRate >= 85 ? 'This excellent completion rate demonstrates strong organizational skills and commitment to relationship building.' : completionRate >= 70 ? 'Your completion rate is above average but has room for improvement through better scheduling and follow-up systems.' : 'The low completion rate suggests systemic issues with visit planning or execution that need immediate attention.'} Consistent marketing visits are crucial for maintaining referral relationships and discovering new opportunities. ${totalVisits === 0 ? 'Consider implementing a systematic marketing visit program to strengthen referral relationships.' : ''}`,
+      keyMetrics: [
+        `${completedVisits}/${totalVisits} Visits`,
+        `${completionRate}% Completion Rate`,
+        `${pendingVisits} Pending Visits`,
+        `${Math.round(totalVisits/Math.max(1, new Date().getMonth() + 1))} Visits/Month`
+      ],
+      actionItems: [
+        completionRate < 80 ? "Implement systematic visit scheduling and reminder system" : "Continue current visit management approach",
+        pendingVisits > 0 ? `Schedule and complete ${pendingVisits} pending visits within 30 days` : "Plan next quarter's visit schedule",
+        "Track visit outcomes and follow-up requirements in CRM",
+        "Set monthly visit targets based on source priority and relationship status"
+      ],
+      icon: Users
+    });
+
+    // Source Quality Assessment
+    const topSourceTypes = Object.entries(sourceTypes)
+      .sort(([,a], [,b]) => (b as number) - (a as number))
+      .slice(0, 3);
+
+    const diversificationScore = Object.keys(sourceTypes).length;
+
+    insights.push({
+      title: "Portfolio Diversification Strategy", 
+      priority: diversificationScore < 3 ? 'medium' : 'low',
+      summary: `${diversificationScore} source types with balanced distribution across specialties`,
+      recommendation: diversificationScore < 3 ? 
+        "Diversify across more practice types for stability" :
+        "Well-diversified portfolio - monitor for balance shifts",
+      detailedAnalysis: `Your referral portfolio spans ${diversificationScore} different source types, with the top contributors being: ${topSourceTypes.map(([type, count]) => `${type} (${count} sources, ${Math.round((Number(count)/totalSources)*100)}%)`).join(', ')}. ${diversificationScore < 3 ? 'Limited diversification creates vulnerability to specialty-specific market changes or relationship disruptions. Consider expanding into complementary practice types.' : diversificationScore < 5 ? 'Good diversification provides stability, though monitoring the balance between types ensures no single specialty dominates your referral flow.' : 'Excellent diversification across multiple specialties provides strong protection against market fluctuations.'} Source type diversity should align with your practice capabilities and patient demographics for optimal results.`,
+      keyMetrics: [
+        `${diversificationScore} Source Types`,
+        `${Number(topSourceTypes[0]?.[1]) || 0} Largest Category`,
+        `${Math.round((Number(topSourceTypes[0]?.[1] || 0) / Math.max(totalSources, 1)) * 100)}% Concentration`,
+        `${totalSources - Number(topSourceTypes[0]?.[1] || 0)} Other Sources`
+      ],
+      actionItems: [
+        diversificationScore < 3 ? "Research and target 2-3 new specialty types for referral development" : "Monitor current source type balance quarterly",
+        "Analyze patient outcomes by source type to identify highest-value partnerships", 
+        "Develop specialty-specific marketing materials and visit strategies",
+        "Track source type performance trends to guide future networking priorities"
+      ],
+      icon: Target
+    });
+
+    return insights;
+  };
+
+  const generateOfflineAnalysis = (): BusinessInsight[] => {
+    return [
+      {
+        title: "System Status Check",
+        priority: "medium" as const,
+        summary: "Analysis running in offline mode with limited data access",
+        recommendation: "Ensure stable internet connection and try again for comprehensive insights",
+        detailedAnalysis: "The system is currently operating in offline mode, which limits our ability to access your latest practice data and generate comprehensive AI-powered insights. This may be due to network connectivity issues, server maintenance, or data synchronization delays. While offline, basic functionality remains available, but real-time analysis and AI enhancements are temporarily unavailable.",
+        keyMetrics: [
+          "Offline Mode Active",
+          "Limited Data Access",
+          "Basic Functions Available",
+          "AI Analysis Unavailable"
+        ],
+        actionItems: [
+          "Check your internet connection stability",
+          "Try refreshing the page or reloading the application",
+          "Contact support if the issue persists for more than 15 minutes",
+          "Review cached data for previously generated insights"
+        ],
+        icon: AlertCircle
+      }
+    ];
+  };
+
+  const callOptimizedAI = async (sources: any[], patients: any[], visits: any[]) => {
+    const context = {
+      sources: sources.slice(0, 20), // Limit data size
+      patients: patients.slice(0, 50),
+      visits: visits.slice(0, 30),
+      analysis_timestamp: new Date().toISOString()
+    };
+
+    const { data, error } = await supabase.functions.invoke('optimized-ai-analysis', {
+      body: { context },
+      headers: {
+        Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+      },
+    });
+
+    if (error) throw error;
+    return data?.content ? JSON.parse(data.content) : null;
   };
 
   const getInsightIcon = (title: string) => {
-    const titleLower = title.toLowerCase();
-    
-    if (titleLower.includes('ai') || titleLower.includes('smart') || titleLower.includes('intelligent')) return Brain;
-    if (titleLower.includes('opportunity') || titleLower.includes('missed') || titleLower.includes('potential')) return Zap;
-    if (titleLower.includes('discovery') || titleLower.includes('discovered') || titleLower.includes('found')) return Eye;
-    if (titleLower.includes('risk') || titleLower.includes('vulnerability') || titleLower.includes('threat')) return Shield;
-    if (titleLower.includes('referral') || titleLower.includes('network') || titleLower.includes('source')) return Building2;
-    if (titleLower.includes('patient') || titleLower.includes('volume') || titleLower.includes('trend')) return TrendingUp;
-    if (titleLower.includes('marketing') || titleLower.includes('visit') || titleLower.includes('outreach')) return Users;
-    if (titleLower.includes('campaign') || titleLower.includes('delivery') || titleLower.includes('email')) return Target;
-    if (titleLower.includes('review') || titleLower.includes('rating') || titleLower.includes('reputation')) return CheckCircle2;
-    if (titleLower.includes('portfolio') || titleLower.includes('diversification') || titleLower.includes('balance')) return BarChart3;
-    
-    return Sparkles;
+    if (title.toLowerCase().includes('source')) return Building2;
+    if (title.toLowerCase().includes('trend') || title.toLowerCase().includes('performance')) return TrendingUp;
+    if (title.toLowerCase().includes('marketing') || title.toLowerCase().includes('engagement')) return Users;
+    if (title.toLowerCase().includes('diversif') || title.toLowerCase().includes('quality')) return Target;
+    return BarChart3;
   };
 
   const formatAnalysisAge = (date: Date) => {
     const now = new Date();
     const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
     
-    if (diffInHours < 1) return 'Just now';
+    if (diffInHours < 1) return 'Just generated';
     if (diffInHours < 24) return `${diffInHours} hours ago`;
-    return format(date, 'MMM d, yyyy \'at\' HH:mm');
+    if (diffInHours < 48) return 'Yesterday';
+    return format(date, 'MMM d, yyyy');
   };
 
-  // Pagination
-  const totalPages = Math.ceil(insights.length / INSIGHTS_PER_PAGE);
-  const currentInsights = insights.slice(
-    currentPage * INSIGHTS_PER_PAGE, 
-    (currentPage + 1) * INSIGHTS_PER_PAGE
-  );
-
-  const nextPage = () => {
-    setCurrentPage(prev => Math.min(prev + 1, totalPages - 1));
+  const getPriorityVariant = (priority: string) => {
+    switch (priority) {
+      case 'high': return 'destructive';
+      case 'medium': return 'default';
+      case 'low': return 'secondary';
+      default: return 'default';
+    }
   };
-
-  const prevPage = () => {
-    setCurrentPage(prev => Math.max(prev - 1, 0));
-  };
-
-  if (isAnalyzing || progressiveLoading) {
-    return <BusinessAnalysisLoadingSkeleton />;
-  }
 
   return (
     <div className="space-y-6">
       {/* Control Panel */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <CardTitle className="flex items-center gap-2">
-                <Brain className="h-5 w-5 text-primary" />
-                AI Business Analysis
-              </CardTitle>
-              {lastRun && (
-                <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                  <Clock className="h-3 w-3" />
-                  Last updated: {formatAnalysisAge(lastRun)}
-                </div>
-              )}
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-primary" />
+              Business Intelligence Analysis
             </div>
             <div className="flex items-center gap-2">
-              <Button 
-                onClick={() => runAnalysis(true)}
-                disabled={isAnalyzing || dataLoading || !unifiedData}
-                className="w-full sm:w-auto"
-                size="lg"
-              >
-                {isAnalyzing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Analyzing...
-                  </>
-                ) : (
-                  <>
-                    <Brain className="mr-2 h-4 w-4" />
-                    {insights.length > 0 ? 'Refresh Analysis' : 'Run Analysis'}
-                  </>
-                )}
-              </Button>
+              {lastRun && (
+                <Badge variant="outline" className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {formatAnalysisAge(lastRun)}
+                </Badge>
+              )}
             </div>
-          </div>
+          </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <p className="text-muted-foreground">
-              AI-powered analysis examines your practice data to identify critical opportunities. 
-              Analysis is cached for {CACHE_HOURS} hours and stored locally for offline access.
-            </p>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Generate actionable insights about your practice performance, referral patterns, and growth opportunities.
+          </p>
+          
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                {error}
+              </AlertDescription>
+            </Alert>
+          )}
 
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription className="flex items-center justify-between">
-                  <span>Analysis Error: {error}</span>
-                  <Button variant="outline" size="sm" onClick={retryAnalysis}>
-                    <RefreshCw className="h-3 w-3 mr-1" />
-                    Retry
-                  </Button>
-                </AlertDescription>
-              </Alert>
-            )}
+          {!cachedAnalysis && !error && (
+            <Alert>
+              <BarChart3 className="h-4 w-4" />
+              <AlertDescription>
+                Ready to analyze your practice data. Click "Run Analysis" to get started.
+              </AlertDescription>
+            </Alert>
+          )}
 
-            {dataLoading && (
-              <Alert>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <AlertDescription>
-                  Loading practice data for analysis...
-                </AlertDescription>
-              </Alert>
+          <div className="flex gap-3">
+            <Button 
+              onClick={runDirectAnalysis}
+              disabled={isAnalyzing}
+              className="flex-1"
+            >
+              {isAnalyzing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Analyzing...
+                </>
+              ) : (
+                <>
+                  <Play className="h-4 w-4 mr-2" />
+                  {insights.length > 0 ? 'Run New Analysis' : 'Run Analysis'}
+                </>
+              )}
+            </Button>
+            
+            {cachedAnalysis && (
+              <Button 
+                variant="outline" 
+                onClick={loadCachedAnalysis}
+                disabled={isAnalyzing}
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh Cache
+              </Button>
             )}
           </div>
         </CardContent>
@@ -441,69 +506,126 @@ export function SimplifiedBusinessAnalysis() {
 
       {/* Analysis Results */}
       {insights.length > 0 && (
-        <>
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-muted-foreground">
-                Showing {currentPage * INSIGHTS_PER_PAGE + 1}-{Math.min((currentPage + 1) * INSIGHTS_PER_PAGE, insights.length)} of {insights.length} insights
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={prevPage}
-                  disabled={currentPage === 0}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  Previous
-                </Button>
-                <span className="text-sm px-2">
-                  {currentPage + 1} of {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={nextPage}
-                  disabled={currentPage === totalPages - 1}
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">Business Insights</h3>
+            {lastRun && (
+              <Badge variant="secondary">
+                Updated {formatAnalysisAge(lastRun)}
+              </Badge>
+            )}
+          </div>
+          
+          <div className="grid gap-4">
+            {insights.map((insight, index) => (
+              <Card key={index} className="border-l-4 border-l-primary hover:shadow-md transition-shadow">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <insight.icon className="h-4 w-4 text-primary" />
+                    {insight.title}
+                    <Badge variant={getPriorityVariant(insight.priority)}>
+                      {insight.priority}
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm font-medium text-foreground">
+                    {insight.summary}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    <span className="font-medium">Quick Fix:</span> {insight.recommendation}
+                  </p>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" size="sm" className="w-full justify-between group">
+                        <span className="flex items-center gap-2">
+                          <Sparkles className="h-4 w-4 text-primary" />
+                          See Detailed Analysis
+                        </span>
+                        <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                          <insight.icon className="h-5 w-5 text-primary" />
+                          {insight.title}
+                          <Badge variant={getPriorityVariant(insight.priority)}>
+                            {insight.priority} priority
+                          </Badge>
+                        </DialogTitle>
+                      </DialogHeader>
+                      
+                      <div className="space-y-6">
+                        {/* AI Analysis Section */}
+                        <div>
+                          <h4 className="font-semibold mb-3 flex items-center gap-2">
+                            <Sparkles className="h-4 w-4 text-primary" />
+                            AI Analysis
+                          </h4>
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            {insight.detailedAnalysis}
+                          </p>
+                        </div>
 
-          {/* Insights Grid */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {currentInsights.map((insight, index) => (
-              <BusinessInsightCard
-                key={`${currentPage}-${index}`}
-                insight={insight}
-                index={index}
-                onRetry={() => runAnalysis(true)}
-              />
+                        {/* Key Metrics */}
+                        <div>
+                          <h4 className="font-semibold mb-3 flex items-center gap-2">
+                            <BarChart3 className="h-4 w-4 text-primary" />
+                            Key Metrics
+                          </h4>
+                          <div className="grid grid-cols-2 gap-3">
+                            {insight.keyMetrics?.map((metric, i) => (
+                              <div key={i} className="bg-muted/50 rounded-lg p-3">
+                                <p className="text-sm font-medium">{metric}</p>
+                              </div>
+                            )) || <p className="text-sm text-muted-foreground">No metrics available</p>}
+                          </div>
+                        </div>
+
+                        {/* Action Items */}
+                        <div>
+                          <h4 className="font-semibold mb-3 flex items-center gap-2">
+                            <CheckCircle2 className="h-4 w-4 text-primary" />
+                            Recommended Actions
+                          </h4>
+                          <div className="space-y-2">
+                            {insight.actionItems?.map((action, i) => (
+                              <div key={i} className="flex items-start gap-3 p-3 bg-primary/5 rounded-lg">
+                                <div className="h-1.5 w-1.5 rounded-full bg-primary mt-2 flex-shrink-0" />
+                                <p className="text-sm">{action}</p>
+                              </div>
+                            )) || <p className="text-sm text-muted-foreground">No actions available</p>}
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end pt-4 border-t">
+                          <Badge variant="outline" className="text-xs">
+                            Generated by AI • {format(lastRun || new Date(), 'MMM d, h:mm a')}
+                          </Badge>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </CardContent>
+              </Card>
             ))}
           </div>
-        </>
+        </div>
       )}
 
-      {/* Empty State */}
-      {insights.length === 0 && !isAnalyzing && !error && (
+      {/* Loading State */}
+      {isAnalyzing && (
         <Card>
-          <CardContent className="py-12">
-            <div className="text-center space-y-4">
-              <Brain className="h-12 w-12 mx-auto text-muted-foreground" />
-              <div>
-                <h3 className="text-lg font-semibold">No Analysis Available</h3>
-                <p className="text-muted-foreground">
-                  Run an AI analysis to get personalized insights about your practice.
+          <CardContent className="p-6">
+            <div className="flex items-center justify-center space-y-4 flex-col">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <div className="text-center">
+                <p className="font-medium">Analyzing Your Practice Data</p>
+                <p className="text-sm text-muted-foreground">
+                  Processing sources, patient data, and marketing activities...
                 </p>
               </div>
-              <Button onClick={() => runAnalysis(true)} disabled={dataLoading}>
-                <Brain className="mr-2 h-4 w-4" />
-                Start Analysis
-              </Button>
             </div>
           </CardContent>
         </Card>

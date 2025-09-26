@@ -1,5 +1,4 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { validateGoogleApiKey, createApiKeyErrorResponse, getApiKeyHealthStatus } from "../_shared/google-api-validation.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -44,16 +43,21 @@ Deno.serve(async (req) => {
 
   // Health check endpoint
   if (req.method === 'GET' && new URL(req.url).pathname.endsWith('/health')) {
-    const healthStatus = getApiKeyHealthStatus();
+    const googleMapsApiKey = Deno.env.get('GOOGLE_MAPS_API_KEY')
+    const isHealthy = !!googleMapsApiKey && googleMapsApiKey.startsWith('AIza')
     
     return new Response(
       JSON.stringify({
-        status: healthStatus.status,
+        status: isHealthy ? 'healthy' : 'unhealthy',
         service: 'google-reviews',
-        timestamp: healthStatus.timestamp
+        timestamp: new Date().toISOString(),
+        checks: {
+          api_key_present: !!googleMapsApiKey,
+          api_key_format_valid: googleMapsApiKey?.startsWith('AIza') || false
+        }
       }),
       { 
-        status: healthStatus.status === 'healthy' ? 200 : 503,
+        status: isHealthy ? 200 : 503,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     )
@@ -97,19 +101,70 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Get and validate Google Maps API key
+    // Get Google Maps API key from Supabase secrets
     const googleApiKey = Deno.env.get('GOOGLE_MAPS_API_KEY')
-    console.log(`get-google-reviews: Processing request for place_id: ${place_id} [${requestId}]`)
     
-    // Perform secure validation
-    const validation = validateGoogleApiKey(googleApiKey, requestId);
-    if (!validation.isValid) {
-      return createApiKeyErrorResponse(validation, requestId, corsHeaders);
+    // Enhanced logging for debugging
+    console.log(`get-google-reviews: Environment check [${requestId}]:`, {
+      api_key_exists: !!googleApiKey,
+      api_key_length: googleApiKey?.length || 0,
+      api_key_prefix: googleApiKey?.substring(0, 4) || 'none',
+      all_env_vars: Object.keys(Deno.env.toObject()).filter(key => key.includes('GOOGLE')),
+    })
+    
+    if (!googleApiKey) {
+      console.error(`get-google-reviews: Google Maps API key not configured [${requestId}]`)
+      return new Response(
+        JSON.stringify({
+          error: 'Google Maps API key not configured. Please add the GOOGLE_MAPS_API_KEY secret in your Supabase project settings.',
+          code: 'API_KEY_MISSING',
+          success: false,
+          request_id: requestId,
+          help: 'Visit https://supabase.com/dashboard/project/vqkzqwibbcvmdwgqladn/settings/functions to add the secret'
+        }),
+        {
+          status: 503,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
+    }
+
+    // Enhanced API key validation
+    if (googleApiKey.length < 20) {
+      console.error(`get-google-reviews: API key too short: ${googleApiKey.length} characters [${requestId}]`)
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid Google Maps API key: too short',
+          code: 'INVALID_API_KEY_LENGTH',
+          success: false,
+          request_id: requestId
+        }),
+        {
+          status: 503,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
+    }
+
+    if (!googleApiKey.startsWith('AIza')) {
+      console.error(`get-google-reviews: Invalid API key format [${requestId}]`)
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid Google Maps API key format. Key should start with "AIza"',
+          code: 'INVALID_API_KEY_FORMAT',
+          success: false,
+          request_id: requestId
+        }),
+        {
+          status: 503,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
     }
 
     // Fetch place details including reviews with timeout and retry logic
     const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place_id}&fields=reviews,rating,user_ratings_total&key=${googleApiKey}`
-    console.log(`get-google-reviews: Making secure Google API request [${requestId}]`)
+    console.log(`get-google-reviews: Making Google API request [${requestId}]`)
     
     // Retry logic for network issues
     const maxRetries = 2
@@ -276,7 +331,7 @@ Deno.serve(async (req) => {
         clearTimeout(timeoutId)
         lastError = fetchError as Error
         
-        if ((fetchError as Error).name === 'AbortError') {
+        if (fetchError.name === 'AbortError') {
           console.error(`get-google-reviews: Request timeout (attempt ${attempt}) [${requestId}]`)
           if (attempt < maxRetries) {
             console.log(`get-google-reviews: Retrying after timeout (attempt ${attempt + 1}/${maxRetries}) [${requestId}]`)
@@ -319,7 +374,7 @@ Deno.serve(async (req) => {
     let errorMessage = 'Internal server error while fetching reviews'
     let statusCode = 500
     
-    if ((error as Error).message.includes('JSON')) {
+    if (error.message.includes('JSON')) {
       errorMessage = 'Invalid request format'
       statusCode = 400
     }
@@ -329,7 +384,7 @@ Deno.serve(async (req) => {
         error: errorMessage,
         code: 'INTERNAL_ERROR',
         success: false,
-        details: (error as Error).message,
+        details: error.message,
         request_id: requestId
       }),
       {

@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts"
-import { validateGoogleApiKey, testApiKeyValidity, createApiKeyErrorResponse, getApiKeyHealthStatus } from "../_shared/google-api-validation.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,16 +17,21 @@ serve(async (req) => {
 
   // Health check endpoint
   if (req.method === 'GET' && new URL(req.url).pathname.endsWith('/health')) {
-    const healthStatus = getApiKeyHealthStatus();
+    const googleMapsApiKey = Deno.env.get('GOOGLE_MAPS_API_KEY')
+    const isHealthy = !!googleMapsApiKey && googleMapsApiKey.startsWith('AIza')
     
     return new Response(
       JSON.stringify({
-        status: healthStatus.status,
+        status: isHealthy ? 'healthy' : 'unhealthy',
         service: 'google-maps-api-key',
-        timestamp: healthStatus.timestamp
+        timestamp: new Date().toISOString(),
+        checks: {
+          api_key_present: !!googleMapsApiKey,
+          api_key_format_valid: googleMapsApiKey?.startsWith('AIza') || false
+        }
       }),
       { 
-        status: healthStatus.status === 'healthy' ? 200 : 503,
+        status: isHealthy ? 200 : 503,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     )
@@ -50,23 +54,100 @@ serve(async (req) => {
   }
 
   try {
-    // Get and validate Google Maps API key
+    // Get the Google Maps API key from environment variables (Supabase secrets)
     const googleMapsApiKey = Deno.env.get('GOOGLE_MAPS_API_KEY')
-    console.log(`get-google-maps-key: Processing request [${requestId}]`)
     
-    // Perform secure validation
-    const validation = validateGoogleApiKey(googleMapsApiKey, requestId);
-    if (!validation.isValid) {
-      return createApiKeyErrorResponse(validation, requestId, corsHeaders);
+    // Enhanced logging for debugging
+    console.log(`get-google-maps-key: Environment check [${requestId}]:`, {
+      api_key_exists: !!googleMapsApiKey,
+      api_key_length: googleMapsApiKey?.length || 0,
+      api_key_prefix: googleMapsApiKey?.substring(0, 4) || 'none',
+      all_env_vars: Object.keys(Deno.env.toObject()).filter(key => key.includes('GOOGLE')),
+    })
+    
+    if (!googleMapsApiKey) {
+      console.error(`get-google-maps-key: Google Maps API key not configured in secrets [${requestId}]`)
+      return new Response(
+        JSON.stringify({ 
+          error: 'Google Maps API key not configured. Please add the GOOGLE_MAPS_API_KEY secret in your Supabase project settings.',
+          code: 'API_KEY_MISSING',
+          success: false,
+          request_id: requestId,
+          help: 'Visit https://supabase.com/dashboard/project/vqkzqwibbcvmdwgqladn/settings/functions to add the secret'
+        }),
+        { 
+          status: 503,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
     }
 
-    // Optional: Test API key validity (use sparingly to avoid quota usage)
-    const testResult = await testApiKeyValidity(googleMapsApiKey!, requestId);
-    if (!testResult.isValid) {
-      return createApiKeyErrorResponse(testResult, requestId, corsHeaders);
+    // Validate API key format (enhanced validation)
+    if (googleMapsApiKey.length < 20) {
+      console.error(`get-google-maps-key: API key too short: ${googleMapsApiKey.length} characters [${requestId}]`)
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid Google Maps API key: too short',
+          code: 'INVALID_API_KEY_LENGTH',
+          success: false,
+          request_id: requestId
+        }),
+        { 
+          status: 503,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
     }
 
-    console.log(`get-google-maps-key: Successfully validated and returning API key [${requestId}]`)
+    if (!googleMapsApiKey.startsWith('AIza')) {
+      console.error(`get-google-maps-key: Invalid API key format - should start with AIza [${requestId}]`)
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid Google Maps API key format. Key should start with "AIza"',
+          code: 'INVALID_API_KEY_FORMAT',
+          success: false,
+          request_id: requestId
+        }),
+        { 
+          status: 503,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    // Test API key validity with a simple request
+    try {
+      const testResponse = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?address=test&key=${googleMapsApiKey}`,
+        { 
+          signal: AbortSignal.timeout(5000),
+          headers: {
+            'User-Agent': 'Nexora-Clinic-App/1.0'
+          }
+        }
+      )
+      
+      if (testResponse.status === 403) {
+        console.error(`get-google-maps-key: API key validation failed - forbidden [${requestId}]`)
+        return new Response(
+          JSON.stringify({ 
+            error: 'Google Maps API key is invalid or lacks required permissions',
+            code: 'INVALID_API_KEY_FORBIDDEN',
+            success: false,
+            request_id: requestId
+          }),
+          { 
+            status: 503,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        )
+      }
+    } catch (testError) {
+      console.warn(`get-google-maps-key: API key validation test failed (continuing anyway): ${testError.message} [${requestId}]`)
+      // Continue anyway as this might be a network issue
+    }
+
+    console.log(`get-google-maps-key: Successfully returning API key [${requestId}]`)
     return new Response(
       JSON.stringify({ 
         google_maps_api_key: googleMapsApiKey,
