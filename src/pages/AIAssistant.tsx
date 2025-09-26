@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useDataPrefetch } from '@/hooks/useDataPrefetch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +16,7 @@ export default function AIAssistant() {
   const { user } = useAuth();
   const { data: unifiedData, loading: dataLoading } = useUnifiedAIData();
   const [activeTab, setActiveTab] = useState('overview');
+  const { prefetchOnHover } = useDataPrefetch();
 
   // Business profile is now part of unified data
   const businessProfile = unifiedData?.business_profile;
@@ -70,19 +72,35 @@ export default function AIAssistant() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview" className="flex items-center gap-2">
+          <TabsTrigger 
+            value="overview" 
+            className="flex items-center gap-2"
+            onMouseEnter={() => prefetchOnHover('/ai-assistant')}
+          >
             <Sparkles className="h-4 w-4" />
             Analysis
           </TabsTrigger>
-          <TabsTrigger value="chat" className="flex items-center gap-2">
+          <TabsTrigger 
+            value="chat" 
+            className="flex items-center gap-2"
+            onMouseEnter={() => prefetchOnHover('/ai-assistant')}
+          >
             <MessageSquare className="h-4 w-4" />
             Chat
           </TabsTrigger>
-          <TabsTrigger value="setup" className="flex items-center gap-2">
+          <TabsTrigger 
+            value="setup" 
+            className="flex items-center gap-2"
+            onMouseEnter={() => prefetchOnHover('/ai-assistant')}
+          >
             <Settings className="h-4 w-4" />
             Setup
           </TabsTrigger>
-          <TabsTrigger value="usage" className="flex items-center gap-2">
+          <TabsTrigger 
+            value="usage" 
+            className="flex items-center gap-2"
+            onMouseEnter={() => prefetchOnHover('/ai-assistant')}
+          >
             <BarChart3 className="h-4 w-4" />
             Usage
           </TabsTrigger>
