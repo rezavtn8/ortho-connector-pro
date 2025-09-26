@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -186,6 +186,13 @@ export function useUnifiedAIData() {
       setLoading(false);
     }
   }, [user]);
+
+  // Auto-fetch unified data when user is available
+  useEffect(() => {
+    if (user && !data && !loading) {
+      fetchAllData();
+    }
+  }, [user, data, loading, fetchAllData]);
 
   return {
     data,

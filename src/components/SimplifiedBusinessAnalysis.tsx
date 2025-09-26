@@ -53,7 +53,7 @@ const LOCAL_STORAGE_KEY = 'business_analysis_cache';
 
 export function SimplifiedBusinessAnalysis() {
   const { user } = useAuth();
-  const { data: unifiedData, loading: dataLoading } = useUnifiedAIData();
+  const { data: unifiedData, loading: dataLoading, fetchAllData } = useUnifiedAIData();
   
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [insights, setInsights] = useState<BusinessInsight[]>([]);
@@ -209,8 +209,12 @@ export function SimplifiedBusinessAnalysis() {
     try {
       console.log('Starting AI business analysis...');
 
-      // Get unified data
-      const rawData = unifiedData;
+      // Get unified data (fetch if missing)
+      let rawData = unifiedData;
+      if (!rawData) {
+        const fetched = await fetchAllData();
+        rawData = fetched;
+      }
       if (!rawData) {
         throw new Error('No practice data available for analysis');
       }
@@ -379,7 +383,7 @@ export function SimplifiedBusinessAnalysis() {
             <div className="flex items-center gap-2">
               <Button 
                 onClick={() => runAnalysis(true)}
-                disabled={isAnalyzing || dataLoading}
+                disabled={isAnalyzing || dataLoading || !unifiedData}
                 className="w-full sm:w-auto"
                 size="lg"
               >

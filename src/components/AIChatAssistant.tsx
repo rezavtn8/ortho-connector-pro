@@ -285,6 +285,7 @@ export function AIChatAssistant() {
       setMessages(prev => [...prev, userMessage]);
       setInputMessage('');
       if (user) {
+        await chatStorage.saveMessage(user.id, userMessage);
         chatStorage.clearDraft(user.id);
       }
     } else {
