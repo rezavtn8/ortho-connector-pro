@@ -87,21 +87,26 @@ const handler = async (req: Request): Promise<Response> => {
         messages: [
           { 
             role: 'system', 
-            content: `You are a healthcare business analyst specializing in medical practice management. Analyze the provided data and return insights in JSON format.
+            content: `You are a senior healthcare business consultant providing executive-level analysis. Write a comprehensive consultant report with detailed sections, not brief summaries.
 
 Response format:
 {
-  "insights": [
+  "narrative_sections": [
     {
-      "title": "Clear insight title",
-      "priority": "high|medium|low",
-      "summary": "Brief 1-2 sentence summary",
-      "recommendation": "Specific actionable recommendation"
+      "title": "Section title",
+      "content": "2-3 detailed paragraphs analyzing specific aspects with data insights, trends, and implications. Write like a consultant report - professional, detailed, and insightful.",
+      "key_findings": ["bullet point finding 1", "bullet point finding 2", "bullet point finding 3"]
+    }
+  ],
+  "recommendations": [
+    {
+      "title": "Recommendation title", 
+      "action": "Specific actionable step with details on implementation"
     }
   ],
   "metrics": {
     "total_sources": number,
-    "total_patients": number,
+    "total_patients": number, 
     "active_campaigns": number,
     "growth_trend": "positive|stable|declining"
   }
@@ -203,13 +208,17 @@ ${(reviews || []).slice(0, 5).map((r: any) => `- ${r.status}${r.needs_attention 
 EMAIL DELIVERY STATUS (recent):
 ${(emails || []).slice(0, 5).map((e: any) => `- ${e.email_status} ${e.delivered_at ? `at ${e.delivered_at}` : ''}`).join('\n')}
 
-Provide exactly 4 actionable business insights focusing on:
-1. Patient source performance and optimization opportunities
-2. Growth trends and pattern analysis  
-3. Campaign and email effectiveness with strategic recommendations
-4. Reviews management and operational next steps
+Write exactly 3-4 detailed narrative sections for an executive summary report covering:
 
-Each insight must include specific, measurable recommendations based on the actual data provided.`;
+1. **Referral Network Performance Analysis**: Deep dive into patient source effectiveness, identifying top performers, underperformers, and optimization opportunities with specific data points and trends.
+
+2. **Patient Volume & Growth Trajectory**: Comprehensive analysis of patient flow patterns, seasonal variations, growth trends, and capacity utilization with strategic implications.
+
+3. **Marketing & Campaign Effectiveness**: Detailed evaluation of current campaign performance, email delivery rates, ROI analysis, and strategic recommendations for improvement.
+
+4. **Operational Excellence & Next Steps**: Review of overall practice performance, review management, operational efficiency, and priority action items for the next quarter.
+
+Each section should be 2-3 paragraphs with specific data insights, professional analysis, and strategic thinking. Include 3-4 key findings per section. Write recommendations as specific, implementable actions.`;
 }
 
 serve(handler);

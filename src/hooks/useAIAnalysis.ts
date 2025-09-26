@@ -4,7 +4,16 @@ import { useAuth } from '@/hooks/useAuth';
 
 interface AIAnalysis {
   id: string;
-  insights: any[];
+  insights?: any[];
+  narrative_sections?: {
+    title: string;
+    content: string;
+    key_findings: string[];
+  }[];
+  recommendations?: {
+    title: string;
+    action: string;
+  }[];
   metrics: {
     total_sources: number;
     total_patients: number;

@@ -134,39 +134,84 @@ export function AIAnalysisTab() {
             <h3 className="text-2xl font-semibold text-foreground">Business Intelligence Report</h3>
           </div>
 
-          {/* Narrative Analysis */}
-          <div className="prose max-w-none mb-8">
-            <div className="text-base leading-7 text-slate-700 dark:text-slate-300 space-y-6">
-              {analysis.insights?.map((insight: any, index: number) => (
-                <div key={index}>
-                  <p className="mb-4">
-                    <span className="font-medium text-foreground">{insight.summary}</span>
-                  </p>
-                  {index < analysis.insights.length - 1 && (
-                    <div className="my-6 w-16 h-px bg-gradient-to-r from-teal-300 to-transparent"></div>
-                  )}
+          {/* Executive Narrative Analysis */}
+          <div className="space-y-8 mb-10">
+            {analysis.narrative_sections?.map((section: any, index: number) => (
+              <div key={index} className="space-y-4">
+                <h4 className="text-lg font-semibold text-foreground">{section.title}</h4>
+                
+                {/* Section Content */}
+                <div className="text-base leading-7 text-slate-700 dark:text-slate-300">
+                  {section.content.split('\n\n').map((paragraph: string, pIndex: number) => (
+                    <p key={pIndex} className="mb-4">{paragraph}</p>
+                  ))}
                 </div>
-              ))}
-            </div>
+
+                {/* Key Findings */}
+                {section.key_findings && section.key_findings.length > 0 && (
+                  <div className="bg-slate-50 dark:bg-slate-900/30 rounded-lg p-4 border-l-4 border-teal-500">
+                    <h5 className="font-medium text-sm text-teal-700 dark:text-teal-300 mb-2">Key Findings</h5>
+                    <ul className="space-y-1 text-sm">
+                      {section.key_findings.map((finding: string, fIndex: number) => (
+                        <li key={fIndex} className="flex items-start gap-2">
+                          <div className="w-1 h-1 bg-teal-500 rounded-full mt-2 flex-shrink-0"></div>
+                          <span className="text-slate-600 dark:text-slate-400">{finding}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {index < (analysis.narrative_sections?.length || 1) - 1 && (
+                  <div className="my-8 w-24 h-px bg-gradient-to-r from-teal-300 to-transparent"></div>
+                )}
+              </div>
+            )) || (
+              // Fallback for old format
+              <div className="text-base leading-7 text-slate-700 dark:text-slate-300 space-y-6">
+                {analysis.insights?.map((insight: any, index: number) => (
+                  <div key={index}>
+                    <p className="mb-4">
+                      <span className="font-medium text-foreground">{insight.summary}</span>
+                    </p>
+                    {index < analysis.insights.length - 1 && (
+                      <div className="my-6 w-16 h-px bg-gradient-to-r from-teal-300 to-transparent"></div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Recommendations Section */}
-          {analysis.insights?.length > 0 && (
+          {/* Strategic Recommendations */}
+          {(analysis.recommendations?.length > 0 || analysis.insights?.length > 0) && (
             <div className="bg-gradient-to-br from-teal-50/50 to-blue-50/30 dark:from-teal-950/20 dark:to-blue-950/20 rounded-xl p-6 border border-teal-100 dark:border-teal-800/30">
               <h4 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
                 <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
-                Key Recommendations
+                Strategic Recommendations
               </h4>
-              <ul className="space-y-3">
-                {analysis.insights?.map((insight: any, index: number) => (
-                  <li key={index} className="flex items-start gap-3 text-sm">
-                    <div className="w-1.5 h-1.5 bg-teal-400 rounded-full mt-2 flex-shrink-0"></div>
-                    <span className="text-slate-700 dark:text-slate-300 leading-6">
-                      {insight.recommendation}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <div className="space-y-4">
+                {analysis.recommendations?.map((rec: any, index: number) => (
+                  <div key={index} className="space-y-2">
+                    <h5 className="font-medium text-sm text-teal-700 dark:text-teal-300">{rec.title}</h5>
+                    <p className="text-sm text-slate-700 dark:text-slate-300 leading-6 pl-3 border-l-2 border-teal-200 dark:border-teal-800">
+                      {rec.action}
+                    </p>
+                  </div>
+                )) || (
+                  // Fallback for old format
+                  <ul className="space-y-3">
+                    {analysis.insights?.map((insight: any, index: number) => (
+                      <li key={index} className="flex items-start gap-3 text-sm">
+                        <div className="w-1.5 h-1.5 bg-teal-400 rounded-full mt-2 flex-shrink-0"></div>
+                        <span className="text-slate-700 dark:text-slate-300 leading-6">
+                          {insight.recommendation}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           )}
         </div>
