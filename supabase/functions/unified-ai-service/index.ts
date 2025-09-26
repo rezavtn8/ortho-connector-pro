@@ -78,9 +78,9 @@ const handler = async (req: Request): Promise<Response> => {
       return createCorsResponse(JSON.stringify({
         success: false,
         error: 'Authentication required'
-      }), {
+      }), { 
         status: 401,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' }
       }, req);
     }
 

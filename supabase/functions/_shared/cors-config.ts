@@ -29,8 +29,11 @@ function getCorsConfig(): CorsConfig {
     'https://localhost:8080'
   ];
 
-  // Lovable staging domain
+  // Lovable domains
   const LOVABLE_STAGING = 'https://lovable.app';
+  
+  // Also allow all Lovable project domains
+  const LOVABLE_PROJECT_PATTERN = '.lovableproject.com';
 
   // Get current environment
   const isDevelopment = Deno.env.get('DENO_DEPLOYMENT_ID') === undefined;
@@ -41,7 +44,7 @@ function getCorsConfig(): CorsConfig {
     // In development, allow development domains
     allowedOrigins = [...DEVELOPMENT_DOMAINS, PRODUCTION_DOMAIN, LOVABLE_STAGING];
   } else {
-    // In production, only allow production domain and Lovable staging
+    // In production, allow production domain, Lovable staging, and Lovable project domains
     allowedOrigins = [PRODUCTION_DOMAIN, LOVABLE_STAGING];
   }
 
@@ -91,7 +94,7 @@ export function isOriginAllowed(origin: string | null, config: CorsConfig): bool
         return true;
       }
       // Also allow Lovable preview domains in development
-      if (url.hostname.endsWith('.lovable.app')) {
+      if (url.hostname.endsWith('.lovable.app') || url.hostname.endsWith('.lovableproject.com')) {
         return true;
       }
     } catch {
