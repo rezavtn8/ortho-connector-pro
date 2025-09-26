@@ -17,13 +17,42 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization") || undefined;
+    // Check for auth header first
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      console.log("No authorization header provided");
+      return new Response(
+        JSON.stringify({ 
+          content: "**Authentication Required** — Please sign in to access AI analysis features.",
+          error: "No authorization header"
+        }),
+        { 
+          status: 200, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      );
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseAnon = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 
-    // Create a client that forwards the user's JWT when present
+    if (!supabaseUrl || !supabaseAnon) {
+      console.log("Missing Supabase configuration");
+      return new Response(
+        JSON.stringify({ 
+          content: "**Configuration Error** — Service temporarily unavailable. Please try again later.",
+          error: "Missing configuration"
+        }),
+        { 
+          status: 200, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      );
+    }
+
+    // Create authenticated Supabase client
     const supabase = createClient(supabaseUrl, supabaseAnon, {
-      global: { headers: authHeader ? { Authorization: authHeader } : {} },
+      global: { headers: { Authorization: authHeader } },
     });
 
     // Parse request body defensively (support legacy shapes used around the app)
@@ -32,13 +61,52 @@ serve(async (req) => {
     const prompt: string = body.prompt || body.message || "";
     const ctx: AnyObject = body.context || {};
 
-    // Try to resolve the user, but never fail the whole request if missing/expired
+    // Try to resolve the user with better error handling
     let userId: string | null = null;
     try {
-      const { data, error } = await supabase.auth.getUser();
-      if (!error && data?.user?.id) userId = data.user.id;
-    } catch (_) {
-      // ignore auth errors – we can still return a helpful response
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError) {
+        console.log("Auth error:", authError.message);
+        return new Response(
+          JSON.stringify({ 
+            content: "**Authentication Failed** — Please sign in again to access AI features.",
+            error: "Authentication failed"
+          }),
+          { 
+            status: 200, 
+            headers: { ...corsHeaders, "Content-Type": "application/json" } 
+          }
+        );
+      }
+      
+      if (authData?.user?.id) {
+        userId = authData.user.id;
+        console.log(`Authenticated user: ${userId}`);
+      } else {
+        console.log("No user found in auth data");
+        return new Response(
+          JSON.stringify({ 
+            content: "**User Not Found** — Please sign in to access AI analysis.",
+            error: "User not found"
+          }),
+          { 
+            status: 200, 
+            headers: { ...corsHeaders, "Content-Type": "application/json" } 
+          }
+        );
+      }
+    } catch (authException) {
+      console.error("Auth exception:", authException);
+      return new Response(
+        JSON.stringify({ 
+          content: "**Authentication Error** — Unable to verify user. Please refresh and try again.",
+          error: "Auth exception"
+        }),
+        { 
+          status: 200, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      );
     }
 
     // Helper to fetch practice data from DB if we have a user; otherwise use provided context
@@ -190,7 +258,10 @@ serve(async (req) => {
     const fallback = "**We hit a temporary issue.** Here are immediate steps: 1) Revisit top sources this week, 2) Email recap to recent referrers, 3) Review month-to-date referrals and set 2 KPIs.";
     return new Response(
       JSON.stringify({ content: fallback, error: err instanceof Error ? err.message : String(err) }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      { 
+        status: 200, // Always return 200 to prevent client-side errors
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      },
     );
   }
 });

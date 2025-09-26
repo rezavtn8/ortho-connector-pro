@@ -314,9 +314,24 @@ RETURN FORMAT: Return only the JSON structure specified in the system prompt.
         },
       });
 
-      if (error) throw error;
+      // Handle both function errors and response errors
+      if (error) {
+        console.error('AI function error:', error);
+        throw new Error(error.message || 'Failed to generate analysis');
+      }
 
-      const analysisContent = data.content || 'Analysis completed successfully.';
+      // Handle cases where the function returned an error in the response
+      if (data?.error) {
+        console.error('AI response error:', data.error);
+        throw new Error(data.error);
+      }
+
+      const analysisContent = data?.content || 'Analysis generated successfully.';
+      
+      // If content is empty or too short, provide fallback
+      if (!analysisContent || analysisContent.trim().length < 10) {
+        throw new Error('AI returned empty response');
+      }
       
       // Extract key insights and recommendations from unified data
       const keyInsights = [

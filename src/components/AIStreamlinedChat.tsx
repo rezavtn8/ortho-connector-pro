@@ -98,12 +98,24 @@ export function AIStreamlinedChat() {
         },
       });
 
+      // Handle both function errors and response errors
       if (error) {
         console.error('AI function error:', error);
         throw new Error(error.message || 'Failed to get AI response');
       }
 
+      // Handle cases where the function returned an error in the response
+      if (data?.error) {
+        console.error('AI response error:', data.error);
+        throw new Error(data.error);
+      }
+
       let responseContent = data?.content || 'I apologize, but I encountered an issue processing your request. Please try again.';
+      
+      // Ensure we have actual content
+      if (!responseContent || responseContent.trim().length < 5) {
+        throw new Error('AI returned empty or invalid response');
+      }
       
       // Limit response length for chat
       const words = responseContent.split(' ');
