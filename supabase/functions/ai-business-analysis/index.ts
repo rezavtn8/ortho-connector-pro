@@ -114,6 +114,7 @@ Response format:
           },
           { role: 'user', content: prompt }
         ],
+        response_format: { type: 'json_object' },
         max_tokens: 800,
         temperature: 0.3,
       }),
@@ -165,7 +166,7 @@ Response format:
       error: error.message,
       details: 'Analysis failed - check function logs for details'
     }), {
-      status: 200, // Always return 200 to avoid FunctionsHttpError
+      status: 500, // Return error to let client handle properly
       headers: { 'Content-Type': 'application/json', ...corsHeaders },
     });
   }

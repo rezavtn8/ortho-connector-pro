@@ -41,7 +41,7 @@ export function useAIAnalysis() {
         .eq('status', 'generated')
         .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (error && error.code !== 'PGRST116') {
         throw error;
@@ -77,20 +77,26 @@ export function useAIAnalysis() {
     });
 
     if (error) throw error;
+    if (!data || data.success === false || !data.analysis) {
+      throw new Error((data as any)?.error || 'Failed to generate analysis');
+    }
 
-    // Cache the new analysis
-    const { error: insertError } = await supabase
-      .from('ai_generated_content')
-      .insert({
-        user_id: user.id,
-        content_type: 'business_analysis',
-        generated_text: JSON.stringify(data.analysis),
-        status: 'generated',
-        metadata: { tokens_used: data.usage?.tokens_used }
-      });
+    // Cache the new analysis only if we have valid JSON
+    const generatedText = JSON.stringify(data.analysis);
+    if (generatedText) {
+      const { error: insertError } = await supabase
+        .from('ai_generated_content')
+        .insert({
+          user_id: user.id,
+          content_type: 'business_analysis',
+          generated_text: generatedText,
+          status: 'generated',
+          metadata: { tokens_used: (data as any).usage?.tokens_used }
+        });
 
-    if (insertError) {
-      console.error('Error caching analysis:', insertError);
+      if (insertError) {
+        console.error('Error caching analysis:', insertError);
+      }
     }
 
     const cacheExpiry = new Date();
