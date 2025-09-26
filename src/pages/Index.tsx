@@ -22,7 +22,7 @@ import { Reviews } from '@/pages/Reviews';
 import { Discover } from '@/pages/Discover';
 import { Logs } from '@/pages/Logs';
 import { AIAssistant } from '@/pages/AIAssistant';
-import { Creator } from '@/pages/Creator';
+
 import { useState } from 'react';
 
 const Index = () => {
@@ -135,14 +135,6 @@ const Index = () => {
             element={
               <SuspenseWrapper type="page">
                 <AIAssistant />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/creator/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <Creator />
               </SuspenseWrapper>
             } 
           />

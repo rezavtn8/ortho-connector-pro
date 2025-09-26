@@ -14,7 +14,6 @@ import {
   MessageSquare,
   Search,
   Bot,
-  Palette
 } from 'lucide-react';
 import {
   Sidebar,
@@ -42,7 +41,7 @@ const mainNavItems = [
   { id: 'offices', title: 'Partner Offices', icon: Building, path: '/offices' },
   { id: 'analytics', title: 'Reports', icon: TrendingUp, path: '/analytics' },
   { id: 'ai-assistant', title: 'AI Assistant', icon: Bot, path: '/ai-assistant' },
-  { id: 'creator', title: 'Creator', icon: Palette, path: '/creator' },
+  
 ];
 
 const managementItems = [

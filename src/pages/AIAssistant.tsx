@@ -161,9 +161,9 @@ export function AIAssistant() {
                 <p className="text-sm text-muted-foreground mb-4">
                   Generate marketing materials tailored to your practice's brand and voice.
                 </p>
-                <Button className="w-full" variant="outline" onClick={() => navigate('/creator')}>
+                <Button className="w-full" variant="outline" disabled>
                   <Palette className="h-4 w-4 mr-2" />
-                  Create Content
+                  Content Creation (Coming Soon)
                 </Button>
               </CardContent>
             </Card>
