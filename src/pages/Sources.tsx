@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Building2, Globe, MessageSquare, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useIsMobile } from '@/hooks/use-mobile';
-
+import { ComponentPerformance } from '@/components/performance/PerformanceMonitor';
 import { useSources } from '@/hooks/useSources';
 import { useSourceOperations } from '@/hooks/useSourceOperations';
 import { SourcesFilters } from '@/components/SourcesFilters';
@@ -78,63 +78,65 @@ export function Sources() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col space-y-3 mb-8">
-        <div className="flex items-center gap-3">
-          <Users className="h-8 w-8 title-icon" />
-          <h1 className="text-4xl font-bold page-title">Patient Sources</h1>
+    <ComponentPerformance name="Sources">
+      <div className="space-y-6">
+        <div className="flex flex-col space-y-3 mb-8">
+          <div className="flex items-center gap-3">
+            <Users className="h-8 w-8 title-icon" />
+            <h1 className="text-4xl font-bold page-title">Patient Sources</h1>
+          </div>
+          <p className="text-muted-foreground text-lg">
+            Manage your patient referral sources and track monthly performance
+          </p>
         </div>
-        <p className="text-muted-foreground text-lg">
-          Manage your patient referral sources and track monthly performance
-        </p>
+
+        <SourcesFilters
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          onDataChange={loadData}
+        />
+
+        <Tabs defaultValue="online" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="online" className="flex items-center gap-2">
+              <Globe className="w-4 h-4" />
+              Online Sources
+            </TabsTrigger>
+            <TabsTrigger value="offices" className="flex items-center gap-2">
+              <Building2 className="w-4 h-4" />
+              Offices
+            </TabsTrigger>
+            <TabsTrigger value="other" className="flex items-center gap-2">
+              <MessageSquare className="w-4 h-4" />
+              Other Sources
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="online" className="mt-6">
+            {renderSourceView(
+              filterSources(sources, '', onlineSourceTypes),
+              'Online Sources',
+              Globe
+            )}
+          </TabsContent>
+
+          <TabsContent value="offices" className="mt-6">
+            {renderSourceView(
+              filterSources(sources, '', officeSourceTypes),
+              'Offices',
+              Building2
+            )}
+          </TabsContent>
+
+          <TabsContent value="other" className="mt-6">
+            {renderSourceView(
+              filterSources(sources, '', otherSourceTypes),
+              'Other Sources',
+              MessageSquare
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
-
-      <SourcesFilters
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
-        onDataChange={loadData}
-      />
-
-      <Tabs defaultValue="online" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="online" className="flex items-center gap-2">
-            <Globe className="w-4 h-4" />
-            Online Sources
-          </TabsTrigger>
-          <TabsTrigger value="offices" className="flex items-center gap-2">
-            <Building2 className="w-4 h-4" />
-            Offices
-          </TabsTrigger>
-          <TabsTrigger value="other" className="flex items-center gap-2">
-            <MessageSquare className="w-4 h-4" />
-            Other Sources
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="online" className="mt-6">
-          {renderSourceView(
-            filterSources(sources, '', onlineSourceTypes),
-            'Online Sources',
-            Globe
-          )}
-        </TabsContent>
-
-        <TabsContent value="offices" className="mt-6">
-          {renderSourceView(
-            filterSources(sources, '', officeSourceTypes),
-            'Offices',
-            Building2
-          )}
-        </TabsContent>
-
-        <TabsContent value="other" className="mt-6">
-          {renderSourceView(
-            filterSources(sources, '', otherSourceTypes),
-            'Other Sources',
-            MessageSquare
-          )}
-        </TabsContent>
-      </Tabs>
-    </div>
+    </ComponentPerformance>
   );
 }

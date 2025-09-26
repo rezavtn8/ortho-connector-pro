@@ -1,68 +1,74 @@
-import { useState, useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
-/**
- * Optimized state hook that prevents unnecessary re-renders
- * for array and object state updates
- */
-export function useOptimizedState<T>(initialValue: T) {
-  const [state, setState] = useState<T>(initialValue);
-  const stateRef = useRef<T>(initialValue);
+// Optimized state hook that batches updates and prevents unnecessary renders
+export function useOptimizedState<T>(initialState: T) {
+  const [state, setState] = useState<T>(initialState);
+  const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingUpdatesRef = useRef<Array<(prev: T) => T>>([]);
 
-  const setOptimizedState = useCallback((newValue: T | ((prev: T) => T)) => {
-    const nextValue = typeof newValue === 'function' 
-      ? (newValue as (prev: T) => T)(stateRef.current)
-      : newValue;
+  const setOptimizedState = useCallback((updater: (prev: T) => T) => {
+    // Batch updates to prevent excessive re-renders
+    pendingUpdatesRef.current.push(updater);
 
-    // Only update if the value actually changed (shallow comparison for primitives)
-    if (stateRef.current !== nextValue) {
-      stateRef.current = nextValue;
-      setState(nextValue);
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
     }
+
+    updateTimeoutRef.current = setTimeout(() => {
+      setState(prev => {
+        let result = prev;
+        for (const update of pendingUpdatesRef.current) {
+          result = update(result);
+        }
+        pendingUpdatesRef.current = [];
+        return result;
+      });
+      updateTimeoutRef.current = null;
+    }, 0); // Batch in next tick
   }, []);
 
-  const getCurrentState = useCallback(() => stateRef.current, []);
+  const setImmediateState = useCallback((updater: (prev: T) => T) => {
+    setState(updater);
+  }, []);
 
-  return [state, setOptimizedState, getCurrentState] as const;
+  return {
+    state,
+    setState: setOptimizedState,
+    setImmediateState
+  };
 }
 
-/**
- * Optimized array state hook with common array operations
- */
-export function useOptimizedArray<T>(initialValue: T[] = []) {
-  const [array, setArray, getCurrentArray] = useOptimizedState<T[]>(initialValue);
+// Optimized array hook for handling arrays with deduplication
+export function useOptimizedArray<T>(initialArray: T[] = []) {
+  const { state: array, setState, setImmediateState } = useOptimizedState<T[]>(initialArray);
 
   const addItem = useCallback((item: T) => {
-    setArray(prev => [...prev, item]);
-  }, [setArray]);
+    setState(prev => [...prev, item]);
+  }, [setState]);
 
   const removeItem = useCallback((index: number) => {
-    setArray(prev => prev.filter((_, i) => i !== index));
-  }, [setArray]);
+    setState(prev => prev.filter((_, i) => i !== index));
+  }, [setState]);
 
-  const updateItem = useCallback((index: number, updater: T | ((prev: T) => T)) => {
-    setArray(prev => prev.map((item, i) => 
-      i === index 
-        ? typeof updater === 'function' ? (updater as (prev: T) => T)(item) : updater
-        : item
-    ));
-  }, [setArray]);
+  const updateItem = useCallback((index: number, item: T) => {
+    setState(prev => prev.map((current, i) => i === index ? item : current));
+  }, [setState]);
 
   const clearArray = useCallback(() => {
-    setArray([]);
-  }, [setArray]);
+    setImmediateState(() => []);
+  }, [setImmediateState]);
 
   const replaceArray = useCallback((newArray: T[]) => {
-    setArray(newArray);
-  }, [setArray]);
+    setImmediateState(() => newArray);
+  }, [setImmediateState]);
 
   return {
     array,
-    setArray,
-    getCurrentArray,
     addItem,
     removeItem,
     updateItem,
     clearArray,
-    replaceArray
+    replaceArray,
+    setArray: setState
   };
 }

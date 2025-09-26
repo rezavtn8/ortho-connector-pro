@@ -202,7 +202,7 @@ export function useCachedData<T = any>(options: UseCachedDataOptions) {
 
       return fallbackData;
     }
-  }, [user, cacheKey, fetcher, staleTime, cacheTime, background, tags]);
+  }, [user?.id, cacheKey, staleTime, cacheTime, background]);
 
   const invalidateCache = useCallback(async () => {
     const cache = getCacheInstance();
@@ -213,21 +213,25 @@ export function useCachedData<T = any>(options: UseCachedDataOptions) {
     if (tags.length > 0) {
       await cache.invalidateByTags(tags);
     }
-  }, [cacheKey, tags]);
+  }, [cacheKey]);
 
   const refetch = useCallback(async (force = false) => {
+    if (!user) return null;
+    
     if (force) {
       await invalidateCache();
     }
+    
+    // Call fetchData directly with proper parameters
     return await fetchData(false);
-  }, [fetchData, invalidateCache]);
+  }, [user, invalidateCache, fetchData]);
 
-  // Initial fetch
+  // Initial fetch - only run once when user or cacheKey changes
   useEffect(() => {
     if (user) {
       fetchData(false);
     }
-  }, [user, fetchData]);
+  }, [user?.id, cacheKey]);
 
   // Set up background sync for this data
   useEffect(() => {
@@ -247,7 +251,7 @@ export function useCachedData<T = any>(options: UseCachedDataOptions) {
         // Cleanup if needed
       }
     };
-  }, [user, cacheKey, background, priority, staleTime, tags]);
+  }, [user?.id, cacheKey, background, priority, staleTime]);
 
   // Handle window focus
   useEffect(() => {
