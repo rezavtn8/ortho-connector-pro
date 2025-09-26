@@ -18,110 +18,278 @@ interface AIRequest {
   };
 }
 
-const handler = async (req: Request): Promise<Response> => {
+serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const startTime = Date.now();
-
   try {
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-    if (!OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY is not set');
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('No authorization header');
     }
 
-    const supabase = createClient(
+    const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
+          headers: { Authorization: authHeader },
         },
       }
     );
 
-    // Get user session
-    const authHeader = req.headers.get('Authorization')!;
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user } } = await supabase.auth.getUser(token);
-
-    if (!user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
+    // Get current user
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    if (userError || !user) {
+      throw new Error('Authentication failed');
     }
 
-    const { task_type, context, prompt, parameters }: AIRequest = await req.json();
+    console.log(`AI Assistant request for user: ${user.id}`);
 
-    // Get business context for user - auto-build if missing
-    let { data: businessProfile } = await supabase
-      .from('ai_business_profiles')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
+    const { task_type, context, prompt, parameters } = await req.json();
+    
+    if (!task_type) {
+      throw new Error('task_type is required');
+    }
 
-    if (!businessProfile) {
-      console.log('No business profile found, auto-building from available data...');
+    console.log('AI Request:', {
+      task_type: task_type,
+      user_id: user.id
+    });
+
+    const startTime = Date.now();
+
+    // For comprehensive analysis, fetch fresh data
+    if (task_type === 'comprehensive_analysis') {
+      console.log('Fetching comprehensive practice data...');
       
-      // Auto-build business profile from available data
-      const { data: userProfile } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
+      // Fetch all relevant data in parallel
+      const [
+        sourcesResult,
+        monthlyResult, 
+        visitsResult,
+        campaignsResult,
+        deliveriesResult,
+        discoveredResult,
+        reviewsResult,
+        userProfileResult,
+        clinicResult
+      ] = await Promise.all([
+        supabaseClient.from('patient_sources').select('*').eq('created_by', user.id),
+        supabaseClient.from('monthly_patients').select('*').eq('user_id', user.id),
+        supabaseClient.from('marketing_visits').select('*').eq('user_id', user.id),
+        supabaseClient.from('campaigns').select('*').eq('created_by', user.id),
+        supabaseClient.from('campaign_deliveries').select('*').eq('created_by', user.id),
+        supabaseClient.from('discovered_offices').select('*').eq('discovered_by', user.id),
+        supabaseClient.from('review_status').select('*').eq('user_id', user.id),
+        supabaseClient.from('user_profiles').select('*').eq('user_id', user.id).single(),
+        supabaseClient.from('clinics').select('*').eq('owner_id', user.id).maybeSingle()
+      ]);
 
-      const { data: clinic } = await supabase
-        .from('clinics')
-        .select('*')
-        .eq('owner_id', user.id)
-        .maybeSingle();
+      // Extract data with error handling
+      const sources = sourcesResult.data || [];
+      const monthlyData = monthlyResult.data || [];
+      const visits = visitsResult.data || [];
+      const campaigns = campaignsResult.data || [];
+      const deliveries = deliveriesResult.data || [];
+      const discoveredOffices = discoveredResult.data || [];
+      const reviews = reviewsResult.data || [];
+      const userProfile = userProfileResult.data;
+      const clinic = clinicResult.data;
 
-      // Create a basic business profile
-      const autoProfile = {
-        user_id: user.id,
-        business_persona: {
-          practice_name: clinic?.name || userProfile?.clinic_name || 'Healthcare Practice',
-          owner_name: `${userProfile?.first_name || ''} ${userProfile?.last_name || ''}`.trim() || 'Doctor',
-          owner_title: userProfile?.job_title || 'Healthcare Professional',
-          degrees: userProfile?.degrees || 'DDS',
-          location: clinic?.address || 'Healthcare Location'
+      console.log(`Data fetched: ${sources.length} sources, ${monthlyData.length} monthly records, ${visits.length} visits, ${campaigns.length} campaigns`);
+
+      // Calculate analytics
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      // Compute real analytics from data
+      const totalReferrals = monthlyData.reduce((sum, m) => sum + (m.patient_count || 0), 0);
+      const activeSources = monthlyData.filter(m => 
+        m.year_month === currentMonth && m.patient_count > 0
+      ).length;
+      
+      const sourceTypes = sources.reduce((acc, s) => {
+        acc[s.source_type] = (acc[s.source_type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      const recentVisits = visits.filter(v => {
+        const visitDate = new Date(v.visit_date);
+        return visitDate >= thirtyDaysAgo;
+      }).length;
+
+      const last6MonthsTrend = monthlyData.filter(m => {
+        const monthDate = new Date(m.year_month + '-01');
+        return monthDate >= sixMonthsAgo;
+      });
+
+      const activeCampaigns = campaigns.filter(c => c.status === 'Active').length;
+      const campaignSuccessRate = deliveries.length > 0 ? 
+        Math.round((deliveries.filter(d => d.delivery_status === 'Completed').length / deliveries.length) * 100) : 0;
+
+      // Build comprehensive context for AI
+      const comprehensiveContext = {
+        practice_info: {
+          name: userProfile?.clinic_name || clinic?.name || 'Practice',
+          owner: userProfile?.full_name || userProfile?.first_name || 'Owner'
         },
-        communication_style: 'professional',
-        brand_voice: {
-          tone: 'professional',
-          values: ['patient care', 'excellence', 'trust']
+        analytics: {
+          total_sources: sources.length,
+          total_referrals: totalReferrals,
+          active_sources_this_month: activeSources,
+          source_types_distribution: sourceTypes,
+          recent_visits: recentVisits,
+          last_6_months_trend: last6MonthsTrend,
+          discovered_offices_count: discoveredOffices.length,
+          imported_offices: discoveredOffices.filter(d => d.imported).length,
+          pending_reviews: reviews.filter(r => r.needs_attention).length,
+          campaign_delivery_success_rate: campaignSuccessRate,
+          active_campaigns: activeCampaigns
+        },
+        detailed_data: {
+          sources: sources.slice(0, 10), // Sample for context
+          monthly_summary: last6MonthsTrend.slice(0, 12),
+          recent_visits: visits.slice(0, 5),
+          campaigns: campaigns.slice(0, 5)
         }
       };
 
-      // Insert the auto-built profile
-      const { data: newProfile } = await supabase
-        .from('ai_business_profiles')
-        .insert(autoProfile)
-        .select()
-        .single();
-
-      businessProfile = newProfile || autoProfile;
-      console.log('Auto-built business profile:', businessProfile);
+      // Update context with comprehensive data
+      context.unified_data = comprehensiveContext;
     }
 
-    // Build system prompt based on business context
-    const systemPrompt = buildSystemPrompt(businessProfile, task_type);
+    // Generate appropriate system prompt
+    const systemPrompt = generateSystemPrompt(task_type, context.unified_data?.practice_info);
+    const userPrompt = generateUserPrompt(task_type, context, prompt, parameters);
     
-    // Build user prompt based on task type
-    const userPrompt = buildUserPrompt(task_type, context, prompt, parameters);
-
-    console.log('AI Request:', { task_type, user_id: user.id });
     console.log('System Prompt:', systemPrompt);
-    console.log('User Prompt:', userPrompt);
+    console.log('User Prompt:', userPrompt.slice(0, 500));
 
-    // Make OpenAI API call (primary: gpt-4.1-2025-04-14)
-    let modelUsed = 'gpt-4.1-2025-04-14';
-    let generatedContent = '';
-    let tokensUsed = 0;
+    // Call OpenAI API
+    const { content: generatedContent, tokensUsed, modelUsed } = await callOpenAI([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt }
+    ]);
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const estimatedCost = calculateCost(tokensUsed, modelUsed);
+
+    // Track usage (with error handling for database issues)
+    try {
+      await supabaseClient
+        .from('ai_usage_tracking')
+        .insert({
+          user_id: user.id,
+          task_type,
+          tokens_used: tokensUsed,
+          estimated_cost: estimatedCost,
+          execution_time_ms: Date.now() - startTime,
+          model_used: modelUsed,
+          request_data: { task_type, context, prompt, parameters },
+          response_data: { content: generatedContent },
+          success: true,
+        });
+    } catch (trackingError) {
+      console.warn('Failed to track AI usage:', trackingError);
+      // Continue without tracking
+    }
+
+    // Store generated content (with error handling)
+    try {
+      await supabaseClient
+        .from('ai_generated_content')
+        .insert({
+          user_id: user.id,
+          content_type: task_type,
+          reference_id: context.reference_id || null,
+          generated_text: generatedContent,
+          metadata: {
+            model_used: modelUsed,
+            tokens_used: tokensUsed,
+            execution_time_ms: Date.now() - startTime,
+            analytics_summary: context.unified_data?.analytics
+          },
+          status: 'generated'
+        });
+    } catch (storageError) {
+      console.warn('Failed to store generated content:', storageError);
+      // Continue without storage
+    }
+
+    console.log('AI response generated successfully');
+
+    return new Response(JSON.stringify({
+      content: generatedContent,
+      usage: {
+        tokens_used: tokensUsed,
+        estimated_cost: estimatedCost,
+        execution_time_ms: Date.now() - startTime
+      }
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
+  } catch (error) {
+    console.error('Error in AI assistant function:', error);
+    return new Response(
+      JSON.stringify({ 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        details: 'Failed to process AI request'
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  }
+});
+
+// OpenAI API call function
+async function callOpenAI(messages: any[]): Promise<{ content: string; tokensUsed: number; modelUsed: string }> {
+  const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+  if (!OPENAI_API_KEY) {
+    throw new Error('OpenAI API key not configured');
+  }
+
+  let generatedContent = '';
+  let tokensUsed = 0;
+  let modelUsed = 'gpt-4.1-2025-04-14';
+
+  // Primary model call (GPT-4.1)
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${OPENAI_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: modelUsed,
+      messages: messages,
+      max_completion_tokens: 1500,
+    }),
+  });
+
+  console.log('OpenAI Response Status:', response.status);
+
+  if (response.ok) {
+    const data = await response.json();
+    generatedContent = (data.choices?.[0]?.message?.content || '').toString();
+    tokensUsed = data.usage?.total_tokens || 0;
+    console.log('Generated Content (primary gpt-4.1):', generatedContent?.slice(0, 200));
+  } else {
+    const errorData = await response.json().catch(() => ({}));
+    console.error('OpenAI API Error (primary):', errorData);
+  }
+
+  // Fallback: if primary failed or returned empty, retry with legacy gpt-4o-mini
+  if (!generatedContent || !generatedContent.trim()) {
+    console.warn('Primary model empty/failed, retrying with gpt-4o-mini');
+    modelUsed = 'gpt-4o-mini';
+    const response2 = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${OPENAI_API_KEY}`,
@@ -129,224 +297,71 @@ const handler = async (req: Request): Promise<Response> => {
       },
       body: JSON.stringify({
         model: modelUsed,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        // gpt-4.1+ uses max_completion_tokens and does not support temperature
-        max_completion_tokens: 1200,
+        messages: messages,
+        max_tokens: 800,
+        temperature: 0.7,
       }),
     });
 
-    console.log('OpenAI Response Status:', response.status);
-
-    if (response.ok) {
-      const data = await response.json();
-      generatedContent = (data.choices?.[0]?.message?.content || '').toString();
-      tokensUsed = data.usage?.total_tokens || 0;
-      console.log('Generated Content (primary gpt-4.1):', generatedContent?.slice(0, 200));
-    } else {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('OpenAI API Error (primary):', errorData);
+    console.log('Fallback OpenAI Response Status:', response2.status);
+    if (!response2.ok) {
+      const errorData2 = await response2.json().catch(() => ({}));
+      console.error('Fallback OpenAI API Error:', errorData2);
+      throw new Error(`OpenAI API error (fallback)`);
     }
 
-    // Fallback: if primary failed or returned empty, retry with legacy gpt-4o-mini (supports temperature/max_tokens)
-    if (!generatedContent || !generatedContent.trim()) {
-      console.warn('Primary model empty/failed, retrying with gpt-4o-mini');
-      modelUsed = 'gpt-4o-mini';
-      const response2 = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: modelUsed,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
-          ],
-          max_tokens: 800,
-          temperature: 0.7,
-        }),
-      });
-
-      console.log('Fallback OpenAI Response Status:', response2.status);
-      if (!response2.ok) {
-        const errorData2 = await response2.json().catch(() => ({}));
-        console.error('Fallback OpenAI API Error:', errorData2);
-        throw new Error(`OpenAI API error (fallback)`);
-      }
-
-      const data2 = await response2.json();
-      generatedContent = (data2.choices?.[0]?.message?.content || '').toString();
-      console.log('Generated Content (fallback gpt-4o-mini):', generatedContent?.slice(0, 200));
-      tokensUsed += data2.usage?.total_tokens || 0;
-    }
-
-    const estimatedCost = calculateCost(tokensUsed, modelUsed);
-
-    // Track usage
-    await supabase
-      .from('ai_usage_tracking')
-      .insert({
-        user_id: user.id,
-        task_type,
-        tokens_used: tokensUsed,
-        estimated_cost: estimatedCost,
-        execution_time_ms: Date.now() - startTime,
-        model_used: modelUsed,
-        request_data: { task_type, context, prompt, parameters },
-        response_data: { content: generatedContent },
-        success: true,
-      });
-
-    // Store generated content
-    const { data: contentRecord } = await supabase
-      .from('ai_generated_content')
-      .insert({
-        user_id: user.id,
-        content_type: task_type,
-        reference_id: context.reference_id || null,
-        generated_text: generatedContent,
-        status: 'generated',
-        metadata: { parameters, context },
-      })
-      .select()
-      .single();
-
-    return new Response(JSON.stringify({
-      content: generatedContent,
-      content_id: contentRecord?.id,
-      usage: {
-        tokens_used: tokensUsed,
-        estimated_cost: estimatedCost,
-        execution_time_ms: Date.now() - startTime,
-      }
-    }), {
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
-    });
-
-  } catch (error: any) {
-    console.error('Error in ai-assistant:', error);
-
-    // Track failed usage
-    try {
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-        {
-          global: {
-            headers: { Authorization: req.headers.get('Authorization')! },
-          },
-        }
-      );
-
-      const authHeader = req.headers.get('Authorization')!;
-      const token = authHeader.replace('Bearer ', '');
-      const { data: { user } } = await supabase.auth.getUser(token);
-
-      if (user) {
-        await supabase
-          .from('ai_usage_tracking')
-          .insert({
-            user_id: user.id,
-            task_type: 'unknown',
-            tokens_used: 0,
-            estimated_cost: 0,
-            execution_time_ms: Date.now() - startTime,
-            success: false,
-            error_message: error.message,
-          });
-      }
-    } catch (trackingError) {
-      console.error('Error tracking failed usage:', trackingError);
-    }
-
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
-    });
+    const data2 = await response2.json();
+    generatedContent = (data2.choices?.[0]?.message?.content || '').toString();
+    console.log('Generated Content (fallback gpt-4o-mini):', generatedContent?.slice(0, 200));
+    tokensUsed += data2.usage?.total_tokens || 0;
   }
-};
 
-function buildSystemPrompt(businessProfile: any, taskType: string): string {
-  const { business_persona, communication_style, brand_voice } = businessProfile;
-  
-  let basePrompt = `You are an AI assistant for ${business_persona.practice_name}, a healthcare practice owned by ${business_persona.owner_name}.
+  return { content: generatedContent, tokensUsed, modelUsed };
+}
 
-BUSINESS CONTEXT:
-- Practice: ${business_persona.practice_name}
-- Owner: ${business_persona.owner_name} (${business_persona.owner_title})
-- Location: ${business_persona.location}
-- Communication Style: ${communication_style}
-- Brand Voice: ${brand_voice.tone}
-- Values: ${brand_voice.values.join(', ')}
+// Calculate estimated cost
+function calculateCost(tokens: number, model: string): number {
+  const rates = {
+    'gpt-4.1-2025-04-14': 0.01,
+    'gpt-4o-mini': 0.002,
+    'gpt-4o': 0.03
+  };
+  return (tokens / 1000) * (rates[model as keyof typeof rates] || 0.01);
+}
 
-IMPORTANT: Always maintain a ${brand_voice.tone} tone that reflects the practice's professional standards and values.`;
+function generateSystemPrompt(taskType: string, practiceInfo: any): string {
+  const practiceName = practiceInfo?.name || 'Healthcare Practice';
+  const ownerName = practiceInfo?.owner || 'Practice Owner';
 
-  switch (taskType) {
+  switch(taskType) {
     case 'email_generation':
-      return `You are a GPT-powered assistant writing **formal, professional, and personalized emails** for ${business_persona.practice_name}'s Partnering Offices platform.
+      return `You are a professional healthcare marketing assistant specialized in creating effective referral relationship emails.
 
-You are given live referral data and relationship metadata for a dental or medical office that has referred patients to our practice (e.g. an endodontic or surgical center).
-
-### OBJECTIVE
-Generate an editable email draft addressed to the office owner, tailored to their actual referral activity. This email will be sent by the owner of the specialty clinic. It should:
-
-- Match the appropriate tone based on the **RelationshipScore**
-- Use referral data thoughtfully (don't be robotic or over-numeric)
-- Highlight the owner's name and role (e.g., Dr. John Smith, General Dentist)
-- Mention the business name (both in opening and end)
-- End with: "Respectfully," followed by our sender's info
-- Leave a bit of room for manual additions
-
-### STRUCTURE
-1. **Greeting** (e.g., "Dear Dr. Smith,")
-2. **Intro Paragraph** – Varies based on their relationship score:
-   - VIP → Express deep appreciation and reinforce collaboration
-   - Warm → Thank them sincerely, offer support, ask if they need anything
-   - Sporadic → Mention recent activity and invite feedback
-   - Cold → Reintroduce our clinic, remind them of how we can help their patients
-3. **Referral Data Summary** – Gently reference:
-   - Number of referrals in the past year (rounded / described naturally)
-   - Treatment types (e.g., root canals, implants, trauma cases)
-   - Timing of most recent referral (e.g., "a few months ago," "earlier this year")
-4. **Call to Action** – One of:
-   - Invite feedback
-   - Ask if they'd like updated referral forms or CE events
-   - Invite them to reach out with any patient needs
-5. **Closing** – Always end with gratitude and mention the business name again
-
-### REQUIREMENTS
-- Never include degrees at the **start of the name**. Instead: "Dr. John Smith, DDS – General Dentist"
-- Include both contact person's name/role and business name in the first and last part of the email
-- Tone must be official, warm, and tailored to the situation. Slight variation between outputs is encouraged
-- If referral count is very low, avoid shame. Gently offer support or reconnection
-- Include {{ExtraNotes}} as an optional add-on at the end (if any)
-
-### SIGNATURE FORMAT:
-Respectfully,  
-${business_persona.owner_name}, ${business_persona.degrees}
-${business_persona.owner_title}
-${business_persona.practice_name}`;
-
-    case 'review_response':
-      return basePrompt + `
-
-TASK: Generate professional responses to Google reviews.
+TASK: Generate professional, personalized emails for dental/medical referral relationship building.
 
 REQUIREMENTS:
-1. Thank the reviewer by name if provided
-2. Acknowledge their specific feedback
-3. Maintain professional healthcare standards
-4. Show appreciation for their trust
-5. Keep responses concise and genuine
-6. Never include personal health information
-7. Redirect complex issues to private communication`;
+1. Professional medical/dental tone
+2. Focus on patient care and clinical excellence
+3. Include clear value propositions
+4. Personalize based on recipient office details
+5. Include appropriate calls to action
+6. Maintain HIPAA-appropriate language`;
+
+    case 'review_response':
+      return `You are a professional healthcare communication specialist focused on patient review responses.
+
+TASK: Generate thoughtful, professional responses to patient reviews.
+
+REQUIREMENTS:
+1. Professional and empathetic tone
+2. Address specific concerns mentioned in reviews
+3. Thank patients for feedback
+4. Maintain patient confidentiality (no specific details)
+5. Demonstrate commitment to quality care
+6. Invite further discussion when appropriate`;
 
     case 'content_creation':
-      return basePrompt + `
+      return `You are a healthcare marketing content specialist.
 
 TASK: Create marketing and communication content.
 
@@ -361,166 +376,99 @@ REQUIREMENTS:
     case 'business_intelligence':
       return `You are a business intelligence AI analyst specializing in healthcare practice management and referral analytics.
 
-TASK: Analyze comprehensive practice data and provide actionable business insights.
+TASK: Analyze comprehensive practice data and provide actionable business insights for ${practiceName}.
 
 ANALYSIS REQUIREMENTS:
 1. Provide exactly 4-6 distinct insights as separate paragraphs
 2. Each insight should start with a **bold summary** followed by detailed analysis
-3. Focus on different aspects: distribution, trends, risks, opportunities, recommendations
+3. Focus on different aspects: referral patterns, marketing effectiveness, growth opportunities, operational efficiency
 4. Use specific data points and percentages when available
 5. Be concise but actionable - avoid generic advice
-6. Prioritize insights by business impact
+6. Prioritize insights by business impact and revenue potential
 
 FORMAT REQUIREMENTS:
 - Start each insight with **Bold Title:** then analysis
 - Use natural paragraph breaks between insights
 - Include specific numbers and trends where relevant
-- End each insight with a clear recommendation
+- End each insight with a clear, actionable recommendation
+- Focus on realistic, implementable solutions
 
 BUSINESS CONTEXT:
-- Practice: ${business_persona?.practice_name || 'Healthcare Practice'}
-- Owner: ${business_persona?.owner_name || 'Healthcare Professional'}
-- Focus on referral source management and practice growth`;
-
-    case 'structured_report':
-      return `You are a business intelligence AI analyst creating structured reports for healthcare practices.
-
-TASK: Generate a comprehensive business intelligence report with six specific sections.
-
-REPORT STRUCTURE REQUIREMENTS:
-You must provide content for exactly these 6 sections in JSON format:
-
-{
-  "source_distribution": {
-    "summary": "1-2 sentence overview",
-    "priority": "high|medium|low",
-    "full_analysis": "detailed analysis with data points"
-  },
-  "performance_trends": {
-    "summary": "1-2 sentence overview", 
-    "priority": "high|medium|low",
-    "full_analysis": "detailed analysis with trends"
-  },
-  "geographic_distribution": {
-    "summary": "1-2 sentence overview",
-    "priority": "high|medium|low", 
-    "full_analysis": "detailed geographic insights"
-  },
-  "source_quality": {
-    "summary": "1-2 sentence overview",
-    "priority": "high|medium|low",
-    "full_analysis": "reliability and quality assessment"
-  },
-  "strategic_recommendations": {
-    "summary": "1-2 sentence overview",
-    "priority": "high|medium|low",
-    "full_analysis": "actionable strategic recommendations"
-  },
-  "emerging_patterns": {
-    "summary": "1-2 sentence overview", 
-    "priority": "high|medium|low",
-    "full_analysis": "new trends and patterns identified"
-  }
-}
-
-CONTENT REQUIREMENTS:
-- Summary: 1-2 concise sentences highlighting key finding
-- Priority: Based on business impact (high/medium/low)
-- Full Analysis: 3-4 sentences with specific data points and actionable insights
-- Use real data from the practice when available
-- Be specific and avoid generic recommendations
-
-BUSINESS CONTEXT:
-- Practice: ${business_persona?.practice_name || 'Healthcare Practice'}
-- Owner: ${business_persona?.owner_name || 'Healthcare Professional'}
-- Focus: Data-driven insights for referral source optimization`;
-
-    case 'practice_consultation':
-      return `You are an AI practice management consultant specializing in healthcare referral optimization.
-
-CONSULTATION GUIDELINES:
-- Provide concise, actionable advice in exactly 2-3 paragraphs
-- First paragraph: Direct answer to the question with key insight
-- Second paragraph: Supporting data analysis and context
-- Third paragraph (if needed): Specific actionable recommendations
-- Use real practice data whenever possible
-- Be conversational but professional
-- Focus on practical, implementable solutions
-
-RESPONSE LENGTH REQUIREMENT:
-- Maximum 3 paragraphs
-- Each paragraph 3-5 sentences
-- Total response under 300 words
-- Prioritize actionable insights over lengthy explanations
-
-BUSINESS CONTEXT:
-- Practice: ${business_persona?.practice_name || 'Healthcare Practice'}
-- Owner: ${business_persona?.owner_name || 'Healthcare Professional'}
-- Communication Style: ${communication_style || 'professional'}
-- Focus: Practical advice based on real practice data and performance metrics`;
+- Practice: ${practiceName}
+- Owner: ${ownerName}
+- Specialty: Endodontics (root canal treatments and related procedures)
+- Focus: Referral source management, practice growth, and operational efficiency`;
 
     case 'quick_consultation':
-      return `You are a quick AI assistant for healthcare practice insights.
+      return `You are a healthcare practice management consultant providing quick, actionable advice for ${practiceName}.
 
-QUICK RESPONSE GUIDELINES:
-- Keep responses under 150 words maximum
-- Be direct and actionable
-- Provide specific, data-driven insights
-- Skip lengthy explanations
-- Focus on immediate actionable advice
+TASK: Provide immediate, practical recommendations for practice improvement.
 
-BUSINESS CONTEXT:
-- Practice: ${business_persona?.practice_name || 'Healthcare Practice'}
-- Owner: ${business_persona?.owner_name || 'Healthcare Professional'}
-- Style: Quick, professional, data-focused responses`;
+REQUIREMENTS:
+1. Be direct and actionable
+2. Focus on immediate impact solutions
+3. Consider resource constraints
+4. Provide 2-3 specific next steps
+5. Keep responses concise but comprehensive`;
 
     default:
-      return basePrompt + `
+      return `You are a professional healthcare assistant helping ${practiceName} with practice management and communication.
 
-TASK: Provide professional assistance with healthcare practice communications.`;
+TASK: Provide helpful, professional assistance based on the request.
+
+REQUIREMENTS:
+1. Maintain professional healthcare standards
+2. Focus on practical, actionable advice
+3. Consider patient care impact
+4. Use appropriate medical/dental terminology
+5. Provide clear, structured responses`;
   }
 }
 
-function buildUserPrompt(taskType: string, context: any, prompt?: string, parameters?: any): string {
-  switch (taskType) {
+function generateUserPrompt(taskType: string, context: any, prompt: string, parameters: any): string {
+  switch(taskType) {
     case 'email_generation':
-      return `Generate a professional referral relationship email using this structured data:
+      return `Generate an email based on this context:
 
-OfficeName: ${context.office_name}
-OwnerName: ${context.owner_name || context.extracted_owner_name || 'Dr. [Owner]'}
-OwnerRole: ${context.owner_role || context.office_type || 'Healthcare Professional'}
-OwnerDegrees: ${context.owner_degrees || 'DDS'}
-ReferralCountPast12Months: ${context.recent_referrals_6months || 0}
-ReferralFrequency: ${context.referral_frequency || (context.average_monthly_referrals > 2 ? 'High' : context.average_monthly_referrals > 1 ? 'Moderate' : 'Low')}
-TreatmentTypesReferred: ${context.treatment_types || 'various dental procedures'}
-LastReferralDate: ${context.last_referral_month ? new Date(context.last_referral_month + '-01').toLocaleDateString() : 'N/A'}
-RelationshipScore: ${context.relationship_strength === 'VIP Partner' ? 'VIP' : 
-                   context.relationship_strength === 'Strong Partner' ? 'Warm' :
-                   context.relationship_strength === 'Active Partner' ? 'Warm' :
-                   context.relationship_strength === 'Growing Partner' ? 'Sporadic' : 'Cold'}
-ExtraNotes: ${context.office_notes || context.additional_info || ''}
+OFFICE DETAILS:
+${JSON.stringify(context.office_details || {}, null, 2)}
 
-Generate the email following the established structure and requirements. Return ONLY the email content, no JSON wrapper.
+CAMPAIGN DETAILS:
+${JSON.stringify(context.campaign_details || {}, null, 2)}
 
-${prompt || ''}`;
+PERSONALIZATION:
+${JSON.stringify(context.personalization || {}, null, 2)}
+
+PARAMETERS:
+- Length: ${parameters?.length || 'medium'}
+- Style: ${parameters?.style || 'professional'}
+- Tone: ${parameters?.tone || 'professional'}
+
+SPECIFIC REQUEST: ${prompt || 'Create an effective referral relationship email.'}`;
 
     case 'review_response':
-      return `Generate a professional response to this Google review:
+      return `Generate a response to this review:
 
 REVIEW DETAILS:
-- Reviewer: ${context.reviewer_name}
-- Rating: ${context.rating}/5 stars
-- Review Text: "${context.review_text}"
-- Review Date: ${context.review_date}
+${JSON.stringify(context.review_details || {}, null, 2)}
 
-RESPONSE STYLE: ${parameters?.tone || 'professional and appreciative'}
+RESPONSE GUIDELINES:
+${JSON.stringify(context.response_guidelines || {}, null, 2)}
 
-${prompt || 'Generate an appropriate response to this review.'}`;
+PARAMETERS:
+- Length: ${parameters?.length || 'medium'}
+- Style: ${parameters?.style || 'professional'}
+- Tone: ${parameters?.tone || 'empathetic'}
+
+SPECIFIC REQUEST: ${prompt || 'Create a thoughtful, professional response to this review.'}`;
 
     case 'content_creation':
-      return `Create content for: ${context.content_type}
+      return `Create content based on this context:
 
-CONTEXT:
+CONTENT TYPE: ${context.content_type || 'general'}
+TARGET AUDIENCE: ${context.target_audience || 'healthcare professionals'}
+
+CONTENT CONTEXT:
 ${JSON.stringify(context, null, 2)}
 
 PARAMETERS:
@@ -532,44 +480,63 @@ PROMPT: ${prompt || 'Create appropriate content based on the context provided.'}
 
     case 'comprehensive_analysis':
     case 'business_intelligence':
-      // Get the unified data from context
       const unifiedData = context.unified_data || {};
       const analytics = unifiedData.analytics || {};
+      const detailedData = unifiedData.detailed_data || {};
       
       return `Analyze this comprehensive practice data and provide 4-6 actionable business insights:
 
-PRACTICE DATA SUMMARY:
+PRACTICE OVERVIEW:
+Practice: ${unifiedData.practice_info?.name || 'Endodontic Practice'}
+Owner: ${unifiedData.practice_info?.owner || 'Practice Owner'}
+Analysis Date: ${new Date().toLocaleDateString()}
+
+REFERRAL SOURCE ANALYSIS:
 - Total Referral Sources: ${analytics.total_sources || 0}
 - Total Referrals (All Time): ${analytics.total_referrals || 0}
-- Active Recent Sources: ${analytics.active_sources_this_month || 0}
+- Active Sources This Month: ${analytics.active_sources_this_month || 0}
 - Source Type Distribution: ${JSON.stringify(analytics.source_types_distribution || {})}
 
-MONTHLY TRENDS:
+MONTHLY PERFORMANCE TRENDS:
 ${analytics.last_6_months_trend && analytics.last_6_months_trend.length > 0 
-  ? analytics.last_6_months_trend.map((m: any) => `${m.year_month}: ${m.patient_count} patients`).join('\n')
-  : 'No recent data available'
+  ? analytics.last_6_months_trend
+    .sort((a: any, b: any) => b.year_month.localeCompare(a.year_month))
+    .slice(0, 6)
+    .map((m: any) => `- ${m.year_month}: ${m.patient_count || 0} patients from source`)
+    .join('\n')
+  : '- No recent monthly data available'
 }
 
-MARKETING VISITS DATA:
-- Total Visits Tracked: ${unifiedData.visits?.length || 0}
-- Recent Visit Activity: ${analytics.recent_visits || 0}
+MARKETING & OUTREACH STATUS:
+- Total Marketing Visits Tracked: ${detailedData.recent_visits?.length || 0}
+- Recent Visit Activity (30 days): ${analytics.recent_visits || 0}
+- Active Campaigns: ${analytics.active_campaigns || 0}
+- Campaign Delivery Success Rate: ${analytics.campaign_delivery_success_rate || 0}%
 
-CAMPAIGN PERFORMANCE:
-- Active Campaigns: ${unifiedData.campaigns?.filter((c: any) => c.status === 'Active').length || 0}
-- Campaign Success Rate: ${analytics.campaign_delivery_success_rate || 0}%
+GROWTH OPPORTUNITIES:
+- Discovered Potential Offices: ${analytics.discovered_offices_count || 0}
+- Imported/Contacted Offices: ${analytics.imported_offices || 0}
+- Reviews Needing Attention: ${analytics.pending_reviews || 0}
 
-BUSINESS OPPORTUNITIES:
-- Discovered Offices: ${analytics.discovered_offices_count || 0}
-- Imported Offices: ${analytics.imported_offices || 0}
-- Pending Reviews: ${analytics.pending_reviews || 0}
+TOP PERFORMING SOURCES (Sample):
+${detailedData.sources && detailedData.sources.length > 0
+  ? detailedData.sources.slice(0, 5).map((s: any) => 
+    `- ${s.name} (${s.source_type}): ${s.is_active ? 'Active' : 'Inactive'} | Rating: ${s.google_rating || 'N/A'}`
+  ).join('\n')
+  : '- No detailed source data available'
+}
 
-AI USAGE METRICS:
-- AI Usage Last 30 Days: ${analytics.ai_usage_last_30_days || 0}
+ANALYSIS INSTRUCTIONS:
+1. Identify critical patterns in referral source performance and distribution
+2. Highlight gaps in marketing outreach and campaign execution  
+3. Assess concentration risk and diversification opportunities
+4. Provide specific, actionable recommendations with clear next steps
+5. Focus on revenue-generating activities and relationship building
+6. Consider both short-term wins and long-term strategic growth
 
-ANALYSIS INSTRUCTION:
-${prompt || `Analyze referral source distribution, performance trends, geographic patterns, and provide specific actionable recommendations. Focus on concentration risk, growth opportunities, and operational improvements.`}
+${prompt || 'Provide comprehensive analysis focusing on practice growth, referral optimization, and marketing effectiveness.'}
 
-RETURN FORMAT: Return only the JSON structure specified in the system prompt.`;
+IMPORTANT: Return insights in clear, professional paragraphs with bold titles and specific recommendations.`;
 
     case 'structured_report':
       return `Generate a structured business intelligence report analyzing this practice data:
@@ -595,97 +562,50 @@ ${context.analysis_data.last_6_months.map((m: any) =>
 
 ${context.analysis_data?.visits?.length ? `
 Marketing Activity:
-- Total Visits: ${context.analysis_data.visits.length}
-- Completed: ${context.analysis_data.visits.filter((v: any) => v.visited).length}
-- Success Rate: ${Math.round((context.analysis_data.visits.filter((v: any) => v.visited).length / context.analysis_data.visits.length) * 100)}%` : 'No visits data'}
+${context.analysis_data.visits.slice(0, 3).map((v: any) => 
+  `- ${v.visit_date}: ${v.rep_name} visited (${v.visit_type})`
+).join('\n')}` : 'No marketing visits data'}
 
-INSTRUCTION: Generate the exact JSON structure for all 6 sections as specified. Use real data from above to create specific, actionable insights.
+REPORT REQUIREMENTS:
+1. Executive Summary
+2. Key Performance Indicators
+3. Trend Analysis
+4. Risk Assessment
+5. Strategic Recommendations
+6. Implementation Priorities
 
-${prompt || ''}`;
+PROMPT: ${prompt || 'Generate a comprehensive structured report with actionable insights.'}`;
 
     case 'practice_consultation':
-      return `You are answering this question about the practice: "${prompt}"
+      return `Provide comprehensive practice consultation based on this data:
 
-COMPREHENSIVE PRACTICE DATA AVAILABLE:
+CONSULTATION CONTEXT:
+${JSON.stringify(context, null, 2)}
 
-REFERRAL SOURCES (${context.practice_data?.sources?.length || 0} total):
-${context.practice_data?.sources?.slice(0, 10).map((s: any) => 
-  `- ${s.name} (${s.source_type}): ${s.is_active ? 'Active' : 'Inactive'}, Location: ${s.address || 'N/A'}${s.latitude && s.longitude ? `, Coordinates: ${s.latitude}, ${s.longitude}` : ''}`
-).join('\n') || 'No sources data'}
+CONSULTATION FOCUS AREAS:
+1. Referral Source Management
+2. Marketing Strategy Optimization
+3. Operational Efficiency
+4. Growth Opportunities
+5. Risk Mitigation
 
-MONTHLY PERFORMANCE:
-${context.practice_data?.monthly_data?.slice(0, 12).map((m: any) => 
-  `${m.year_month}: ${m.patient_count || 0} referrals from ${m.source_id ? 'tracked source' : 'unknown'}`
-).join('\n') || 'No monthly data'}
+SPECIFIC QUESTION/CONCERN: ${prompt || 'Provide general practice improvement recommendations.'}
 
-MARKETING VISITS (${context.practice_data?.visits?.length || 0} total):
-${context.practice_data?.visits?.slice(0, 8).map((v: any) => 
-  `- ${new Date(v.visit_date).toLocaleDateString()}: ${v.visited ? 'Completed' : 'Planned'} visit, Rating: ${v.star_rating || 'N/A'}`
-).join('\n') || 'No visit data'}
+Please provide detailed, actionable advice with specific next steps.`;
 
-CAMPAIGNS (${context.practice_data?.campaigns?.length || 0} total):
-${context.practice_data?.campaigns?.slice(0, 5).map((c: any) => 
-  `- "${c.name}" (${c.status}): ${c.campaign_type} campaign, ${c.delivery_method}`
-).join('\n') || 'No campaign data'}
+    case 'quick_consultation':
+      return `Quick consultation request:
 
-DISCOVERED OFFICES (${context.practice_data?.discovered_offices?.length || 0} total):
-${context.practice_data?.discovered_offices?.slice(0, 5).map((d: any) => 
-  `- ${d.name}: ${d.office_type}, Rating: ${d.rating || 'N/A'}, ${d.imported ? 'Imported' : 'Not imported'}`
-).join('\n') || 'No discovered offices'}
+CONTEXT: ${JSON.stringify(context, null, 2)}
 
-REVIEWS (${context.practice_data?.reviews?.length || 0} total):
-${context.practice_data?.reviews?.slice(0, 5).map((r: any) => 
-  `- ${r.status} review, Attention needed: ${r.needs_attention ? 'Yes' : 'No'}`
-).join('\n') || 'No review data'}
+QUESTION: ${prompt || 'Provide quick practice improvement advice.'}
 
-ANALYTICS SUMMARY:
-- Total Active Sources: ${context.practice_data?.analytics?.total_sources || 0}
-- Total Referrals: ${context.practice_data?.analytics?.total_referrals || 0}
-- Sources Active This Month: ${context.practice_data?.analytics?.active_sources_this_month || 0}
-- Recent Marketing Visits: ${context.practice_data?.analytics?.recent_visits || 0}
-- Source Distribution: ${JSON.stringify(context.practice_data?.analytics?.source_types_distribution || {})}
-
-USER PROFILE:
-${context.practice_data?.user_profile ? `
-- Name: ${context.practice_data.user_profile.first_name} ${context.practice_data.user_profile.last_name}
-- Role: ${context.practice_data.user_profile.role}
-- Clinic: ${context.practice_data.user_profile.clinic_name || 'N/A'}` : 'Profile data not available'}
-
-CLINIC LOCATION:
-${context.practice_data?.clinic_info ? `
-- Name: ${context.practice_data.clinic_info.name}
-- Address: ${context.practice_data.clinic_info.address || 'N/A'}
-- Coordinates: ${context.practice_data.clinic_info.latitude && context.practice_data.clinic_info.longitude ? `${context.practice_data.clinic_info.latitude}, ${context.practice_data.clinic_info.longitude}` : 'Not set'}` : 'Clinic data not available'}
-
-AI BUSINESS PROFILE & SETTINGS:
-${context.business_profile ? `
-- Practice Style: ${context.business_profile.communication_style || 'professional'}
-- Specialties: ${context.business_profile.specialties?.join(', ') || 'General healthcare'}
-- Target Audience: ${context.business_profile.target_audience || 'Not specified'}
-- Brand Voice: ${JSON.stringify(context.business_profile.brand_voice || {})}
-- Competitive Advantages: ${context.business_profile.competitive_advantages?.join(', ') || 'Not specified'}
-- Practice Values: ${context.business_profile.practice_values?.join(', ') || 'Not specified'}` : 'AI business profile not configured'}
-
-AI TEMPLATES & CONTENT HISTORY:
-- Active Templates: ${context.practice_data?.ai_templates?.length || 0}
-- Recent AI Content Generated: ${context.practice_data?.ai_content?.length || 0}
-- AI Usage (Last 30 Days): ${context.practice_data?.analytics?.ai_usage_last_30_days || 0}
-
-IMPORTANT: Respond in exactly 2-3 paragraphs, maximum 300 words total. Use specific data points from above to support your analysis and recommendations.
-
-USER QUESTION: ${prompt}
-
-Provide exactly 4-6 insights, each starting with **Bold Summary:** followed by detailed analysis and specific recommendations.`;
+Provide 2-3 immediate, actionable recommendations.`;
 
     default:
-      return prompt || 'Please provide assistance with the given context.';
+      return `${prompt || 'Provide helpful assistance based on the provided context.'}
+
+CONTEXT:
+${JSON.stringify(context, null, 2)}`;
   }
 }
-
-function calculateCost(tokens: number, model: string): number {
-  // Estimated pricing for GPT-4.1 (adjust based on actual pricing)
-  const costPer1KTokens = 0.01; // $0.01 per 1K tokens
-  return (tokens / 1000) * costPer1KTokens;
-}
-
-serve(handler);
