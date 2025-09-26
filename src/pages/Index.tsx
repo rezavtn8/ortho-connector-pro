@@ -15,7 +15,7 @@ import { Offices } from '@/pages/Offices';
 import { MarketingVisits } from '@/pages/MarketingVisits';
 import { Campaigns } from '@/pages/Campaigns';
 import { Settings } from '@/pages/Settings';
-import { Analytics } from '@/pages/Analytics';
+import Analytics from '@/pages/Analytics';
 import { SourceDetail } from '@/pages/SourceDetail';
 import { MapView } from '@/pages/MapView';
 import { Reviews } from '@/pages/Reviews';

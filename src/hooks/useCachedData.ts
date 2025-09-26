@@ -29,7 +29,10 @@ interface CachedDataState<T> {
   isBackground: boolean;
 }
 
+// Global request deduplication and batching
 const inFlightRequests = new Map<string, Promise<any>>();
+const requestQueue = new Map<string, Array<{ resolve: Function; reject: Function }>>();
+const batchTimeout = new Map<string, NodeJS.Timeout>();
 
 export function useCachedData<T = any>(options: UseCachedDataOptions) {
   const { user } = useAuth();
@@ -104,11 +107,40 @@ export function useCachedData<T = any>(options: UseCachedDataOptions) {
         return cachedData;
       }
 
-      // Fetch fresh data with request de-duplication
-      console.log(`Fetching fresh data for: ${cacheKey}`);
+      // Advanced request batching and deduplication
       let fetchPromise = inFlightRequests.get(cacheKey);
       if (!fetchPromise) {
-        fetchPromise = fetcher();
+        // Batch similar requests together
+        const batchKey = cacheKey.split('_')[0]; // Group by type
+        
+        if (!requestQueue.has(batchKey)) {
+          requestQueue.set(batchKey, []);
+        }
+        
+        // Return a promise that will be resolved when batch executes
+        fetchPromise = new Promise((resolve, reject) => {
+          requestQueue.get(batchKey)!.push({ resolve, reject });
+          
+          // Clear existing batch timeout
+          if (batchTimeout.has(batchKey)) {
+            clearTimeout(batchTimeout.get(batchKey)!);
+          }
+          
+          // Set new batch timeout (micro-batching)
+          batchTimeout.set(batchKey, setTimeout(async () => {
+            const requests = requestQueue.get(batchKey) || [];
+            requestQueue.delete(batchKey);
+            batchTimeout.delete(batchKey);
+            
+            try {
+              const result = await fetcher();
+              requests.forEach(req => req.resolve(result));
+            } catch (error) {
+              requests.forEach(req => req.reject(error));
+            }
+          }, 10)); // 10ms batching window
+        });
+        
         inFlightRequests.set(cacheKey, fetchPromise);
       }
 
