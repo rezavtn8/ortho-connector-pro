@@ -234,6 +234,7 @@ export function SimplifiedBusinessAnalysis() {
       const { data: aiResponse, error: aiError } = await supabase.functions.invoke('unified-ai-service', {
         body: { 
           task_type: 'analysis',
+          taskType: 'analysis',
           prompt: 'Analyze my practice data and provide 4-6 comprehensive business insights with actionable recommendations. Focus on the most critical opportunities and issues.',
           context: limitedData,
           parameters: {
@@ -253,7 +254,11 @@ export function SimplifiedBusinessAnalysis() {
         throw new Error(aiResponse?.error || 'AI analysis failed');
       }
 
-      const processedInsights = processAnalysisResponse(aiResponse.data);
+      const responseText = typeof aiResponse.data === 'string' 
+        ? aiResponse.data 
+        : (aiResponse.data?.content ?? aiResponse.data?.text ?? JSON.stringify(aiResponse.data));
+
+      const processedInsights = processAnalysisResponse(responseText);
       
       if (processedInsights.length === 0) {
         throw new Error('No insights generated from AI response');

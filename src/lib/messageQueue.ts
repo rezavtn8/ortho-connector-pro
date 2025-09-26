@@ -75,25 +75,34 @@ class MessageQueue {
 
     try {
       const { supabase } = await import('@/integrations/supabase/client');
+      const { chatStorage } = await import('./chatStorage');
       
-      // Get essential data for context
+      // Get essential data for context (cached + trimmed)
       const cachedData = await this.getEssentialData(message.userId);
+
+      // Build recent conversation history for better context
+      const allMessages = await chatStorage.getAllMessages(message.userId);
+      const recentHistory = allMessages.slice(-10).map(m => ({ role: m.role, content: m.content }));
+
+      const session = (await supabase.auth.getSession()).data.session;
 
       const { data: aiResponse, error } = await supabase.functions.invoke('unified-ai-service', {
         body: {
+          // Send both snake_case and camelCase for maximum compatibility
           task_type: 'chat',
+          taskType: 'chat',
           prompt: message.content,
           context: {
             practice_data: cachedData,
-            conversation_history: [] // Will be handled by the service
+            conversation_history: recentHistory,
           },
           parameters: {
-            stream: false // We'll implement SSE later
+            stream: false
           }
         },
-        headers: {
-          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-        },
+        headers: session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : undefined,
       });
 
       if (error) {
@@ -104,7 +113,13 @@ class MessageQueue {
         throw new Error(aiResponse?.error || 'AI service failed');
       }
 
-      message.onSuccess(aiResponse.data || 'I apologize, but I couldn\'t generate a response. Please try again.');
+      // Normalize response data to string
+      const payload = aiResponse.data;
+      const text = typeof payload === 'string'
+        ? payload
+        : (payload?.content ?? payload?.text ?? JSON.stringify(payload));
+
+      message.onSuccess(text || 'I apologize, but I could not generate a response. Please try again.');
       
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {

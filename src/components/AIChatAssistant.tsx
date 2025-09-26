@@ -359,8 +359,6 @@ export function AIChatAssistant() {
       }
     });
 
-    // Save user message to storage
-    await chatStorage.saveMessage(user.id, userMessage);
   }, [user, scrollToBottom]);
 
   const handleQuickAction = (prompt: string) => {

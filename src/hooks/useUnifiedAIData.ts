@@ -54,6 +54,19 @@ export function useUnifiedAIData() {
 
     try {
       // Fetch ALL platform data in parallel for maximum efficiency
+      // Add timeframe filters for performance
+      const eighteenMonthsAgoFilter = new Date();
+      eighteenMonthsAgoFilter.setMonth(eighteenMonthsAgoFilter.getMonth() - 18);
+      const eighteenMonthsAgoStr = eighteenMonthsAgoFilter.toISOString().substring(0, 7); // YYYY-MM
+
+      const sixMonthsAgoFilter = new Date();
+      sixMonthsAgoFilter.setMonth(sixMonthsAgoFilter.getMonth() - 6);
+      const sixMonthsAgoDateStr = sixMonthsAgoFilter.toISOString().split('T')[0]; // YYYY-MM-DD
+
+      const twelveMonthsAgoFilter = new Date();
+      twelveMonthsAgoFilter.setMonth(twelveMonthsAgoFilter.getMonth() - 12);
+      const twelveMonthsAgoISO = twelveMonthsAgoFilter.toISOString();
+
       const [
         sourcesResult,
         monthlyResult, 
@@ -71,9 +84,9 @@ export function useUnifiedAIData() {
         aiContentResult
       ] = await Promise.all([
         supabase.from('patient_sources').select('*').eq('created_by', user.id),
-        supabase.from('monthly_patients').select('*').eq('user_id', user.id),
-        supabase.from('marketing_visits').select('*').eq('user_id', user.id),
-        supabase.from('campaigns').select('*').eq('created_by', user.id),
+        supabase.from('monthly_patients').select('*').eq('user_id', user.id).gte('year_month', eighteenMonthsAgoStr),
+        supabase.from('marketing_visits').select('*').eq('user_id', user.id).gte('visit_date', sixMonthsAgoDateStr),
+        supabase.from('campaigns').select('*').eq('created_by', user.id).gte('created_at', twelveMonthsAgoISO),
         supabase.from('discovered_offices').select('*').eq('discovered_by', user.id),
         supabase.from('review_status').select('*').eq('user_id', user.id),
         supabase.from('campaign_deliveries').select('*').eq('created_by', user.id),
