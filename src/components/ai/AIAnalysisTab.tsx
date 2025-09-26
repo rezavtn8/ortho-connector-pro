@@ -107,63 +107,64 @@ export function AIAnalysisTab() {
         </Button>
       </div>
 
-      {analysis.insights?.map((insight: any, index: number) => (
-        <Card key={index}>
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <CardTitle className="text-lg">{insight.title}</CardTitle>
-              <Badge variant={
-                insight.priority === 'high' ? 'destructive' : 
-                insight.priority === 'medium' ? 'default' : 
-                'secondary'
-              }>
-                {insight.priority} priority
-              </Badge>
+      <Card className="p-6">
+        <div className="prose prose-lg max-w-none">
+          <div className="flex items-center gap-3 mb-6">
+            <Brain className="h-6 w-6 text-teal-600" />
+            <h3 className="text-xl font-bold text-foreground m-0">Executive Summary</h3>
+          </div>
+          
+          {analysis.metrics && (
+            <div className="bg-teal-50 dark:bg-teal-950/30 rounded-lg p-4 mb-6 border border-teal-200 dark:border-teal-800">
+              <div className="flex items-center gap-4 text-sm">
+                <span className="text-teal-700 dark:text-teal-300 font-medium">
+                  <strong className="text-teal-600">{analysis.metrics.total_sources || 0}</strong> sources
+                </span>
+                <span className="text-teal-700 dark:text-teal-300 font-medium">
+                  <strong className="text-teal-600">{analysis.metrics.total_patients || 0}</strong> patients
+                </span>
+                <span className="text-teal-700 dark:text-teal-300 font-medium">
+                  <strong className="text-teal-600">{analysis.metrics.active_campaigns || 0}</strong> active campaigns
+                </span>
+              </div>
             </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground mb-4">{insight.summary}</p>
-            <Separator className="my-4" />
-            <div>
-              <h4 className="font-medium mb-2">Recommendation:</h4>
-              <p className="text-sm">{insight.recommendation}</p>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+          )}
 
-      {analysis.metrics && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Key Metrics Overview
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-primary">
-                  {analysis.metrics.total_sources || 0}
+          <div className="space-y-4 text-foreground leading-relaxed">
+            {analysis.insights?.map((insight: any, index: number) => {
+              const priorityColor = insight.priority === 'high' ? 'text-red-600 dark:text-red-400' : 
+                                  insight.priority === 'medium' ? 'text-amber-600 dark:text-amber-400' : 
+                                  'text-green-600 dark:text-green-400';
+              
+              return (
+                <div key={index} className="mb-6">
+                  <h4 className={`font-bold text-lg mb-2 ${priorityColor}`}>
+                    {insight.title}
+                  </h4>
+                  <p className="text-muted-foreground mb-3 italic">
+                    {insight.summary}
+                  </p>
+                  <div className="bg-gradient-to-r from-teal-50 to-blue-50 dark:from-teal-950/20 dark:to-blue-950/20 rounded-lg p-4 border-l-4 border-teal-500">
+                    <p className="text-sm">
+                      <span className="font-semibold text-teal-700 dark:text-teal-300">Strategic Recommendation:</span>{' '}
+                      <span className="text-foreground">{insight.recommendation}</span>
+                    </p>
+                  </div>
+                  {index < analysis.insights.length - 1 && (
+                    <div className="mt-4 border-b border-border/30"></div>
+                  )}
                 </div>
-                <p className="text-sm text-muted-foreground">Total Sources</p>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-primary">
-                  {analysis.metrics.total_patients || 0}
-                </div>
-                <p className="text-sm text-muted-foreground">Total Patients</p>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-primary">
-                  {analysis.metrics.active_campaigns || 0}
-                </div>
-                <p className="text-sm text-muted-foreground">Active Campaigns</p>
-              </div>
+              );
+            })}
+
+            <div className="mt-8 p-4 bg-gradient-to-br from-teal-100 to-blue-100 dark:from-teal-900/30 dark:to-blue-900/30 rounded-lg border border-teal-200 dark:border-teal-700">
+              <p className="text-sm text-teal-800 dark:text-teal-200 italic">
+                <strong>Next Steps:</strong> Focus on the highest priority recommendations above to maximize impact on patient acquisition and retention.
+              </p>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        </div>
+      </Card>
     </div>
   );
 }
