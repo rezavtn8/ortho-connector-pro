@@ -119,9 +119,18 @@ Response format:
     
     let analysis;
     try {
-      analysis = JSON.parse(analysisContent);
+      // Clean the response by removing markdown code blocks if present
+      let cleanContent = analysisContent.trim();
+      if (cleanContent.startsWith('```json')) {
+        cleanContent = cleanContent.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+      } else if (cleanContent.startsWith('```')) {
+        cleanContent = cleanContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
+      }
+      
+      analysis = JSON.parse(cleanContent);
     } catch (parseError) {
       console.error('Failed to parse OpenAI response:', analysisContent);
+      console.error('Parse error:', parseError);
       throw new Error('Invalid analysis format received');
     }
 
