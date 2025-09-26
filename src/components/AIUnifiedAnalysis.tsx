@@ -33,30 +33,83 @@ interface QuickStat {
   icon: React.ComponentType<any>;
 }
 
-// Component to format AI text with proper styling
-const FormattedAIText = ({ text }: { text: string }) => {
+// Component to parse and format AI JSON response with proper styling
+const FormattedAIAnalysis = ({ text }: { text: string }) => {
+  // Try to parse JSON response first
+  let parsedContent = null;
+  try {
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      parsedContent = JSON.parse(jsonMatch[0]);
+    }
+  } catch (e) {
+    console.warn('Could not parse AI response as JSON:', e);
+  }
+
+  // If we have structured JSON content with insights
+  if (parsedContent && parsedContent.insights && Array.isArray(parsedContent.insights)) {
+    return (
+      <div className="space-y-6">
+        {parsedContent.insights.map((insight: any, index: number) => (
+          <div key={index} className="bg-white/50 rounded-lg p-5 border border-teal-100">
+            {/* Bold title in teal */}
+            <h4 className="font-bold text-teal-700 text-lg mb-3 leading-tight">
+              {insight.title || `Insight ${index + 1}`}
+            </h4>
+            
+            {/* Analysis content with proper formatting */}
+            <div className="text-slate-700 leading-relaxed space-y-3">
+              <p className="text-sm">
+                {insight.analysis || insight.content || ''}
+              </p>
+              
+              {/* Recommendation section if available */}
+              {insight.recommendation && (
+                <div className="mt-4 p-3 bg-teal-50 rounded border-l-4 border-teal-500">
+                  <p className="text-sm font-medium text-teal-800 mb-1">Recommendation:</p>
+                  <p className="text-sm text-teal-700">{insight.recommendation}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Fallback: format as regular text with basic markdown parsing
   const formatText = (text: string) => {
+    // Clean up JSON artifacts and formatting
+    let formatted = text
+      .replace(/\{[\s\S]*?"insights":\s*\[[\s\S]*?\]/g, '') // Remove JSON structure
+      .replace(/\{[\s\S]*?\}/g, '') // Remove any remaining JSON
+      .replace(/```json/g, '')
+      .replace(/```/g, '')
+      .replace(/^\s*[\[\]{}",]+/gm, '') // Remove JSON characters at line start
+      .replace(/[\[\]{}",]+\s*$/gm, '') // Remove JSON characters at line end
+      .trim();
+
     // Replace **bold** with <strong>
-    let formatted = text.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-teal-700">$1</strong>');
+    formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-teal-700">$1</strong>');
     
     // Replace *italic* with <em>
     formatted = formatted.replace(/\*(.*?)\*/g, '<em class="italic text-slate-600">$1</em>');
     
+    // Handle titles that start with numbers or bullets
+    formatted = formatted.replace(/^(\d+\.\s*)(.*?):/gm, '<strong class="font-bold text-teal-700">$1$2:</strong>');
+    
     // Replace bullet points
-    formatted = formatted.replace(/^[\s]*[-•]\s+/gm, '<span class="text-teal-500">•</span> ');
+    formatted = formatted.replace(/^[\s]*[-•]\s+/gm, '<span class="text-teal-500 font-bold">•</span> ');
     
-    // Replace numbered lists
-    formatted = formatted.replace(/^[\s]*(\d+)\.\s+/gm, '<span class="font-medium text-teal-600">$1.</span> ');
-    
-    // Remove unwanted characters like {., etc.
-    formatted = formatted.replace(/[{}]/g, '');
+    // Clean up extra whitespace and line breaks
+    formatted = formatted.replace(/\n\s*\n\s*\n/g, '\n\n');
     
     return formatted;
   };
 
   return (
     <div 
-      className="text-slate-700 leading-relaxed space-y-3"
+      className="text-slate-700 leading-relaxed space-y-4"
       dangerouslySetInnerHTML={{ __html: formatText(text) }}
     />
   );
@@ -318,7 +371,7 @@ RETURN FORMAT: Return only the JSON structure specified in the system prompt.
               {/* Main Analysis Text */}
               <div className="prose prose-slate max-w-none">
                 <div className="bg-white/70 backdrop-blur-sm rounded-lg p-6 border border-slate-200/50">
-                  <FormattedAIText text={analysis.content} />
+                  <FormattedAIAnalysis text={analysis.content} />
                 </div>
               </div>
 

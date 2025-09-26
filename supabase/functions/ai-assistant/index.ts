@@ -536,7 +536,20 @@ ANALYSIS INSTRUCTIONS:
 
 ${prompt || 'Provide comprehensive analysis focusing on practice growth, referral optimization, and marketing effectiveness.'}
 
-IMPORTANT: Return insights in clear, professional paragraphs with bold titles and specific recommendations.`;
+IMPORTANT: Return insights in clear, professional paragraphs with bold titles and specific recommendations.
+
+FORMAT YOUR RESPONSE AS VALID JSON:
+{
+  "insights": [
+    {
+      "title": "Clear, Actionable Title",
+      "analysis": "Detailed analysis with specific data points and implications...",
+      "recommendation": "Specific, actionable recommendation with clear next steps..."
+    }
+  ]
+}
+
+Ensure each insight has a compelling title, thorough analysis using the provided data, and a concrete recommendation.`;
 
     case 'structured_report':
       return `Generate a structured business intelligence report analyzing this practice data:
