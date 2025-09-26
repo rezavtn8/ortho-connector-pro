@@ -13,6 +13,7 @@ import {
   BarChart3,
   MessageSquare,
   Search,
+  Bot,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -39,6 +40,7 @@ const mainNavItems = [
   { id: 'sources', title: 'Patient Sources', icon: Users, path: '/sources' },
   { id: 'offices', title: 'Partner Offices', icon: Building, path: '/offices' },
   { id: 'analytics', title: 'Reports', icon: TrendingUp, path: '/analytics' },
+  { id: 'ai-assistant', title: 'AI Assistant', icon: Bot, path: '/ai-assistant' },
   
 ];
 
