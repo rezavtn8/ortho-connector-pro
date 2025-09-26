@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Brain, MessageSquare, Settings, Sparkles, BarChart3, Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUnifiedAIData } from '@/hooks/useUnifiedAIData';
-import { SimplifiedBusinessAnalysis } from '@/components/SimplifiedBusinessAnalysis';
+import { AIAnalysisText } from '@/components/AIAnalysisText';
 import { AIChatAssistant } from '@/components/AIChatAssistant';
 import { AIBusinessSetup } from '@/components/AIBusinessSetup';
 import { AIUsageDashboard } from '@/components/AIUsageDashboard';
@@ -138,7 +138,7 @@ const AIAssistant = memo(() => {
               </Card>
             )}
 
-            <SimplifiedBusinessAnalysis />
+            <AIAnalysisText />
           </TabsContent>
 
           {activeTab === 'chat' && (

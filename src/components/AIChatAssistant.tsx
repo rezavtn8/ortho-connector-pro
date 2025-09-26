@@ -25,6 +25,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 import { chatStorage, ChatMessage } from '@/lib/chatStorage';
 import { messageQueue } from '@/lib/messageQueue';
+import { useUnifiedAIData } from '@/hooks/useUnifiedAIData';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const MESSAGES_PER_LOAD = 10;
@@ -33,23 +34,23 @@ const MESSAGES_PER_LOAD = 10;
 const QUICK_ACTIONS = [
   {
     icon: BarChart3,
-    label: 'Analyze Performance',
-    prompt: 'Analyze my practice performance and identify key trends and opportunities'
+    label: 'Performance Summary',
+    prompt: 'Give me a quick summary of my practice performance this month with key metrics'
   },
   {
     icon: Lightbulb,
-    label: 'Growth Strategies',
-    prompt: 'Suggest specific growth strategies based on my current referral patterns'
+    label: 'Growth Opportunities',
+    prompt: 'Based on my data, what are the top 3 growth opportunities I should focus on?'
   },
   {
     icon: Users,
-    label: 'Referral Insights',
-    prompt: 'What insights can you provide about my referral network and relationships?'
+    label: 'Top Referrers',
+    prompt: 'Show me my top referral sources and suggest ways to strengthen these relationships'
   },
   {
     icon: FileText,
-    label: 'Content Ideas',
-    prompt: 'Generate marketing content ideas to strengthen referral relationships'
+    label: 'Action Items',
+    prompt: 'What specific actions should I take this week based on my current data trends?'
   }
 ];
 
@@ -170,6 +171,7 @@ function ChatMessageBubble({ message, onRetry, onEdit }: ChatMessageBubbleProps)
 
 export function AIChatAssistant() {
   const { user } = useAuth();
+  const { data: unifiedData, loading: dataLoading } = useUnifiedAIData();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -208,11 +210,15 @@ export function AIChatAssistant() {
 
   // Initialize with welcome message if needed
   useEffect(() => {
-    if (messages.length === 0) {
+    if (messages.length === 0 && user) {
+      const practiceDataSummary = unifiedData ? 
+        `I have access to your practice data including ${unifiedData.sources?.length || 0} referral sources, ${unifiedData.monthly_data?.length || 0} months of patient data, and ${unifiedData.visits?.length || 0} recent visits.` : 
+        'I\'m loading your practice data to provide more personalized assistance.';
+
       const welcomeMessage: ChatMessage = {
         id: 'welcome',
         role: 'assistant',
-        content: "Hi! I'm your AI practice assistant. I can help you analyze your referral patterns, suggest growth strategies, create marketing content, and answer questions about your practice data. What would you like to explore today?",
+        content: `Hi! I'm your AI practice assistant with full access to your practice data. ${practiceDataSummary} I can analyze performance trends, identify growth opportunities, suggest referral strategies, and provide actionable insights. What would you like to explore?`,
         timestamp: new Date(),
         type: 'general',
         status: 'sent'
@@ -223,7 +229,7 @@ export function AIChatAssistant() {
         chatStorage.saveMessage(user.id, welcomeMessage);
       }
     }
-  }, [messages.length, user]);
+  }, [messages.length, user, unifiedData]);
 
   const loadMessages = async (reset = false) => {
     if (!user || loadingHistory) return;
@@ -422,6 +428,11 @@ export function AIChatAssistant() {
                 Processing
               </Badge>
             )}
+            {unifiedData && (
+              <Badge variant="outline" className="ml-2 text-xs">
+                {unifiedData.sources?.length || 0} sources • {unifiedData.monthly_data?.length || 0} months data
+              </Badge>
+            )}
           </CardTitle>
         </CardHeader>
         
@@ -492,7 +503,10 @@ export function AIChatAssistant() {
               <div className="flex gap-2">
                 <Textarea
                   ref={textareaRef}
-                  placeholder={editingMessageId ? "Edit your message..." : "Ask about your practice data, request analysis, or get recommendations..."}
+                  placeholder={editingMessageId ? "Edit your message..." : unifiedData ? 
+                    "Ask about your performance metrics, referral trends, growth opportunities..." : 
+                    "Ask me anything about your practice (loading data for better insights)..."
+                  }
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
                   onKeyDown={handleKeyDown}
