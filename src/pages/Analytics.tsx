@@ -12,7 +12,7 @@ import {
   SourceType,
   formatYearMonth
 } from '@/lib/database.types';
-import { supabase } from '@/integrations/supabase/client';
+import { useUserSources, useAnalyticsData } from '@/hooks/useCachedData';
 import { nowPostgres } from '@/lib/dateSync';
 import {
   Activity,
@@ -64,29 +64,26 @@ export function Analytics() {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
+  // Cached data hooks (deduped + persisted)
+  const { data: sourcesData, isLoading: sourcesLoading } = useUserSources();
+  const { data: analyticsData, isLoading: analyticsLoading } = useAnalyticsData();
+
   // Chart colors
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
 
+  // Use cached data and compute analytics locally
   useEffect(() => {
-    loadAnalytics();
-  }, [selectedPeriod]);
-
-  const loadAnalytics = async () => {
-    try {
+    if (sourcesLoading || analyticsLoading) {
       setLoading(true);
+      return;
+    }
 
-      // Load sources
-      const { data: sourcesData, error: sourcesError } = await supabase
-        .from('patient_sources')
-        .select('*')
-        .eq('is_active', true);
-
-      if (sourcesError) throw sourcesError;
+    try {
+      setLoading(false);
 
       // Calculate date range based on selected period
       const now = new Date();
       let startDate: Date;
-      
       switch (selectedPeriod) {
         case '3m':
           startDate = new Date(now.getFullYear(), now.getMonth() - 3, 1);
@@ -98,39 +95,30 @@ export function Analytics() {
           startDate = new Date(now.getFullYear(), now.getMonth() - 12, 1);
           break;
         default:
-          startDate = new Date(2020, 0, 1); // All time
+          startDate = new Date(2020, 0, 1);
       }
-
       const startYearMonth = `${startDate.getFullYear()}-${(startDate.getMonth() + 1).toString().padStart(2, '0')}`;
 
-      // Load monthly data
-      const { data: monthlyDataResult, error: monthlyError } = await supabase
-        .from('monthly_patients')
-        .select('*')
-        .gte('year_month', startYearMonth)
-        .order('year_month', { ascending: true });
+      // Filter data from cache
+      const activeSources = (sourcesData || []).filter((s: any) => s.is_active);
+      const monthlyDataResult = (analyticsData?.monthly_data || [])
+        .filter((m: any) => m.year_month >= startYearMonth)
+        .sort((a: any, b: any) => a.year_month.localeCompare(b.year_month));
 
-      if (monthlyError) throw monthlyError;
-
-      setSources(sourcesData || []);
-      setMonthlyData(monthlyDataResult || []);
+      setSources(activeSources as any);
+      setMonthlyData(monthlyDataResult as any);
 
       // Calculate analytics for each source
-      const analyticsData: SourceAnalytics[] = (sourcesData || []).map(source => {
-        const sourceMonthlyData = (monthlyDataResult || []).filter(m => m.source_id === source.id);
-        const totalPatients = sourceMonthlyData.reduce((sum, m) => sum + m.patient_count, 0);
-        const averageMonthly = sourceMonthlyData.length > 0 
-          ? Math.round(totalPatients / sourceMonthlyData.length)
-          : 0;
+      const analyticsComputed: SourceAnalytics[] = (activeSources || []).map((source: any) => {
+        const sourceMonthlyData = (monthlyDataResult || []).filter((m: any) => m.source_id === source.id);
+        const totalPatients = sourceMonthlyData.reduce((sum: number, m: any) => sum + (m.patient_count || 0), 0);
+        const averageMonthly = sourceMonthlyData.length > 0 ? Math.round(totalPatients / sourceMonthlyData.length) : 0;
 
-        // Calculate trend
         let trend: 'up' | 'down' | 'stable' = 'stable';
         let trendPercentage = 0;
-
         if (sourceMonthlyData.length >= 2) {
-          const recent = sourceMonthlyData[sourceMonthlyData.length - 1].patient_count;
-          const previous = sourceMonthlyData[sourceMonthlyData.length - 2].patient_count;
-          
+          const recent = sourceMonthlyData[sourceMonthlyData.length - 1].patient_count || 0;
+          const previous = sourceMonthlyData[sourceMonthlyData.length - 2].patient_count || 0;
           if (recent > previous) {
             trend = 'up';
             trendPercentage = previous > 0 ? Math.round(((recent - previous) / previous) * 100) : 100;
@@ -146,26 +134,19 @@ export function Analytics() {
           averageMonthly,
           trend,
           trendPercentage,
-          monthlyData: sourceMonthlyData
+          monthlyData: sourceMonthlyData as any
         };
       });
 
-      setAnalytics(analyticsData);
+      setAnalytics(analyticsComputed);
     } catch (error) {
-      console.error('Error loading analytics:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load analytics data",
-        variant: "destructive",
-      });
-      // Set empty data on error
+      console.error('Error computing analytics:', error);
+      toast({ title: 'Error', description: 'Failed to process analytics data', variant: 'destructive' });
       setSources([]);
       setMonthlyData([]);
       setAnalytics([]);
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [sourcesData, analyticsData, selectedPeriod, sourcesLoading, analyticsLoading, toast]);
 
   // Helper function to determine source category
   const getSourceCategory = (sourceType: SourceType) => {

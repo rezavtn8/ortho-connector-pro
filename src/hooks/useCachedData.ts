@@ -29,6 +29,8 @@ interface CachedDataState<T> {
   isBackground: boolean;
 }
 
+const inFlightRequests = new Map<string, Promise<any>>();
+
 export function useCachedData<T = any>(options: UseCachedDataOptions) {
   const { user } = useAuth();
   const [state, setState] = useState<CachedDataState<T>>({
@@ -102,9 +104,22 @@ export function useCachedData<T = any>(options: UseCachedDataOptions) {
         return cachedData;
       }
 
-      // Fetch fresh data
+      // Fetch fresh data with request de-duplication
       console.log(`Fetching fresh data for: ${cacheKey}`);
-      const freshData = await fetcher();
+      let fetchPromise = inFlightRequests.get(cacheKey);
+      if (!fetchPromise) {
+        fetchPromise = fetcher();
+        inFlightRequests.set(cacheKey, fetchPromise);
+      }
+
+      let freshData: any = null;
+      try {
+        freshData = await fetchPromise;
+      } finally {
+        // Ensure we clear in-flight map only for the original promise
+        const current = inFlightRequests.get(cacheKey);
+        if (current === fetchPromise) inFlightRequests.delete(cacheKey);
+      }
 
       if (freshData) {
         // Cache the new data
@@ -278,7 +293,7 @@ export function useUserSources() {
 
       const { data, error } = await supabase
         .from('patient_sources')
-        .select('*')
+        .select('id,name,source_type,is_active,created_by,updated_at')
         .eq('created_by', user.id)
         .limit(100);
 
@@ -305,12 +320,12 @@ export function useAnalyticsData() {
 
       const [monthlyResult, visitsResult] = await Promise.all([
         supabase.from('monthly_patients')
-          .select('*')
+          .select('id,source_id,year_month,patient_count,updated_at,user_id')
           .eq('user_id', user.id)
           .gte('year_month', sixMonthsAgo.toISOString().substring(0, 7))
           .limit(50),
         supabase.from('marketing_visits')
-          .select('*')
+          .select('id,visit_date,source_id,notes,created_at,updated_at,user_id')
           .eq('user_id', user.id)
           .gte('visit_date', sixMonthsAgo.toISOString().split('T')[0])
           .limit(50)
