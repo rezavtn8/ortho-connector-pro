@@ -45,10 +45,12 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('Processing chat message for user:', user.id);
 
     // Get fresh business data for context
-    const [sourcesRes, patientsRes, campaignsRes, profileRes] = await Promise.all([
+    const [sourcesRes, patientsRes, campaignsRes, reviewsRes, emailsRes, profileRes] = await Promise.all([
       supabase.from('patient_sources').select('name, source_type, is_active').eq('created_by', user.id).limit(20),
       supabase.from('monthly_patients').select('year_month, patient_count').eq('user_id', user.id).order('year_month', { ascending: false }).limit(6),
       supabase.from('campaigns').select('name, status, campaign_type').eq('created_by', user.id).limit(10),
+      supabase.from('review_status').select('status, needs_attention, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(20),
+      supabase.from('campaign_deliveries').select('email_status, delivered_at, campaign_id, office_id').eq('created_by', user.id).order('created_at', { ascending: false }).limit(20),
       supabase.from('ai_business_profiles').select('communication_style, competitive_advantages, practice_values').eq('user_id', user.id).single()
     ]);
 
@@ -56,6 +58,8 @@ const handler = async (req: Request): Promise<Response> => {
       sources: sourcesRes.data || [],
       patients: patientsRes.data || [],
       campaigns: campaignsRes.data || [],
+      reviews: reviewsRes.data || [],
+      emails: emailsRes.data || [],
       profile: profileRes.data || null
     };
 
@@ -73,8 +77,10 @@ Practice highlights: ${highlights.join(', ') || 'Standard healthcare practice'}
 
 Current business context:
 - ${businessContext.sources.length} patient sources
-- Latest patient data: ${businessContext.patients.slice(0, 3).map(p => `${p.year_month}: ${p.patient_count}`).join(', ')}  
+- Latest patient data: ${businessContext.patients.slice(0, 3).map(p => `${p.year_month}: ${p.patient_count}`).join(', ') || 'no data'}
 - ${businessContext.campaigns.length} campaigns
+- ${businessContext.reviews.filter((r: any) => r.needs_attention).length} reviews needing attention out of ${businessContext.reviews.length} recent
+- Recent email deliveries: ${businessContext.emails.slice(0,3).map((e: any) => e.email_status).join(', ') || 'none'}
 
 Provide helpful, medium-length responses (2-4 sentences). Focus on actionable insights based on their actual data. Be conversational but professional.`
       },

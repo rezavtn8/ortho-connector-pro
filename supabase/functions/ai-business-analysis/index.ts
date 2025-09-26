@@ -43,11 +43,13 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('Generating AI business analysis for user:', user.id);
 
     // Fetch business data
-    const [sourcesRes, patientsRes, campaignsRes, visitsRes, profileRes] = await Promise.all([
+    const [sourcesRes, patientsRes, campaignsRes, visitsRes, reviewsRes, emailsRes, profileRes] = await Promise.all([
       supabase.from('patient_sources').select('*').eq('created_by', user.id),
       supabase.from('monthly_patients').select('*').eq('user_id', user.id).order('year_month', { ascending: false }).limit(12),
       supabase.from('campaigns').select('*').eq('created_by', user.id),
       supabase.from('marketing_visits').select('*').eq('user_id', user.id),
+      supabase.from('review_status').select('*').eq('user_id', user.id),
+      supabase.from('campaign_deliveries').select('*').eq('created_by', user.id),
       supabase.from('ai_business_profiles').select('*').eq('user_id', user.id).single()
     ]);
 
@@ -56,6 +58,8 @@ const handler = async (req: Request): Promise<Response> => {
       patients: patientsRes.data || [],
       campaigns: campaignsRes.data || [],
       visits: visitsRes.data || [],
+      reviews: reviewsRes.data || [],
+      emails: emailsRes.data || [],
       profile: profileRes.data || null
     };
 
@@ -63,7 +67,9 @@ const handler = async (req: Request): Promise<Response> => {
       sources: businessData.sources.length,
       patients: businessData.patients.length,
       campaigns: businessData.campaigns.length,
-      visits: businessData.visits.length
+      visits: businessData.visits.length,
+      reviews: businessData.reviews.length,
+      emails: businessData.emails.length
     });
 
     // Build analysis prompt
@@ -161,12 +167,14 @@ Response format:
 };
 
 function buildAnalysisPrompt(data: any): string {
-  const { sources, patients, campaigns, visits, profile } = data;
+  const { sources, patients, campaigns, visits, reviews, emails, profile } = data;
   
   const totalPatients = patients.reduce((sum: number, p: any) => sum + (p.patient_count || 0), 0);
   const activeCampaigns = campaigns.filter((c: any) => c.status === 'Active').length;
   const tone = profile?.communication_style || 'professional';
   const highlights = profile?.competitive_advantages || [];
+  const reviewsNeedingAttention = (reviews || []).filter((r: any) => r.needs_attention).length;
+  const recentEmailSends = (emails || []).filter((e: any) => e.email_status === 'sent').length;
 
   return `Analyze this healthcare practice data with a ${tone} tone:
 
@@ -175,6 +183,8 @@ PRACTICE OVERVIEW:
 - Total Patients (12 months): ${totalPatients}
 - Active Campaigns: ${activeCampaigns}
 - Marketing Visits: ${visits.length}
+- Reviews (attention needed): ${reviewsNeedingAttention} of ${(reviews || []).length}
+- Email deliveries (recent sent): ${recentEmailSends}
 
 CLINIC HIGHLIGHTS: ${highlights.length > 0 ? highlights.join(', ') : 'None specified'}
 
@@ -187,11 +197,17 @@ ${patients.slice(0, 6).map((p: any) => `- ${p.year_month}: ${p.patient_count} pa
 CAMPAIGN STATUS:
 ${campaigns.slice(0, 5).map((c: any) => `- ${c.name} (${c.status})`).join('\n')}
 
+REVIEWS OVERVIEW (recent):
+${(reviews || []).slice(0, 5).map((r: any) => `- ${r.status}${r.needs_attention ? ' (needs attention)' : ''}`).join('\n')}
+
+EMAIL DELIVERY STATUS (recent):
+${(emails || []).slice(0, 5).map((e: any) => `- ${e.email_status} ${e.delivered_at ? `at ${e.delivered_at}` : ''}`).join('\n')}
+
 Provide exactly 4 actionable business insights focusing on:
 1. Patient source performance and optimization opportunities
 2. Growth trends and pattern analysis  
-3. Campaign effectiveness and strategic recommendations
-4. Operational improvements and next steps
+3. Campaign and email effectiveness with strategic recommendations
+4. Reviews management and operational next steps
 
 Each insight must include specific, measurable recommendations based on the actual data provided.`;
 }
