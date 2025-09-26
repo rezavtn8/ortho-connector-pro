@@ -532,22 +532,39 @@ PROMPT: ${prompt || 'Create appropriate content based on the context provided.'}
 
     case 'comprehensive_analysis':
     case 'business_intelligence':
+      // Get the unified data from context
+      const unifiedData = context.unified_data || {};
+      const analytics = unifiedData.analytics || {};
+      
       return `Analyze this comprehensive practice data and provide 4-6 actionable business insights:
 
 PRACTICE DATA SUMMARY:
-- Total Referral Sources: ${context.analysis_data?.total_sources || 0}
-- Total Referrals (All Time): ${context.analysis_data?.total_referrals || 0}
-- Active Recent Sources: ${context.analysis_data?.last_6_months?.length || 0}
-- Source Type Distribution: ${JSON.stringify(context.analysis_data?.source_types || {})}
+- Total Referral Sources: ${analytics.total_sources || 0}
+- Total Referrals (All Time): ${analytics.total_referrals || 0}
+- Active Recent Sources: ${analytics.active_sources_this_month || 0}
+- Source Type Distribution: ${JSON.stringify(analytics.source_types_distribution || {})}
 
 MONTHLY TRENDS:
-${context.analysis_data?.last_6_months?.map((m: any) => 
-  `${m.year_month}: ${m.patient_count} patients`
-).join('\n') || 'No recent data available'}
+${analytics.last_6_months_trend && analytics.last_6_months_trend.length > 0 
+  ? analytics.last_6_months_trend.map((m: any) => `${m.year_month}: ${m.patient_count} patients`).join('\n')
+  : 'No recent data available'
+}
 
 MARKETING VISITS DATA:
-- Total Visits Tracked: ${context.analysis_data?.visits?.length || 0}
-- Recent Visit Activity: ${context.analysis_data?.visits?.filter((v: any) => v.visited)?.length || 0}
+- Total Visits Tracked: ${unifiedData.visits?.length || 0}
+- Recent Visit Activity: ${analytics.recent_visits || 0}
+
+CAMPAIGN PERFORMANCE:
+- Active Campaigns: ${unifiedData.campaigns?.filter((c: any) => c.status === 'Active').length || 0}
+- Campaign Success Rate: ${analytics.campaign_delivery_success_rate || 0}%
+
+BUSINESS OPPORTUNITIES:
+- Discovered Offices: ${analytics.discovered_offices_count || 0}
+- Imported Offices: ${analytics.imported_offices || 0}
+- Pending Reviews: ${analytics.pending_reviews || 0}
+
+AI USAGE METRICS:
+- AI Usage Last 30 Days: ${analytics.ai_usage_last_30_days || 0}
 
 ANALYSIS INSTRUCTION:
 ${prompt || `Analyze referral source distribution, performance trends, geographic patterns, and provide specific actionable recommendations. Focus on concentration risk, growth opportunities, and operational improvements.`}

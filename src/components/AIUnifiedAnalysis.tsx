@@ -17,6 +17,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { useUnifiedAIData } from '@/hooks/useUnifiedAIData';
 
 interface AnalysisData {
   content: string;
@@ -32,8 +33,38 @@ interface QuickStat {
   icon: React.ComponentType<any>;
 }
 
+// Component to format AI text with proper styling
+const FormattedAIText = ({ text }: { text: string }) => {
+  const formatText = (text: string) => {
+    // Replace **bold** with <strong>
+    let formatted = text.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-teal-700">$1</strong>');
+    
+    // Replace *italic* with <em>
+    formatted = formatted.replace(/\*(.*?)\*/g, '<em class="italic text-slate-600">$1</em>');
+    
+    // Replace bullet points
+    formatted = formatted.replace(/^[\s]*[-•]\s+/gm, '<span class="text-teal-500">•</span> ');
+    
+    // Replace numbered lists
+    formatted = formatted.replace(/^[\s]*(\d+)\.\s+/gm, '<span class="font-medium text-teal-600">$1.</span> ');
+    
+    // Remove unwanted characters like {., etc.
+    formatted = formatted.replace(/[{}]/g, '');
+    
+    return formatted;
+  };
+
+  return (
+    <div 
+      className="text-slate-700 leading-relaxed space-y-3"
+      dangerouslySetInnerHTML={{ __html: formatText(text) }}
+    />
+  );
+};
+
 export function AIUnifiedAnalysis() {
   const { user } = useAuth();
+  const { fetchAllData } = useUnifiedAIData();
   const [analysis, setAnalysis] = useState<AnalysisData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [quickStats, setQuickStats] = useState<QuickStat[]>([]);
@@ -140,40 +171,55 @@ export function AIUnifiedAnalysis() {
     setIsLoading(true);
 
     try {
-      // Get comprehensive data
-      const [
-        sourcesResult, 
-        patientsResult, 
-        visitsResult, 
-        campaignsResult,
-        deliveriesResult
-      ] = await Promise.all([
-        supabase.from('patient_sources').select('*').eq('created_by', user.id),
-        supabase.from('monthly_patients').select('*').eq('user_id', user.id),
-        supabase.from('marketing_visits').select('*').eq('user_id', user.id),
-        supabase.from('campaigns').select('*').eq('created_by', user.id),
-        supabase.from('campaign_deliveries').select('*').eq('created_by', user.id)
-      ]);
+      // Get comprehensive unified data
+      const unifiedData = await fetchAllData();
+      
+      if (!unifiedData) {
+        throw new Error('Failed to fetch practice data');
+      }
 
-      const sources = sourcesResult.data || [];
-      const patients = patientsResult.data || [];
-      const visits = visitsResult.data || [];
-      const campaigns = campaignsResult.data || [];
-      const deliveries = deliveriesResult.data || [];
+      // Create detailed analysis prompt with actual data
+      const analysisPrompt = `
+Analyze this comprehensive practice data and provide 4-6 actionable business insights:
+
+PRACTICE DATA SUMMARY:
+- Total Referral Sources: ${unifiedData.analytics.total_sources}
+- Total Referrals (All Time): ${unifiedData.analytics.total_referrals}
+- Active Recent Sources: ${unifiedData.analytics.active_sources_this_month}
+- Source Type Distribution: ${JSON.stringify(unifiedData.analytics.source_types_distribution)}
+
+MONTHLY TRENDS:
+${unifiedData.analytics.last_6_months_trend.length > 0 
+  ? unifiedData.analytics.last_6_months_trend.map(m => `${m.year_month}: ${m.patient_count} patients`).join('\n')
+  : 'No recent data available'
+}
+
+MARKETING VISITS DATA:
+- Total Visits Tracked: ${unifiedData.visits.length}
+- Recent Visit Activity: ${unifiedData.analytics.recent_visits}
+
+CAMPAIGN PERFORMANCE:
+- Active Campaigns: ${unifiedData.campaigns.filter(c => c.status === 'Active').length}
+- Campaign Success Rate: ${unifiedData.analytics.campaign_delivery_success_rate}%
+
+BUSINESS OPPORTUNITIES:
+- Discovered Offices: ${unifiedData.analytics.discovered_offices_count}
+- Imported Offices: ${unifiedData.analytics.imported_offices}
+- Pending Reviews: ${unifiedData.analytics.pending_reviews}
+
+ANALYSIS INSTRUCTION:
+Generate a comprehensive, flowing analysis of this practice's performance, focusing on key insights and actionable recommendations. Keep it concise but thorough.
+
+RETURN FORMAT: Return only the JSON structure specified in the system prompt.
+`;
 
       const { data, error } = await supabase.functions.invoke('ai-assistant', {
         body: {
           task_type: 'comprehensive_analysis',
           context: {
-            practice_data: {
-              sources,
-              monthly_data: patients,
-              visits,
-              campaigns,
-              campaign_deliveries: deliveries
-            }
+            unified_data: unifiedData
           },
-          prompt: 'Generate a comprehensive, flowing analysis of this practice\'s performance, focusing on key insights and actionable recommendations. Keep it concise but thorough.'
+          prompt: analysisPrompt
         },
         headers: {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
@@ -184,19 +230,19 @@ export function AIUnifiedAnalysis() {
 
       const analysisContent = data.content || 'Analysis completed successfully.';
       
-      // Extract key insights and recommendations
+      // Extract key insights and recommendations from unified data
       const keyInsights = [
-        `${sources.length} total referral sources with ${sources.filter(s => s.is_active).length} currently active`,
-        `${patients.reduce((sum, p) => sum + (p.patient_count || 0), 0)} total referrals tracked across all time periods`,
-        `${Math.round((visits.filter(v => v.visited).length / Math.max(visits.length, 1)) * 100)}% marketing visit completion rate`,
-        `${campaigns.filter(c => c.status === 'Active').length} active campaigns with ${deliveries.length} total deliveries`
+        `${unifiedData.analytics.total_sources} total referral sources with ${unifiedData.analytics.active_sources_this_month} currently active`,
+        `${unifiedData.analytics.total_referrals} total referrals tracked across all time periods`,
+        `${unifiedData.analytics.recent_visits} recent marketing visits with ${Math.round((unifiedData.visits.filter(v => v.visited).length / Math.max(unifiedData.visits.length, 1)) * 100)}% completion rate`,
+        `${unifiedData.campaigns.filter(c => c.status === 'Active').length} active campaigns with ${unifiedData.analytics.campaign_delivery_success_rate}% success rate`
       ];
 
       const recommendations = [
-        sources.length < 10 ? 'Expand referral network to reduce dependency risk' : 'Maintain regular source engagement',
-        visits.filter(v => v.visited).length / Math.max(visits.length, 1) < 0.8 ? 'Improve visit completion rates' : 'Continue excellent outreach efforts',
+        unifiedData.analytics.total_sources < 10 ? 'Expand referral network to reduce dependency risk' : 'Maintain regular source engagement',
+        unifiedData.analytics.campaign_delivery_success_rate < 80 ? 'Improve campaign delivery rates and follow-up processes' : 'Continue excellent campaign execution',
         'Monitor monthly referral trends for seasonal patterns',
-        'Develop source-specific communication strategies'
+        'Develop source-specific communication strategies based on performance data'
       ];
 
       const newAnalysis = {
@@ -272,9 +318,7 @@ export function AIUnifiedAnalysis() {
               {/* Main Analysis Text */}
               <div className="prose prose-slate max-w-none">
                 <div className="bg-white/70 backdrop-blur-sm rounded-lg p-6 border border-slate-200/50">
-                  <div className="text-slate-700 leading-relaxed whitespace-pre-wrap">
-                    {analysis.content}
-                  </div>
+                  <FormattedAIText text={analysis.content} />
                 </div>
               </div>
 
