@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 interface AIRequest {
-  task_type: 'email_generation' | 'review_response' | 'content_creation' | 'analysis' | 'comprehensive_analysis' | 'business_intelligence' | 'structured_report' | 'practice_consultation';
+  task_type: 'email_generation' | 'review_response' | 'content_creation' | 'analysis' | 'comprehensive_analysis' | 'business_intelligence' | 'structured_report' | 'practice_consultation' | 'quick_consultation';
   context: any;
   prompt?: string;
   parameters?: {
@@ -458,6 +458,21 @@ BUSINESS CONTEXT:
 - Owner: ${business_persona?.owner_name || 'Healthcare Professional'}
 - Communication Style: ${communication_style || 'professional'}
 - Focus: Practical advice based on real practice data and performance metrics`;
+
+    case 'quick_consultation':
+      return `You are a quick AI assistant for healthcare practice insights.
+
+QUICK RESPONSE GUIDELINES:
+- Keep responses under 150 words maximum
+- Be direct and actionable
+- Provide specific, data-driven insights
+- Skip lengthy explanations
+- Focus on immediate actionable advice
+
+BUSINESS CONTEXT:
+- Practice: ${business_persona?.practice_name || 'Healthcare Practice'}
+- Owner: ${business_persona?.owner_name || 'Healthcare Professional'}
+- Style: Quick, professional, data-focused responses`;
 
     default:
       return basePrompt + `

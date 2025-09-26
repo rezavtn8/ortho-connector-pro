@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AIBusinessSetup } from '@/components/AIBusinessSetup';
 import { AIUsageDashboard } from '@/components/AIUsageDashboard';
-import { SimplifiedBusinessAnalysis } from '@/components/SimplifiedBusinessAnalysis';
-import { AIChatAssistant } from '@/components/AIChatAssistant';
+import { AIUnifiedAnalysis } from '@/components/AIUnifiedAnalysis';
+import { AIStreamlinedChat } from '@/components/AIStreamlinedChat';
 import { Bot, MessageSquare, Mail, FileText, BarChart3, Settings, Activity, Building2, User, Network, Palette, TrendingUp, Zap } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -104,101 +104,77 @@ export function AIAssistant() {
           )}
 
           {/* AI Insights Section */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Zap className="h-5 w-5 text-primary" />
-              <h3 className="text-lg font-semibold">AI Business Analysis</h3>
-            </div>
-            <SimplifiedBusinessAnalysis />
-          </div>
+          <AIUnifiedAnalysis />
 
           {/* Quick Actions Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => setActiveTab('chat')}>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Bot className="h-5 w-5 text-primary" />
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <Bot className="h-4 w-4 text-primary" />
                   AI Consultation
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Chat with AI for personalized insights and recommendations about your practice.
+              <CardContent className="pt-0">
+                <p className="text-xs text-muted-foreground mb-3">
+                  Quick insights and recommendations
                 </p>
-                <Button className="w-full">
-                  <MessageSquare className="h-4 w-4 mr-2" />
+                <Button size="sm" className="w-full">
+                  <MessageSquare className="h-3 w-3 mr-2" />
                   Start Chat
                 </Button>
               </CardContent>
             </Card>
 
             <Card className="hover:shadow-md transition-shadow">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Mail className="h-5 w-5 text-primary" />
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <Mail className="h-4 w-4 text-primary" />
                   Smart Campaigns
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Create AI-powered marketing campaigns based on your practice data.
+              <CardContent className="pt-0">
+                <p className="text-xs text-muted-foreground mb-3">
+                  AI-powered marketing campaigns
                 </p>
-                <Button className="w-full" variant="outline" onClick={() => navigate('/campaigns')}>
-                  <Mail className="h-4 w-4 mr-2" />
+                <Button size="sm" className="w-full" variant="outline" onClick={() => navigate('/campaigns')}>
+                  <Mail className="h-3 w-3 mr-2" />
                   Create Campaign
                 </Button>
               </CardContent>
             </Card>
 
             <Card className="hover:shadow-md transition-shadow">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-primary" />
-                  Content Studio
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Generate marketing materials tailored to your practice's brand and voice.
-                </p>
-                <Button className="w-full" variant="outline" disabled>
-                  <Palette className="h-4 w-4 mr-2" />
-                  Content Creation (Coming Soon)
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="hover:shadow-md transition-shadow">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5 text-primary" />
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <MessageSquare className="h-4 w-4 text-primary" />
                   Review Manager
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  AI-powered responses to reviews that match your practice's voice.
+              <CardContent className="pt-0">
+                <p className="text-xs text-muted-foreground mb-3">
+                  AI review responses
                 </p>
-                <Button className="w-full" variant="outline" onClick={() => navigate('/reviews')}>
-                  <MessageSquare className="h-4 w-4 mr-2" />
+                <Button size="sm" className="w-full" variant="outline" onClick={() => navigate('/reviews')}>
+                  <MessageSquare className="h-3 w-3 mr-2" />
                   Manage Reviews
                 </Button>
               </CardContent>
             </Card>
 
             <Card className="hover:shadow-md transition-shadow">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5 text-primary" />
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <Activity className="h-4 w-4 text-primary" />
                   Usage Analytics
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Monitor AI usage, costs, and performance metrics for optimization.
+              <CardContent className="pt-0">
+                <p className="text-xs text-muted-foreground mb-3">
+                  Monitor AI usage metrics
                 </p>
-                <Button className="w-full" variant="outline" onClick={() => setActiveTab('setup')}>
-                  <Activity className="h-4 w-4 mr-2" />
+                <Button size="sm" className="w-full" variant="outline" onClick={() => setActiveTab('setup')}>
+                  <Activity className="h-3 w-3 mr-2" />
                   View Usage
                 </Button>
               </CardContent>
@@ -208,7 +184,7 @@ export function AIAssistant() {
 
 
         <TabsContent value="chat" className="space-y-6">
-          <AIChatAssistant />
+          <AIStreamlinedChat />
         </TabsContent>
 
         <TabsContent value="setup" className="space-y-6">
