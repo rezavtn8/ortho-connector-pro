@@ -53,67 +53,59 @@ export function useUnifiedAIData() {
     setError(null);
 
     try {
-      // Fetch ALL platform data in parallel for maximum efficiency
-      // Add timeframe filters for performance
+      // Fetch core data first, then optional data in batches to avoid overwhelming DB
       const eighteenMonthsAgoFilter = new Date();
       eighteenMonthsAgoFilter.setMonth(eighteenMonthsAgoFilter.getMonth() - 18);
-      const eighteenMonthsAgoStr = eighteenMonthsAgoFilter.toISOString().substring(0, 7); // YYYY-MM
+      const eighteenMonthsAgoStr = eighteenMonthsAgoFilter.toISOString().substring(0, 7);
 
       const sixMonthsAgoFilter = new Date();
       sixMonthsAgoFilter.setMonth(sixMonthsAgoFilter.getMonth() - 6);
-      const sixMonthsAgoDateStr = sixMonthsAgoFilter.toISOString().split('T')[0]; // YYYY-MM-DD
+      const sixMonthsAgoDateStr = sixMonthsAgoFilter.toISOString().split('T')[0];
 
-      const twelveMonthsAgoFilter = new Date();
-      twelveMonthsAgoFilter.setMonth(twelveMonthsAgoFilter.getMonth() - 12);
-      const twelveMonthsAgoISO = twelveMonthsAgoFilter.toISOString();
-
-      const [
-        sourcesResult,
-        monthlyResult, 
-        visitsResult,
-        campaignsResult,
-        discoveredResult,
-        reviewsResult,
-        deliveriesResult,
-        usageResult,
-        userProfileResult,
-        clinicResult,
-        activityResult,
-        aiBusinessProfileResult,
-        aiTemplatesResult,
-        aiContentResult
-      ] = await Promise.all([
-        supabase.from('patient_sources').select('*').eq('created_by', user.id),
-        supabase.from('monthly_patients').select('*').eq('user_id', user.id).gte('year_month', eighteenMonthsAgoStr),
-        supabase.from('marketing_visits').select('*').eq('user_id', user.id).gte('visit_date', sixMonthsAgoDateStr),
-        supabase.from('campaigns').select('*').eq('created_by', user.id).gte('created_at', twelveMonthsAgoISO),
-        supabase.from('discovered_offices').select('*').eq('discovered_by', user.id),
-        supabase.from('review_status').select('*').eq('user_id', user.id),
-        supabase.from('campaign_deliveries').select('*').eq('created_by', user.id),
-        supabase.from('ai_usage_tracking').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(50),
+      // Batch 1: Essential data for AI
+      const [sourcesResult, monthlyResult, userProfileResult, clinicResult] = await Promise.all([
+        supabase.from('patient_sources').select('*').eq('created_by', user.id).limit(100),
+        supabase.from('monthly_patients').select('*').eq('user_id', user.id).gte('year_month', eighteenMonthsAgoStr).limit(50),
         supabase.from('user_profiles').select('*').eq('user_id', user.id).single(),
-        supabase.from('clinics').select('*').eq('owner_id', user.id).maybeSingle(),
-        supabase.from('activity_log').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(100),
-        supabase.from('ai_business_profiles').select('*').eq('user_id', user.id).maybeSingle(),
-        supabase.from('ai_response_templates').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(10),
-        supabase.from('ai_generated_content').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(20)
+        supabase.from('clinics').select('*').eq('owner_id', user.id).maybeSingle()
       ]);
 
-      // Extract data arrays
+      // Small delay to prevent overwhelming the DB
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Batch 2: Recent activity data  
+      const [visitsResult, campaignsResult, aiBusinessProfileResult] = await Promise.all([
+        supabase.from('marketing_visits').select('*').eq('user_id', user.id).gte('visit_date', sixMonthsAgoDateStr).limit(50),
+        supabase.from('campaigns').select('*').eq('created_by', user.id).order('created_at', { ascending: false }).limit(25),
+        supabase.from('ai_business_profiles').select('*').eq('user_id', user.id).maybeSingle()
+      ]);
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Batch 3: Additional data (non-blocking)
+      const [discoveredResult, reviewsResult, usageResult] = await Promise.all([
+        supabase.from('discovered_offices').select('*').eq('discovered_by', user.id).limit(50),
+        supabase.from('review_status').select('*').eq('user_id', user.id).limit(25),
+        supabase.from('ai_usage_tracking').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(25)
+      ]);
+
+      // Set defaults for optional data that might fail
+      const deliveries: any[] = [];
+      const activities: any[] = [];
+      const aiTemplates: any[] = [];
+      const aiContent: any[] = [];
+
+      // Extract data arrays safely
       const sources = sourcesResult.data || [];
       const monthlyData = monthlyResult.data || [];
       const visits = visitsResult.data || [];
       const campaigns = campaignsResult.data || [];
       const discoveredOffices = discoveredResult.data || [];
       const reviews = reviewsResult.data || [];
-      const deliveries = deliveriesResult.data || [];
       const aiUsage = usageResult.data || [];
       const userProfile = userProfileResult.data;
       const clinic = clinicResult.data;
-      const activities = activityResult.data || [];
       const aiBusinessProfileData = aiBusinessProfileResult.data;
-      const aiTemplates = aiTemplatesResult.data || [];
-      const aiContent = aiContentResult.data || [];
 
       // Get business profile from AI business context if not available
       let businessProfile = aiBusinessProfileData;

@@ -14,6 +14,7 @@ import { AIUsageDashboard } from '@/components/AIUsageDashboard';
 export default function AIAssistant() {
   const { user } = useAuth();
   const { data: unifiedData, loading: dataLoading } = useUnifiedAIData();
+  const [activeTab, setActiveTab] = useState('overview');
 
   // Business profile is now part of unified data
   const businessProfile = unifiedData?.business_profile;
@@ -67,7 +68,7 @@ export default function AIAssistant() {
         </Alert>
       )}
 
-      <Tabs defaultValue="overview" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <Sparkles className="h-4 w-4" />
@@ -118,17 +119,23 @@ export default function AIAssistant() {
           <SimplifiedBusinessAnalysis />
         </TabsContent>
 
-        <TabsContent value="chat">
-          <AIChatAssistant />
-        </TabsContent>
+        {activeTab === 'chat' && (
+          <TabsContent value="chat">
+            <AIChatAssistant />
+          </TabsContent>
+        )}
 
-        <TabsContent value="setup">
-          <AIBusinessSetup />
-        </TabsContent>
+        {activeTab === 'setup' && (
+          <TabsContent value="setup">
+            <AIBusinessSetup />
+          </TabsContent>
+        )}
 
-        <TabsContent value="usage">
-          <AIUsageDashboard />
-        </TabsContent>
+        {activeTab === 'usage' && (
+          <TabsContent value="usage">
+            <AIUsageDashboard />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
