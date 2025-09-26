@@ -173,7 +173,7 @@ serve(async (req) => {
           
           if (textData.status === 'OK' && textData.results) {
             // Filter for dental-related results
-            const dentalResults = textData.results.filter(place => {
+            const dentalResults = textData.results.filter((place: any) => {
               const name = place.name.toLowerCase();
               const types = place.types || [];
               return name.includes('dental') || name.includes('dentist') || 
@@ -392,7 +392,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : 'Unknown error',
         canRefresh: true
       }),
       {

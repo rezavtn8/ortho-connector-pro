@@ -143,7 +143,7 @@ serve(async (req) => {
         )
       }
     } catch (testError) {
-      console.warn(`get-google-maps-key: API key validation test failed (continuing anyway): ${testError.message} [${requestId}]`)
+      console.warn(`get-google-maps-key: API key validation test failed (continuing anyway): ${testError instanceof Error ? testError.message : 'Unknown error'} [${requestId}]`)
       // Continue anyway as this might be a network issue
     }
 

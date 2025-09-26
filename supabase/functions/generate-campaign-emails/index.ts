@@ -130,7 +130,7 @@ serve(async (req) => {
       
       // Office-specific campaign history
       const officeCampaigns = allCampaigns?.filter(c => 
-        c.campaign_deliveries?.some(d => d.office_id === office.id)
+        c.campaign_deliveries?.some((d: any) => d.office_id === office.id)
       ) || [];
 
       // Office details from sources
@@ -394,7 +394,7 @@ serve(async (req) => {
     console.error('Error in comprehensive email generation:', error);
     return new Response(JSON.stringify({ 
       success: false,
-      error: error.message 
+      error: error instanceof Error ? error.message : 'Unknown error' 
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

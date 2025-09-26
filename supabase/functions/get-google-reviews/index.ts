@@ -331,7 +331,7 @@ Deno.serve(async (req) => {
         clearTimeout(timeoutId)
         lastError = fetchError as Error
         
-        if (fetchError.name === 'AbortError') {
+        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
           console.error(`get-google-reviews: Request timeout (attempt ${attempt}) [${requestId}]`)
           if (attempt < maxRetries) {
             console.log(`get-google-reviews: Retrying after timeout (attempt ${attempt + 1}/${maxRetries}) [${requestId}]`)
@@ -374,7 +374,7 @@ Deno.serve(async (req) => {
     let errorMessage = 'Internal server error while fetching reviews'
     let statusCode = 500
     
-    if (error.message.includes('JSON')) {
+    if (error instanceof Error && error.message.includes('JSON')) {
       errorMessage = 'Invalid request format'
       statusCode = 400
     }
@@ -384,7 +384,7 @@ Deno.serve(async (req) => {
         error: errorMessage,
         code: 'INTERNAL_ERROR',
         success: false,
-        details: error.message,
+        details: error instanceof Error ? error.message : 'Unknown error',
         request_id: requestId
       }),
       {
