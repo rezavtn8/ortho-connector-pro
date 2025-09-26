@@ -35,18 +35,49 @@ interface QuickStat {
 
 // Component to parse and format AI JSON response with proper styling
 const FormattedAIAnalysis = ({ text }: { text: string }) => {
-  // Try to parse JSON response first
+  // Try to parse JSON response with more robust handling
   let parsedContent = null;
+  let cleanText = text;
+  
   try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    // First try to find JSON block in the response
+    const jsonMatch = text.match(/\{[\s\S]*?("insights"[\s\S]*?\][\s\S]*?)\}/);
     if (jsonMatch) {
-      parsedContent = JSON.parse(jsonMatch[0]);
+      let jsonStr = jsonMatch[0];
+      // Clean up common JSON issues
+      jsonStr = jsonStr.replace(/,(\s*[}\]])/g, '$1'); // Remove trailing commas
+      jsonStr = jsonStr.replace(/([{,]\s*)(\w+):/g, '$1"$2":'); // Quote unquoted keys
+      parsedContent = JSON.parse(jsonStr);
     }
   } catch (e) {
-    console.warn('Could not parse AI response as JSON:', e);
+    console.warn('Could not parse AI response as JSON, using fallback formatting:', e);
+    
+    // Try a simpler approach - look for structured content patterns
+    const insights = [];
+    const sections = text.split(/\*\*[\w\s:]+\*\*/);
+    
+    if (sections.length > 1) {
+      const titles = text.match(/\*\*(.*?)\*\*/g) || [];
+      for (let i = 0; i < titles.length && i < sections.length - 1; i++) {
+        const title = titles[i].replace(/\*\*/g, '').replace(/:/g, '').trim();
+        const content = sections[i + 1].trim();
+        
+        if (title && content) {
+          insights.push({
+            title: title,
+            analysis: content,
+            recommendation: null
+          });
+        }
+      }
+      
+      if (insights.length > 0) {
+        parsedContent = { insights };
+      }
+    }
   }
 
-  // If we have structured JSON content with insights
+  // If we have structured content with insights
   if (parsedContent && parsedContent.insights && Array.isArray(parsedContent.insights)) {
     return (
       <div className="space-y-6">
@@ -59,7 +90,7 @@ const FormattedAIAnalysis = ({ text }: { text: string }) => {
             
             {/* Analysis content with proper formatting */}
             <div className="text-slate-700 leading-relaxed space-y-3">
-              <p className="text-sm">
+              <p className="text-sm whitespace-pre-line">
                 {insight.analysis || insight.content || ''}
               </p>
               
@@ -67,7 +98,7 @@ const FormattedAIAnalysis = ({ text }: { text: string }) => {
               {insight.recommendation && (
                 <div className="mt-4 p-3 bg-teal-50 rounded border-l-4 border-teal-500">
                   <p className="text-sm font-medium text-teal-800 mb-1">Recommendation:</p>
-                  <p className="text-sm text-teal-700">{insight.recommendation}</p>
+                  <p className="text-sm text-teal-700 whitespace-pre-line">{insight.recommendation}</p>
                 </div>
               )}
             </div>
@@ -81,13 +112,17 @@ const FormattedAIAnalysis = ({ text }: { text: string }) => {
   const formatText = (text: string) => {
     // Clean up JSON artifacts and formatting
     let formatted = text
-      .replace(/\{[\s\S]*?"insights":\s*\[[\s\S]*?\]/g, '') // Remove JSON structure
-      .replace(/\{[\s\S]*?\}/g, '') // Remove any remaining JSON
+      .replace(/\{[\s\S]*?"insights"[\s\S]*?\}/g, '') // Remove any JSON structure
       .replace(/```json/g, '')
       .replace(/```/g, '')
       .replace(/^\s*[\[\]{}",]+/gm, '') // Remove JSON characters at line start
       .replace(/[\[\]{}",]+\s*$/gm, '') // Remove JSON characters at line end
       .trim();
+
+    // If the text is mostly empty after cleanup, return the original
+    if (formatted.length < 50) {
+      formatted = text;
+    }
 
     // Replace **bold** with <strong>
     formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-teal-700">$1</strong>');
@@ -95,14 +130,14 @@ const FormattedAIAnalysis = ({ text }: { text: string }) => {
     // Replace *italic* with <em>
     formatted = formatted.replace(/\*(.*?)\*/g, '<em class="italic text-slate-600">$1</em>');
     
-    // Handle titles that start with numbers or bullets
-    formatted = formatted.replace(/^(\d+\.\s*)(.*?):/gm, '<strong class="font-bold text-teal-700">$1$2:</strong>');
+    // Handle numbered insights
+    formatted = formatted.replace(/^(\d+)\.\s*\*\*(.*?)\*\*/gm, '<div class="mt-4 mb-2"><strong class="font-bold text-teal-700">$1. $2</strong></div>');
     
     // Replace bullet points
     formatted = formatted.replace(/^[\s]*[-•]\s+/gm, '<span class="text-teal-500 font-bold">•</span> ');
     
-    // Clean up extra whitespace and line breaks
-    formatted = formatted.replace(/\n\s*\n\s*\n/g, '\n\n');
+    // Handle line breaks properly
+    formatted = formatted.replace(/\n/g, '<br/>');
     
     return formatted;
   };
@@ -110,7 +145,7 @@ const FormattedAIAnalysis = ({ text }: { text: string }) => {
   return (
     <div 
       className="text-slate-700 leading-relaxed space-y-4"
-      dangerouslySetInnerHTML={{ __html: formatText(text) }}
+      dangerouslySetInnerHTML={{ __html: formatText(cleanText) }}
     />
   );
 };

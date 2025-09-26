@@ -98,10 +98,14 @@ export function AIStreamlinedChat() {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('AI function error:', error);
+        throw new Error(error.message || 'Failed to get AI response');
+      }
 
-      // Limit response length
-      let responseContent = data.content || 'I apologize, but I encountered an issue. Please try again.';
+      let responseContent = data?.content || 'I apologize, but I encountered an issue processing your request. Please try again.';
+      
+      // Limit response length for chat
       const words = responseContent.split(' ');
       if (words.length > 150) {
         responseContent = words.slice(0, 150).join(' ') + '...';
@@ -117,18 +121,25 @@ export function AIStreamlinedChat() {
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+
     } catch (error: any) {
-      console.error('Error calling AI assistant:', error);
+      console.error('Chat error:', error);
       
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'Sorry, I encountered an error. Please try asking again or check your connection.',
+        content: 'I apologize, but I encountered a technical issue. Please try asking your question again.',
         timestamp: new Date(),
         type: 'quick'
       };
 
       setMessages(prev => [...prev, errorMessage]);
+
+      toast({
+        title: 'Chat Error',
+        description: 'There was an issue with the AI response. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setIsLoading(false);
     }
