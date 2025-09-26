@@ -54,13 +54,15 @@ export function useAIChat() {
     await logMessage(userMessage);
 
     try {
+      const conversationHistory = [...messages, userMessage].map(m => ({
+        role: m.role,
+        content: m.content
+      }));
+
       const { data, error } = await supabase.functions.invoke('ai-chat-assistant', {
         body: {
           message: content,
-          conversation_history: messages.map(m => ({
-            role: m.role,
-            content: m.content
-          }))
+          conversation_history: conversationHistory
         }
       });
 
