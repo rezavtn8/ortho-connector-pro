@@ -287,10 +287,11 @@ export const Discover = () => {
       if (error) {
         console.error('❌ callGooglePlacesAPI: Function error:', error);
         
-        if (error.message?.includes('Edge Function returned a non-2xx status code')) {
+        const errMsg = String((error as any)?.message || '');
+        if (errMsg.includes('429') || /rate\s*limit/i.test(errMsg)) {
           toast({
             title: "Rate Limited",
-            description: "You've reached the weekly discovery limit. Try again next week.",
+            description: "You've reached the weekly discovery limit. Try again later.",
             variant: "destructive"
           });
           await loadWeeklyUsage();

@@ -417,9 +417,15 @@ serve(async (req) => {
 
       // Insert new offices
       if (offices.length > 0) {
+        // Strip non-existent columns before DB insert
+        const officesForInsert = offices.map((o: any) => {
+          const { already_in_network, ...db } = o as any;
+          return db;
+        });
+
         const { data: inserted, error: insertError } = await supabase
           .from('discovered_offices')
-          .upsert(offices, { 
+          .upsert(officesForInsert, { 
             onConflict: 'place_id',
             ignoreDuplicates: false 
           })
