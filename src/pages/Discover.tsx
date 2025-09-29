@@ -382,24 +382,28 @@ export const Discover = () => {
     }
   };
 
-  const handleDiscover = async (params: DiscoveryParams) => {
-    console.log('🎯 handleDiscover: Starting discovery with params:', params);
+  const handleDiscover = async (params: DiscoveryParams, forceRefresh = false) => {
+    console.log('🎯 handleDiscover: Starting discovery with params:', params, 'forceRefresh:', forceRefresh);
     setIsLoading(true);
     
     try {
-      // Check for cached results first
-      console.log('🔍 handleDiscover: Checking for cached results...');
-      const { offices: cachedOffices, session: cachedSession } = await searchCachedOffices(params);
-      
-      if (cachedOffices.length > 0) {
-        console.log(`✅ handleDiscover: Found ${cachedOffices.length} cached offices`);
-        setDiscoveredOffices(cachedOffices);
-        setCurrentSession(cachedSession);
-        toast({
-          title: "Cached Results",
-          description: `Found ${cachedOffices.length} cached offices matching your search parameters`,
-        });
-        return;
+      // Skip cache check if force refresh is requested
+      if (!forceRefresh) {
+        console.log('🔍 handleDiscover: Checking for cached results...');
+        const { offices: cachedOffices, session: cachedSession } = await searchCachedOffices(params);
+        
+        if (cachedOffices.length > 0) {
+          console.log(`✅ handleDiscover: Found ${cachedOffices.length} cached offices`);
+          setDiscoveredOffices(cachedOffices);
+          setCurrentSession(cachedSession);
+          toast({
+            title: "Cached Results",
+            description: `Found ${cachedOffices.length} cached offices matching your search parameters. Click "Refresh" to search again.`,
+          });
+          return;
+        }
+      } else {
+        console.log('🔄 handleDiscover: Force refresh requested, skipping cache check');
       }
 
       // No rate limiting - directly call API
@@ -416,6 +420,22 @@ export const Discover = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleForceRefresh = async () => {
+    if (!currentSession) return;
+    
+    const params: DiscoveryParams = {
+      distance: currentSession.search_distance,
+      zipCode: currentSession.zip_code_override || undefined,
+      officeType: currentSession.office_type_filter || 'all',
+      minRating: 0,
+      searchStrategy: 'comprehensive',
+      includeSpecialties: true,
+      requireWebsite: false
+    };
+    
+    await handleDiscover(params, true);
   };
 
   const handleAddToNetwork = (office: DiscoveredOffice) => {
@@ -466,17 +486,28 @@ export const Discover = () => {
         </p>
       </div>
 
-      {/* Action Button */}
-      <div className="flex justify-end mb-6">
+      {/* Action Buttons */}
+      <div className="flex justify-end gap-2 mb-6">
         {currentSession && (
-          <Button 
-            onClick={handleStartOver}
-            variant="outline"
-            className="flex items-center gap-2"
-          >
-            <RefreshCw className="w-4 h-4" />
-            New Search
-          </Button>
+          <>
+            <Button 
+              onClick={handleForceRefresh}
+              variant="default"
+              disabled={isLoading}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+              {isLoading ? 'Searching...' : 'Refresh Results'}
+            </Button>
+            <Button 
+              onClick={handleStartOver}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <Search className="w-4 h-4" />
+              New Search
+            </Button>
+          </>
         )}
       </div>
 
