@@ -163,76 +163,74 @@ export function AIAnalysisTab() {
 
       {/* Narrative Sections */}
       <div className="space-y-6">
-        {analysis.narrative_sections?.map((section: any, index: number) => (
-          <Card key={index}>
+        {(() => {
+          const sections = (analysis.narrative_sections || []).filter((s: any) => {
+            const hasTitle = typeof s?.title === 'string' && s.title.trim().length > 0;
+            const hasContent = typeof s?.content === 'string' && s.content.trim().length > 0;
+            const hasFindings = Array.isArray(s?.key_findings) && s.key_findings.length > 0;
+            return hasTitle || hasContent || hasFindings;
+          });
+          if (sections.length === 0) return null;
+          return sections.map((section: any, index: number) => (
+            <Card key={index}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                  {section.title || 'Insights'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {section.content && (
+                  <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                    {section.content}
+                  </p>
+                )}
+                {Array.isArray(section.key_findings) && section.key_findings.length > 0 && (
+                  <div className="bg-muted/50 rounded-lg p-4">
+                    <p className="font-medium mb-2">Key Findings:</p>
+                    <ul className="space-y-2">
+                      {section.key_findings.map((finding: string, fIndex: number) => (
+                        <li key={fIndex} className="flex items-start gap-2">
+                          <span className="text-primary mt-1">•</span>
+                          <span className="text-sm">{finding}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ));
+        })()}
+      </div>
+
+      {/* Strategic Recommendations - Purple AI accent */}
+      {(() => {
+        const recs = (analysis.recommendations || []).filter((r: any) =>
+          (typeof r?.title === 'string' && r.title.trim()) || (typeof r?.action === 'string' && r.action.trim())
+        );
+        if (recs.length === 0) return null;
+        return (
+          <Card className="border-purple-200 bg-gradient-to-br from-purple-50/50 to-blue-50/50">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-primary" />
-                {section.title}
+                <Brain className="h-5 w-5 text-purple-600" />
+                Strategic Recommendations
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Section Content */}
-              {section.content && (
-                <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                  {section.content}
-                </p>
-              )}
-              
-              {/* Key Findings */}
-              {section.key_findings && section.key_findings.length > 0 && (
-                <div className="bg-muted/50 rounded-lg p-4">
-                  <p className="font-medium mb-2">Key Findings:</p>
-                  <ul className="space-y-2">
-                    {section.key_findings.map((finding: string, fIndex: number) => (
-                      <li key={fIndex} className="flex items-start gap-2">
-                        <span className="text-primary mt-1">•</span>
-                        <span className="text-sm">{finding}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )) || (
-              // Fallback for old format
-              <div className="text-base leading-7 text-slate-700 dark:text-slate-300 space-y-6">
-                {analysis.insights?.map((insight: any, index: number) => (
-                  <div key={index}>
-                    <p className="mb-4">
-                      <span className="font-medium text-foreground">{insight.summary}</span>
-                    </p>
-                    {index < analysis.insights.length - 1 && (
-                      <div className="my-6 w-16 h-px bg-gradient-to-r from-teal-300 to-transparent"></div>
-                    )}
+            <CardContent>
+              <div className="space-y-3">
+                {recs.map((rec: any, index: number) => (
+                  <div key={index} className="bg-white rounded-lg p-4 border border-purple-100">
+                    <h4 className="font-semibold text-purple-900 mb-1">{rec.title || 'Recommendation'}</h4>
+                    {rec.action && <p className="text-sm text-muted-foreground">{rec.action}</p>}
                   </div>
                 ))}
               </div>
-            )}
-          </div>
-
-      {/* Strategic Recommendations - Purple AI accent */}
-      {analysis.recommendations && analysis.recommendations.length > 0 && (
-        <Card className="border-purple-200 bg-gradient-to-br from-purple-50/50 to-blue-50/50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Brain className="h-5 w-5 text-purple-600" />
-              Strategic Recommendations
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {analysis.recommendations.map((rec: any, index: number) => (
-                <div key={index} className="bg-white rounded-lg p-4 border border-purple-100">
-                  <h4 className="font-semibold text-purple-900 mb-1">{rec.title}</h4>
-                  <p className="text-sm text-muted-foreground">{rec.action}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        );
+      })()}
     </div>
   );
 }

@@ -42,6 +42,11 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Generating AI business analysis for user:', user.id);
 
+    // Establish time window for the last 12 months
+    const now = new Date();
+    const startDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 12, 1));
+    const startYearMonth = startDate.toISOString().slice(0, 7);
+
     // Fetch ALL business data for comprehensive analysis
     const [
       sourcesRes, 
@@ -56,7 +61,12 @@ const handler = async (req: Request): Promise<Response> => {
       aiSettingsRes
     ] = await Promise.all([
       supabase.from('patient_sources').select('*').eq('created_by', user.id),
-      supabase.from('monthly_patients').select('*').eq('user_id', user.id).order('year_month', { ascending: false }).limit(24),
+      supabase
+        .from('monthly_patients')
+        .select('*')
+        .eq('user_id', user.id)
+        .gte('year_month', startYearMonth)
+        .order('year_month', { ascending: false }),
       supabase.from('campaigns').select('*').eq('created_by', user.id),
       supabase.from('marketing_visits').select('*').eq('user_id', user.id),
       supabase.from('review_status').select('*').eq('user_id', user.id),
@@ -206,11 +216,18 @@ const handler = async (req: Request): Promise<Response> => {
         // Deterministic fallback using collected business data
         try {
           const totalSources = businessData.sources?.length || 0;
-          const totalPatients = (businessData.patients || []).reduce((sum: number, p: any) => sum + (p.patient_count || 0), 0);
-          const activeCampaigns = (businessData.campaigns || []).filter((c: any) => (c.status || '').toLowerCase() === 'active').length;
-          const monthlyCounts = (businessData.patients || []).map((p: any) => p.patient_count || 0);
-          const recent3 = monthlyCounts.slice(0, 3).reduce((a: number, b: number) => a + b, 0);
-          const prev3 = monthlyCounts.slice(3, 6).reduce((a: number, b: number) => a + b, 0);
+          // Aggregate patient counts by month to avoid double-counting per-source rows
+          const byMonth: Record<string, number> = {};
+          (businessData.patients || []).forEach((p: any) => {
+            const ym = p.year_month as string;
+            const c = (p.patient_count || 0) as number;
+            byMonth[ym] = (byMonth[ym] ?? 0) + c;
+          });
+          const monthsDesc = Object.keys(byMonth).sort().reverse();
+          const last12 = monthsDesc.slice(0, 12);
+          const totalPatients = last12.reduce((sum, m) => sum + (byMonth[m] || 0), 0);
+          const recent3 = last12.slice(0, 3).reduce((a, m) => a + (byMonth[m] || 0), 0);
+          const prev3 = last12.slice(3, 6).reduce((a, m) => a + (byMonth[m] || 0), 0);
           const growth_trend = prev3 === 0 ? (recent3 > 0 ? 'positive' as const : 'stable' as const)
             : (recent3 > prev3 * 1.1 ? 'positive' as const : (recent3 < prev3 * 0.9 ? 'declining' as const : 'stable' as const));
 
@@ -236,9 +253,9 @@ const handler = async (req: Request): Promise<Response> => {
               },
               {
                 title: 'Marketing & Campaign Effectiveness',
-                content: `Active campaigns: ${activeCampaigns}. Draft or paused initiatives suppress visibility. Standardize a lightweight campaign sequence (intro email + flyer + 2‑week follow‑up) and iterate monthly on open/appointment conversion.`,
+                content: `Active campaigns: ${(businessData.campaigns || []).filter((c: any) => (c.status || '').toLowerCase() === 'active').length}. Draft or paused initiatives suppress visibility. Standardize a lightweight campaign sequence (intro email + flyer + 2‑week follow‑up) and iterate monthly on open/appointment conversion.`,
                 key_findings: [
-                  `Active campaigns: ${activeCampaigns}`,
+                  `Active campaigns: ${(businessData.campaigns || []).filter((c: any) => (c.status || '').toLowerCase() === 'active').length}`,
                   'Execution gaps across email and rep cadence',
                   'Small, templatized motions unlock faster throughput'
                 ]
@@ -262,7 +279,7 @@ const handler = async (req: Request): Promise<Response> => {
             metrics: {
               total_sources: totalSources,
               total_patients: totalPatients,
-              active_campaigns: activeCampaigns,
+              active_campaigns: (businessData.campaigns || []).filter((c: any) => (c.status || '').toLowerCase() === 'active').length,
               growth_trend
             }
           };
@@ -303,16 +320,24 @@ const handler = async (req: Request): Promise<Response> => {
 function buildAnalysisPrompt(data: any): string {
   const { sources, patients, campaigns, visits, reviews, deliveries, discovered, tags, userProfile, aiSettings } = data;
   
-  // DEBUG LOGGING FOR PATIENT CALCULATIONS
+  // DEBUG LOGGING FOR PATIENT CALCULATIONS (aggregated by month)
   console.log('=== ANALYSIS PATIENT COUNT DEBUG ===');
-  console.log('Total patient records:', patients.length);
-  console.log('First 3 patient records:', JSON.stringify(patients.slice(0, 3), null, 2));
-  
-  const totalPatients = patients.reduce((sum: number, p: any) => sum + (p.patient_count || 0), 0);
-  const last3MonthsPatients = patients.slice(0, 3).reduce((sum: number, p: any) => sum + (p.patient_count || 0), 0);
-  
-  console.log('Total Patients (all time):', totalPatients);
-  console.log('Last 3 Months Patients (first 3 records):', last3MonthsPatients);
+  console.log('Total patient rows:', patients.length);
+  const byMonth: Record<string, number> = {};
+  (patients || []).forEach((p: any) => {
+    const ym = p.year_month as string;
+    const c = (p.patient_count || 0) as number;
+    byMonth[ym] = (byMonth[ym] ?? 0) + c;
+  });
+  const monthsDesc = Object.keys(byMonth).sort().reverse();
+  const last12 = monthsDesc.slice(0, 12);
+  const totalPatients = last12.reduce((sum, m) => sum + (byMonth[m] || 0), 0);
+  const last3MonthsPatients = last12.slice(0, 3).reduce((sum, m) => sum + (byMonth[m] || 0), 0);
+  console.log('Months (desc):', monthsDesc.join(', '));
+  console.log('Last 3 Months Keys:', last12.slice(0,3));
+  console.log('Last 3 Months Values:', last12.slice(0,3).map(m => byMonth[m] || 0));
+  console.log('Total Patients (last 12 months):', totalPatients);
+  console.log('Last 3 Months Patients (aggregated):', last3MonthsPatients);
   console.log('=== END DEBUG ===');
   const activeCampaigns = campaigns.filter((c: any) => c.status === 'Active').length;
   const completedVisits = visits.filter((v: any) => v.visited);
@@ -358,10 +383,10 @@ COMPREHENSIVE BUSINESS DATA
 • Tagged Sources: ${tags.length}
 
 📈 PATIENT VOLUME ANALYSIS:
-• Total Patients (24 months): ${totalPatients}
+• Total Patients (last 12 months): ${totalPatients}
 • Last 3 Months: ${last3MonthsPatients}
 • Recent Monthly Trend:
-${patients.slice(0, 6).map((p: any) => `  ${p.year_month}: ${p.patient_count} patients`).join('\n')}
+${last12.slice(0, 6).map((m: string) => `  ${m}: ${byMonth[m] || 0} patients`).join('\n')}
 
 🎯 FIELD MARKETING ACTIVITY:
 • Total Marketing Visits: ${visits.length}

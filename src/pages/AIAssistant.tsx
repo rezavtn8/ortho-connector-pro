@@ -46,10 +46,13 @@ export function AIAssistant() {
         const sourceMonthlyData = monthlyData.filter(m => m.source_id === source.id);
         const total = sourceMonthlyData.reduce((sum, m) => sum + m.patient_count, 0);
         
+        // Ensure chronological order by year_month before trend calculation
+        const sorted = [...sourceMonthlyData].sort((a, b) => (a.year_month || '').localeCompare(b.year_month || ''));
+        const recent = sorted.length >= 1 ? (sorted[sorted.length - 1].patient_count || 0) : 0;
+        const previous = sorted.length >= 2 ? (sorted[sorted.length - 2].patient_count || 0) : 0;
+
         let trend: 'up' | 'down' | 'stable' = 'stable';
-        if (sourceMonthlyData.length >= 2) {
-          const recent = sourceMonthlyData[sourceMonthlyData.length - 1].patient_count;
-          const previous = sourceMonthlyData[sourceMonthlyData.length - 2].patient_count;
+        if (sorted.length >= 2) {
           if (recent > previous) trend = 'up';
           else if (recent < previous) trend = 'down';
         }
