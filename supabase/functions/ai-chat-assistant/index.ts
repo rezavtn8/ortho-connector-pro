@@ -97,6 +97,17 @@ const handler = async (req: Request): Promise<Response> => {
     const currentYM = ymStr(now);
     const prevMonthDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
     const lastYM = ymStr(prevMonthDate);
+    const twoMonthsAgoYM = ymStr(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 2, 1)));
+    
+    // DEBUG LOGGING
+    console.log('=== PATIENT COUNT DEBUG ===');
+    console.log('Current Date (UTC):', now.toISOString());
+    console.log('Current Month Key:', currentYM);
+    console.log('Last Month Key:', lastYM);
+    console.log('Two Months Ago Key:', twoMonthsAgoYM);
+    console.log('byMonth object:', JSON.stringify(byMonth, null, 2));
+    console.log('Raw patient data count:', patients.length);
+    
     const currentMonthTotal = byMonth[currentYM] ?? 0;
     const lastMonthTotal = byMonth[lastYM] ?? 0;
 
@@ -106,8 +117,13 @@ const handler = async (req: Request): Promise<Response> => {
       last12Months.push(ymStr(d));
     }
     const last12Total = last12Months.reduce((sum, key) => sum + (byMonth[key] ?? 0), 0);
-    const last3Total = [currentYM, lastYM, ymStr(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 2, 1)))]
-      .reduce((sum, key) => sum + (byMonth[key] ?? 0), 0);
+    const last3Months = [currentYM, lastYM, twoMonthsAgoYM];
+    const last3Total = last3Months.reduce((sum, key) => sum + (byMonth[key] ?? 0), 0);
+    
+    console.log('Last 3 Months Keys:', last3Months);
+    console.log('Last 3 Months Values:', last3Months.map(key => byMonth[key] ?? 0));
+    console.log('Last 3 Total:', last3Total);
+    console.log('=== END DEBUG ===');
 
     const campaignsByStatus: Record<string, number> = {};
     (campaignsStatusesRes.data || []).forEach((c: any) => {

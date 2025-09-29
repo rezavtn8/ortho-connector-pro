@@ -303,8 +303,17 @@ const handler = async (req: Request): Promise<Response> => {
 function buildAnalysisPrompt(data: any): string {
   const { sources, patients, campaigns, visits, reviews, deliveries, discovered, tags, userProfile, aiSettings } = data;
   
+  // DEBUG LOGGING FOR PATIENT CALCULATIONS
+  console.log('=== ANALYSIS PATIENT COUNT DEBUG ===');
+  console.log('Total patient records:', patients.length);
+  console.log('First 3 patient records:', JSON.stringify(patients.slice(0, 3), null, 2));
+  
   const totalPatients = patients.reduce((sum: number, p: any) => sum + (p.patient_count || 0), 0);
   const last3MonthsPatients = patients.slice(0, 3).reduce((sum: number, p: any) => sum + (p.patient_count || 0), 0);
+  
+  console.log('Total Patients (all time):', totalPatients);
+  console.log('Last 3 Months Patients (first 3 records):', last3MonthsPatients);
+  console.log('=== END DEBUG ===');
   const activeCampaigns = campaigns.filter((c: any) => c.status === 'Active').length;
   const completedVisits = visits.filter((v: any) => v.visited);
   const avgVisitRating = completedVisits.length > 0 
