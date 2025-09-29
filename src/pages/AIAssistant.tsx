@@ -10,17 +10,16 @@ export function AIAssistant() {
   const [activeTab, setActiveTab] = useState('analysis');
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center shadow-lg shadow-purple-500/30">
-          <Brain className="h-6 w-6 text-white" />
+    <div className="space-y-6">
+      {/* Header - Teal Theme matching other pages */}
+      <div className="flex flex-col space-y-3 mb-8">
+        <div className="flex items-center gap-3 mb-2">
+          <Brain className="h-8 w-8 title-icon" />
+          <h1 className="text-4xl font-bold page-title">AI Assistant</h1>
         </div>
-        <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">AI Assistant</h1>
-          <p className="text-muted-foreground">
-            Get insights, chat, and customize your AI-powered business analysis
-          </p>
-        </div>
+        <p className="text-muted-foreground text-lg">
+          Intelligent insights and data-driven chat powered by AI
+        </p>
       </div>
 
       <Card>

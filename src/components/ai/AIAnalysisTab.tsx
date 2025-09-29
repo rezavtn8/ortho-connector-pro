@@ -101,90 +101,101 @@ export function AIAnalysisTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      {/* Header Section - Teal theme */}
+      <div className="flex items-center justify-between">
         <div>
-          <div className="flex items-center gap-3 mb-1">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center shadow-md shadow-purple-500/30">
-              <Brain className="h-5 w-5 text-white" />
-            </div>
-            <h2 className="text-xl font-semibold">Business Analysis</h2>
-          </div>
-          <p className="text-sm text-muted-foreground ml-13">
+          <h2 className="text-2xl font-bold">Business Intelligence Report</h2>
+          <p className="text-sm text-muted-foreground">
             Last updated: {format(new Date(analysis.generated_at), 'PPp')}
           </p>
         </div>
-        <Button onClick={handleRefresh} disabled={refreshing} className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-md shadow-purple-500/20">
+        {/* Purple AI Button */}
+        <Button 
+          onClick={handleRefresh} 
+          disabled={refreshing} 
+          className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
+        >
           <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
           Refresh Analysis
         </Button>
       </div>
 
-      <Card className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg border border-purple-200/50 dark:border-purple-800/50">
-        {/* Data Snapshot Bar */}
-        {analysis.metrics && (
-          <div className="px-8 py-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 border-b border-purple-200/50 dark:border-purple-800/50">
-            <div className="flex items-center justify-center gap-8 text-sm font-medium">
-              <span className="text-slate-600 dark:text-slate-300">
-                <span className="font-semibold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">{analysis.metrics.total_sources || 0}</span> sources
-              </span>
-              <div className="h-4 w-px bg-purple-300/50 dark:bg-purple-700/50"></div>
-              <span className="text-slate-600 dark:text-slate-300">
-                <span className="font-semibold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">{analysis.metrics.total_patients || 0}</span> patients
-              </span>
-              <div className="h-4 w-px bg-purple-300/50 dark:bg-purple-700/50"></div>
-              <span className="text-slate-600 dark:text-slate-300">
-                <span className="font-semibold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">{analysis.metrics.active_campaigns || 0}</span> campaigns
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Executive Summary Content */}
-        <div className="px-8 py-8">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center">
-              <Brain className="h-5 w-5 text-white" />
-            </div>
-            <h3 className="text-2xl font-semibold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">Business Intelligence Report</h3>
-          </div>
-
-          {/* Executive Narrative Analysis */}
-          <div className="space-y-8 mb-10">
-            {analysis.narrative_sections?.map((section: any, index: number) => (
-              <div key={index} className="space-y-4">
-                <h4 className="text-lg font-semibold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">{section.title}</h4>
-                
-                {/* Section Content with validation */}
-                <div className="text-base leading-7 text-slate-700 dark:text-slate-300">
-                  {section.content ? (
-                    section.content.split('\n\n').map((paragraph: string, pIndex: number) => (
-                      <p key={pIndex} className="mb-4">{paragraph}</p>
-                    ))
-                  ) : (
-                    <p className="text-muted-foreground italic">No content available for this section</p>
-                  )}
+      {/* Data Snapshot - Teal theme */}
+      {analysis.metrics && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-3xl font-bold">{analysis.metrics.total_sources || 0}</p>
+                  <p className="text-sm text-muted-foreground">Total Sources</p>
                 </div>
-
-                {/* Key Findings */}
-                {section.key_findings && section.key_findings.length > 0 && (
-                  <div className="bg-purple-50 dark:bg-purple-950/20 rounded-lg p-4 border-l-4 border-purple-500">
-                    <h5 className="font-medium text-sm bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-2">Key Findings</h5>
-                    <ul className="space-y-1 text-sm">
-                      {section.key_findings.map((finding: string, fIndex: number) => (
-                        <li key={fIndex} className="flex items-start gap-2">
-                          <div className="w-1 h-1 bg-purple-500 rounded-full mt-2 flex-shrink-0"></div>
-                          <span className="text-slate-600 dark:text-slate-400">{finding}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {index < (analysis.narrative_sections?.length || 1) - 1 && (
-                  <div className="my-8 w-24 h-px bg-gradient-to-r from-purple-300 to-blue-300"></div>
-                )}
+                <TrendingUp className="h-8 w-8 text-primary opacity-20" />
               </div>
-            )) || (
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-3xl font-bold">{analysis.metrics.total_patients || 0}</p>
+                  <p className="text-sm text-muted-foreground">Total Patients</p>
+                </div>
+                <Users className="h-8 w-8 text-primary opacity-20" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-3xl font-bold">{analysis.metrics.active_campaigns || 0}</p>
+                  <p className="text-sm text-muted-foreground">Active Campaigns</p>
+                </div>
+                <Star className="h-8 w-8 text-primary opacity-20" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Narrative Sections */}
+      <div className="space-y-6">
+        {analysis.narrative_sections?.map((section: any, index: number) => (
+          <Card key={index}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-primary" />
+                {section.title}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Section Content */}
+              {section.content && (
+                <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                  {section.content}
+                </p>
+              )}
+              
+              {/* Key Findings */}
+              {section.key_findings && section.key_findings.length > 0 && (
+                <div className="bg-muted/50 rounded-lg p-4">
+                  <p className="font-medium mb-2">Key Findings:</p>
+                  <ul className="space-y-2">
+                    {section.key_findings.map((finding: string, fIndex: number) => (
+                      <li key={fIndex} className="flex items-start gap-2">
+                        <span className="text-primary mt-1">•</span>
+                        <span className="text-sm">{finding}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )) || (
               // Fallback for old format
               <div className="text-base leading-7 text-slate-700 dark:text-slate-300 space-y-6">
                 {analysis.insights?.map((insight: any, index: number) => (
@@ -201,39 +212,27 @@ export function AIAnalysisTab() {
             )}
           </div>
 
-          {/* Strategic Recommendations */}
-          {(analysis.recommendations?.length > 0 || analysis.insights?.length > 0) && (
-            <div className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 rounded-xl p-6 border border-purple-200 dark:border-purple-800/30 shadow-md shadow-purple-500/10">
-              <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <div className="w-2 h-2 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full"></div>
-                <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">Strategic Recommendations</span>
-              </h4>
-              <div className="space-y-4">
-                {analysis.recommendations?.map((rec: any, index: number) => (
-                  <div key={index} className="space-y-2">
-                    <h5 className="font-medium text-sm bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">{rec.title}</h5>
-                    <p className="text-sm text-slate-700 dark:text-slate-300 leading-6 pl-3 border-l-2 border-purple-300 dark:border-purple-700">
-                      {rec.action}
-                    </p>
-                  </div>
-                )) || (
-                  // Fallback for old format
-                  <ul className="space-y-3">
-                    {analysis.insights?.map((insight: any, index: number) => (
-                      <li key={index} className="flex items-start gap-3 text-sm">
-                        <div className="w-1.5 h-1.5 bg-teal-400 rounded-full mt-2 flex-shrink-0"></div>
-                        <span className="text-slate-700 dark:text-slate-300 leading-6">
-                          {insight.recommendation}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+      {/* Strategic Recommendations - Purple AI accent */}
+      {analysis.recommendations && analysis.recommendations.length > 0 && (
+        <Card className="border-purple-200 bg-gradient-to-br from-purple-50/50 to-blue-50/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Brain className="h-5 w-5 text-purple-600" />
+              Strategic Recommendations
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {analysis.recommendations.map((rec: any, index: number) => (
+                <div key={index} className="bg-white rounded-lg p-4 border border-purple-100">
+                  <h4 className="font-semibold text-purple-900 mb-1">{rec.title}</h4>
+                  <p className="text-sm text-muted-foreground">{rec.action}</p>
+                </div>
+              ))}
             </div>
-          )}
-        </div>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

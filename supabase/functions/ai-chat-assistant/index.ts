@@ -44,7 +44,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Processing chat message for user:', user.id);
 
-    // Get fresh business data with accurate counts
+    // Fetch ALL platform data for comprehensive analysis
     const [
       sourcesCountRes,
       activeSourcesCountRes,
@@ -54,24 +54,35 @@ const handler = async (req: Request): Promise<Response> => {
       campaignsStatusesRes,
       reviewsCountRes,
       reviewsAttentionCountRes,
-      emailsRes,
-      profileRes
+      deliveriesRes,
+      marketingVisitsRes,
+      discoveredOfficesRes,
+      userProfileRes,
+      aiSettingsRes,
+      tagsRes,
+      activityRes
     ] = await Promise.all([
       supabase.from('patient_sources').select('*', { count: 'exact', head: true }).eq('created_by', user.id),
       supabase.from('patient_sources').select('*', { count: 'exact', head: true }).eq('created_by', user.id).eq('is_active', true),
       supabase.from('patient_sources').select('name, source_type, is_active').eq('created_by', user.id).order('name').limit(25),
-      supabase.from('monthly_patients').select('year_month, patient_count').eq('user_id', user.id).order('year_month', { ascending: false }).limit(24),
+      supabase.from('monthly_patients').select('year_month, patient_count, source_id').eq('user_id', user.id).order('year_month', { ascending: false }).limit(24),
       supabase.from('campaigns').select('*', { count: 'exact', head: true }).eq('created_by', user.id),
       supabase.from('campaigns').select('status, campaign_type').eq('created_by', user.id).limit(1000),
       supabase.from('review_status').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
       supabase.from('review_status').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('needs_attention', true),
-      supabase.from('campaign_deliveries').select('email_status, delivered_at, campaign_id, office_id').eq('created_by', user.id).order('created_at', { ascending: false }).limit(20),
-      supabase.from('ai_business_profiles').select('communication_style, competitive_advantages, practice_values').eq('user_id', user.id).maybeSingle()
+      supabase.from('campaign_deliveries').select('email_status, gift_status, delivered_at, email_sent_at').eq('created_by', user.id).order('created_at', { ascending: false }).limit(50),
+      supabase.from('marketing_visits').select('visited, visit_date, star_rating, materials_handed_out').eq('user_id', user.id).order('visit_date', { ascending: false }).limit(100),
+      supabase.from('discovered_offices').select('*', { count: 'exact', head: true }).eq('discovered_by', user.id),
+      supabase.from('user_profiles').select('first_name, last_name, clinic_id, clinic_name').eq('user_id', user.id).maybeSingle(),
+      supabase.from('ai_business_profiles').select('*').eq('user_id', user.id).maybeSingle(),
+      supabase.from('source_tags').select('tag_name, source_id').eq('user_id', user.id).limit(100),
+      supabase.from('activity_log').select('action_type, resource_type, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(20)
     ]);
 
-    // Aggregate and build business context
+    // Aggregate comprehensive business context
     const totalSources = sourcesCountRes.count ?? 0;
     const activeSources = activeSourcesCountRes.count ?? 0;
+    const totalDiscovered = discoveredOfficesRes.count ?? 0;
 
     const patients = patientsRes.data || [];
     const byMonth: Record<string, number> = {};
@@ -95,6 +106,8 @@ const handler = async (req: Request): Promise<Response> => {
       last12Months.push(ymStr(d));
     }
     const last12Total = last12Months.reduce((sum, key) => sum + (byMonth[key] ?? 0), 0);
+    const last3Total = [currentYM, lastYM, ymStr(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 2, 1)))]
+      .reduce((sum, key) => sum + (byMonth[key] ?? 0), 0);
 
     const campaignsByStatus: Record<string, number> = {};
     (campaignsStatusesRes.data || []).forEach((c: any) => {
@@ -106,39 +119,103 @@ const handler = async (req: Request): Promise<Response> => {
     const totalReviews = reviewsCountRes.count ?? 0;
     const reviewsNeedingAttention = reviewsAttentionCountRes.count ?? 0;
 
+    const deliveries = deliveriesRes.data || [];
+    const emailsSent = deliveries.filter((d: any) => d.email_sent_at).length;
+    const giftsDelivered = deliveries.filter((d: any) => d.delivered_at).length;
+
+    const visits = marketingVisitsRes.data || [];
+    const completedVisits = visits.filter((v: any) => v.visited);
+    const avgRating = completedVisits.length > 0 
+      ? completedVisits.reduce((sum: number, v: any) => sum + (v.star_rating || 0), 0) / completedVisits.length 
+      : 0;
+    const last30DaysVisits = visits.filter((v: any) => {
+      const vDate = new Date(v.visit_date);
+      const daysDiff = (now.getTime() - vDate.getTime()) / (1000 * 60 * 60 * 24);
+      return daysDiff <= 30;
+    }).length;
+
+    const userProfile = (userProfileRes as any)?.data ?? userProfileRes;
+    const aiSettings = (aiSettingsRes as any)?.data ?? aiSettingsRes;
+    const tags = tagsRes.data || [];
+    const activities = activityRes.data || [];
+
     const businessContext = {
-      totals: {
-        patientSources: totalSources,
-        activeSources,
-        campaigns: totalCampaigns,
-        reviews: totalReviews,
-        reviewsNeedingAttention
+      dataTimestamp: new Date().toISOString(),
+      practice: {
+        owner: userProfile ? `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim() : 'Owner',
+        clinicName: userProfile?.clinic_name || 'Your Practice',
+        communicationStyle: aiSettings?.communication_style || 'professional',
+        competitiveAdvantages: aiSettings?.competitive_advantages || [],
+        practiceValues: aiSettings?.practice_values || [],
+        specialties: aiSettings?.specialties || [],
+        targetAudience: aiSettings?.target_audience || 'General dentistry',
+        brandVoice: aiSettings?.brand_voice || {}
+      },
+      sources: {
+        total: totalSources,
+        active: activeSources,
+        byType: (sourcesSampleRes.data || []).reduce((acc: any, s: any) => {
+          acc[s.source_type] = (acc[s.source_type] || 0) + 1;
+          return acc;
+        }, {}),
+        topPerformers: patients.slice(0, 10).map((p: any) => ({
+          sourceId: p.source_id,
+          count: p.patient_count
+        })),
+        tags: tags.slice(0, 20)
       },
       patients: {
-        currentMonth: currentYM,
-        currentMonthTotal,
-        lastMonth: lastYM,
-        lastMonthTotal,
-        last12Total
+        total: patients.reduce((sum: number, p: any) => sum + (p.patient_count || 0), 0),
+        last12Months: last12Total,
+        last3Months: last3Total,
+        currentMonth: currentMonthTotal,
+        previousMonth: lastMonthTotal,
+        growthRate: lastMonthTotal > 0 ? ((currentMonthTotal - lastMonthTotal) / lastMonthTotal * 100).toFixed(1) + '%' : 'N/A',
+        monthlyTrends: last12Months.map(ym => ({ month: ym, count: byMonth[ym] || 0 }))
       },
-      campaignsByStatus,
-      sample: {
-        sources: (sourcesSampleRes.data || []).slice(0, 5),
-        recentPatients: patients.slice(0, 6),
-        recentEmails: emailsRes.data || []
+      campaigns: {
+        total: totalCampaigns,
+        byStatus: campaignsByStatus,
+        deliveries: {
+          total: deliveries.length,
+          emailsSent,
+          giftsDelivered
+        }
       },
-      profile: (profileRes as any)?.data ?? profileRes ?? null
+      fieldActivity: {
+        visits: {
+          total: visits.length,
+          completed: completedVisits.length,
+          last30Days: last30DaysVisits,
+          averageRating: avgRating.toFixed(1),
+          materialsDistributed: completedVisits.flatMap((v: any) => v.materials_handed_out || [])
+        }
+      },
+      reviews: {
+        total: totalReviews,
+        needingAttention: reviewsNeedingAttention
+      },
+      discovery: {
+        officesDiscovered: totalDiscovered,
+        recentActivity: activities.slice(0, 10)
+      }
     };
 
-    // Build conversation messages grounded on the JSON business context
-    const tone = businessContext.profile?.communication_style || 'professional';
-    const highlights = businessContext.profile?.competitive_advantages || [];
+    // Build conversation messages with comprehensive business context
     const systemContent = [
-      'You are a helpful AI assistant for a healthcare practice management platform.',
-      `Communication tone: ${tone}`,
-      `Practice highlights: ${Array.isArray(highlights) && highlights.length ? highlights.join(', ') : 'Standard healthcare practice'}`,
-      'Use the JSON businessContext below to ground all numbers. Never guess; if a value is missing, say "no data".',
-      `businessContext: ${JSON.stringify(businessContext)}`
+      'You are an expert healthcare referral network consultant and AI assistant.',
+      `Practice: ${businessContext.practice.clinicName}`,
+      `Owner: ${businessContext.practice.owner}`,
+      `Communication style: ${businessContext.practice.communicationStyle}`,
+      `Specialties: ${businessContext.practice.specialties.join(', ') || 'General practice'}`,
+      '',
+      'CRITICAL: Use ONLY the data in businessContext below. Never guess or hallucinate numbers.',
+      'When asked about metrics, cite the exact numbers from the JSON.',
+      'Provide actionable insights based on the comprehensive data available.',
+      `Data last updated: ${businessContext.dataTimestamp}`,
+      '',
+      `BUSINESS CONTEXT (JSON):`,
+      JSON.stringify(businessContext, null, 2)
     ].join('\n');
 
     const historyMessages = Array.isArray(conversation_history) ? conversation_history : [];

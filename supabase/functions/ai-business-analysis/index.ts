@@ -42,15 +42,29 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Generating AI business analysis for user:', user.id);
 
-    // Fetch business data
-    const [sourcesRes, patientsRes, campaignsRes, visitsRes, reviewsRes, emailsRes, profileRes] = await Promise.all([
+    // Fetch ALL business data for comprehensive analysis
+    const [
+      sourcesRes, 
+      patientsRes, 
+      campaignsRes, 
+      visitsRes, 
+      reviewsRes, 
+      deliveriesRes, 
+      discoveredRes,
+      tagsRes,
+      userProfileRes,
+      aiSettingsRes
+    ] = await Promise.all([
       supabase.from('patient_sources').select('*').eq('created_by', user.id),
-      supabase.from('monthly_patients').select('*').eq('user_id', user.id).order('year_month', { ascending: false }).limit(12),
+      supabase.from('monthly_patients').select('*').eq('user_id', user.id).order('year_month', { ascending: false }).limit(24),
       supabase.from('campaigns').select('*').eq('created_by', user.id),
       supabase.from('marketing_visits').select('*').eq('user_id', user.id),
       supabase.from('review_status').select('*').eq('user_id', user.id),
       supabase.from('campaign_deliveries').select('*').eq('created_by', user.id),
-      supabase.from('ai_business_profiles').select('*').eq('user_id', user.id).single()
+      supabase.from('discovered_offices').select('*').eq('discovered_by', user.id),
+      supabase.from('source_tags').select('*').eq('user_id', user.id),
+      supabase.from('user_profiles').select('first_name, last_name, clinic_name').eq('user_id', user.id).maybeSingle(),
+      supabase.from('ai_business_profiles').select('*').eq('user_id', user.id).maybeSingle()
     ]);
 
     const businessData = {
@@ -59,17 +73,22 @@ const handler = async (req: Request): Promise<Response> => {
       campaigns: campaignsRes.data || [],
       visits: visitsRes.data || [],
       reviews: reviewsRes.data || [],
-      emails: emailsRes.data || [],
-      profile: profileRes.data || null
+      deliveries: deliveriesRes.data || [],
+      discovered: discoveredRes.data || [],
+      tags: tagsRes.data || [],
+      userProfile: (userProfileRes as any)?.data ?? userProfileRes,
+      aiSettings: (aiSettingsRes as any)?.data ?? aiSettingsRes
     };
 
-    console.log('Business data collected:', {
+    console.log('Comprehensive business data collected:', {
       sources: businessData.sources.length,
       patients: businessData.patients.length,
       campaigns: businessData.campaigns.length,
       visits: businessData.visits.length,
       reviews: businessData.reviews.length,
-      emails: businessData.emails.length
+      deliveries: businessData.deliveries.length,
+      discovered: businessData.discovered.length,
+      tags: businessData.tags.length
     });
 
     // Build analysis prompt
@@ -87,7 +106,7 @@ const handler = async (req: Request): Promise<Response> => {
         messages: [
           {
             role: 'system',
-            content: 'You are a senior healthcare business consultant. Analyze and then RETURN RESULTS ONLY by calling the tool emit_analysis with your final structured analysis. Do not write commentary.'
+            content: 'You are a senior healthcare marketing strategist with 15+ years specializing in dental referral network optimization. Analyze the comprehensive business data and RETURN structured insights by calling the emit_analysis tool. Focus on actionable recommendations backed by data.'
           },
           { role: 'user', content: prompt }
         ],
@@ -282,53 +301,113 @@ const handler = async (req: Request): Promise<Response> => {
 };
 
 function buildAnalysisPrompt(data: any): string {
-  const { sources, patients, campaigns, visits, reviews, emails, profile } = data;
+  const { sources, patients, campaigns, visits, reviews, deliveries, discovered, tags, userProfile, aiSettings } = data;
   
   const totalPatients = patients.reduce((sum: number, p: any) => sum + (p.patient_count || 0), 0);
+  const last3MonthsPatients = patients.slice(0, 3).reduce((sum: number, p: any) => sum + (p.patient_count || 0), 0);
   const activeCampaigns = campaigns.filter((c: any) => c.status === 'Active').length;
-  const tone = profile?.communication_style || 'professional';
-  const highlights = profile?.competitive_advantages || [];
-  const reviewsNeedingAttention = (reviews || []).filter((r: any) => r.needs_attention).length;
-  const recentEmailSends = (emails || []).filter((e: any) => e.email_status === 'sent').length;
+  const completedVisits = visits.filter((v: any) => v.visited);
+  const avgVisitRating = completedVisits.length > 0 
+    ? (completedVisits.reduce((sum: number, v: any) => sum + (v.star_rating || 0), 0) / completedVisits.length).toFixed(1)
+    : 'N/A';
+  const emailsSent = deliveries.filter((d: any) => d.email_sent_at).length;
+  const giftsDelivered = deliveries.filter((d: any) => d.delivered_at).length;
+  
+  const tone = aiSettings?.communication_style || 'professional';
+  const highlights = aiSettings?.competitive_advantages || [];
+  const specialties = aiSettings?.specialties || [];
+  const practiceValues = aiSettings?.practice_values || [];
+  const reviewsNeedingAttention = reviews.filter((r: any) => r.needs_attention).length;
+  
+  const ownerName = userProfile ? `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim() : 'Practice Owner';
+  const clinicName = userProfile?.clinic_name || 'Your Practice';
 
-  return `Analyze this healthcare practice data with a ${tone} tone:
+  const sourcesByType = sources.reduce((acc: any, s: any) => {
+    acc[s.source_type] = (acc[s.source_type] || 0) + 1;
+    return acc;
+  }, {});
 
-PRACTICE OVERVIEW:
-- Total Sources: ${sources.length}
-- Total Patients (12 months): ${totalPatients}
-- Active Campaigns: ${activeCampaigns}
-- Marketing Visits: ${visits.length}
-- Reviews (attention needed): ${reviewsNeedingAttention} of ${(reviews || []).length}
-- Email deliveries (recent sent): ${recentEmailSends}
+  return `SENIOR HEALTHCARE MARKETING STRATEGIST ANALYSIS
 
-CLINIC HIGHLIGHTS: ${highlights.length > 0 ? highlights.join(', ') : 'None specified'}
+Practice: ${clinicName}
+Owner: ${ownerName}
+Communication Style: ${tone}
+Specialties: ${specialties.join(', ') || 'General dentistry'}
+Practice Values: ${practiceValues.join(', ') || 'Patient-focused care'}
+Competitive Advantages: ${highlights.join(', ') || 'Quality service'}
 
-PATIENT SOURCES:
-${sources.slice(0, 10).map((s: any) => `- ${s.name} (${s.source_type})`).join('\n')}
+═══════════════════════════════════════════════════════════
+COMPREHENSIVE BUSINESS DATA
+═══════════════════════════════════════════════════════════
 
-PATIENT TRENDS (Recent months):
-${patients.slice(0, 6).map((p: any) => `- ${p.year_month}: ${p.patient_count} patients`).join('\n')}
+📊 REFERRAL NETWORK METRICS:
+• Total Sources: ${sources.length}
+  - Offices: ${sourcesByType['Office'] || 0}
+  - Google/Yelp: ${(sourcesByType['Google'] || 0) + (sourcesByType['Yelp'] || 0)}
+  - Other: ${sources.length - (sourcesByType['Office'] || 0) - (sourcesByType['Google'] || 0) - (sourcesByType['Yelp'] || 0)}
+• Active Sources: ${sources.filter((s: any) => s.is_active).length}
+• Tagged Sources: ${tags.length}
 
-CAMPAIGN STATUS:
-${campaigns.slice(0, 5).map((c: any) => `- ${c.name} (${c.status})`).join('\n')}
+📈 PATIENT VOLUME ANALYSIS:
+• Total Patients (24 months): ${totalPatients}
+• Last 3 Months: ${last3MonthsPatients}
+• Recent Monthly Trend:
+${patients.slice(0, 6).map((p: any) => `  ${p.year_month}: ${p.patient_count} patients`).join('\n')}
 
-REVIEWS OVERVIEW (recent):
-${(reviews || []).slice(0, 5).map((r: any) => `- ${r.status}${r.needs_attention ? ' (needs attention)' : ''}`).join('\n')}
+🎯 FIELD MARKETING ACTIVITY:
+• Total Marketing Visits: ${visits.length}
+• Completed Visits: ${completedVisits.length}
+• Average Visit Rating: ${avgVisitRating} stars
+• Materials Distributed: ${completedVisits.flatMap((v: any) => v.materials_handed_out || []).join(', ') || 'None recorded'}
 
-EMAIL DELIVERY STATUS (recent):
-${(emails || []).slice(0, 5).map((e: any) => `- ${e.email_status} ${e.delivered_at ? `at ${e.delivered_at}` : ''}`).join('\n')}
+📧 CAMPAIGN PERFORMANCE:
+• Total Campaigns: ${campaigns.length}
+• Active Campaigns: ${activeCampaigns}
+• Campaign Deliveries: ${deliveries.length}
+• Emails Sent: ${emailsSent}
+• Gifts Delivered: ${giftsDelivered}
+• Campaign Types: ${campaigns.map((c: any) => c.campaign_type).filter((v: any, i: any, a: any) => a.indexOf(v) === i).join(', ')}
 
-Write exactly 3-4 detailed narrative sections for an executive summary report covering:
+⭐ REVIEWS & REPUTATION:
+• Total Reviews Tracked: ${reviews.length}
+• Reviews Needing Attention: ${reviewsNeedingAttention}
 
-1. **Referral Network Performance Analysis**: Deep dive into patient source effectiveness, identifying top performers, underperformers, and optimization opportunities with specific data points and trends.
+🔍 MARKET EXPANSION:
+• Discovered Offices: ${discovered.length}
+• Imported to Sources: ${discovered.filter((d: any) => d.imported).length}
 
-2. **Patient Volume & Growth Trajectory**: Comprehensive analysis of patient flow patterns, seasonal variations, growth trends, and capacity utilization with strategic implications.
+TOP PERFORMING SOURCES (by patient volume):
+${sources.slice(0, 10).map((s: any, i: number) => {
+  const sourcePatients = patients.filter((p: any) => p.source_id === s.id);
+  const total = sourcePatients.reduce((sum: number, p: any) => sum + (p.patient_count || 0), 0);
+  return `${i + 1}. ${s.name} (${s.source_type}): ${total} patients`;
+}).join('\n')}
 
-3. **Marketing & Campaign Effectiveness**: Detailed evaluation of current campaign performance, email delivery rates, ROI analysis, and strategic recommendations for improvement.
+═══════════════════════════════════════════════════════════
+REQUIRED ANALYSIS SECTIONS
+═══════════════════════════════════════════════════════════
 
-4. **Operational Excellence & Next Steps**: Review of overall practice performance, review management, operational efficiency, and priority action items for the next quarter.
+Create exactly 4 comprehensive narrative sections:
 
-Each section should be 2-3 paragraphs with specific data insights, professional analysis, and strategic thinking. Include 3-4 key findings per section. Write recommendations as specific, implementable actions.`;
+1. **Referral Network Health & Source Performance**
+   Analyze source distribution, performance concentration, active vs inactive sources, 
+   top performers, underutilized relationships. Include data-driven insights on which 
+   sources drive volume and which need attention. Use specific numbers.
+
+2. **Patient Volume Trends & Growth Analysis**
+   Deep dive into monthly trends, seasonal patterns, growth rate, volume concentration.
+   Calculate momentum, identify opportunities for stabilization and growth.
+
+3. **Field Marketing & Campaign Effectiveness**
+   Evaluate visit frequency, quality scores, campaign execution, email performance,
+   gift delivery completion, ROI indicators. Identify what's working and gaps.
+
+4. **Strategic Priorities & Market Expansion**
+   Assess discovered offices pipeline, review management needs, operational priorities.
+   Provide 3-5 specific, actionable next steps with clear impact potential.
+
+Each section must be 2-3 rich paragraphs with concrete data points, professional insights, 
+and strategic recommendations. Include 3-4 key findings per section using ONLY the data provided above.`;
 }
 
 serve(handler);

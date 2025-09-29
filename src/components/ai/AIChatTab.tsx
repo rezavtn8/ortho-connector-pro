@@ -35,52 +35,50 @@ export function AIChatTab() {
   }, [messages]);
 
   return (
-    <div className="flex flex-col h-[600px]">
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center shadow-md shadow-purple-500/30">
-            <Bot className="h-5 w-5 text-white" />
-          </div>
-          <div>
-            <h2 className="text-xl font-semibold">AI Chat Assistant</h2>
-            <p className="text-sm text-muted-foreground">
-              Ask questions about your business data and get instant insights
-            </p>
-          </div>
+    <div className="space-y-4">
+      {/* Header - Teal theme */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">Chat with Your Data</h2>
+          <p className="text-sm text-muted-foreground">
+            Ask questions about your practice and get instant answers
+          </p>
         </div>
         {messages.length > 0 && (
-          <Button variant="outline" onClick={clearChat} className="border-purple-200 dark:border-purple-800 hover:bg-purple-50 dark:hover:bg-purple-950/20">
+          <Button variant="outline" size="sm" onClick={clearChat}>
             Clear Chat
           </Button>
         )}
       </div>
 
-      <Card className="flex-1 flex flex-col border-purple-200/50 dark:border-purple-800/50">
-        <CardContent className="p-0 flex-1 flex flex-col">
-          <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
+      {/* Chat Interface - Teal Card */}
+      <Card className="h-[600px] flex flex-col">
+        <CardContent className="flex-1 flex flex-col p-0">
+          <ScrollArea className="flex-1 px-6" ref={scrollAreaRef}>
             {messages.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-purple-500/30">
-                  <Bot className="h-8 w-8 text-white" />
+              <div className="flex flex-col items-center justify-center h-full py-12">
+                {/* Purple AI Bot Icon */}
+                <div className="p-4 rounded-full bg-gradient-to-br from-purple-100 to-blue-100 mb-4">
+                  <Bot className="h-8 w-8 text-purple-600" />
                 </div>
-                <h3 className="text-lg font-semibold mb-2 bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">Start a conversation</h3>
-                <p className="text-muted-foreground mb-4">
-                  Ask me anything about your business data, patient sources, or campaigns
+                <h3 className="text-lg font-medium mb-2">Start a Conversation</h3>
+                <p className="text-muted-foreground text-center mb-6 max-w-md">
+                  Ask me anything about your practice data, patient sources, campaigns, or get strategic advice.
                 </p>
-                <div className="flex flex-wrap gap-2 justify-center">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 w-full max-w-2xl">
                   {[
-                    "How are my patient sources performing?",
-                    "What campaigns should I focus on?",
-                    "Show me this month's trends"
-                  ].map((suggestion) => (
+                    "What are my top performing sources?",
+                    "How is my patient volume trending?",
+                    "Which campaigns are most effective?",
+                    "What sources need attention?"
+                  ].map((question, index) => (
                     <Button
-                      key={suggestion}
+                      key={index}
                       variant="outline"
-                      size="sm"
-                      onClick={() => setInput(suggestion)}
-                      className="text-xs border-purple-200 dark:border-purple-800 hover:bg-purple-50 dark:hover:bg-purple-950/20"
+                      className="text-left h-auto py-3 px-4 whitespace-normal hover:bg-purple-50 hover:border-purple-200"
+                      onClick={() => setInput(question)}
                     >
-                      {suggestion}
+                      <span className="text-sm">{question}</span>
                     </Button>
                   ))}
                 </div>
@@ -99,55 +97,70 @@ export function AIChatTab() {
                       "flex gap-3",
                       message.role === 'user' ? "flex-row-reverse" : "flex-row"
                     )}>
+                      {/* Purple AI Bot Avatar */}
+                      {message.role === 'assistant' && (
+                        <div className="flex-shrink-0">
+                          <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500">
+                            <Bot className="h-5 w-5 text-white" />
+                          </div>
+                        </div>
+                      )}
                       <div className={cn(
-                        "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center",
-                        message.role === 'user' 
-                          ? "bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-md shadow-purple-500/30" 
-                          : "bg-gradient-to-r from-purple-100 to-blue-100 dark:from-purple-900/50 dark:to-blue-900/50 text-purple-600 dark:text-purple-300"
-                      )}>
-                        {message.role === 'user' ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
-                      </div>
-                      <div className={cn(
-                        "rounded-lg px-4 py-2 max-w-full",
+                        "rounded-lg px-4 py-3 max-w-[80%]",
                         message.role === 'user'
-                          ? "bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-sm"
-                          : "bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted"
                       )}>
                         <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                         <p className="text-xs opacity-70 mt-1">
                           {message.timestamp.toLocaleTimeString()}
                         </p>
                       </div>
+                      {message.role === 'user' && (
+                        <div className="flex-shrink-0">
+                          <div className="p-2 rounded-lg bg-primary">
+                            <User className="h-5 w-5 text-primary-foreground" />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
                 {loading && (
-                  <div className="flex gap-3 mr-auto max-w-[80%]">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-r from-purple-100 to-blue-100 dark:from-purple-900/50 dark:to-blue-900/50 text-purple-600 dark:text-purple-300 flex items-center justify-center">
-                      <Bot className="h-4 w-4" />
+                  <div className="flex gap-3 justify-start">
+                    <div className="flex-shrink-0">
+                      <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500">
+                        <Bot className="h-5 w-5 text-white" />
+                      </div>
                     </div>
-                    <div className="bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg px-4 py-2">
+                    <div className="rounded-lg px-4 py-3 bg-muted">
                       <div className="flex items-center gap-2">
                         <Loader2 className="h-4 w-4 animate-spin text-purple-600" />
-                        <span className="text-sm">Thinking...</span>
+                        <span className="text-sm text-muted-foreground">Thinking...</span>
                       </div>
                     </div>
                   </div>
                 )}
+                <div ref={scrollAreaRef} />
               </div>
             )}
           </ScrollArea>
-          
-          <div className="p-4 border-t border-purple-200/50 dark:border-purple-800/50">
+
+          {/* Input Area - Purple AI Send Button */}
+          <div className="border-t p-4">
             <form onSubmit={handleSubmit} className="flex gap-2">
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask about your business data..."
+                placeholder="Ask about your practice data..."
                 disabled={loading}
-                className="flex-1 border-purple-200 dark:border-purple-800 focus-visible:ring-purple-500"
+                className="flex-1"
               />
-              <Button type="submit" disabled={!input.trim() || loading} className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-md shadow-purple-500/20">
+              <Button 
+                type="submit" 
+                disabled={loading || !input.trim()}
+                className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
+              >
                 {loading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
