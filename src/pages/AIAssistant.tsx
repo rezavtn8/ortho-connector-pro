@@ -126,49 +126,34 @@ export function AIAssistant() {
         </Card>
       )}
 
-      <Card>
-        <CardContent className="p-0">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <div className="border-b">
-              <TabsList className="grid w-full grid-cols-3 bg-transparent h-auto p-1">
-                <TabsTrigger 
-                  value="analysis" 
-                  className="flex items-center gap-2 py-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-50 data-[state=active]:to-blue-50 dark:data-[state=active]:from-purple-950/30 dark:data-[state=active]:to-blue-950/30 data-[state=active]:border-b-2 data-[state=active]:border-purple-500 rounded-none data-[state=active]:shadow-sm"
-                >
-                  <Brain className="h-4 w-4" />
-                  Analysis
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="chat" 
-                  className="flex items-center gap-2 py-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-50 data-[state=active]:to-blue-50 dark:data-[state=active]:from-purple-950/30 dark:data-[state=active]:to-blue-950/30 data-[state=active]:border-b-2 data-[state=active]:border-purple-500 rounded-none data-[state=active]:shadow-sm"
-                >
-                  <MessageSquare className="h-4 w-4" />
-                  Chat
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="settings" 
-                  className="flex items-center gap-2 py-3 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-50 data-[state=active]:to-blue-50 dark:data-[state=active]:from-purple-950/30 dark:data-[state=active]:to-blue-950/30 data-[state=active]:border-b-2 data-[state=active]:border-purple-500 rounded-none data-[state=active]:shadow-sm"
-                >
-                  <Settings className="h-4 w-4" />
-                  Settings
-                </TabsTrigger>
-              </TabsList>
-            </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-3 max-w-2xl" variant="pills">
+          <TabsTrigger value="analysis" variant="pills" className="flex items-center gap-2">
+            <Brain className="h-4 w-4" />
+            Analysis
+          </TabsTrigger>
+          <TabsTrigger value="chat" variant="pills" className="flex items-center gap-2">
+            <MessageSquare className="h-4 w-4" />
+            Chat
+          </TabsTrigger>
+          <TabsTrigger value="settings" variant="pills" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            Settings
+          </TabsTrigger>
+        </TabsList>
 
-            <TabsContent value="analysis" className="p-6 mt-0">
-              <AIAnalysisTab />
-            </TabsContent>
+        <TabsContent value="analysis" className="mt-6">
+          <AIAnalysisTab />
+        </TabsContent>
 
-            <TabsContent value="chat" className="p-6 mt-0">
-              <AIChatTab />
-            </TabsContent>
+        <TabsContent value="chat" className="mt-6">
+          <AIChatTab />
+        </TabsContent>
 
-            <TabsContent value="settings" className="p-6 mt-0">
-              <AISettingsTab />
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+        <TabsContent value="settings" className="mt-6">
+          <AISettingsTab />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
