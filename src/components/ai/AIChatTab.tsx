@@ -52,9 +52,10 @@ export function AIChatTab() {
       </div>
 
       {/* Chat Interface - Teal Card */}
-      <Card className="h-[600px] flex flex-col">
-        <CardContent className="flex-1 flex flex-col p-0">
-          <ScrollArea className="flex-1 px-6" ref={scrollAreaRef}>
+      <Card className="h-[calc(100vh-280px)] min-h-[500px] flex flex-col">
+        <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
+          <ScrollArea className="flex-1 px-6 py-4">
+            <div className="space-y-4 pb-4">
             {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full py-12">
                 {/* Purple AI Bot Icon */}
@@ -84,7 +85,7 @@ export function AIChatTab() {
                 </div>
               </div>
             ) : (
-              <div className="space-y-4">
+              <>
                 {messages.map((message) => (
                   <div
                     key={message.id}
@@ -141,9 +142,9 @@ export function AIChatTab() {
                     </div>
                   </div>
                 )}
-                <div ref={scrollAreaRef} />
-              </div>
+              </>
             )}
+            </div>
           </ScrollArea>
 
           {/* Input Area - Purple AI Send Button */}

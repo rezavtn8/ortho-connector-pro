@@ -139,6 +139,43 @@ const handler = async (req: Request): Promise<Response> => {
     const tags = tagsRes.data || [];
     const activities = activityRes.data || [];
 
+    // Build source ID to name map
+    const sourceIdToName: Record<string, string> = {};
+    (sourcesSampleRes.data || []).forEach((s: any) => {
+      if (s.name) sourceIdToName[s.name] = s.name;
+    });
+    
+    // Get actual source data with names for top performers
+    const sourceIdsForTopPerformers = [...new Set(patients.slice(0, 10).map((p: any) => p.source_id).filter(Boolean))];
+    const topPerformerSourcesRes = await supabase
+      .from('patient_sources')
+      .select('id, name')
+      .in('id', sourceIdsForTopPerformers)
+      .eq('created_by', user.id);
+    
+    const sourceIdMap = new Map<string, string>();
+    (topPerformerSourcesRes.data || []).forEach((s: any) => {
+      sourceIdMap.set(s.id, s.name);
+    });
+
+    // Aggregate patient counts by source
+    const sourcePatientCounts = new Map<string, number>();
+    patients.forEach((p: any) => {
+      if (p.source_id) {
+        const current = sourcePatientCounts.get(p.source_id) || 0;
+        sourcePatientCounts.set(p.source_id, current + (p.patient_count || 0));
+      }
+    });
+
+    // Get top 10 sources by patient count
+    const topPerformersData = Array.from(sourcePatientCounts.entries())
+      .map(([sourceId, count]) => ({
+        sourceName: sourceIdMap.get(sourceId) || 'Unknown Source',
+        count
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
     const businessContext = {
       dataTimestamp: new Date().toISOString(),
       practice: {
@@ -158,10 +195,7 @@ const handler = async (req: Request): Promise<Response> => {
           acc[s.source_type] = (acc[s.source_type] || 0) + 1;
           return acc;
         }, {}),
-        topPerformers: patients.slice(0, 10).map((p: any) => ({
-          sourceId: p.source_id,
-          count: p.patient_count
-        })),
+        topPerformers: topPerformersData,
         tags: tags.slice(0, 20)
       },
       patients: {
