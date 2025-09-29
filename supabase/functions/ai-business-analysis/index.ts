@@ -377,11 +377,19 @@ ${patients.slice(0, 6).map((p: any) => `  ${p.year_month}: ${p.patient_count} pa
 • Imported to Sources: ${discovered.filter((d: any) => d.imported).length}
 
 TOP PERFORMING SOURCES (by patient volume):
-${sources.slice(0, 10).map((s: any, i: number) => {
-  const sourcePatients = patients.filter((p: any) => p.source_id === s.id);
-  const total = sourcePatients.reduce((sum: number, p: any) => sum + (p.patient_count || 0), 0);
-  return `${i + 1}. ${s.name} (${s.source_type}): ${total} patients`;
-}).join('\n')}
+${(() => {
+  const counts = new Map<string, number>();
+  patients.forEach((p: any) => {
+    if (p.source_id) counts.set(p.source_id, (counts.get(p.source_id) || 0) + (p.patient_count || 0));
+  });
+  const nameMap = new Map<string, string>(sources.map((s: any) => [s.id, s.name]));
+  return Array.from(counts.entries())
+    .map(([id, cnt]) => ({ id, cnt, name: nameMap.get(id) || `Source ${id.slice(0,4)}…` }))
+    .sort((a, b) => b.cnt - a.cnt)
+    .slice(0, 10)
+    .map((item, i) => `${i + 1}. ${item.name}: ${item.cnt} patients`)
+    .join('\n');
+})()}
 
 ═══════════════════════════════════════════════════════════
 REQUIRED ANALYSIS SECTIONS

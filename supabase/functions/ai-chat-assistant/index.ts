@@ -64,7 +64,7 @@ const handler = async (req: Request): Promise<Response> => {
     ] = await Promise.all([
       supabase.from('patient_sources').select('*', { count: 'exact', head: true }).eq('created_by', user.id),
       supabase.from('patient_sources').select('*', { count: 'exact', head: true }).eq('created_by', user.id).eq('is_active', true),
-      supabase.from('patient_sources').select('name, source_type, is_active').eq('created_by', user.id).order('name').limit(25),
+      supabase.from('patient_sources').select('id, name, source_type, is_active').eq('created_by', user.id).order('name').limit(1000),
       supabase.from('monthly_patients').select('year_month, patient_count, source_id').eq('user_id', user.id).order('year_month', { ascending: false }).limit(24),
       supabase.from('campaigns').select('*', { count: 'exact', head: true }).eq('created_by', user.id),
       supabase.from('campaigns').select('status, campaign_type').eq('created_by', user.id).limit(1000),
@@ -139,40 +139,43 @@ const handler = async (req: Request): Promise<Response> => {
     const tags = tagsRes.data || [];
     const activities = activityRes.data || [];
 
-    // Build source ID to name map
-    const sourceIdToName: Record<string, string> = {};
-    (sourcesSampleRes.data || []).forEach((s: any) => {
-      if (s.name) sourceIdToName[s.name] = s.name;
-    });
-    
-    // Get actual source data with names for top performers
-    const sourceIdsForTopPerformers = [...new Set(patients.slice(0, 10).map((p: any) => p.source_id).filter(Boolean))];
-    const topPerformerSourcesRes = await supabase
-      .from('patient_sources')
-      .select('id, name')
-      .in('id', sourceIdsForTopPerformers)
-      .eq('created_by', user.id);
-    
-    const sourceIdMap = new Map<string, string>();
-    (topPerformerSourcesRes.data || []).forEach((s: any) => {
-      sourceIdMap.set(s.id, s.name);
-    });
-
-    // Aggregate patient counts by source
+    // Aggregate patient counts by source across available months
     const sourcePatientCounts = new Map<string, number>();
     patients.forEach((p: any) => {
-      if (p.source_id) {
-        const current = sourcePatientCounts.get(p.source_id) || 0;
-        sourcePatientCounts.set(p.source_id, current + (p.patient_count || 0));
-      }
+      const sid = p.source_id as string | null;
+      if (!sid) return;
+      sourcePatientCounts.set(sid, (sourcePatientCounts.get(sid) || 0) + (p.patient_count || 0));
     });
 
-    // Get top 10 sources by patient count
+    // Determine top source ids and fetch their names
+    const topIds = Array.from(sourcePatientCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 20)
+      .map(([sid]) => sid);
+
+    // Build a quick map from the preloaded sources list
+    const preloadMap = new Map<string, string>();
+    (sourcesSampleRes.data || []).forEach((s: any) => {
+      if (s.id) preloadMap.set(s.id, s.name || '');
+    });
+
+    // Fetch any missing names that weren't in the preload
+    const missingIds = topIds.filter((id) => !preloadMap.has(id));
+    let fetchedMap = new Map<string, string>();
+    if (missingIds.length) {
+      const fetchRes = await supabase
+        .from('patient_sources')
+        .select('id, name')
+        .in('id', missingIds)
+        .eq('created_by', user.id);
+      fetchedMap = new Map((fetchRes.data || []).map((s: any) => [s.id, s.name]));
+    }
+
+    const nameFor = (id: string) => preloadMap.get(id) || fetchedMap.get(id) || `Source ${id.slice(0, 4)}…`;
+
+    // Compose top performers with names
     const topPerformersData = Array.from(sourcePatientCounts.entries())
-      .map(([sourceId, count]) => ({
-        sourceName: sourceIdMap.get(sourceId) || 'Unknown Source',
-        count
-      }))
+      .map(([sourceId, count]) => ({ sourceName: nameFor(sourceId), count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
 
@@ -244,7 +247,8 @@ const handler = async (req: Request): Promise<Response> => {
       `Specialties: ${businessContext.practice.specialties.join(', ') || 'General practice'}`,
       '',
       'CRITICAL: Use ONLY the data in businessContext below. Never guess or hallucinate numbers.',
-      'When asked about metrics, cite the exact numbers from the JSON.',
+      'When asked about top sources, use businessContext.sources.topPerformers and display sourceName and count only (no raw IDs).',
+      'When referencing time series, use patients.monthlyTrends.',
       'Provide actionable insights based on the comprehensive data available.',
       `Data last updated: ${businessContext.dataTimestamp}`,
       '',
