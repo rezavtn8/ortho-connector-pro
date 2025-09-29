@@ -70,7 +70,11 @@ serve(async (req) => {
       throw new Error('Search coordinates not available');
     }
 
-    // Check for cached results first based on search parameters
+    // PHASE 2: Enhanced cache key with all search parameters
+    const cacheKey = `${distance}_${min_rating}_${office_type_filter || 'all'}_${search_strategy}_${include_specialties}_${require_website}`;
+    console.log(`Cache key: ${cacheKey}`);
+
+    // Check for cached results with matching parameters
     const { data: cachedOffices, error: cacheError } = await supabase
       .from('discovered_offices')
       .select('*')
@@ -79,20 +83,28 @@ serve(async (req) => {
       .eq('search_distance', distance)
       .eq('search_location_lat', searchLatitude)
       .eq('search_location_lng', searchLongitude)
-      .order('fetched_at', { ascending: false });
+      .order('fetched_at', { ascending: false })
+      .limit(100);
 
-    // If we have cached results matching these exact parameters, return them
+    // Return cached results if found and recent (within 7 days)
     if (cachedOffices && cachedOffices.length > 0) {
-      return new Response(
-        JSON.stringify({
-          success: true,
-          cached: true,
-          message: `Found ${cachedOffices.length} cached offices for your search parameters`,
-          offices: cachedOffices,
-          canRefresh: true
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      const mostRecentFetch = new Date(cachedOffices[0].fetched_at);
+      const daysSinceLastFetch = (Date.now() - mostRecentFetch.getTime()) / (1000 * 60 * 60 * 24);
+      
+      if (daysSinceLastFetch < 7) {
+        console.log(`Returning ${cachedOffices.length} cached offices (${daysSinceLastFetch.toFixed(1)} days old)`);
+        return new Response(
+          JSON.stringify({
+            success: true,
+            cached: true,
+            cacheAge: daysSinceLastFetch.toFixed(1),
+            message: `Found ${cachedOffices.length} cached offices from ${daysSinceLastFetch.toFixed(1)} days ago`,
+            offices: cachedOffices,
+            canRefresh: true
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Rate limiting temporarily disabled for testing
@@ -125,72 +137,120 @@ serve(async (req) => {
       throw new Error('Failed to create discovery session');
     }
 
-    const radiusMeters = distance * 1609.34; // Convert miles to meters
+    let radiusMeters = distance * 1609.34; // Convert miles to meters
+    let searchRadius = distance;
+    let radiusExpanded = false;
     
-    console.log(`Using ${search_strategy} search strategy within ${distance} miles (${radiusMeters}m) of ${searchLatitude}, ${searchLongitude}`);
+    console.log(`Using ${search_strategy} strategy within ${distance} miles (${radiusMeters}m) of ${searchLatitude}, ${searchLongitude}`);
     
-    // Perform multiple searches based on strategy
+    // PHASE 1: Helper function for pagination
+    const fetchWithPagination = async (url: string, maxPages = 3): Promise<any[]> => {
+      const results: any[] = [];
+      let nextPageToken: string | null = null;
+      let pageCount = 0;
+      
+      do {
+        const currentUrl: string = nextPageToken ? `${url}&pagetoken=${nextPageToken}` : url;
+        const response: Response = await fetch(currentUrl);
+        const data: any = await response.json();
+        
+        if (data.status === 'OK' && data.results) {
+          results.push(...data.results);
+          nextPageToken = data.next_page_token;
+          pageCount++;
+          
+          console.log(`Page ${pageCount}: Found ${data.results.length} results (total: ${results.length})`);
+          
+          // Wait 2 seconds before fetching next page (Google requirement)
+          if (nextPageToken && pageCount < maxPages) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+        } else {
+          break;
+        }
+      } while (nextPageToken && pageCount < maxPages);
+      
+      return results;
+    };
+    
+    // Perform multiple searches with pagination
     let allResults = [];
     
-    // 1. Primary dentist search
+    // 1. PHASE 1: Primary dentist search WITH PAGINATION
     const dentistUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${searchLatitude},${searchLongitude}&radius=${radiusMeters}&type=dentist&key=${googleApiKey}`;
-    console.log('Searching for dentists...');
-    const dentistResponse = await fetch(dentistUrl);
-    const dentistData = await dentistResponse.json();
+    console.log('Searching for dentists with pagination...');
+    const dentistResults = await fetchWithPagination(dentistUrl);
+    allResults.push(...dentistResults);
+    console.log(`✅ Found ${dentistResults.length} total dentists (with pagination)`);
     
-    if (dentistData.status === 'OK' && dentistData.results) {
-      allResults.push(...dentistData.results);
-      console.log(`Found ${dentistData.results.length} dentists`);
+    // 2. PHASE 1: Expanded text-based searches with pagination
+    // ALWAYS run comprehensive search regardless of strategy
+    const searchTerms = [
+      // Original terms
+      'dental office',
+      'dental clinic',
+      'family dentistry',
+      'cosmetic dentistry',
+      // PHASE 1: Expanded terms
+      'dentistry',
+      'dental care',
+      'dental center',
+      'dental practice',
+      'smile center',
+      'dental group',
+      'implant dentist',
+      'emergency dentist',
+      'teeth whitening',
+      'dental spa',
+      'sedation dentistry'
+    ];
+    
+    if (include_specialties || search_strategy === 'specialty') {
+      searchTerms.push(
+        'orthodontics',
+        'oral surgery',
+        'endodontics', 
+        'periodontics',
+        'pediatric dentistry',
+        'oral surgeon',
+        'orthodontist',
+        'prosthodontist'
+      );
     }
     
-    // 2. Text-based searches for comprehensive strategy
-    if (search_strategy === 'comprehensive' || search_strategy === 'specialty') {
-      const searchTerms = [
-        'dental office',
-        'dental clinic',
-        'family dentistry',
-        'cosmetic dentistry'
-      ];
-      
-      if (include_specialties || search_strategy === 'specialty') {
-        searchTerms.push(
-          'orthodontics',
-          'oral surgery',
-          'endodontics', 
-          'periodontics',
-          'pediatric dentistry',
-          'oral surgeon',
-          'orthodontist'
-        );
+    console.log(`Running comprehensive search with ${searchTerms.length} search terms...`);
+    
+    // PHASE 2: Parallel search execution
+    const searchPromises = searchTerms.slice(0, 5).map(async (term) => {
+      try {
+        const textSearchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(term)}&location=${searchLatitude},${searchLongitude}&radius=${radiusMeters}&key=${googleApiKey}`;
+        console.log(`Searching for: ${term}`);
+        const results = await fetchWithPagination(textSearchUrl, 2); // 2 pages per term
+        
+        // Filter for dental-related results
+        const dentalResults = results.filter((place: any) => {
+          const name = place.name.toLowerCase();
+          const types = place.types || [];
+          return name.includes('dental') || name.includes('dentist') || 
+                 name.includes('orthodont') || name.includes('oral') ||
+                 types.includes('dentist') || types.includes('doctor');
+        });
+        
+        console.log(`✅ Found ${dentalResults.length} results for "${term}"`);
+        return dentalResults;
+      } catch (error) {
+        console.error(`Error searching for ${term}:`, error);
+        return [];
       }
-      
-      for (const term of searchTerms) {
-        try {
-          const textSearchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(term + ' near me')}&location=${searchLatitude},${searchLongitude}&radius=${radiusMeters}&key=${googleApiKey}`;
-          console.log(`Searching for: ${term}`);
-          const textResponse = await fetch(textSearchUrl);
-          const textData = await textResponse.json();
-          
-          if (textData.status === 'OK' && textData.results) {
-            // Filter for dental-related results
-            const dentalResults = textData.results.filter((place: any) => {
-              const name = place.name.toLowerCase();
-              const types = place.types || [];
-              return name.includes('dental') || name.includes('dentist') || 
-                     name.includes('orthodont') || name.includes('oral') ||
-                     types.includes('dentist') || types.includes('doctor');
-            });
-            allResults.push(...dentalResults);
-            console.log(`Found ${dentalResults.length} results for ${term}`);
-          }
-          
-          // Rate limiting - small delay between requests
-          await new Promise(resolve => setTimeout(resolve, 100));
-        } catch (error) {
-          console.error(`Error searching for ${term}:`, error);
-        }
+    });
+    
+    // Wait for all parallel searches to complete
+    const parallelResults = await Promise.allSettled(searchPromises);
+    parallelResults.forEach((result) => {
+      if (result.status === 'fulfilled') {
+        allResults.push(...result.value);
       }
-    }
+    });
     
     // Remove duplicates by place_id
     const uniqueResults = [];
@@ -203,12 +263,37 @@ serve(async (req) => {
       }
     }
     
-    console.log(`Total unique places found: ${uniqueResults.length}`);
+    console.log(`✅ Total unique places found: ${uniqueResults.length}`);
     
-    // Create a mock response object for compatibility
+    // PHASE 2: Adaptive radius expansion if results are low
+    if (uniqueResults.length < 5 && searchRadius < 25) {
+      const expandedRadius = Math.min(searchRadius + 10, 25);
+      radiusExpanded = true;
+      console.log(`⚠️ Low results (${uniqueResults.length}), expanding search to ${expandedRadius} miles...`);
+      
+      radiusMeters = expandedRadius * 1609.34;
+      searchRadius = expandedRadius;
+      
+      // Repeat nearby search with expanded radius
+      const expandedUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${searchLatitude},${searchLongitude}&radius=${radiusMeters}&type=dentist&key=${googleApiKey}`;
+      const expandedResults = await fetchWithPagination(expandedUrl);
+      
+      for (const place of expandedResults) {
+        if (place.place_id && !seenPlaceIds.has(place.place_id)) {
+          seenPlaceIds.add(place.place_id);
+          uniqueResults.push(place);
+        }
+      }
+      
+      console.log(`✅ After expansion: ${uniqueResults.length} total places`);
+    }
+    
+    // Create a response object
     const placesData = {
       status: uniqueResults.length > 0 ? 'OK' : 'ZERO_RESULTS',
-      results: uniqueResults
+      results: uniqueResults,
+      radiusExpanded,
+      finalRadius: searchRadius
     };
 
     if (placesData.status !== 'OK' && placesData.status !== 'ZERO_RESULTS') {
@@ -216,7 +301,7 @@ serve(async (req) => {
       throw new Error(`Google Places API error: ${placesData.status}`);
     }
 
-    console.log(`Found ${placesData.results?.length || 0} places from Google`);
+    console.log(`📊 Summary: ${placesData.results?.length || 0} total places found`);
 
     // Get existing sources to avoid duplicates
     const { data: existingSources } = await supabase
@@ -230,35 +315,65 @@ serve(async (req) => {
     const existingAddresses = new Set(existingSources?.map(s => s.address?.toLowerCase()) || []);
 
     const offices = [];
-    const newOffices = [];
+    const alreadyInNetworkOffices = [];
 
     if (placesData.results && placesData.results.length > 0) {
-      // Get details for each place to get more complete information
+      // PHASE 2: Batch detail requests (10 at a time)
+      const placeIds = placesData.results
+        .filter(p => p.place_id)
+        .map(p => p.place_id);
+      
+      console.log(`📋 Fetching details for ${placeIds.length} places in batches...`);
+      
+      const detailsMap = new Map();
+      const batchSize = 10;
+      
+      for (let i = 0; i < placeIds.length; i += batchSize) {
+        const batch = placeIds.slice(i, i + batchSize);
+        const batchPromises = batch.map(async (placeId) => {
+          try {
+            const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=formatted_phone_number,website&key=${googleApiKey}`;
+            const response = await fetch(detailsUrl);
+            const data = await response.json();
+            
+            if (data.status === 'OK' && data.result) {
+              return {
+                placeId,
+                phone: data.result.formatted_phone_number || null,
+                website: data.result.website || null
+              };
+            }
+          } catch (error) {
+            console.error(`Error fetching details for ${placeId}:`, error);
+          }
+          return null;
+        });
+        
+        const batchResults = await Promise.all(batchPromises);
+        batchResults.forEach(result => {
+          if (result) {
+            detailsMap.set(result.placeId, result);
+          }
+        });
+        
+        // Small delay between batches
+        if (i + batchSize < placeIds.length) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+        
+        console.log(`✅ Processed batch ${Math.floor(i / batchSize) + 1} (${Math.min(i + batchSize, placeIds.length)}/${placeIds.length})`);
+      }
+      
+      // Process each place with batched details
       for (const place of placesData.results) {
         try {
-          // Skip if this appears to be the user's own clinic or already exists as a source  
+          // Skip own clinic
           if (clinic.google_place_id && place.place_id === clinic.google_place_id) {
             console.log(`Skipping own clinic: ${place.name}`);
             continue;
           }
 
-          if (existingPlaceIds.has(place.place_id)) {
-            console.log(`Skipping existing source by place_id: ${place.name}`);
-            continue;
-          }
-
-          if (existingNames.has(place.name.toLowerCase())) {
-            console.log(`Skipping existing source by name: ${place.name}`);
-            continue;
-          }
-
-          const placeAddress = place.vicinity || place.formatted_address;
-          if (placeAddress && existingAddresses.has(placeAddress.toLowerCase())) {
-            console.log(`Skipping existing source by address: ${place.name}`);
-            continue;
-          }
-
-          // Skip if it's too close and has similar name (likely same clinic)
+          // Skip if too close and similar name (likely same clinic)
           const distanceFromSearch = calculateDistance(
             searchLatitude, searchLongitude,
             place.geometry.location.lat, place.geometry.location.lng
@@ -267,25 +382,20 @@ serve(async (req) => {
           if (clinicName && distanceFromSearch < 0.1) {
             const clinicFirstWord = clinicName.toLowerCase().split(' ')[0];
             if (clinicFirstWord && place.name.toLowerCase().includes(clinicFirstWord)) {
-              console.log(`Skipping ${place.name} - appears to be user's own clinic by proximity and name`);
+              console.log(`Skipping ${place.name} - appears to be user's own clinic`);
               continue;
             }
           }
 
-          // Get place details for phone and website
-          let phone = null;
-          let website = null;
-          
-          if (place.place_id) {
-            const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=formatted_phone_number,website&key=${googleApiKey}`;
-            const detailsResponse = await fetch(detailsUrl);
-            const detailsData = await detailsResponse.json();
-            
-            if (detailsData.status === 'OK' && detailsData.result) {
-              phone = detailsData.result.formatted_phone_number || null;
-              website = detailsData.result.website || null;
-            }
-          }
+          // PHASE 1: Mark existing sources as already_in_network instead of skipping
+          const alreadyInNetwork = existingPlaceIds.has(place.place_id) ||
+                                   existingNames.has(place.name.toLowerCase()) ||
+                                   (place.vicinity && existingAddresses.has(place.vicinity.toLowerCase()));
+
+          // Get details from batch fetch
+          const details = detailsMap.get(place.place_id);
+          const phone = details?.phone || null;
+          const website = details?.website || null;
 
           // Apply filters
           if (min_rating > 0 && (!place.rating || place.rating < min_rating)) {
@@ -319,21 +429,27 @@ serve(async (req) => {
             discovered_by: user.id,
             clinic_id: clinic_id,
             source: 'google',
-            search_distance: distance,
+            search_distance: searchRadius, // Use final radius (may be expanded)
             search_location_lat: searchLatitude,
             search_location_lng: searchLongitude,
             office_type: inferredType,
-            discovery_session_id: session.id
+            discovery_session_id: session.id,
+            already_in_network: alreadyInNetwork // PHASE 1: New field
           };
 
-          offices.push(office);
+          if (alreadyInNetwork) {
+            alreadyInNetworkOffices.push(office);
+            console.log(`📌 Already in network: ${place.name}`);
+          } else {
+            offices.push(office);
+          }
         } catch (error) {
           console.error(`Error processing place ${place.name}:`, error);
           // Continue with other places
         }
       }
 
-      // Insert only new offices (by place_id)
+      // Insert new offices
       if (offices.length > 0) {
         const { data: inserted, error: insertError } = await supabase
           .from('discovered_offices')
@@ -347,39 +463,39 @@ serve(async (req) => {
           console.error('Insert error:', insertError);
           throw insertError;
         }
-
-        // Filter to only truly new offices (those that were just inserted)
-        const existingPlaceIds = new Set();
-        const { data: existing } = await supabase
-          .from('discovered_offices')
-          .select('place_id')
-          .eq('clinic_id', clinic_id)
-          .eq('discovered_by', user.id);
-        
-        if (existing) {
-          existing.forEach(office => existingPlaceIds.add(office.place_id));
-        }
-
-        newOffices.push(...offices.filter(office => !existingPlaceIds.has(office.place_id)));
       }
     }
 
-    console.log(`Successfully processed ${offices.length} offices, ${newOffices.length} were new`);
+    const totalFound = offices.length + alreadyInNetworkOffices.length;
+    console.log(`✅ Successfully processed ${totalFound} offices (${offices.length} new, ${alreadyInNetworkOffices.length} already in network)`);
 
     // Update session with results count
     await supabase
       .from('discovery_sessions')
-      .update({ results_count: offices.length })
+      .update({ results_count: totalFound })
       .eq('id', session.id);
 
+    // PHASE 3: Enhanced metadata in response
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Found ${offices.length} dental offices nearby`,
-        newOfficesCount: newOffices.length,
-        totalOfficesCount: offices.length,
-        offices: offices,
+        message: radiusExpanded 
+          ? `Expanded search to ${searchRadius} miles and found ${totalFound} offices`
+          : `Found ${totalFound} dental offices nearby`,
+        totalOfficesCount: totalFound,
+        newOfficesCount: offices.length,
+        alreadyInNetworkCount: alreadyInNetworkOffices.length,
+        offices: [...offices, ...alreadyInNetworkOffices], // Include both types
         sessionId: session.id,
+        radiusExpanded,
+        finalRadius: searchRadius,
+        searchMetadata: {
+          strategy: search_strategy,
+          minRating: min_rating,
+          includeSpecialties: include_specialties,
+          requireWebsite: require_website,
+          searchTermsUsed: searchTerms.length
+        },
         canRefresh: true
       }),
       {

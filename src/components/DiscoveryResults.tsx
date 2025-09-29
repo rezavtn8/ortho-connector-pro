@@ -22,6 +22,7 @@ interface DiscoveredOffice {
   search_distance: number;
   imported: boolean;
   distance?: number;
+  already_in_network?: boolean; // PHASE 1: New field
 }
 
 interface DiscoverySession {
@@ -53,9 +54,12 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
   const [sortBy, setSortBy] = useState<'distance' | 'rating' | 'name' | 'type'>('distance');
   const [selectedOffice, setSelectedOffice] = useState<DiscoveredOffice | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showAlreadyAdded, setShowAlreadyAdded] = useState(false); // PHASE 3: Toggle for already added
 
-  // Filter out already imported offices by default
-  const availableOffices = offices.filter(office => !office.imported);
+  // PHASE 1: Separate offices into categories
+  const newOffices = offices.filter(office => !office.imported && !office.already_in_network);
+  const alreadyInNetwork = offices.filter(office => office.already_in_network || office.imported);
+  const availableOffices = showAlreadyAdded ? offices : newOffices;
 
   // Sort offices
   const sortedOffices = [...availableOffices].sort((a, b) => {
@@ -132,16 +136,44 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
   };
 
   const getStats = () => {
-    const total = availableOffices.length;
-    const highRated = availableOffices.filter(o => (o.rating || 0) >= 4.0).length;
-    const avgRating = total > 0 
-      ? availableOffices.reduce((sum, o) => sum + (o.rating || 0), 0) / availableOffices.filter(o => o.rating).length 
+    const total = offices.length;
+    const newCount = newOffices.length;
+    const alreadyAddedCount = alreadyInNetwork.length;
+    const highRated = newOffices.filter(o => (o.rating || 0) >= 4.0).length;
+    const withWebsite = newOffices.filter(o => o.website).length;
+    const avgRating = newOffices.length > 0 
+      ? newOffices.reduce((sum, o) => sum + (o.rating || 0), 0) / newOffices.filter(o => o.rating).length 
       : 0;
     
-    return { total, highRated, avgRating };
+    return { total, newCount, alreadyAddedCount, highRated, withWebsite, avgRating };
   };
 
   const stats = getStats();
+
+  // PHASE 3: Intelligent recommendations
+  const getRecommendations = () => {
+    const recommendations = [];
+    
+    if (stats.newCount < 10 && session && session.search_distance < 25) {
+      recommendations.push({
+        icon: '🎯',
+        message: `Try expanding radius to ${session.search_distance + 10} miles`,
+        action: 'expand_radius'
+      });
+    }
+    
+    if (stats.newCount === 0 && stats.alreadyAddedCount > 0) {
+      recommendations.push({
+        icon: '✨',
+        message: 'All discovered offices are already in your network',
+        action: 'show_added'
+      });
+    }
+    
+    return recommendations;
+  };
+
+  const recommendations = getRecommendations();
 
   if (isLoading) {
     return (
@@ -172,74 +204,77 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Search Parameters Display */}
-      <Card className="bg-gradient-to-r from-primary/5 to-blue-600/5 border-primary/20">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Navigation className="w-4 h-4 text-primary" />
+      {/* PHASE 3: Enhanced Filter Summary Card */}
+      <Card className="bg-gradient-to-r from-primary/10 to-blue-600/10 border-primary/30">
+        <CardContent className="p-6">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/20 rounded-lg">
+                  <Navigation className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-lg">Discovery Results</h3>
+                  <p className="text-sm text-muted-foreground">{getSearchParametersText()}</p>
+                </div>
               </div>
-              <div>
-                <p className="font-medium">Search Parameters Used</p>
-                <p className="text-sm text-muted-foreground">{getSearchParametersText()}</p>
+              <Badge variant="secondary" className="text-lg px-4 py-2">
+                {stats.total} Total
+              </Badge>
+            </div>
+            
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="bg-background/50 rounded-lg p-3 border">
+                <p className="text-xs text-muted-foreground">New Opportunities</p>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.newCount}</p>
+              </div>
+              <div className="bg-background/50 rounded-lg p-3 border">
+                <p className="text-xs text-muted-foreground">Already in Network</p>
+                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.alreadyAddedCount}</p>
+              </div>
+              <div className="bg-background/50 rounded-lg p-3 border">
+                <p className="text-xs text-muted-foreground">High Rated (4.0+)</p>
+                <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{stats.highRated}</p>
+              </div>
+              <div className="bg-background/50 rounded-lg p-3 border">
+                <p className="text-xs text-muted-foreground">With Website</p>
+                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{stats.withWebsite}</p>
               </div>
             </div>
-            <Badge variant="secondary" className="bg-primary/10 text-primary">
-              {stats.total} offices found
-            </Badge>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant={showAlreadyAdded ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowAlreadyAdded(!showAlreadyAdded)}
+              >
+                {showAlreadyAdded ? 'Hide' : 'Show'} Already Added ({stats.alreadyAddedCount})
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/20 dark:to-blue-900/20 border-blue-200 dark:border-blue-800">
+      {/* PHASE 3: Intelligent Recommendations */}
+      {recommendations.length > 0 && (
+        <Card className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 border-amber-200 dark:border-amber-800">
           <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-600 rounded-lg">
-                <Building2 className="w-4 h-4 text-white" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-blue-700 dark:text-blue-300">Available Offices</p>
-                <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">{stats.total}</p>
-              </div>
+            <div className="space-y-2">
+              <h4 className="font-semibold flex items-center gap-2">
+                💡 Suggestions to Find More Offices
+              </h4>
+              {recommendations.map((rec, idx) => (
+                <div key={idx} className="flex items-center gap-2 text-sm">
+                  <span>{rec.icon}</span>
+                  <span>{rec.message}</span>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
+      )}
 
-        <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-950/20 dark:to-yellow-900/20 border-yellow-200 dark:border-yellow-800">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-yellow-600 rounded-lg">
-                <Star className="w-4 h-4 text-white" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-yellow-700 dark:text-yellow-300">High Rated (4.0+)</p>
-                <p className="text-2xl font-bold text-yellow-900 dark:text-yellow-100">{stats.highRated}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950/20 dark:to-purple-900/20 border-purple-200 dark:border-purple-800">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-600 rounded-lg">
-                <Users className="w-4 h-4 text-white" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-purple-700 dark:text-purple-300">Avg Rating</p>
-                <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
-                  {stats.avgRating > 0 ? stats.avgRating.toFixed(1) : '—'}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {availableOffices.length === 0 ? (
+      {newOffices.length === 0 && !showAlreadyAdded ? (
         <Card className="text-center p-8">
           <div className="space-y-4">
             <Check className="w-12 h-12 text-green-500 mx-auto" />
@@ -272,25 +307,32 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
             </div>
 
             <div className="text-sm text-muted-foreground">
-              {stats.total} offices found • Sorted by {sortBy}
+              Showing {availableOffices.length} offices • Sorted by {sortBy}
             </div>
           </div>
 
           {/* Grid Results Display */}
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
             {sortedOffices.map((office) => (
-              <Card key={office.id} className="hover:shadow-lg transition-shadow">
+              <Card key={office.id} className={`hover:shadow-lg transition-shadow ${
+                office.already_in_network || office.imported ? 'opacity-60 border-blue-300 dark:border-blue-800' : ''
+              }`}>
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <CardTitle className="text-lg leading-tight">{office.name}</CardTitle>
-                      <div className="flex items-center gap-2 mt-2">
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
                         <Badge variant="outline" className="text-xs">
                           {office.office_type}
                         </Badge>
                         {office.distance && (
                           <Badge variant="secondary" className="text-xs">
                             {office.distance.toFixed(1)} mi
+                          </Badge>
+                        )}
+                        {(office.already_in_network || office.imported) && (
+                          <Badge className="bg-blue-500 text-white text-xs">
+                            ✓ In Network
                           </Badge>
                         )}
                       </div>
@@ -338,13 +380,24 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
                     )}
                   </div>
 
-                  <Button
-                    onClick={() => handleAddToNetwork(office)}
-                    className="w-full bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-600/90"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add to Network
-                  </Button>
+                  {!(office.already_in_network || office.imported) ? (
+                    <Button
+                      onClick={() => handleAddToNetwork(office)}
+                      className="w-full bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-600/90"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add to Network
+                    </Button>
+                  ) : (
+                    <Button
+                      disabled
+                      variant="outline"
+                      className="w-full"
+                    >
+                      <Check className="w-4 h-4 mr-2" />
+                      Already Added
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             ))}
