@@ -311,6 +311,44 @@ export function Analytics() {
         </p>
       </div>
 
+      {/* Quick Stats Card */}
+      <Card variant="outline" className="bg-card/50">
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5" />
+                Total Patients
+              </p>
+              <p className="text-2xl font-bold text-foreground">{totalPatients.toLocaleString()}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Activity className="w-3.5 h-3.5" />
+                Avg/Source
+              </p>
+              <p className="text-2xl font-bold text-foreground">{averagePerSource}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <TrendingUp className="w-3.5 h-3.5" />
+                Growing
+              </p>
+              <p className="text-2xl font-bold text-green-600">{growingSources}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <TrendingDown className="w-3.5 h-3.5" />
+                Declining
+              </p>
+              <p className="text-2xl font-bold text-red-600">
+                {filteredAnalytics.filter(a => a.trend === 'down').length}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Controls */}
       <div className="flex justify-between items-center">
         <div className="flex gap-4">
