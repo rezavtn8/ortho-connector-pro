@@ -127,29 +127,26 @@ export function useAIAnalysis() {
   useEffect(() => {
     if (!user) return;
 
-    const loadAnalysis = async () => {
+    const loadCachedAnalysis = async () => {
       setLoading(true);
       setError(null);
 
       try {
-        // First, try to get cached analysis
+        // Only load cached analysis - don't auto-generate
         const cachedAnalysis = await fetchCachedAnalysis();
         
         if (cachedAnalysis) {
           setAnalysis(cachedAnalysis);
-        } else {
-          // No valid cache, generate new analysis
-          const newAnalysis = await generateNewAnalysis();
-          setAnalysis(newAnalysis);
         }
       } catch (err: any) {
-        setError(err.message || 'Failed to load analysis');
+        console.error('Failed to load cached analysis:', err);
+        setError(err.message || 'Failed to load cached analysis');
       } finally {
         setLoading(false);
       }
     };
 
-    loadAnalysis();
+    loadCachedAnalysis();
   }, [user]);
 
   return {

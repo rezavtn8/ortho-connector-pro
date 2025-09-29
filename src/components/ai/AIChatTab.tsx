@@ -37,26 +37,33 @@ export function AIChatTab() {
   return (
     <div className="flex flex-col h-[600px]">
       <div className="flex justify-between items-center mb-4">
-        <div>
-          <h2 className="text-xl font-semibold">AI Chat Assistant</h2>
-          <p className="text-sm text-muted-foreground">
-            Ask questions about your business data and get instant insights
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center shadow-md shadow-purple-500/30">
+            <Bot className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold">AI Chat Assistant</h2>
+            <p className="text-sm text-muted-foreground">
+              Ask questions about your business data and get instant insights
+            </p>
+          </div>
         </div>
         {messages.length > 0 && (
-          <Button variant="outline" onClick={clearChat}>
+          <Button variant="outline" onClick={clearChat} className="border-purple-200 dark:border-purple-800 hover:bg-purple-50 dark:hover:bg-purple-950/20">
             Clear Chat
           </Button>
         )}
       </div>
 
-      <Card className="flex-1 flex flex-col">
+      <Card className="flex-1 flex flex-col border-purple-200/50 dark:border-purple-800/50">
         <CardContent className="p-0 flex-1 flex flex-col">
           <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
             {messages.length === 0 ? (
               <div className="text-center py-12">
-                <Bot className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Start a conversation</h3>
+                <div className="w-16 h-16 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-purple-500/30">
+                  <Bot className="h-8 w-8 text-white" />
+                </div>
+                <h3 className="text-lg font-semibold mb-2 bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">Start a conversation</h3>
                 <p className="text-muted-foreground mb-4">
                   Ask me anything about your business data, patient sources, or campaigns
                 </p>
@@ -71,7 +78,7 @@ export function AIChatTab() {
                       variant="outline"
                       size="sm"
                       onClick={() => setInput(suggestion)}
-                      className="text-xs"
+                      className="text-xs border-purple-200 dark:border-purple-800 hover:bg-purple-50 dark:hover:bg-purple-950/20"
                     >
                       {suggestion}
                     </Button>
@@ -95,16 +102,16 @@ export function AIChatTab() {
                       <div className={cn(
                         "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center",
                         message.role === 'user' 
-                          ? "bg-primary text-primary-foreground" 
-                          : "bg-muted text-muted-foreground"
+                          ? "bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-md shadow-purple-500/30" 
+                          : "bg-gradient-to-r from-purple-100 to-blue-100 dark:from-purple-900/50 dark:to-blue-900/50 text-purple-600 dark:text-purple-300"
                       )}>
                         {message.role === 'user' ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
                       </div>
                       <div className={cn(
                         "rounded-lg px-4 py-2 max-w-full",
                         message.role === 'user'
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted"
+                          ? "bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-sm"
+                          : "bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800"
                       )}>
                         <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                         <p className="text-xs opacity-70 mt-1">
@@ -116,12 +123,12 @@ export function AIChatTab() {
                 ))}
                 {loading && (
                   <div className="flex gap-3 mr-auto max-w-[80%]">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted text-muted-foreground flex items-center justify-center">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-r from-purple-100 to-blue-100 dark:from-purple-900/50 dark:to-blue-900/50 text-purple-600 dark:text-purple-300 flex items-center justify-center">
                       <Bot className="h-4 w-4" />
                     </div>
-                    <div className="bg-muted rounded-lg px-4 py-2">
+                    <div className="bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg px-4 py-2">
                       <div className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Loader2 className="h-4 w-4 animate-spin text-purple-600" />
                         <span className="text-sm">Thinking...</span>
                       </div>
                     </div>
@@ -131,16 +138,16 @@ export function AIChatTab() {
             )}
           </ScrollArea>
           
-          <div className="p-4 border-t">
+          <div className="p-4 border-t border-purple-200/50 dark:border-purple-800/50">
             <form onSubmit={handleSubmit} className="flex gap-2">
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Ask about your business data..."
                 disabled={loading}
-                className="flex-1"
+                className="flex-1 border-purple-200 dark:border-purple-800 focus-visible:ring-purple-500"
               />
-              <Button type="submit" disabled={!input.trim() || loading}>
+              <Button type="submit" disabled={!input.trim() || loading} className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-md shadow-purple-500/20">
                 {loading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (

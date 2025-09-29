@@ -37,16 +37,16 @@ export function AIAnalysisTab() {
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <h2 className="text-xl font-semibold">Business Analysis</h2>
-          <Button disabled>
+          <Button disabled className="bg-gradient-to-r from-purple-500 to-blue-500">
             <RefreshCw className="h-4 w-4 animate-spin mr-2" />
             Analyzing...
           </Button>
         </div>
         <div className="grid gap-4">
           {[1, 2, 3].map((i) => (
-            <Card key={i} className="animate-pulse">
+            <Card key={i} className="animate-pulse border-purple-200/50 dark:border-purple-800/50">
               <CardHeader>
-                <div className="h-4 bg-muted rounded w-1/3"></div>
+                <div className="h-4 bg-gradient-to-r from-purple-200 to-blue-200 dark:from-purple-900 dark:to-blue-900 rounded w-1/3"></div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
@@ -64,12 +64,14 @@ export function AIAnalysisTab() {
   if (error) {
     return (
       <div className="text-center py-12">
-        <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+        <div className="w-16 h-16 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center mx-auto mb-4">
+          <AlertCircle className="h-8 w-8 text-white" />
+        </div>
         <h3 className="text-lg font-semibold mb-2">Analysis Failed</h3>
         <p className="text-muted-foreground mb-4">
           Unable to generate business analysis. Please try again.
         </p>
-        <Button onClick={handleRefresh} variant="outline">
+        <Button onClick={handleRefresh} className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600">
           <RefreshCw className="h-4 w-4 mr-2" />
           Retry Analysis
         </Button>
@@ -80,13 +82,17 @@ export function AIAnalysisTab() {
   if (!analysis) {
     return (
       <div className="text-center py-12">
-        <Brain className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-        <h3 className="text-lg font-semibold mb-2">No Analysis Yet</h3>
-        <p className="text-muted-foreground mb-4">
-          Generate your first AI-powered business analysis
+        <div className="w-20 h-20 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center mx-auto mb-6 shadow-lg shadow-purple-500/30">
+          <Brain className="h-10 w-10 text-white" />
+        </div>
+        <h3 className="text-xl font-semibold mb-2 bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+          Generate Your First AI Analysis
+        </h3>
+        <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+          Get AI-powered insights about your business performance, patient sources, and strategic recommendations
         </p>
-        <Button onClick={handleRefresh}>
-          <RefreshCw className="h-4 w-4 mr-2" />
+        <Button onClick={handleRefresh} className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-lg shadow-purple-500/30">
+          <Brain className="h-4 w-4 mr-2" />
           Generate Analysis
         </Button>
       </div>
@@ -97,32 +103,37 @@ export function AIAnalysisTab() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-xl font-semibold">Business Analysis</h2>
-          <p className="text-sm text-muted-foreground">
+          <div className="flex items-center gap-3 mb-1">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center shadow-md shadow-purple-500/30">
+              <Brain className="h-5 w-5 text-white" />
+            </div>
+            <h2 className="text-xl font-semibold">Business Analysis</h2>
+          </div>
+          <p className="text-sm text-muted-foreground ml-13">
             Last updated: {format(new Date(analysis.generated_at), 'PPp')}
           </p>
         </div>
-        <Button onClick={handleRefresh} disabled={refreshing}>
+        <Button onClick={handleRefresh} disabled={refreshing} className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-md shadow-purple-500/20">
           <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-          Refresh
+          Refresh Analysis
         </Button>
       </div>
 
-      <Card className="max-w-4xl mx-auto bg-white dark:bg-card shadow-sm border border-border/50">
+      <Card className="max-w-4xl mx-auto bg-white dark:bg-card shadow-lg border border-purple-200/50 dark:border-purple-800/50">
         {/* Data Snapshot Bar */}
         {analysis.metrics && (
-          <div className="px-8 py-4 bg-gradient-to-r from-slate-50 to-blue-50/30 dark:from-slate-900/50 dark:to-blue-900/20 border-b border-border/30">
+          <div className="px-8 py-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 border-b border-purple-200/50 dark:border-purple-800/50">
             <div className="flex items-center justify-center gap-8 text-sm font-medium">
               <span className="text-slate-600 dark:text-slate-300">
-                <span className="text-teal-600 font-semibold">{analysis.metrics.total_sources || 0}</span> sources
+                <span className="font-semibold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">{analysis.metrics.total_sources || 0}</span> sources
               </span>
-              <div className="h-4 w-px bg-border/50"></div>
+              <div className="h-4 w-px bg-purple-300/50 dark:bg-purple-700/50"></div>
               <span className="text-slate-600 dark:text-slate-300">
-                <span className="text-teal-600 font-semibold">{analysis.metrics.total_patients || 0}</span> patients
+                <span className="font-semibold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">{analysis.metrics.total_patients || 0}</span> patients
               </span>
-              <div className="h-4 w-px bg-border/50"></div>
+              <div className="h-4 w-px bg-purple-300/50 dark:bg-purple-700/50"></div>
               <span className="text-slate-600 dark:text-slate-300">
-                <span className="text-teal-600 font-semibold">{analysis.metrics.active_campaigns || 0}</span> campaigns
+                <span className="font-semibold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">{analysis.metrics.active_campaigns || 0}</span> campaigns
               </span>
             </div>
           </div>
@@ -131,31 +142,37 @@ export function AIAnalysisTab() {
         {/* Executive Summary Content */}
         <div className="px-8 py-8">
           <div className="flex items-center gap-3 mb-8">
-            <Brain className="h-6 w-6 text-teal-600" />
-            <h3 className="text-2xl font-semibold text-foreground">Business Intelligence Report</h3>
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center">
+              <Brain className="h-5 w-5 text-white" />
+            </div>
+            <h3 className="text-2xl font-semibold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">Business Intelligence Report</h3>
           </div>
 
           {/* Executive Narrative Analysis */}
           <div className="space-y-8 mb-10">
             {analysis.narrative_sections?.map((section: any, index: number) => (
               <div key={index} className="space-y-4">
-                <h4 className="text-lg font-semibold text-foreground">{section.title}</h4>
+                <h4 className="text-lg font-semibold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">{section.title}</h4>
                 
-                {/* Section Content */}
+                {/* Section Content with validation */}
                 <div className="text-base leading-7 text-slate-700 dark:text-slate-300">
-                  {section.content.split('\n\n').map((paragraph: string, pIndex: number) => (
-                    <p key={pIndex} className="mb-4">{paragraph}</p>
-                  ))}
+                  {section.content ? (
+                    section.content.split('\n\n').map((paragraph: string, pIndex: number) => (
+                      <p key={pIndex} className="mb-4">{paragraph}</p>
+                    ))
+                  ) : (
+                    <p className="text-muted-foreground italic">No content available for this section</p>
+                  )}
                 </div>
 
                 {/* Key Findings */}
                 {section.key_findings && section.key_findings.length > 0 && (
-                  <div className="bg-slate-50 dark:bg-slate-900/30 rounded-lg p-4 border-l-4 border-teal-500">
-                    <h5 className="font-medium text-sm text-teal-700 dark:text-teal-300 mb-2">Key Findings</h5>
+                  <div className="bg-purple-50 dark:bg-purple-950/20 rounded-lg p-4 border-l-4 border-purple-500">
+                    <h5 className="font-medium text-sm bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-2">Key Findings</h5>
                     <ul className="space-y-1 text-sm">
                       {section.key_findings.map((finding: string, fIndex: number) => (
                         <li key={fIndex} className="flex items-start gap-2">
-                          <div className="w-1 h-1 bg-teal-500 rounded-full mt-2 flex-shrink-0"></div>
+                          <div className="w-1 h-1 bg-purple-500 rounded-full mt-2 flex-shrink-0"></div>
                           <span className="text-slate-600 dark:text-slate-400">{finding}</span>
                         </li>
                       ))}
@@ -164,7 +181,7 @@ export function AIAnalysisTab() {
                 )}
 
                 {index < (analysis.narrative_sections?.length || 1) - 1 && (
-                  <div className="my-8 w-24 h-px bg-gradient-to-r from-teal-300 to-transparent"></div>
+                  <div className="my-8 w-24 h-px bg-gradient-to-r from-purple-300 to-blue-300"></div>
                 )}
               </div>
             )) || (
@@ -186,16 +203,16 @@ export function AIAnalysisTab() {
 
           {/* Strategic Recommendations */}
           {(analysis.recommendations?.length > 0 || analysis.insights?.length > 0) && (
-            <div className="bg-gradient-to-br from-teal-50/50 to-blue-50/30 dark:from-teal-950/20 dark:to-blue-950/20 rounded-xl p-6 border border-teal-100 dark:border-teal-800/30">
-              <h4 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-                <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
-                Strategic Recommendations
+            <div className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 rounded-xl p-6 border border-purple-200 dark:border-purple-800/30 shadow-md shadow-purple-500/10">
+              <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <div className="w-2 h-2 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full"></div>
+                <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">Strategic Recommendations</span>
               </h4>
               <div className="space-y-4">
                 {analysis.recommendations?.map((rec: any, index: number) => (
                   <div key={index} className="space-y-2">
-                    <h5 className="font-medium text-sm text-teal-700 dark:text-teal-300">{rec.title}</h5>
-                    <p className="text-sm text-slate-700 dark:text-slate-300 leading-6 pl-3 border-l-2 border-teal-200 dark:border-teal-800">
+                    <h5 className="font-medium text-sm bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">{rec.title}</h5>
+                    <p className="text-sm text-slate-700 dark:text-slate-300 leading-6 pl-3 border-l-2 border-purple-300 dark:border-purple-700">
                       {rec.action}
                     </p>
                   </div>

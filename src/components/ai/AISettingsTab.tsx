@@ -150,7 +150,7 @@ export function AISettingsTab() {
         </Card>
 
         <div className="flex justify-end">
-          <Button onClick={handleSave} disabled={saving || loading}>
+          <Button onClick={handleSave} disabled={saving || loading} className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 shadow-md shadow-purple-500/20">
             {saving ? (
               <>
                 <Save className="h-4 w-4 mr-2 animate-pulse" />
