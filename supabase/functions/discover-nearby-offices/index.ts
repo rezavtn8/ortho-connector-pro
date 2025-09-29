@@ -70,45 +70,11 @@ serve(async (req) => {
       throw new Error('Search coordinates not available');
     }
 
-    // PHASE 2: Enhanced cache key with all search parameters
-    const cacheKey = `${distance}_${min_rating}_${office_type_filter || 'all'}_${search_strategy}_${include_specialties}_${require_website}`;
-    console.log(`Cache key: ${cacheKey}`);
+    // Cache disabled - always fetch fresh results
+    console.log('Cache bypassed - fetching fresh results from Google Places API');
 
-    // Check for cached results with matching parameters
-    const { data: cachedOffices, error: cacheError } = await supabase
-      .from('discovered_offices')
-      .select('*')
-      .eq('discovered_by', user.id)
-      .eq('clinic_id', clinic_id)
-      .eq('search_distance', distance)
-      .eq('search_location_lat', searchLatitude)
-      .eq('search_location_lng', searchLongitude)
-      .order('fetched_at', { ascending: false })
-      .limit(100);
-
-    // Return cached results if found and recent (within 7 days)
-    if (cachedOffices && cachedOffices.length > 0) {
-      const mostRecentFetch = new Date(cachedOffices[0].fetched_at);
-      const daysSinceLastFetch = (Date.now() - mostRecentFetch.getTime()) / (1000 * 60 * 60 * 24);
-      
-      if (daysSinceLastFetch < 7) {
-        console.log(`Returning ${cachedOffices.length} cached offices (${daysSinceLastFetch.toFixed(1)} days old)`);
-        return new Response(
-          JSON.stringify({
-            success: true,
-            cached: true,
-            cacheAge: daysSinceLastFetch.toFixed(1),
-            message: `Found ${cachedOffices.length} cached offices from ${daysSinceLastFetch.toFixed(1)} days ago`,
-            offices: cachedOffices,
-            canRefresh: true
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    }
-
-    // Rate limiting temporarily disabled for testing
-    console.log('Rate limiting disabled - proceeding with API call');
+    // Rate limiting disabled - proceeding with API call
+    console.log('Rate limiting disabled - proceeding with fresh API call');
 
     // Call Google Places API
     const googleApiKey = Deno.env.get('GOOGLE_MAPS_API_KEY');
