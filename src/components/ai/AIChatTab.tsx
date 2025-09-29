@@ -90,15 +90,15 @@ export function AIChatTab() {
                   <div
                     key={message.id}
                     className={cn(
-                      "flex gap-3 max-w-[80%]",
-                      message.role === 'user' ? "ml-auto" : "mr-auto"
+                      "flex gap-3 w-full",
+                      message.role === 'user' ? "justify-end" : "justify-start"
                     )}
                   >
                     <div className={cn(
-                      "flex gap-3",
+                      "flex gap-3 max-w-[85%]",
                       message.role === 'user' ? "flex-row-reverse" : "flex-row"
                     )}>
-                      {/* Purple AI Bot Avatar */}
+                      {/* Avatar */}
                       {message.role === 'assistant' && (
                         <div className="flex-shrink-0">
                           <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500">
@@ -106,17 +106,6 @@ export function AIChatTab() {
                           </div>
                         </div>
                       )}
-                      <div className={cn(
-                        "rounded-lg px-4 py-3 max-w-[80%]",
-                        message.role === 'user'
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted"
-                      )}>
-                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                        <p className="text-xs opacity-70 mt-1">
-                          {message.timestamp.toLocaleTimeString()}
-                        </p>
-                      </div>
                       {message.role === 'user' && (
                         <div className="flex-shrink-0">
                           <div className="p-2 rounded-lg bg-primary">
@@ -124,6 +113,17 @@ export function AIChatTab() {
                           </div>
                         </div>
                       )}
+                      <div className={cn(
+                        "rounded-lg px-4 py-3 flex-1",
+                        message.role === 'user'
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted"
+                      )}>
+                        <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                        <p className="text-xs opacity-70 mt-2">
+                          {message.timestamp.toLocaleTimeString()}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 ))}
