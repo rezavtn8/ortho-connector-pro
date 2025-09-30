@@ -5,7 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { useResilientQuery } from '@/hooks/useResilientQuery';
 import { supabase } from '@/integrations/supabase/client';
 import { ResilientErrorBoundary } from '@/components/ResilientErrorBoundary';
-import { UnifiedCampaignCreator } from '@/components/UnifiedCampaignCreator';
+import { EmailCampaignCreator } from '@/components/EmailCampaignCreator';
+import { PhysicalCampaignCreator } from '@/components/PhysicalCampaignCreator';
 import { 
   Megaphone, 
   Plus, 
@@ -15,12 +16,13 @@ import {
   Calendar,
   Users,
   Mail,
-  Sparkles
+  Package
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 function CampaignsContent() {
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [showPhysicalDialog, setShowPhysicalDialog] = useState(false);
   const { data: campaigns, isLoading, error, retry, isOffline, refetch } = useResilientQuery({
     queryKey: ['campaigns'],
     queryFn: async () => {
@@ -121,17 +123,28 @@ function CampaignsContent() {
         </Card>
       )}
 
-      {/* Create Campaign Button */}
+      {/* Create Campaign Buttons */}
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold">Your Campaigns</h2>
-        <Button 
-          className="gap-2" 
-          disabled={isOffline}
-          onClick={() => setShowCreateDialog(true)}
-        >
-          <Sparkles className="h-4 w-4" />
-          Create AI Campaign
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline"
+            className="gap-2" 
+            disabled={isOffline}
+            onClick={() => setShowEmailDialog(true)}
+          >
+            <Mail className="h-4 w-4" />
+            Email Campaign
+          </Button>
+          <Button 
+            className="gap-2" 
+            disabled={isOffline}
+            onClick={() => setShowPhysicalDialog(true)}
+          >
+            <Package className="h-4 w-4" />
+            Physical Campaign
+          </Button>
+        </div>
       </div>
 
       {/* Campaigns List */}
@@ -143,14 +156,25 @@ function CampaignsContent() {
             <p className="text-muted-foreground mb-4">
               Start by creating your first marketing campaign to reach out to your referral sources.
             </p>
-            <Button 
-              className="gap-2" 
-              disabled={isOffline}
-              onClick={() => setShowCreateDialog(true)}
-            >
-              <Sparkles className="h-4 w-4" />
-              Create AI Campaign
-            </Button>
+            <div className="flex gap-2 justify-center">
+              <Button 
+                variant="outline"
+                className="gap-2" 
+                disabled={isOffline}
+                onClick={() => setShowEmailDialog(true)}
+              >
+                <Mail className="h-4 w-4" />
+                Email Campaign
+              </Button>
+              <Button 
+                className="gap-2" 
+                disabled={isOffline}
+                onClick={() => setShowPhysicalDialog(true)}
+              >
+                <Package className="h-4 w-4" />
+                Physical Campaign
+              </Button>
+            </div>
           </CardContent>
         </Card>
       ) : (
@@ -218,10 +242,15 @@ function CampaignsContent() {
         </div>
       )}
 
-      {/* Unified Campaign Creator Dialog */}
-      <UnifiedCampaignCreator
-        open={showCreateDialog}
-        onOpenChange={setShowCreateDialog}
+      {/* Campaign Creator Dialogs */}
+      <EmailCampaignCreator
+        open={showEmailDialog}
+        onOpenChange={setShowEmailDialog}
+        onCampaignCreated={handleCampaignCreated}
+      />
+      <PhysicalCampaignCreator
+        open={showPhysicalDialog}
+        onOpenChange={setShowPhysicalDialog}
         onCampaignCreated={handleCampaignCreated}
       />
     </div>
