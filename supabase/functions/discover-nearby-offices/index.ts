@@ -65,16 +65,70 @@ serve(async (req) => {
     let searchLatitude = search_lat || clinic.latitude;
     let searchLongitude = search_lng || clinic.longitude;
     let clinicName = clinic.name;
+    const cacheStartTime = Date.now();
 
     if (!searchLatitude || !searchLongitude) {
       throw new Error('Search coordinates not available');
     }
 
-    // Cache disabled - always fetch fresh results
-    console.log('Cache bypassed - fetching fresh results from Google Places API');
+    // CHECK CACHE FIRST - Look for valid cached results
+    console.log('🔍 Checking cache for existing results...');
+    const cacheStartTime = Date.now();
+    
+    const { data: cachedOffices, error: cacheError } = await supabase
+      .from('discovered_offices')
+      .select('*')
+      .eq('discovered_by', user.id)
+      .eq('clinic_id', clinic_id)
+      .eq('search_distance', distance)
+      .gt('cache_expires_at', new Date().toISOString())
+      .order('fetched_at', { ascending: false });
 
-    // Rate limiting disabled - proceeding with API call
-    console.log('Rate limiting disabled - proceeding with fresh API call');
+    if (cacheError) {
+      console.error('⚠️ Cache lookup error:', cacheError);
+    }
+
+    if (cachedOffices && cachedOffices.length > 0) {
+      const cacheAge = Math.floor((Date.now() - new Date(cachedOffices[0].fetched_at).getTime()) / 1000);
+      console.log(`✅ Found ${cachedOffices.length} valid cached offices (age: ${cacheAge}s, expires: ${cachedOffices[0].cache_expires_at})`);
+      
+      // Update session with cache hit metadata
+      const { data: cachedSession } = await supabase
+        .from('discovery_sessions')
+        .insert({
+          user_id: user.id,
+          clinic_id: clinic_id,
+          search_distance: distance,
+          search_lat: searchLatitude,
+          search_lng: searchLongitude,
+          office_type_filter: office_type_filter,
+          zip_code_override: zip_code_override,
+          api_call_made: false,
+          cache_hit: true,
+          cache_age_seconds: cacheAge,
+          results_count: cachedOffices.length
+        })
+        .select()
+        .single();
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          cached: true,
+          message: `Loaded ${cachedOffices.length} offices from cache (${Math.floor(cacheAge / 60)} minutes old)`,
+          offices: cachedOffices,
+          sessionId: cachedSession?.id,
+          cacheAge: cacheAge,
+          totalOfficesCount: cachedOffices.length,
+          newOfficesCount: 0,
+          alreadyInNetworkCount: 0,
+          canRefresh: true
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('❌ No valid cache found - fetching fresh results from Google Places API');
 
     // Call Google Places API
     const googleApiKey = Deno.env.get('GOOGLE_MAPS_API_KEY');
@@ -298,7 +352,7 @@ serve(async (req) => {
         const batch = placeIds.slice(i, i + batchSize);
         const batchPromises = batch.map(async (placeId) => {
           try {
-            const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=formatted_phone_number,website&key=${googleApiKey}`;
+            const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=formatted_phone_number,website,user_ratings_total&key=${googleApiKey}`;
             const response = await fetch(detailsUrl);
             const data = await response.json();
             
@@ -306,7 +360,8 @@ serve(async (req) => {
               return {
                 placeId,
                 phone: data.result.formatted_phone_number || null,
-                website: data.result.website || null
+                website: data.result.website || null,
+                user_ratings_total: data.result.user_ratings_total || null
               };
             }
           } catch (error) {
@@ -362,6 +417,7 @@ serve(async (req) => {
           const details = detailsMap.get(place.place_id);
           const phone = details?.phone || null;
           const website = details?.website || null;
+          const user_ratings_total = details?.user_ratings_total || null;
 
           // Apply filters
           if (min_rating > 0 && (!place.rating || place.rating < min_rating)) {
@@ -390,17 +446,20 @@ serve(async (req) => {
             phone,
             website,
             rating: place.rating || null,
+            user_ratings_total: user_ratings_total,
             lat: place.geometry.location.lat,
             lng: place.geometry.location.lng,
             discovered_by: user.id,
             clinic_id: clinic_id,
             source: 'google',
-            search_distance: searchRadius, // Use final radius (may be expanded)
+            search_distance: searchRadius,
             search_location_lat: searchLatitude,
             search_location_lng: searchLongitude,
             office_type: inferredType,
             discovery_session_id: session.id,
-            already_in_network: alreadyInNetwork // PHASE 1: New field
+            cache_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            last_verified_at: new Date().toISOString(),
+            already_in_network: alreadyInNetwork
           };
 
           if (alreadyInNetwork) {
@@ -417,6 +476,8 @@ serve(async (req) => {
 
       // Insert new offices
       if (offices.length > 0) {
+        const apiResponseTime = Date.now() - cacheStartTime;
+        
         // Strip non-existent columns before DB insert
         const officesForInsert = offices.map((o: any) => {
           const { already_in_network, ...db } = o as any;
@@ -435,6 +496,15 @@ serve(async (req) => {
           console.error('Insert error:', insertError);
           throw insertError;
         }
+        
+        // Update session with API response time
+        await supabase
+          .from('discovery_sessions')
+          .update({ 
+            api_response_time_ms: apiResponseTime,
+            results_count: totalFound
+          })
+          .eq('id', session.id);
       }
     }
 

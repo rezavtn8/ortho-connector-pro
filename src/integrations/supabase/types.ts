@@ -419,6 +419,7 @@ export type Database = {
       discovered_offices: {
         Row: {
           address: string | null
+          cache_expires_at: string | null
           clinic_id: string | null
           created_at: string
           discovered_by: string
@@ -426,6 +427,7 @@ export type Database = {
           fetched_at: string
           id: string
           imported: boolean
+          last_verified_at: string | null
           lat: number | null
           lng: number | null
           name: string
@@ -438,10 +440,12 @@ export type Database = {
           search_location_lng: number | null
           source: string
           updated_at: string
+          user_ratings_total: number | null
           website: string | null
         }
         Insert: {
           address?: string | null
+          cache_expires_at?: string | null
           clinic_id?: string | null
           created_at?: string
           discovered_by: string
@@ -449,6 +453,7 @@ export type Database = {
           fetched_at?: string
           id?: string
           imported?: boolean
+          last_verified_at?: string | null
           lat?: number | null
           lng?: number | null
           name: string
@@ -461,10 +466,12 @@ export type Database = {
           search_location_lng?: number | null
           source?: string
           updated_at?: string
+          user_ratings_total?: number | null
           website?: string | null
         }
         Update: {
           address?: string | null
+          cache_expires_at?: string | null
           clinic_id?: string | null
           created_at?: string
           discovered_by?: string
@@ -472,6 +479,7 @@ export type Database = {
           fetched_at?: string
           id?: string
           imported?: boolean
+          last_verified_at?: string | null
           lat?: number | null
           lng?: number | null
           name?: string
@@ -484,6 +492,7 @@ export type Database = {
           search_location_lng?: number | null
           source?: string
           updated_at?: string
+          user_ratings_total?: number | null
           website?: string | null
         }
         Relationships: [
@@ -506,6 +515,9 @@ export type Database = {
       discovery_sessions: {
         Row: {
           api_call_made: boolean | null
+          api_response_time_ms: number | null
+          cache_age_seconds: number | null
+          cache_hit: boolean | null
           clinic_id: string | null
           created_at: string
           id: string
@@ -520,6 +532,9 @@ export type Database = {
         }
         Insert: {
           api_call_made?: boolean | null
+          api_response_time_ms?: number | null
+          cache_age_seconds?: number | null
+          cache_hit?: boolean | null
           clinic_id?: string | null
           created_at?: string
           id?: string
@@ -534,6 +549,9 @@ export type Database = {
         }
         Update: {
           api_call_made?: boolean | null
+          api_response_time_ms?: number | null
+          cache_age_seconds?: number | null
+          cache_hit?: boolean | null
           clinic_id?: string | null
           created_at?: string
           id?: string
@@ -1362,6 +1380,10 @@ export type Database = {
           p_window_minutes?: number
         }
         Returns: boolean
+      }
+      cleanup_expired_discovered_offices: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       cleanup_old_audit_logs: {
         Args: Record<PropertyKey, never>

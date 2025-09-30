@@ -16,13 +16,14 @@ interface DiscoveredOffice {
   phone: string | null;
   website: string | null;
   rating: number | null;
+  user_ratings_total: number | null;
   lat: number | null;
   lng: number | null;
   office_type: string;
   search_distance: number;
   imported: boolean;
   distance?: number;
-  already_in_network?: boolean; // PHASE 1: New field
+  already_in_network?: boolean;
 }
 
 interface DiscoverySession {
@@ -89,7 +90,7 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
     onOfficeAdded();
   };
 
-  const renderStars = (rating: number | null) => {
+  const renderStars = (rating: number | null, reviewCount: number | null) => {
     if (!rating) return <span className="text-muted-foreground text-sm">No rating</span>;
     
     const stars = [];
@@ -112,7 +113,10 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
     return (
       <div className="flex items-center gap-1">
         {stars}
-        <span className="text-sm text-muted-foreground ml-1">({rating})</span>
+        <span className="text-sm text-muted-foreground ml-1">
+          {rating}
+          {reviewCount && <span className="text-xs"> ({reviewCount} reviews)</span>}
+        </span>
       </div>
     );
   };
@@ -346,7 +350,7 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
                 </CardHeader>
 
                 <CardContent className="space-y-3">
-                  {office.rating && renderStars(office.rating)}
+                  {office.rating && renderStars(office.rating, office.user_ratings_total)}
 
                   {office.address && (
                     <div className="flex items-start gap-2 text-sm">

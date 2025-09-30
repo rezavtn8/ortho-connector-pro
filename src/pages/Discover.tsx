@@ -17,6 +17,7 @@ interface DiscoveredOffice {
   phone: string | null;
   website: string | null;
   rating: number | null;
+  user_ratings_total: number | null;
   lat: number | null;
   lng: number | null;
   office_type: string;
