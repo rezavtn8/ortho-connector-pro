@@ -30,7 +30,7 @@ export function useOffices() {
     queryFn: async () => {
       const currentMonth = getCurrentYearMonth();
       
-      // Single optimized query with joins
+      // Single optimized query with joins - using left join to include all offices
       const { data: sources, error } = await supabase
         .from('patient_sources')
         .select(`
@@ -44,7 +44,7 @@ export function useOffices() {
           website,
           notes,
           google_rating,
-          monthly_patients!inner(
+          monthly_patients(
             year_month,
             patient_count
           )
