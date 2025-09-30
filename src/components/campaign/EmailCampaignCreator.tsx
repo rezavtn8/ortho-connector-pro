@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Mail, Sparkles, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Loader2, Mail, ArrowRight, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { EnhancedDatePicker } from '../EnhancedDatePicker';
@@ -48,7 +48,6 @@ const OFFICE_TIER_FILTERS = [
 export function EmailCampaignCreator({ open, onOpenChange, onCampaignCreated }: EmailCampaignCreatorProps) {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [generatingContent, setGeneratingContent] = useState(false);
   const [offices, setOffices] = useState<Office[]>([]);
   const [loadingOffices, setLoadingOffices] = useState(true);
   
@@ -57,11 +56,8 @@ export function EmailCampaignCreator({ open, onOpenChange, onCampaignCreated }: 
   const [campaignName, setCampaignName] = useState('');
   const [plannedDate, setPlannedDate] = useState<Date>();
   const [notes, setNotes] = useState('');
-  const [aiInstructions, setAiInstructions] = useState('');
   const [selectedOffices, setSelectedOffices] = useState<string[]>([]);
   const [tierFilter, setTierFilter] = useState('all');
-  const [emailSubject, setEmailSubject] = useState('');
-  const [emailBody, setEmailBody] = useState('');
 
   // Fetch offices
   useEffect(() => {
@@ -144,75 +140,6 @@ export function EmailCampaignCreator({ open, onOpenChange, onCampaignCreated }: 
   const allInCategorySelected = filteredOffices.length > 0 && 
     filteredOffices.every(o => selectedOffices.includes(o.id));
 
-  const generateEmailContent = async () => {
-    if (selectedOffices.length === 0) {
-      toast.error('Please select at least one office');
-      return;
-    }
-
-    setGeneratingContent(true);
-    try {
-      // Get user profile for sender name
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('first_name, last_name, degrees, job_title')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      // Prepare comprehensive office data for AI
-      const officesData = selectedOffices.map(officeId => {
-        const office = offices.find(o => o.id === officeId);
-        if (!office) return null;
-        
-        return {
-          id: office.id,
-          name: office.name,
-          address: office.address || '',
-          source_type: 'Office', // Will be fetched by edge function
-          referral_tier: office.tier
-        };
-      }).filter(Boolean);
-
-      console.log('Calling edge function with offices:', officesData);
-
-      const { data, error } = await supabase.functions.invoke('generate-campaign-emails', {
-        body: {
-          offices: officesData,
-          campaign_name: campaignName || 'Email Campaign',
-          user_name: profile ? `${profile.first_name} ${profile.last_name}` : undefined,
-        }
-      });
-
-      if (error) {
-        console.error('Edge function error:', error);
-        throw error;
-      }
-
-      if (!data?.success) {
-        throw new Error(data?.error || 'Failed to generate emails');
-      }
-
-      if (data.emails && data.emails.length > 0) {
-        // Use the first email as template (they should all have similar structure)
-        const firstEmail = data.emails[0];
-        setEmailSubject(firstEmail.subject);
-        setEmailBody(firstEmail.body);
-        toast.success(`AI generated ${data.emails.length} personalized email${data.emails.length > 1 ? 's' : ''}!`);
-        setStep(4);
-      } else {
-        throw new Error('No emails generated');
-      }
-    } catch (error: any) {
-      console.error('Failed to generate content:', error);
-      toast.error('Failed to generate content: ' + (error.message || 'Unknown error'));
-    } finally {
-      setGeneratingContent(false);
-    }
-  };
-
   const handleSubmit = async () => {
     if (!campaignName || selectedOffices.length === 0) {
       toast.error('Please fill in all required fields');
@@ -246,8 +173,6 @@ export function EmailCampaignCreator({ open, onOpenChange, onCampaignCreated }: 
         return {
           campaign_id: campaign.id,
           office_id: officeId,
-          email_subject: emailSubject,
-          email_body: emailBody,
           email_status: 'pending',
           action_mode: 'email_only',
           delivery_status: 'Not Started',
@@ -279,11 +204,8 @@ export function EmailCampaignCreator({ open, onOpenChange, onCampaignCreated }: 
     setCampaignName('');
     setPlannedDate(undefined);
     setNotes('');
-    setAiInstructions('');
     setSelectedOffices([]);
     setTierFilter('all');
-    setEmailSubject('');
-    setEmailBody('');
   };
 
   useEffect(() => {
@@ -296,7 +218,7 @@ export function EmailCampaignCreator({ open, onOpenChange, onCampaignCreated }: 
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Mail className="h-5 w-5" />
-            Create Email Campaign - Step {step} of 4
+            Create Email Campaign - Step {step} of 3
           </DialogTitle>
         </DialogHeader>
 
@@ -347,24 +269,13 @@ export function EmailCampaignCreator({ open, onOpenChange, onCampaignCreated }: 
               </div>
 
               <div>
-                <Label htmlFor="aiInstructions">AI Instructions (Optional)</Label>
-                <Textarea
-                  id="aiInstructions"
-                  value={aiInstructions}
-                  onChange={(e) => setAiInstructions(e.target.value)}
-                  placeholder="Any specific tone, content, or messaging you'd like in the emails..."
-                  rows={4}
-                />
-              </div>
-
-              <div>
                 <Label htmlFor="notes">Campaign Notes</Label>
                 <Textarea
                   id="notes"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Internal notes about this campaign..."
-                  rows={3}
+                  rows={6}
                 />
               </div>
             </div>
@@ -431,35 +342,6 @@ export function EmailCampaignCreator({ open, onOpenChange, onCampaignCreated }: 
             </div>
           )}
 
-          {step === 4 && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="emailSubject">Email Subject *</Label>
-                <Input
-                  id="emailSubject"
-                  value={emailSubject}
-                  onChange={(e) => setEmailSubject(e.target.value)}
-                  placeholder="Subject line"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="emailBody">Email Body *</Label>
-                <Textarea
-                  id="emailBody"
-                  value={emailBody}
-                  onChange={(e) => setEmailBody(e.target.value)}
-                  placeholder="Email content..."
-                  rows={12}
-                  className="font-mono text-sm"
-                />
-              </div>
-
-              <div className="text-sm text-muted-foreground">
-                You can edit the AI-generated content before creating the campaign
-              </div>
-            </div>
-          )}
         </ScrollArea>
 
         <DialogFooter className="flex justify-between">
@@ -482,22 +364,7 @@ export function EmailCampaignCreator({ open, onOpenChange, onCampaignCreated }: 
               </Button>
             )}
             {step === 3 && (
-              <Button onClick={generateEmailContent} disabled={generatingContent || selectedOffices.length === 0}>
-                {generatingContent ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    Generate with AI
-                  </>
-                )}
-              </Button>
-            )}
-            {step === 4 && (
-              <Button onClick={handleSubmit} disabled={loading}>
+              <Button onClick={handleSubmit} disabled={loading || selectedOffices.length === 0}>
                 {loading ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
