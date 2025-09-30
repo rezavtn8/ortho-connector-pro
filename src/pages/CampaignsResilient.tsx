@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useResilientQuery } from '@/hooks/useResilientQuery';
 import { supabase } from '@/integrations/supabase/client';
 import { ResilientErrorBoundary } from '@/components/ResilientErrorBoundary';
+import { UnifiedCampaignCreator } from '@/components/UnifiedCampaignCreator';
 import { 
   Megaphone, 
   Plus, 
@@ -13,12 +14,14 @@ import {
   WifiOff,
   Calendar,
   Users,
-  Mail
+  Mail,
+  Sparkles
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 function CampaignsContent() {
-  const { data: campaigns, isLoading, error, retry, isOffline } = useResilientQuery({
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const { data: campaigns, isLoading, error, retry, isOffline, refetch } = useResilientQuery({
     queryKey: ['campaigns'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -32,6 +35,10 @@ function CampaignsContent() {
     fallbackData: [],
     retryMessage: 'Refreshing campaigns...'
   });
+
+  const handleCampaignCreated = () => {
+    refetch();
+  };
 
   if (isLoading) {
     return (
@@ -117,9 +124,13 @@ function CampaignsContent() {
       {/* Create Campaign Button */}
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold">Your Campaigns</h2>
-        <Button className="gap-2" disabled={isOffline}>
-          <Plus className="h-4 w-4" />
-          Create Campaign
+        <Button 
+          className="gap-2" 
+          disabled={isOffline}
+          onClick={() => setShowCreateDialog(true)}
+        >
+          <Sparkles className="h-4 w-4" />
+          Create AI Campaign
         </Button>
       </div>
 
@@ -132,9 +143,13 @@ function CampaignsContent() {
             <p className="text-muted-foreground mb-4">
               Start by creating your first marketing campaign to reach out to your referral sources.
             </p>
-            <Button className="gap-2" disabled={isOffline}>
-              <Plus className="h-4 w-4" />
-              Create Your First Campaign
+            <Button 
+              className="gap-2" 
+              disabled={isOffline}
+              onClick={() => setShowCreateDialog(true)}
+            >
+              <Sparkles className="h-4 w-4" />
+              Create AI Campaign
             </Button>
           </CardContent>
         </Card>
@@ -202,6 +217,13 @@ function CampaignsContent() {
           ))}
         </div>
       )}
+
+      {/* Unified Campaign Creator Dialog */}
+      <UnifiedCampaignCreator
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
+        onCampaignCreated={handleCampaignCreated}
+      />
     </div>
   );
 }
