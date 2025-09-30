@@ -22,6 +22,7 @@ export interface Office {
   r3?: number;
   mslr?: number;
   tier?: string;
+  percentile?: number | null;
 }
 
 export function useOffices() {
@@ -64,10 +65,8 @@ export function useOffices() {
         .in('office_id', sourceIds)
         .order('visit_date', { ascending: false });
 
-      // Process offices with aggregated data
-      const offices: Office[] = [];
-      
-      for (const source of sources || []) {
+      // First pass: Calculate metrics for all offices
+      const officesWithMetrics = (sources || []).map(source => {
         const monthlyData = source.monthly_patients || [];
         const currentMonthData = monthlyData.find(m => m.year_month === currentMonth);
         const currentMonthReferrals = currentMonthData?.patient_count || 0;
@@ -98,7 +97,7 @@ export function useOffices() {
         const mslr = lastActiveData ? 
           Math.floor((new Date().getTime() - new Date(lastActiveData.year_month + '-01').getTime()) / (1000 * 60 * 60 * 24 * 30)) : 999;
         
-        // Determine strength and category
+        // Determine strength and category (legacy)
         let strength: Office['strength'] = 'Cold';
         if (r3 >= 5 && mslr <= 2) strength = 'Strong';
         else if (r3 >= 2 && mslr <= 3) strength = 'Moderate';
@@ -108,63 +107,155 @@ export function useOffices() {
         if (totalReferrals >= 20 && currentMonthReferrals >= 8) {
           category = 'VIP';
         }
-        
-        // Get visit history for this office
-        const officeVisits = visits?.filter(v => v.office_id === source.id) || [];
-        const recentVisits = officeVisits.filter(v => {
-          const visitDate = new Date(v.visit_date);
-          const sixMonthsAgo = new Date();
-          sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-          return visitDate >= sixMonthsAgo;
-        });
-        const visitCount6m = recentVisits.length;
-        const avgRating = recentVisits.length > 0 
-          ? recentVisits.reduce((sum, v) => sum + (v.star_rating || 0), 0) / recentVisits.length 
-          : 0;
-        const hasGoodEngagement = visitCount6m >= 2 && avgRating >= 3;
-        
-        // Determine tier with visit history consideration
-        let tier = 'Cold';
-        
-        // VIP: High referrals OR good engagement with decent referrals
-        if ((l12 >= 25 && r3 >= 8) || (hasGoodEngagement && l12 >= 15 && r3 >= 5)) {
-          tier = 'VIP';
-        }
-        // Warm: Moderate referrals OR recent visits with some referrals
-        else if ((l12 >= 12 && r3 >= 4) || (visitCount6m >= 1 && l12 >= 6 && r3 >= 2)) {
-          tier = 'Warm';
-        }
-        // Dormant: Has referrals but inactive AND no recent engagement
-        else if (l12 >= 1 && visitCount6m === 0) {
-          tier = 'Dormant';
-        }
-        // Cold: No referrals or minimal activity
-        else {
-          tier = 'Cold';
-        }
-        
-        offices.push({
-          id: source.id,
-          name: source.name,
-          address: source.address,
-          phone: source.phone,
-          latitude: source.latitude,
-          longitude: source.longitude,
-          email: source.email,
-          website: source.website,
-          notes: source.notes,
-          google_rating: source.google_rating,
+
+        return {
+          source,
           currentMonthReferrals,
           totalReferrals,
-          strength,
-          category,
-          lastActiveMonth: lastActiveData?.year_month || null,
           l12,
           r3,
           mslr,
-          tier
+          lastActiveData,
+          strength,
+          category
+        };
+      });
+
+      // Step 1: Separate dormant offices (no referrals in past 6+ months)
+      const dormantOffices = officesWithMetrics.filter(item => item.mslr >= 6);
+      const activeOffices = officesWithMetrics.filter(item => item.mslr < 6);
+
+      // Step 2: Sort active offices by L12 (descending), with mslr as tiebreaker
+      activeOffices.sort((a, b) => {
+        if (b.l12 !== a.l12) return b.l12 - a.l12;
+        return a.mslr - b.mslr; // Lower mslr (more recent) is better
+      });
+
+      // Step 3: Assign tiers based on quartiles or absolute thresholds
+      const activeCount = activeOffices.length;
+      const minOfficesForQuartiles = 8; // Need at least 8 offices for meaningful quartiles
+      const offices: Office[] = [];
+
+      if (activeCount >= minOfficesForQuartiles) {
+        // Use quartile-based approach
+        const q1 = Math.ceil(activeCount * 0.25);
+        const q2 = Math.ceil(activeCount * 0.50);
+        const q3 = Math.ceil(activeCount * 0.75);
+        
+        activeOffices.forEach((item, index) => {
+          let tier: string;
+          const percentile = Math.round(((activeCount - index) / activeCount) * 100);
+          
+          // Initial tier assignment based on quartile
+          if (index < q1) tier = 'VIP';
+          else if (index < q2) tier = 'Warm';
+          else if (index < q3) tier = 'Regular';
+          else tier = 'Low';
+          
+          // Step 4: Apply recency adjustments
+          if ((tier === 'VIP' || tier === 'Warm') && item.mslr > 3) {
+            // Downgrade one tier if no referral in >3 months
+            if (tier === 'VIP') tier = 'Warm';
+            else if (tier === 'Warm') tier = 'Regular';
+          } else if ((tier === 'Regular' || tier === 'Low') && item.mslr <= 1) {
+            // Bump up one tier for recent referral
+            if (tier === 'Low') tier = 'Regular';
+            else if (tier === 'Regular') tier = 'Warm';
+          }
+          
+          offices.push({
+            id: item.source.id,
+            name: item.source.name,
+            address: item.source.address,
+            phone: item.source.phone,
+            latitude: item.source.latitude,
+            longitude: item.source.longitude,
+            email: item.source.email,
+            website: item.source.website,
+            notes: item.source.notes,
+            google_rating: item.source.google_rating,
+            currentMonthReferrals: item.currentMonthReferrals,
+            totalReferrals: item.totalReferrals,
+            strength: item.strength,
+            category: item.category,
+            lastActiveMonth: item.lastActiveData?.year_month || null,
+            l12: item.l12,
+            r3: item.r3,
+            mslr: item.mslr,
+            tier,
+            percentile
+          });
+        });
+      } else {
+        // Step 6: Use absolute thresholds for sparse data
+        activeOffices.forEach((item, index) => {
+          let tier: string;
+          
+          // Absolute threshold assignment
+          if (item.l12 >= 20 && item.r3 >= 5) tier = 'VIP';
+          else if (item.l12 >= 10 && item.r3 >= 3) tier = 'Warm';
+          else if (item.l12 >= 5) tier = 'Regular';
+          else tier = 'Low';
+          
+          // Apply recency adjustments
+          if ((tier === 'VIP' || tier === 'Warm') && item.mslr > 3) {
+            if (tier === 'VIP') tier = 'Warm';
+            else if (tier === 'Warm') tier = 'Regular';
+          } else if ((tier === 'Regular' || tier === 'Low') && item.mslr <= 1) {
+            if (tier === 'Low') tier = 'Regular';
+            else if (tier === 'Regular') tier = 'Warm';
+          }
+          
+          offices.push({
+            id: item.source.id,
+            name: item.source.name,
+            address: item.source.address,
+            phone: item.source.phone,
+            latitude: item.source.latitude,
+            longitude: item.source.longitude,
+            email: item.source.email,
+            website: item.source.website,
+            notes: item.source.notes,
+            google_rating: item.source.google_rating,
+            currentMonthReferrals: item.currentMonthReferrals,
+            totalReferrals: item.totalReferrals,
+            strength: item.strength,
+            category: item.category,
+            lastActiveMonth: item.lastActiveData?.year_month || null,
+            l12: item.l12,
+            r3: item.r3,
+            mslr: item.mslr,
+            tier,
+            percentile: null // No percentile for sparse data
+          });
         });
       }
+
+      // Add dormant offices
+      dormantOffices.forEach(item => {
+        offices.push({
+          id: item.source.id,
+          name: item.source.name,
+          address: item.source.address,
+          phone: item.source.phone,
+          latitude: item.source.latitude,
+          longitude: item.source.longitude,
+          email: item.source.email,
+          website: item.source.website,
+          notes: item.source.notes,
+          google_rating: item.source.google_rating,
+          currentMonthReferrals: item.currentMonthReferrals,
+          totalReferrals: item.totalReferrals,
+          strength: item.strength,
+          category: item.category,
+          lastActiveMonth: item.lastActiveData?.year_month || null,
+          l12: item.l12,
+          r3: item.r3,
+          mslr: item.mslr,
+          tier: 'Dormant',
+          percentile: null
+        });
+      });
       
       return offices;
     },
