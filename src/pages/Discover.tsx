@@ -59,25 +59,9 @@ interface UserProfile {
 }
 
 export const Discover = () => {
-  const [currentSession, setCurrentSession] = useState<DiscoverySession | null>(() => {
-    // Restore session from localStorage on component mount
-    try {
-      const saved = localStorage.getItem('discoverySession');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
-  
-  const [discoveredOffices, setDiscoveredOffices] = useState<DiscoveredOffice[]>(() => {
-    // Restore offices from localStorage on component mount
-    try {
-      const saved = localStorage.getItem('discoveredOffices');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [currentSession, setCurrentSession] = useState<DiscoverySession | null>(null);
+  const [discoveredOffices, setDiscoveredOffices] = useState<DiscoveredOffice[]>([]);
+  const [cacheMetadata, setCacheMetadata] = useState<{ cacheAge?: number; expiresIn?: number } | null>(null);
   
   const [isLoading, setIsLoading] = useState(false);
   const [weeklyUsage, setWeeklyUsage] = useState({ used: 0, limit: 999 });
@@ -87,23 +71,6 @@ export const Discover = () => {
   
   const { user } = useAuth();
   const { toast } = useToast();
-
-  // Persist results to localStorage whenever they change
-  useEffect(() => {
-    if (currentSession) {
-      localStorage.setItem('discoverySession', JSON.stringify(currentSession));
-    } else {
-      localStorage.removeItem('discoverySession');
-    }
-  }, [currentSession]);
-
-  useEffect(() => {
-    if (discoveredOffices.length > 0) {
-      localStorage.setItem('discoveredOffices', JSON.stringify(discoveredOffices));
-    } else {
-      localStorage.removeItem('discoveredOffices');
-    }
-  }, [discoveredOffices]);
 
   useEffect(() => {
     if (user) {
@@ -156,83 +123,6 @@ export const Discover = () => {
     }
   };
 
-  const searchCachedOffices = async (params: DiscoveryParams): Promise<{ offices: DiscoveredOffice[]; session: DiscoverySession | null }> => {
-    console.log('🔍 searchCachedOffices: Starting search with params:', params);
-    
-    if (!user || !clinicLocation) {
-      console.log('❌ searchCachedOffices: Missing user or clinic location');
-      return { offices: [], session: null };
-    }
-
-    try {
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('clinic_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile?.clinic_id) {
-        console.log('❌ searchCachedOffices: No clinic_id found');
-        return { offices: [], session: null };
-      }
-
-      // Look for cached offices with matching search parameters
-      const { data: offices, error } = await supabase
-        .from('discovered_offices')
-        .select('*')
-        .eq('discovered_by', user.id)
-        .eq('clinic_id', profile.clinic_id)
-        .eq('search_distance', params.distance)
-        .order('fetched_at', { ascending: false });
-
-      console.log(`✅ searchCachedOffices: Found ${offices?.length || 0} cached offices`);
-
-      if (error) {
-        console.error('❌ searchCachedOffices: Query error:', error);
-        return { offices: [], session: null };
-      }
-
-      if (offices && offices.length > 0) {
-        // Calculate distances
-        const searchLat = clinicLocation.lat;
-        const searchLng = clinicLocation.lng;
-        
-        const officesWithDistance = offices.map(office => {
-          const distance = office.lat && office.lng ? calculateDistance(
-            searchLat, searchLng, office.lat, office.lng
-          ) : undefined;
-          
-          return { ...office, distance };
-        });
-
-        // Get session info from the first office
-        const sessionId = offices[0].discovery_session_id;
-        let sessionData = null;
-        
-        if (sessionId) {
-          const { data: session } = await supabase
-            .from('discovery_sessions')
-            .select('*')
-            .eq('id', sessionId)
-            .single();
-            
-          if (session) {
-            sessionData = session as DiscoverySession;
-          }
-        }
-
-        console.log(`✅ searchCachedOffices: Returning ${officesWithDistance.length} offices with session`);
-        return { 
-          offices: officesWithDistance as DiscoveredOffice[], 
-          session: sessionData 
-        };
-      }
-    } catch (error) {
-      console.error('❌ searchCachedOffices: Exception:', error);
-    }
-
-    return { offices: [], session: null };
-  };
 
   const callGooglePlacesAPI = async (params: DiscoveryParams): Promise<void> => {
     console.log('🚀 callGooglePlacesAPI: Starting with params:', params);
@@ -330,10 +220,23 @@ export const Discover = () => {
       const officesCount = data.offices?.length || 0;
       console.log(`✅ callGooglePlacesAPI: Success! ${officesCount} offices found (cached: ${data.cached})`);
       
+      // Store cache metadata
+      if (data.cached && data.cacheAge !== undefined && data.expiresIn !== undefined) {
+        setCacheMetadata({
+          cacheAge: data.cacheAge,
+          expiresIn: data.expiresIn
+        });
+      } else {
+        setCacheMetadata(null);
+      }
+      
       if (data.cached) {
+        const ageMinutes = Math.floor((data.cacheAge || 0) / 60);
+        const expiresMinutes = Math.floor((data.expiresIn || 0) / 60);
+        const expiresDays = Math.floor(expiresMinutes / (60 * 24));
         toast({
           title: "Cached Results",
-          description: `Found ${officesCount} cached offices from previous search`,
+          description: `Found ${officesCount} cached offices (${ageMinutes} min old, expires in ${expiresDays}d)`,
         });
       } else {
         toast({
@@ -389,29 +292,9 @@ export const Discover = () => {
     setIsLoading(true);
     
     try {
-      // Skip cache check if force refresh is requested
-      if (!forceRefresh) {
-        console.log('🔍 handleDiscover: Checking for cached results...');
-        const { offices: cachedOffices, session: cachedSession } = await searchCachedOffices(params);
-        
-        if (cachedOffices.length > 0) {
-          console.log(`✅ handleDiscover: Found ${cachedOffices.length} cached offices`);
-          setDiscoveredOffices(cachedOffices);
-          setCurrentSession(cachedSession);
-          toast({
-            title: "Cached Results",
-            description: `Found ${cachedOffices.length} cached offices matching your search parameters. Click "Refresh" to search again.`,
-          });
-          return;
-        }
-      } else {
-        console.log('🔄 handleDiscover: Force refresh requested, skipping cache check');
-      }
-
-      // No rate limiting - directly call API
-      console.log('🚀 handleDiscover: Making API call...');
+      // Edge function handles all caching - just call it directly
+      console.log('🚀 handleDiscover: Calling edge function (handles caching internally)');
       await callGooglePlacesAPI(params);
-
     } catch (error) {
       console.error('❌ handleDiscover: Exception:', error);
       toast({
@@ -470,9 +353,43 @@ export const Discover = () => {
     console.log('🔄 handleStartOver: Clearing all discovery results and starting fresh');
     setCurrentSession(null);
     setDiscoveredOffices([]);
-    // Clear localStorage as well
-    localStorage.removeItem('discoverySession');
-    localStorage.removeItem('discoveredOffices');
+    setCacheMetadata(null);
+  };
+
+  const handleClearCache = async () => {
+    if (!user || !currentSession) return;
+    
+    try {
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('clinic_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profile?.clinic_id) return;
+
+      // Delete cached offices for this search
+      await supabase
+        .from('discovered_offices')
+        .delete()
+        .eq('discovered_by', user.id)
+        .eq('clinic_id', profile.clinic_id)
+        .eq('search_distance', currentSession.search_distance);
+
+      toast({
+        title: "Cache Cleared",
+        description: "Cached results removed. Next search will fetch fresh data.",
+      });
+
+      handleStartOver();
+    } catch (error) {
+      console.error('Error clearing cache:', error);
+      toast({
+        title: "Error",
+        description: "Failed to clear cache",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -487,6 +404,38 @@ export const Discover = () => {
           Smart discovery tool to find and connect with dental offices in your area
         </p>
       </div>
+
+      {/* Cache Info & Action Buttons */}
+      {cacheMetadata && (
+        <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800 mb-4">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="text-blue-600 dark:text-blue-400">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Cached Results</p>
+                  <p className="text-xs text-muted-foreground">
+                    Fetched {Math.floor(cacheMetadata.cacheAge / 60)} minutes ago • 
+                    Expires in {Math.floor(cacheMetadata.expiresIn / (60 * 60 * 24))} days
+                  </p>
+                </div>
+              </div>
+              <Button 
+                onClick={handleClearCache}
+                variant="outline"
+                size="sm"
+                className="text-xs"
+              >
+                Clear Cache
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Action Buttons */}
       <div className="flex justify-end gap-2 mb-6">

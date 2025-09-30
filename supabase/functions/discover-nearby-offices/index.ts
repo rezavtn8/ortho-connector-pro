@@ -65,7 +65,6 @@ serve(async (req) => {
     let searchLatitude = search_lat || clinic.latitude;
     let searchLongitude = search_lng || clinic.longitude;
     let clinicName = clinic.name;
-    const cacheStartTime = Date.now();
 
     if (!searchLatitude || !searchLongitude) {
       throw new Error('Search coordinates not available');
@@ -90,7 +89,14 @@ serve(async (req) => {
 
     if (cachedOffices && cachedOffices.length > 0) {
       const cacheAge = Math.floor((Date.now() - new Date(cachedOffices[0].fetched_at).getTime()) / 1000);
-      console.log(`✅ Found ${cachedOffices.length} valid cached offices (age: ${cacheAge}s, expires: ${cachedOffices[0].cache_expires_at})`);
+      const expiresAt = new Date(cachedOffices[0].cache_expires_at);
+      const expiresIn = Math.floor((expiresAt.getTime() - Date.now()) / 1000);
+      
+      // Calculate already_in_network count from cached results
+      const alreadyInNetworkCount = cachedOffices.filter(o => o.already_in_network).length;
+      const newOfficesCount = cachedOffices.length - alreadyInNetworkCount;
+      
+      console.log(`✅ Found ${cachedOffices.length} valid cached offices (age: ${cacheAge}s, expires in: ${expiresIn}s)`);
       
       // Update session with cache hit metadata
       const { data: cachedSession } = await supabase
@@ -115,13 +121,14 @@ serve(async (req) => {
         JSON.stringify({
           success: true,
           cached: true,
+          cacheAge: cacheAge,
+          expiresIn: expiresIn,
           message: `Loaded ${cachedOffices.length} offices from cache (${Math.floor(cacheAge / 60)} minutes old)`,
           offices: cachedOffices,
           sessionId: cachedSession?.id,
-          cacheAge: cacheAge,
           totalOfficesCount: cachedOffices.length,
-          newOfficesCount: 0,
-          alreadyInNetworkCount: 0,
+          newOfficesCount: newOfficesCount,
+          alreadyInNetworkCount: alreadyInNetworkCount,
           canRefresh: true
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
