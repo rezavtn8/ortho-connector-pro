@@ -218,7 +218,7 @@ export function EmailCampaignCreator({ open, onOpenChange, onCampaignCreated }: 
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Mail className="h-5 w-5" />
-            Create Email Campaign - Step {step} of 3
+            Create Email Campaign - Step {step} of 2
           </DialogTitle>
         </DialogHeader>
 
@@ -248,44 +248,44 @@ export function EmailCampaignCreator({ open, onOpenChange, onCampaignCreated }: 
           )}
 
           {step === 2 && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="campaignName">Campaign Name *</Label>
-                <Input
-                  id="campaignName"
-                  value={campaignName}
-                  onChange={(e) => setCampaignName(e.target.value)}
-                  placeholder="e.g., Spring Referral Outreach"
-                />
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="campaignName">Campaign Name *</Label>
+                  <Input
+                    id="campaignName"
+                    value={campaignName}
+                    onChange={(e) => setCampaignName(e.target.value)}
+                    placeholder="e.g., Spring Referral Outreach"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="plannedDate">Planned Send Date</Label>
+                    <EnhancedDatePicker
+                      value={plannedDate}
+                      onChange={setPlannedDate}
+                      placeholder="Select date"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="notes">Campaign Notes</Label>
+                  <Textarea
+                    id="notes"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Internal notes about this campaign..."
+                    rows={3}
+                  />
+                </div>
               </div>
 
-              <div>
-                <Label htmlFor="plannedDate">Planned Send Date</Label>
-                <EnhancedDatePicker
-                  value={plannedDate}
-                  onChange={setPlannedDate}
-                  placeholder="Select date"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="notes">Campaign Notes</Label>
-                <Textarea
-                  id="notes"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Internal notes about this campaign..."
-                  rows={6}
-                />
-              </div>
-            </div>
-          )}
-
-          {step === 3 && (
-            <div className="space-y-4">
-              <div>
+              <div className="border-t pt-4">
                 <div className="flex items-center justify-between mb-3">
-                  <Label className="text-lg font-semibold">Select Target Offices</Label>
+                  <Label className="text-lg font-semibold">Select Target Offices *</Label>
                   <Button
                     variant="outline"
                     size="sm"
@@ -313,7 +313,7 @@ export function EmailCampaignCreator({ open, onOpenChange, onCampaignCreated }: 
                     <Loader2 className="h-8 w-8 animate-spin" />
                   </div>
                 ) : (
-                  <div className="space-y-2 max-h-[400px] overflow-y-auto border rounded-lg p-4">
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto border rounded-lg p-4">
                     {filteredOffices.map(office => (
                       <div key={office.id} className="flex items-start gap-3 p-3 border rounded hover:bg-muted/50">
                         <Checkbox
@@ -357,13 +357,13 @@ export function EmailCampaignCreator({ open, onOpenChange, onCampaignCreated }: 
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            {step < 3 && (
+            {step < 2 && (
               <Button onClick={() => setStep(step + 1)}>
                 Next
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             )}
-            {step === 3 && (
+            {step === 2 && (
               <Button onClick={handleSubmit} disabled={loading || selectedOffices.length === 0}>
                 {loading ? (
                   <>
