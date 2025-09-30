@@ -8,9 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ResilientErrorBoundary } from '@/components/ResilientErrorBoundary';
-import { Eye, Edit, Users, Trash2, Search, MapPin, Phone, Mail, AlertCircle, ChevronDown, TrendingUp, Calendar, Building2, RefreshCw } from 'lucide-react';
+import { Eye, Edit, Users, Trash2, Search, MapPin, Phone, Mail, AlertCircle, TrendingUp, Calendar, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { PatientLoadHistoryEditor } from '@/components/PatientLoadHistoryEditor';
 import { AddOfficeDialog as AddSourceDialog } from '@/components/AddSourceDialog';
@@ -45,19 +44,15 @@ function OfficesContent() {
   const [editForm, setEditForm] = useState<Partial<Office>>({});
   const [patientLoadOffice, setPatientLoadOffice] = useState<{ id: string; name: string; currentLoad: number } | null>(null);
   const [tierFilter, setTierFilter] = useState<string>('All');
-  const [openTiers, setOpenTiers] = useState<Record<string, boolean>>({
-    VIP: true,
-    Warm: true,
-    Dormant: false,
-    Cold: false
-  });
+  const [sortField, setSortField] = useState<'name' | 'tier' | 'l12' | 'r3' | 'current' | 'lastActive'>('tier');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   // Fetch offices data with tier calculations
   const { data: offices, isLoading, error, refetch } = useOffices();
 
-  // Filter and group offices by tier
-  const { filteredOffices, groupedByTier, stats } = useMemo(() => {
-    if (!offices) return { filteredOffices: [], groupedByTier: {}, stats: { total: 0, vip: 0, warm: 0, dormant: 0, cold: 0, l12Total: 0, currentMonth: 0 } };
+  // Filter and sort offices
+  const { filteredOffices, stats } = useMemo(() => {
+    if (!offices) return { filteredOffices: [], stats: { total: 0, vip: 0, warm: 0, dormant: 0, cold: 0, l12Total: 0, currentMonth: 0 } };
     
     // Filter by search term
     let filtered = offices.filter(office =>
@@ -70,24 +65,43 @@ function OfficesContent() {
       filtered = filtered.filter(office => office.tier === tierFilter);
     }
 
-    // Group by tier
-    const grouped: Record<string, Office[]> = {
-      VIP: [],
-      Warm: [],
-      Dormant: [],
-      Cold: []
-    };
-
-    filtered.forEach(office => {
-      const tier = office.tier || 'Cold';
-      if (grouped[tier]) {
-        grouped[tier].push(office);
+    // Sort offices
+    filtered.sort((a, b) => {
+      let aVal: any, bVal: any;
+      
+      switch (sortField) {
+        case 'name':
+          aVal = a.name.toLowerCase();
+          bVal = b.name.toLowerCase();
+          break;
+        case 'tier':
+          const tierOrder = { VIP: 1, Warm: 2, Dormant: 3, Cold: 4 };
+          aVal = tierOrder[a.tier as keyof typeof tierOrder] || 5;
+          bVal = tierOrder[b.tier as keyof typeof tierOrder] || 5;
+          break;
+        case 'l12':
+          aVal = a.l12 || 0;
+          bVal = b.l12 || 0;
+          break;
+        case 'r3':
+          aVal = a.r3 || 0;
+          bVal = b.r3 || 0;
+          break;
+        case 'current':
+          aVal = a.currentMonthReferrals || 0;
+          bVal = b.currentMonthReferrals || 0;
+          break;
+        case 'lastActive':
+          aVal = a.lastActiveMonth || '0000-00';
+          bVal = b.lastActiveMonth || '0000-00';
+          break;
+        default:
+          return 0;
       }
-    });
-
-    // Sort within each tier by r3 (most recent activity first)
-    Object.keys(grouped).forEach(tier => {
-      grouped[tier].sort((a, b) => (b.r3 || 0) - (a.r3 || 0));
+      
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
     });
 
     // Calculate stats
@@ -101,8 +115,8 @@ function OfficesContent() {
       currentMonth: offices.reduce((sum, o) => sum + (o.currentMonthReferrals || 0), 0)
     };
 
-    return { filteredOffices: filtered, groupedByTier: grouped, stats };
-  }, [offices, searchTerm, tierFilter]);
+    return { filteredOffices: filtered, stats };
+  }, [offices, searchTerm, tierFilter, sortField, sortDirection]);
 
   const handleRefresh = async () => {
     try {
@@ -198,6 +212,15 @@ function OfficesContent() {
     }
   };
 
+  const handleSort = (field: typeof sortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+
   const getTierBadgeVariant = (tier?: string) => {
     switch (tier) {
       case 'VIP': return 'default';
@@ -215,16 +238,6 @@ function OfficesContent() {
       case 'Dormant': return '💤';
       case 'Cold': return '❄️';
       default: return '📍';
-    }
-  };
-
-  const getTierDescription = (tier: string) => {
-    switch (tier) {
-      case 'VIP': return 'Consistently sending 8+ referrals/month';
-      case 'Warm': return 'Active partnership with 4+ referrals/month';
-      case 'Dormant': return 'Has sent referrals but currently inactive';
-      case 'Cold': return 'No recent referrals';
-      default: return '';
     }
   };
 
@@ -353,7 +366,7 @@ function OfficesContent() {
         </CardContent>
       </Card>
 
-      {/* Tier-Based Office Groups */}
+      {/* Unified Office Table */}
       {isLoading ? (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
@@ -375,176 +388,181 @@ function OfficesContent() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
-          {(['VIP', 'Warm', 'Dormant', 'Cold'] as const).map((tier) => {
-            const tierOffices = groupedByTier[tier] || [];
-            if (tierOffices.length === 0) return null;
-
-            return (
-              <Card key={tier}>
-                <Collapsible
-                  open={openTiers[tier]}
-                  onOpenChange={(open) => setOpenTiers({ ...openTiers, [tier]: open })}
-                >
-                  <CollapsibleTrigger className="w-full">
-                    <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <span className="text-2xl">{getTierIcon(tier)}</span>
-                          <div className="text-left">
-                            <CardTitle className="flex items-center gap-2">
-                              {tier} Partners
-                              <Badge variant={getTierBadgeVariant(tier)}>{tierOffices.length}</Badge>
-                            </CardTitle>
-                            <CardDescription className="mt-1">
-                              {getTierDescription(tier)}
-                            </CardDescription>
-                          </div>
+        <Card>
+          <CardContent className="pt-6">
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => handleSort('name')}
+                    >
+                      Office Name {sortField === 'name' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </TableHead>
+                    <TableHead 
+                      className="text-center cursor-pointer hover:bg-muted/50"
+                      onClick={() => handleSort('tier')}
+                    >
+                      Category {sortField === 'tier' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </TableHead>
+                    <TableHead 
+                      className="text-center cursor-pointer hover:bg-muted/50"
+                      onClick={() => handleSort('l12')}
+                    >
+                      L12 {sortField === 'l12' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </TableHead>
+                    <TableHead 
+                      className="text-center cursor-pointer hover:bg-muted/50"
+                      onClick={() => handleSort('r3')}
+                    >
+                      R3 {sortField === 'r3' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </TableHead>
+                    <TableHead 
+                      className="text-center cursor-pointer hover:bg-muted/50"
+                      onClick={() => handleSort('current')}
+                    >
+                      Current {sortField === 'current' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => handleSort('lastActive')}
+                    >
+                      Last Active {sortField === 'lastActive' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredOffices.map((office) => (
+                    <TableRow key={office.id}>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{office.name}</p>
+                          <p className="text-sm text-muted-foreground flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            {office.address || 'No address'}
+                          </p>
                         </div>
-                        <ChevronDown className={`h-5 w-5 transition-transform ${openTiers[tier] ? 'transform rotate-180' : ''}`} />
-                      </div>
-                    </CardHeader>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <CardContent>
-                      {/* Desktop Table View */}
-                      <div className="hidden md:block overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Office Name</TableHead>
-                              <TableHead className="text-center">L12</TableHead>
-                              <TableHead className="text-center">R3</TableHead>
-                              <TableHead className="text-center">Current</TableHead>
-                              <TableHead>Last Active</TableHead>
-                              <TableHead className="text-right">Actions</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {tierOffices.map((office) => (
-                              <TableRow key={office.id}>
-                                <TableCell>
-                                  <div>
-                                    <p className="font-medium">{office.name}</p>
-                                    <p className="text-sm text-muted-foreground flex items-center gap-1">
-                                      <MapPin className="h-3 w-3" />
-                                      {office.address || 'No address'}
-                                    </p>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-center">
-                                  <span className="font-semibold">{office.l12 || 0}</span>
-                                </TableCell>
-                                <TableCell className="text-center">
-                                  <span className="font-semibold">{office.r3 || 0}</span>
-                                </TableCell>
-                                <TableCell className="text-center">
-                                  <span className="font-semibold">{office.currentMonthReferrals || 0}</span>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                                    <Calendar className="h-3 w-3" />
-                                    {formatLastActive(office.lastActiveMonth)}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <div className="flex justify-end gap-1">
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => handleView(office)}
-                                      title="View Details"
-                                    >
-                                      <Eye className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => handleEdit(office)}
-                                      title="Edit"
-                                    >
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => handlePatientCounts(office)}
-                                      title="Patient Counts"
-                                    >
-                                      <Users className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => handleDelete(office)}
-                                      title="Delete"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant={getTierBadgeVariant(office.tier)}>
+                          {getTierIcon(office.tier || 'Cold')} {office.tier}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className="font-semibold">{office.l12 || 0}</span>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className="font-semibold">{office.r3 || 0}</span>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className="font-semibold">{office.currentMonthReferrals || 0}</span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <Calendar className="h-3 w-3" />
+                          {formatLastActive(office.lastActiveMonth)}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="sm" onClick={() => handleView(office)}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleEdit(office)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handlePatientCounts(office)}>
+                            <Users className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleDelete(office)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
 
-                      {/* Mobile Card View */}
-                      <div className="md:hidden space-y-3">
-                        {tierOffices.map((office) => (
-                          <Card key={office.id}>
-                            <CardHeader className="pb-3">
-                              <CardTitle className="text-base">{office.name}</CardTitle>
-                              <CardDescription className="flex items-center gap-1">
-                                <MapPin className="h-3 w-3" />
-                                {office.address || 'No address'}
-                              </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-3">
-                              <div className="grid grid-cols-4 gap-2 text-center">
-                                <div>
-                                  <p className="text-xs text-muted-foreground">L12</p>
-                                  <p className="text-lg font-bold">{office.l12 || 0}</p>
-                                </div>
-                                <div>
-                                  <p className="text-xs text-muted-foreground">R3</p>
-                                  <p className="text-lg font-bold">{office.r3 || 0}</p>
-                                </div>
-                                <div>
-                                  <p className="text-xs text-muted-foreground">Current</p>
-                                  <p className="text-lg font-bold">{office.currentMonthReferrals || 0}</p>
-                                </div>
-                                <div>
-                                  <p className="text-xs text-muted-foreground">MSLR</p>
-                                  <p className="text-lg font-bold">{office.mslr || 0}</p>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                                <Calendar className="h-3 w-3" />
-                                Last active: {formatLastActive(office.lastActiveMonth)}
-                              </div>
-                              <div className="flex gap-2">
-                                <Button size="sm" variant="outline" onClick={() => handleView(office)}>
-                                  <Eye className="h-4 w-4 mr-1" /> View
-                                </Button>
-                                <Button size="sm" variant="outline" onClick={() => handleEdit(office)}>
-                                  <Edit className="h-4 w-4 mr-1" /> Edit
-                                </Button>
-                                <Button size="sm" variant="outline" onClick={() => handlePatientCounts(office)}>
-                                  <Users className="h-4 w-4 mr-1" /> Count
-                                </Button>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-4">
+              {filteredOffices.map((office) => (
+                <Card key={office.id} className="p-4">
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="font-semibold">{office.name}</h3>
+                        <p className="text-sm text-muted-foreground flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          {office.address || 'No address'}
+                        </p>
                       </div>
-                    </CardContent>
-                  </CollapsibleContent>
-                </Collapsible>
-              </Card>
-            );
-          })}
-        </div>
+                      <Badge variant={getTierBadgeVariant(office.tier)}>
+                        {getTierIcon(office.tier || 'Cold')} {office.tier}
+                      </Badge>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-2 text-center py-2 border-y">
+                      <div>
+                        <p className="text-xs text-muted-foreground">L12</p>
+                        <p className="text-lg font-bold">{office.l12 || 0}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">R3</p>
+                        <p className="text-lg font-bold">{office.r3 || 0}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Current</p>
+                        <p className="text-lg font-bold">{office.currentMonthReferrals || 0}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <Calendar className="h-3 w-3" />
+                      Last active: {formatLastActive(office.lastActiveMonth)}
+                    </div>
+
+                    {office.phone && (
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <Phone className="h-3 w-3" />
+                        {office.phone}
+                      </div>
+                    )}
+
+                    {office.email && (
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <Mail className="h-3 w-3" />
+                        {office.email}
+                      </div>
+                    )}
+                    
+                    <div className="flex gap-2 pt-2">
+                      <Button variant="outline" size="sm" onClick={() => handleView(office)} className="flex-1">
+                        <Eye className="h-4 w-4 mr-1" />
+                        View
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => handleEdit(office)} className="flex-1">
+                        <Edit className="h-4 w-4 mr-1" />
+                        Edit
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => handlePatientCounts(office)} className="flex-1">
+                        <Users className="h-4 w-4 mr-1" />
+                        Counts
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(office)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Edit Office Dialog */}

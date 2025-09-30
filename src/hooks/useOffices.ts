@@ -56,6 +56,14 @@ export function useOffices() {
 
       if (error) throw error;
 
+      // Fetch all marketing visits for these offices
+      const sourceIds = sources?.map(s => s.id) || [];
+      const { data: visits } = await supabase
+        .from('marketing_visits')
+        .select('office_id, visit_date, visited, star_rating')
+        .in('office_id', sourceIds)
+        .order('visit_date', { ascending: false });
+
       // Process offices with aggregated data
       const offices: Office[] = [];
       
@@ -101,11 +109,39 @@ export function useOffices() {
           category = 'VIP';
         }
         
-        // Determine tier
+        // Get visit history for this office
+        const officeVisits = visits?.filter(v => v.office_id === source.id) || [];
+        const recentVisits = officeVisits.filter(v => {
+          const visitDate = new Date(v.visit_date);
+          const sixMonthsAgo = new Date();
+          sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+          return visitDate >= sixMonthsAgo;
+        });
+        const visitCount6m = recentVisits.length;
+        const avgRating = recentVisits.length > 0 
+          ? recentVisits.reduce((sum, v) => sum + (v.star_rating || 0), 0) / recentVisits.length 
+          : 0;
+        const hasGoodEngagement = visitCount6m >= 2 && avgRating >= 3;
+        
+        // Determine tier with visit history consideration
         let tier = 'Cold';
-        if (l12 >= 25 && r3 >= 8) tier = 'VIP';
-        else if (l12 >= 12 && r3 >= 4) tier = 'Warm';
-        else if (l12 >= 1) tier = 'Dormant';
+        
+        // VIP: High referrals OR good engagement with decent referrals
+        if ((l12 >= 25 && r3 >= 8) || (hasGoodEngagement && l12 >= 15 && r3 >= 5)) {
+          tier = 'VIP';
+        }
+        // Warm: Moderate referrals OR recent visits with some referrals
+        else if ((l12 >= 12 && r3 >= 4) || (visitCount6m >= 1 && l12 >= 6 && r3 >= 2)) {
+          tier = 'Warm';
+        }
+        // Dormant: Has referrals but inactive AND no recent engagement
+        else if (l12 >= 1 && visitCount6m === 0) {
+          tier = 'Dormant';
+        }
+        // Cold: No referrals or minimal activity
+        else {
+          tier = 'Cold';
+        }
         
         offices.push({
           id: source.id,
