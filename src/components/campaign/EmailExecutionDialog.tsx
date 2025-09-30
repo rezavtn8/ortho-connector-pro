@@ -283,6 +283,14 @@ export function EmailExecutionDialog({
   const emailsGenerated = deliveries.some(d => d.email_body);
   const sentCount = deliveries.filter(d => d.email_status === 'sent').length;
 
+  // Auto-generate emails on first open if not already generated
+  useEffect(() => {
+    if (open && deliveries.length > 0 && !loading && !emailsGenerated && !generatingEmails) {
+      console.log('Auto-generating emails on dialog open...');
+      generateEmails();
+    }
+  }, [open, deliveries, loading, emailsGenerated]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
@@ -301,42 +309,49 @@ export function EmailExecutionDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Action Bar */}
-        <Card className="bg-primary/5">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold text-lg mb-1">Email Generation</h3>
-                <p className="text-sm text-muted-foreground">
-                  {emailsGenerated 
-                    ? `Emails generated. Review, edit, and send to offices.`
-                    : `Generate personalized AI emails for all selected offices.`
-                  }
-                </p>
+        {/* Status Bar */}
+        {generatingEmails && (
+          <Card className="bg-primary/5 border-primary/20">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <RefreshCw className="w-5 h-5 animate-spin text-primary" />
+                <div>
+                  <h3 className="font-semibold text-lg">Generating AI Emails...</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Creating personalized emails for {deliveries.length} offices using your complete practice data
+                  </p>
+                </div>
               </div>
-              {!emailsGenerated && (
+            </CardContent>
+          </Card>
+        )}
+
+        {emailsGenerated && !generatingEmails && (
+          <Card className="bg-green-50 border-green-200">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  <div>
+                    <h3 className="font-semibold text-lg text-green-900">Emails Ready!</h3>
+                    <p className="text-sm text-green-700">
+                      {deliveries.length} personalized emails generated. Review and send to offices.
+                    </p>
+                  </div>
+                </div>
                 <Button 
                   onClick={generateEmails}
-                  disabled={generatingEmails}
-                  size="lg"
+                  variant="outline"
+                  size="sm"
                   className="gap-2"
                 >
-                  {generatingEmails ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Wand2 className="w-4 h-4" />
-                      Generate AI Emails
-                    </>
-                  )}
+                  <RefreshCw className="w-4 h-4" />
+                  Regenerate All
                 </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Office Email Cards */}
         {loading ? (
@@ -406,10 +421,10 @@ export function EmailExecutionDialog({
                     </div>
                   ) : delivery.email_body ? (
                     <div className="space-y-3">
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Subject</Label>
-                        <p className="text-sm font-medium">{delivery.email_subject}</p>
-                      </div>
+                       <div className="bg-muted/50 p-3 rounded-md">
+                         <Label className="text-xs text-muted-foreground">Subject</Label>
+                         <p className="text-sm font-medium mt-1">{delivery.email_subject}</p>
+                       </div>
                       <div>
                         <Label className="text-xs text-muted-foreground">Body Preview</Label>
                         <p className="text-sm whitespace-pre-wrap line-clamp-3">{delivery.email_body}</p>
