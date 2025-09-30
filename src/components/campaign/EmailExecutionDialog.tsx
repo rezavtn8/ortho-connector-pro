@@ -309,54 +309,31 @@ export function EmailExecutionDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Status Bar */}
-        {generatingEmails && (
-          <Card className="bg-primary/5 border-primary/20">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <RefreshCw className="w-5 h-5 animate-spin text-primary" />
-                <div>
-                  <h3 className="font-semibold text-lg">Generating AI Emails...</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Creating personalized emails for {deliveries.length} offices using your complete practice data
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {emailsGenerated && !generatingEmails && (
-          <Card className="bg-green-50 border-green-200">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                  <div>
-                    <h3 className="font-semibold text-lg text-green-900">Emails Ready!</h3>
-                    <p className="text-sm text-green-700">
-                      {deliveries.length} personalized emails generated. Review and send to offices.
-                    </p>
-                  </div>
-                </div>
-                <Button 
-                  onClick={generateEmails}
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  Regenerate All
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Simple Action Bar */}
+        {emailsGenerated && (
+          <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+            <p className="text-sm text-muted-foreground">
+              {sentCount}/{deliveries.length} emails sent
+            </p>
+            <Button 
+              onClick={generateEmails}
+              variant="ghost"
+              size="sm"
+              className="gap-2 h-8"
+            >
+              <RefreshCw className="w-3 h-3" />
+              Regenerate
+            </Button>
+          </div>
         )}
 
         {/* Office Email Cards */}
-        {loading ? (
-          <div className="text-center py-8">
-            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+        {(loading || generatingEmails) ? (
+          <div className="text-center py-12">
+            <RefreshCw className="w-8 h-8 animate-spin text-primary mx-auto mb-3" />
+            <p className="text-sm text-muted-foreground">
+              {generatingEmails ? 'Generating personalized emails...' : 'Loading...'}
+            </p>
           </div>
         ) : deliveries.length === 0 ? (
           <Card>
