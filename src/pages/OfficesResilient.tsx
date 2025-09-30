@@ -34,6 +34,9 @@ interface Office {
   r3?: number;
   mslr?: number;
   tier?: string;
+  score?: number;
+  percentageOfTotal?: number;
+  conditionalLabel?: 'At-Risk' | 'Emerging' | null;
 }
 
 function OfficesContent() {
@@ -44,8 +47,8 @@ function OfficesContent() {
   const [editForm, setEditForm] = useState<Partial<Office>>({});
   const [patientLoadOffice, setPatientLoadOffice] = useState<{ id: string; name: string; currentLoad: number } | null>(null);
   const [tierFilter, setTierFilter] = useState<string>('All');
-  const [sortField, setSortField] = useState<'name' | 'tier' | 'l12' | 'r3' | 'current' | 'lastActive'>('tier');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [sortField, setSortField] = useState<'name' | 'tier' | 'score' | 'l12' | 'r3' | 'current' | 'lastActive'>('score');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   // Fetch offices data with tier calculations
   const { data: offices, isLoading, error, refetch } = useOffices();
@@ -78,6 +81,10 @@ function OfficesContent() {
           const tierOrder = { VIP: 1, Warm: 2, Dormant: 3, Cold: 4 };
           aVal = tierOrder[a.tier as keyof typeof tierOrder] || 5;
           bVal = tierOrder[b.tier as keyof typeof tierOrder] || 5;
+          break;
+        case 'score':
+          aVal = a.score || 0;
+          bVal = b.score || 0;
           break;
         case 'l12':
           aVal = a.l12 || 0;
@@ -409,6 +416,12 @@ function OfficesContent() {
                     </TableHead>
                     <TableHead 
                       className="text-center cursor-pointer hover:bg-muted/50"
+                      onClick={() => handleSort('score')}
+                    >
+                      Score / % {sortField === 'score' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </TableHead>
+                    <TableHead 
+                      className="text-center cursor-pointer hover:bg-muted/50"
                       onClick={() => handleSort('l12')}
                     >
                       L12 {sortField === 'l12' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -447,9 +460,25 @@ function OfficesContent() {
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
-                        <Badge variant={getTierBadgeVariant(office.tier)}>
-                          {getTierIcon(office.tier || 'Cold')} {office.tier}
-                        </Badge>
+                        <div className="flex flex-col gap-1 items-center">
+                          <Badge variant={getTierBadgeVariant(office.tier)}>
+                            {getTierIcon(office.tier || 'Cold')} {office.tier}
+                          </Badge>
+                          {office.conditionalLabel && (
+                            <Badge 
+                              variant={office.conditionalLabel === 'At-Risk' ? 'destructive' : 'default'} 
+                              className="text-xs"
+                            >
+                              {office.conditionalLabel}
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex flex-col items-center">
+                          <span className="font-semibold">{office.score?.toFixed(1) || '0.0'}</span>
+                          <span className="text-xs text-muted-foreground">{office.percentageOfTotal?.toFixed(1) || '0.0'}%</span>
+                        </div>
                       </TableCell>
                       <TableCell className="text-center">
                         <span className="font-semibold">{office.l12 || 0}</span>
@@ -501,12 +530,27 @@ function OfficesContent() {
                           {office.address || 'No address'}
                         </p>
                       </div>
-                      <Badge variant={getTierBadgeVariant(office.tier)}>
-                        {getTierIcon(office.tier || 'Cold')} {office.tier}
-                      </Badge>
+                      <div className="flex flex-col gap-1 items-end">
+                        <Badge variant={getTierBadgeVariant(office.tier)}>
+                          {getTierIcon(office.tier || 'Cold')} {office.tier}
+                        </Badge>
+                        {office.conditionalLabel && (
+                          <Badge 
+                            variant={office.conditionalLabel === 'At-Risk' ? 'destructive' : 'default'} 
+                            className="text-xs"
+                          >
+                            {office.conditionalLabel}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                     
-                    <div className="grid grid-cols-3 gap-2 text-center py-2 border-y">
+                    <div className="grid grid-cols-4 gap-2 text-center py-2 border-y">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Score</p>
+                        <p className="text-sm font-bold">{office.score?.toFixed(1) || '0.0'}</p>
+                        <p className="text-xs text-muted-foreground">{office.percentageOfTotal?.toFixed(1) || '0.0'}%</p>
+                      </div>
                       <div>
                         <p className="text-xs text-muted-foreground">L12</p>
                         <p className="text-lg font-bold">{office.l12 || 0}</p>

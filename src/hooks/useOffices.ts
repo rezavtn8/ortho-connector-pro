@@ -23,6 +23,9 @@ export interface Office {
   mslr?: number;
   tier?: string;
   percentile?: number | null;
+  score?: number;
+  percentageOfTotal?: number;
+  conditionalLabel?: 'At-Risk' | 'Emerging' | null;
 }
 
 export function useOffices() {
@@ -117,51 +120,66 @@ export function useOffices() {
           mslr,
           lastActiveData,
           strength,
-          category
+          category,
+          score: 0
         };
       });
 
-      // Step 1: Separate dormant offices (no referrals in past 6+ months)
-      const dormantOffices = officesWithMetrics.filter(item => item.mslr >= 6);
-      const activeOffices = officesWithMetrics.filter(item => item.mslr < 6);
+      // Calculate total referrals across all offices for percentage calculation
+      const totalAllReferrals = officesWithMetrics.reduce((sum, item) => sum + item.l12, 0);
 
-      // Step 2: Sort active offices by L12 (descending), with mslr as tiebreaker
-      activeOffices.sort((a, b) => {
-        if (b.l12 !== a.l12) return b.l12 - a.l12;
-        return a.mslr - b.mslr; // Lower mslr (more recent) is better
+      // Step 1: Separate offices with no referrals from those with referrals
+      const officesWithNoReferrals = officesWithMetrics.filter(item => item.totalReferrals === 0);
+      const officesWithReferrals = officesWithMetrics.filter(item => item.totalReferrals > 0);
+      
+      // Step 2: Separate dormant offices (have referrals but not in last 6 months)
+      const dormantOffices = officesWithReferrals.filter(item => item.mslr >= 6);
+      const activeOffices = officesWithReferrals.filter(item => item.mslr < 6);
+
+      // Step 3: Calculate weighted score for active offices
+      activeOffices.forEach(item => {
+        item.score = (item.l12 * 0.6) + (item.r3 * 0.4);
       });
 
-      // Step 3: Assign tiers based on quartiles or absolute thresholds
+      // Step 4: Sort active offices by weighted score (descending)
+      activeOffices.sort((a, b) => {
+        if (b.score !== a.score) return b.score! - a.score!;
+        return a.mslr - b.mslr; // Lower mslr (more recent) as tiebreaker
+      });
+
+      // Step 5: Assign tiers based on quartiles
       const activeCount = activeOffices.length;
-      const minOfficesForQuartiles = 8; // Need at least 8 offices for meaningful quartiles
       const offices: Office[] = [];
 
-      if (activeCount >= minOfficesForQuartiles) {
-        // Use quartile-based approach
+      if (activeCount > 0) {
         const q1 = Math.ceil(activeCount * 0.25);
         const q2 = Math.ceil(activeCount * 0.50);
-        const q3 = Math.ceil(activeCount * 0.75);
         
         activeOffices.forEach((item, index) => {
           let tier: string;
           const percentile = Math.round(((activeCount - index) / activeCount) * 100);
           
-          // Initial tier assignment based on quartile
-          if (index < q1) tier = 'VIP';
-          else if (index < q2) tier = 'Warm';
-          else if (index < q3) tier = 'Regular';
-          else tier = 'Low';
+          // Assign tier based on quartile
+          if (index < q1) tier = 'VIP'; // Top 25%
+          else if (index < q2) tier = 'Warm'; // Next 25%
+          else tier = 'Cold'; // Bottom 50%
           
-          // Step 4: Apply recency adjustments
-          if ((tier === 'VIP' || tier === 'Warm') && item.mslr > 3) {
-            // Downgrade one tier if no referral in >3 months
-            if (tier === 'VIP') tier = 'Warm';
-            else if (tier === 'Warm') tier = 'Regular';
-          } else if ((tier === 'Regular' || tier === 'Low') && item.mslr <= 1) {
-            // Bump up one tier for recent referral
-            if (tier === 'Low') tier = 'Regular';
-            else if (tier === 'Regular') tier = 'Warm';
+          // Step 6: Determine conditional labels
+          let conditionalLabel: 'At-Risk' | 'Emerging' | null = null;
+          
+          // At-Risk: High L12 (top 50%) but 0 in R3
+          if (index < q2 && item.r3 === 0 && item.l12 > 0) {
+            conditionalLabel = 'At-Risk';
           }
+          
+          // Emerging: Low L12 (bottom 50%) but strong R3 (R3 > L12/4 suggests recent spike)
+          if (index >= q2 && item.r3 > 0 && item.r3 > item.l12 / 4) {
+            conditionalLabel = 'Emerging';
+          }
+          
+          const percentageOfTotal = totalAllReferrals > 0 
+            ? Math.round((item.l12 / totalAllReferrals) * 100 * 10) / 10 
+            : 0;
           
           offices.push({
             id: item.source.id,
@@ -183,56 +201,20 @@ export function useOffices() {
             r3: item.r3,
             mslr: item.mslr,
             tier,
-            percentile
-          });
-        });
-      } else {
-        // Step 6: Use absolute thresholds for sparse data
-        activeOffices.forEach((item, index) => {
-          let tier: string;
-          
-          // Absolute threshold assignment
-          if (item.l12 >= 20 && item.r3 >= 5) tier = 'VIP';
-          else if (item.l12 >= 10 && item.r3 >= 3) tier = 'Warm';
-          else if (item.l12 >= 5) tier = 'Regular';
-          else tier = 'Low';
-          
-          // Apply recency adjustments
-          if ((tier === 'VIP' || tier === 'Warm') && item.mslr > 3) {
-            if (tier === 'VIP') tier = 'Warm';
-            else if (tier === 'Warm') tier = 'Regular';
-          } else if ((tier === 'Regular' || tier === 'Low') && item.mslr <= 1) {
-            if (tier === 'Low') tier = 'Regular';
-            else if (tier === 'Regular') tier = 'Warm';
-          }
-          
-          offices.push({
-            id: item.source.id,
-            name: item.source.name,
-            address: item.source.address,
-            phone: item.source.phone,
-            latitude: item.source.latitude,
-            longitude: item.source.longitude,
-            email: item.source.email,
-            website: item.source.website,
-            notes: item.source.notes,
-            google_rating: item.source.google_rating,
-            currentMonthReferrals: item.currentMonthReferrals,
-            totalReferrals: item.totalReferrals,
-            strength: item.strength,
-            category: item.category,
-            lastActiveMonth: item.lastActiveData?.year_month || null,
-            l12: item.l12,
-            r3: item.r3,
-            mslr: item.mslr,
-            tier,
-            percentile: null // No percentile for sparse data
+            percentile,
+            score: item.score,
+            percentageOfTotal,
+            conditionalLabel
           });
         });
       }
 
       // Add dormant offices
       dormantOffices.forEach(item => {
+        const percentageOfTotal = totalAllReferrals > 0 
+          ? Math.round((item.l12 / totalAllReferrals) * 100 * 10) / 10 
+          : 0;
+          
         offices.push({
           id: item.source.id,
           name: item.source.name,
@@ -253,7 +235,39 @@ export function useOffices() {
           r3: item.r3,
           mslr: item.mslr,
           tier: 'Dormant',
-          percentile: null
+          percentile: null,
+          score: 0,
+          percentageOfTotal,
+          conditionalLabel: null
+        });
+      });
+
+      // Add offices with no referrals as Cold
+      officesWithNoReferrals.forEach(item => {
+        offices.push({
+          id: item.source.id,
+          name: item.source.name,
+          address: item.source.address,
+          phone: item.source.phone,
+          latitude: item.source.latitude,
+          longitude: item.source.longitude,
+          email: item.source.email,
+          website: item.source.website,
+          notes: item.source.notes,
+          google_rating: item.source.google_rating,
+          currentMonthReferrals: item.currentMonthReferrals,
+          totalReferrals: item.totalReferrals,
+          strength: item.strength,
+          category: item.category,
+          lastActiveMonth: null,
+          l12: item.l12,
+          r3: item.r3,
+          mslr: item.mslr,
+          tier: 'Cold',
+          percentile: null,
+          score: 0,
+          percentageOfTotal: 0,
+          conditionalLabel: null
         });
       });
       
