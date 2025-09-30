@@ -97,14 +97,79 @@ function CampaignsContent() {
     );
   }
 
+  const emailCampaigns = campaigns?.filter(c => c.delivery_method === 'email') || [];
+  const giftCampaigns = campaigns?.filter(c => c.delivery_method === 'physical') || [];
+  const otherCampaigns = campaigns?.filter(c => c.delivery_method !== 'email' && c.delivery_method !== 'physical') || [];
+
+  const renderCampaignCard = (campaign: any) => (
+    <Card key={campaign.id} className="hover:shadow-lg transition-shadow">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg">{campaign.name}</CardTitle>
+          <Badge variant={campaign.status === 'Active' ? 'default' : campaign.status === 'Draft' ? 'secondary' : 'outline'}>
+            {campaign.status}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid md:grid-cols-3 gap-4">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <div>
+              <p className="text-sm font-medium">Created</p>
+              <p className="text-sm text-muted-foreground">
+                {formatDistanceToNow(new Date(campaign.created_at), { addSuffix: true })}
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-muted-foreground" />
+            <div>
+              <p className="text-sm font-medium">Type</p>
+              <p className="text-sm text-muted-foreground">
+                {campaign.campaign_type || 'General'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Mail className="h-4 w-4 text-muted-foreground" />
+            <div>
+              <p className="text-sm font-medium">Method</p>
+              <p className="text-sm text-muted-foreground">
+                {campaign.delivery_method || 'Email'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {campaign.notes && (
+          <div className="mt-4">
+            <p className="text-sm text-muted-foreground">{campaign.notes}</p>
+          </div>
+        )}
+
+        <div className="flex gap-2 mt-4">
+          <Button variant="outline" size="sm" disabled={isOffline}>
+            View Details
+          </Button>
+          <Button variant="outline" size="sm" disabled={isOffline}>
+            Edit
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col space-y-3 mb-8">
-          <div className="flex items-center gap-3">
-            <Megaphone className="h-8 w-8 title-icon" />
-            <h1 className="text-4xl font-bold page-title">Campaigns</h1>
-          </div>
+        <div className="flex items-center gap-3">
+          <Megaphone className="h-8 w-8 title-icon" />
+          <h1 className="text-4xl font-bold page-title">Campaigns</h1>
+        </div>
         <p className="text-muted-foreground text-lg">
           Manage your marketing campaigns and outreach efforts
         </p>
@@ -123,124 +188,79 @@ function CampaignsContent() {
         </Card>
       )}
 
-      {/* Create Campaign Buttons */}
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold">Your Campaigns</h2>
-        <div className="flex gap-2">
+      {/* Email Campaigns Section */}
+      <div className="bg-primary/5 rounded-lg p-6 border border-primary/10">
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center gap-2">
+            <Mail className="h-5 w-5 text-primary" />
+            <h2 className="text-xl font-semibold">Email Campaigns</h2>
+          </div>
           <Button 
             variant="outline"
             className="gap-2" 
             disabled={isOffline}
             onClick={() => setShowEmailDialog(true)}
           >
-            <Mail className="h-4 w-4" />
-            Email Campaign
+            <Plus className="h-4 w-4" />
+            Create Email Campaign
           </Button>
+        </div>
+        {emailCampaigns.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">No email campaigns yet. Create your first one!</p>
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            {emailCampaigns.map(renderCampaignCard)}
+          </div>
+        )}
+      </div>
+
+      {/* Gift Campaigns Section */}
+      <div className="bg-accent/30 rounded-lg p-6 border border-accent/40">
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center gap-2">
+            <Package className="h-5 w-5 text-accent-foreground" />
+            <h2 className="text-xl font-semibold">Gift Campaigns</h2>
+          </div>
           <Button 
             className="gap-2" 
             disabled={isOffline}
             onClick={() => setShowPhysicalDialog(true)}
           >
-            <Package className="h-4 w-4" />
-            Physical Campaign
+            <Plus className="h-4 w-4" />
+            Create Gift Campaign
           </Button>
         </div>
+        {giftCampaigns.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">No gift campaigns yet. Create your first one!</p>
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            {giftCampaigns.map(renderCampaignCard)}
+          </div>
+        )}
       </div>
 
-      {/* Campaigns List */}
-      {campaigns?.length === 0 ? (
-        <Card>
-          <CardContent className="text-center py-12">
-            <Megaphone className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-lg font-medium mb-2">No campaigns yet</h3>
-            <p className="text-muted-foreground mb-4">
-              Start by creating your first marketing campaign to reach out to your referral sources.
-            </p>
-            <div className="flex gap-2 justify-center">
-              <Button 
-                variant="outline"
-                className="gap-2" 
-                disabled={isOffline}
-                onClick={() => setShowEmailDialog(true)}
-              >
-                <Mail className="h-4 w-4" />
-                Email Campaign
-              </Button>
-              <Button 
-                className="gap-2" 
-                disabled={isOffline}
-                onClick={() => setShowPhysicalDialog(true)}
-              >
-                <Package className="h-4 w-4" />
-                Physical Campaign
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4">
-          {campaigns?.map((campaign) => (
-            <Card key={campaign.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">{campaign.name}</CardTitle>
-                  <Badge variant={campaign.status === 'Active' ? 'default' : campaign.status === 'Draft' ? 'secondary' : 'outline'}>
-                    {campaign.status}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid md:grid-cols-3 gap-4">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm font-medium">Created</p>
-                      <p className="text-sm text-muted-foreground">
-                        {formatDistanceToNow(new Date(campaign.created_at), { addSuffix: true })}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm font-medium">Type</p>
-                      <p className="text-sm text-muted-foreground">
-                        {campaign.campaign_type || 'General'}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm font-medium">Method</p>
-                      <p className="text-sm text-muted-foreground">
-                        {campaign.delivery_method || 'Email'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {campaign.notes && (
-                  <div className="mt-4">
-                    <p className="text-sm text-muted-foreground">{campaign.notes}</p>
-                  </div>
-                )}
-
-                <div className="flex gap-2 mt-4">
-                  <Button variant="outline" size="sm" disabled={isOffline}>
-                    View Details
-                  </Button>
-                  <Button variant="outline" size="sm" disabled={isOffline}>
-                    Edit
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+      {/* Other Campaigns Section */}
+      <div className="bg-muted/50 rounded-lg p-6 border border-muted">
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center gap-2">
+            <Megaphone className="h-5 w-5 text-muted-foreground" />
+            <h2 className="text-xl font-semibold">Other Campaigns</h2>
+          </div>
         </div>
-      )}
+        {otherCampaigns.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">Future campaign types like events, ads, etc. will appear here.</p>
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            {otherCampaigns.map(renderCampaignCard)}
+          </div>
+        )}
+      </div>
 
       {/* Campaign Creator Dialogs */}
       <EmailCampaignCreator
