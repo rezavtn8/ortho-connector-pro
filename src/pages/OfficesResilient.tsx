@@ -1,95 +1,127 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Building2, Plus, Wifi, WifiOff, RefreshCw, Eye, Edit, Users, Loader2, Search, Trash2, Power, Check, X } from 'lucide-react';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { useResilientQuery } from '@/hooks/useResilientQuery';
-import { supabase } from '@/integrations/supabase/client';
-import { ResilientErrorBoundary } from '@/components/ResilientErrorBoundary';
-import { AddOfficeDialog } from '@/components/AddSourceDialog';
-import { PatientLoadHistoryEditor } from '@/components/PatientLoadHistoryEditor';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { Checkbox } from '@/components/ui/checkbox';
+import { supabase } from '@/integrations/supabase/client';
+import { useOffices } from '@/hooks/useOffices';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ResilientErrorBoundary } from '@/components/ResilientErrorBoundary';
+import { Eye, Edit, Users, Trash2, Search, MapPin, Phone, Mail, AlertCircle, ChevronDown, TrendingUp, Calendar, Building2, RefreshCw } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { PatientLoadHistoryEditor } from '@/components/PatientLoadHistoryEditor';
+import { AddOfficeDialog as AddSourceDialog } from '@/components/AddSourceDialog';
 
 interface Office {
   id: string;
   name: string;
-  address: string | null;
-  phone: string | null;
-  email: string | null;
-  notes: string | null;
-  is_active: boolean;
-  source_type: string;
-  patient_load?: number;
+  address?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  website?: string | null;
+  notes?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  currentMonthReferrals: number;
+  totalReferrals: number;
+  strength: 'Strong' | 'Moderate' | 'Sporadic' | 'Cold';
+  category: 'VIP' | 'Strong' | 'Moderate' | 'Sporadic' | 'Cold';
+  lastActiveMonth?: string | null;
+  google_rating?: number | null;
+  l12?: number;
+  r3?: number;
+  mslr?: number;
+  tier?: string;
 }
 
 function OfficesContent() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const isMobile = useIsMobile();
   const [searchTerm, setSearchTerm] = useState('');
-  const [editingOffice, setEditingOffice] = useState<string | null>(null);
+  const [editingOffice, setEditingOffice] = useState<Office | null>(null);
   const [editForm, setEditForm] = useState<Partial<Office>>({});
-  const [selectedOffices, setSelectedOffices] = useState<string[]>([]);
-  const [showPatientModal, setShowPatientModal] = useState<{ officeId: string; officeName: string; currentLoad: number } | null>(null);
-
-  const {
-    data: offices,
-    isLoading,
-    error,
-    isOffline,
-    retry
-  } = useResilientQuery({
-    queryKey: ['partner-offices'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('patient_sources')
-        .select('*')
-        .eq('source_type', 'Office')
-        .order('name');
-      
-      if (error) throw error;
-      
-      return data as Office[];
-    },
-    fallbackData: [],
-    retryMessage: 'Refreshing offices...'
+  const [patientLoadOffice, setPatientLoadOffice] = useState<{ id: string; name: string; currentLoad: number } | null>(null);
+  const [tierFilter, setTierFilter] = useState<string>('All');
+  const [openTiers, setOpenTiers] = useState<Record<string, boolean>>({
+    VIP: true,
+    Warm: true,
+    Dormant: false,
+    Cold: false
   });
 
-  const filteredOffices = offices?.filter(office =>
-    searchTerm === '' ||
-    office.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    office.address?.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  // Fetch offices data with tier calculations
+  const { data: offices, isLoading, error, refetch } = useOffices();
 
-  const handleRefresh = () => {
-    retry();
+  // Filter and group offices by tier
+  const { filteredOffices, groupedByTier, stats } = useMemo(() => {
+    if (!offices) return { filteredOffices: [], groupedByTier: {}, stats: { total: 0, vip: 0, warm: 0, dormant: 0, cold: 0, l12Total: 0, currentMonth: 0 } };
+    
+    // Filter by search term
+    let filtered = offices.filter(office =>
+      office.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      office.address?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    // Filter by tier
+    if (tierFilter !== 'All') {
+      filtered = filtered.filter(office => office.tier === tierFilter);
+    }
+
+    // Group by tier
+    const grouped: Record<string, Office[]> = {
+      VIP: [],
+      Warm: [],
+      Dormant: [],
+      Cold: []
+    };
+
+    filtered.forEach(office => {
+      const tier = office.tier || 'Cold';
+      if (grouped[tier]) {
+        grouped[tier].push(office);
+      }
+    });
+
+    // Sort within each tier by r3 (most recent activity first)
+    Object.keys(grouped).forEach(tier => {
+      grouped[tier].sort((a, b) => (b.r3 || 0) - (a.r3 || 0));
+    });
+
+    // Calculate stats
+    const stats = {
+      total: offices.length,
+      vip: offices.filter(o => o.tier === 'VIP').length,
+      warm: offices.filter(o => o.tier === 'Warm').length,
+      dormant: offices.filter(o => o.tier === 'Dormant').length,
+      cold: offices.filter(o => o.tier === 'Cold').length,
+      l12Total: offices.reduce((sum, o) => sum + (o.l12 || 0), 0),
+      currentMonth: offices.reduce((sum, o) => sum + (o.currentMonthReferrals || 0), 0)
+    };
+
+    return { filteredOffices: filtered, groupedByTier: grouped, stats };
+  }, [offices, searchTerm, tierFilter]);
+
+  const handleRefresh = async () => {
+    try {
+      await refetch();
+      toast({
+        title: 'Refreshed',
+        description: 'Office data has been refreshed'
+      });
+    } catch (error) {
+      console.error('Failed to refresh:', error);
+    }
   };
 
-  const handleOfficeAdded = () => {
-    retry();
+  const handleView = (office: Office) => {
+    navigate(`/sources/${office.id}`);
   };
 
-  const handleViewOffice = (officeId: string) => {
-    navigate(`/sources/${officeId}`);
-  };
-
-  const handleEditOffice = (office: Office) => {
-    setEditingOffice(office.id);
+  const handleEdit = (office: Office) => {
+    setEditingOffice(office);
     setEditForm(office);
   };
 
@@ -106,24 +138,23 @@ function OfficesContent() {
           email: editForm.email || null,
           notes: editForm.notes || null,
         })
-        .eq('id', editingOffice);
+        .eq('id', editingOffice.id);
 
       if (error) throw error;
 
       toast({
-        title: "Success",
-        description: "Office updated successfully",
+        title: 'Success',
+        description: 'Office updated successfully'
       });
-
       setEditingOffice(null);
       setEditForm({});
-      retry();
+      refetch();
     } catch (error) {
       console.error('Error updating office:', error);
       toast({
-        title: "Error",
-        description: "Failed to update office",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to update office',
+        variant: 'destructive'
       });
     }
   };
@@ -133,521 +164,448 @@ function OfficesContent() {
     setEditForm({});
   };
 
-  const handleToggleActive = async (officeId: string, isActive: boolean) => {
-    try {
-      const { error } = await supabase
-        .from('patient_sources')
-        .update({ is_active: isActive })
-        .eq('id', officeId);
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: `Office ${isActive ? 'activated' : 'deactivated'} successfully`,
-      });
-
-      retry();
-    } catch (error) {
-      console.error('Error updating office status:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update office status",
-        variant: "destructive",
-      });
-    }
+  const handlePatientCounts = (office: Office) => {
+    setPatientLoadOffice({
+      id: office.id,
+      name: office.name,
+      currentLoad: office.currentMonthReferrals || 0
+    });
   };
 
-  const handleDeleteOffice = async (officeId: string) => {
-    if (!confirm('Are you sure you want to delete this office?')) return;
+  const handleDelete = async (office: Office) => {
+    if (!confirm(`Are you sure you want to delete ${office.name}?`)) return;
 
     try {
       const { error } = await supabase
         .from('patient_sources')
         .delete()
-        .eq('id', officeId);
+        .eq('id', office.id);
 
       if (error) throw error;
 
       toast({
-        title: "Success",
-        description: "Office deleted successfully",
+        title: 'Success',
+        description: 'Office deleted successfully'
       });
-
-      retry();
+      refetch();
     } catch (error) {
       console.error('Error deleting office:', error);
       toast({
-        title: "Error",
-        description: "Failed to delete office",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to delete office',
+        variant: 'destructive'
       });
     }
   };
 
-  const handleSelectOffice = (officeId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedOffices(prev => [...prev, officeId]);
-    } else {
-      setSelectedOffices(prev => prev.filter(id => id !== officeId));
+  const getTierBadgeVariant = (tier?: string) => {
+    switch (tier) {
+      case 'VIP': return 'default';
+      case 'Warm': return 'secondary';
+      case 'Dormant': return 'outline';
+      case 'Cold': return 'outline';
+      default: return 'outline';
     }
   };
 
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedOffices(filteredOffices.map(o => o.id));
-    } else {
-      setSelectedOffices([]);
+  const getTierIcon = (tier: string) => {
+    switch (tier) {
+      case 'VIP': return '🌟';
+      case 'Warm': return '🔥';
+      case 'Dormant': return '💤';
+      case 'Cold': return '❄️';
+      default: return '📍';
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex flex-col space-y-3 mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <Building2 className="h-8 w-8 title-icon" />
-            <h1 className="text-4xl font-bold page-title">Partner Offices</h1>
-          </div>
-          <p className="text-muted-foreground text-lg">
-            Loading office data...
-          </p>
-        </div>
+  const getTierDescription = (tier: string) => {
+    switch (tier) {
+      case 'VIP': return 'Consistently sending 8+ referrals/month';
+      case 'Warm': return 'Active partnership with 4+ referrals/month';
+      case 'Dormant': return 'Has sent referrals but currently inactive';
+      case 'Cold': return 'No recent referrals';
+      default: return '';
+    }
+  };
 
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      </div>
-    );
-  }
+  const formatLastActive = (lastActiveMonth?: string | null) => {
+    if (!lastActiveMonth) return 'Never';
+    const date = new Date(lastActiveMonth + '-01');
+    const now = new Date();
+    const monthsDiff = (now.getFullYear() - date.getFullYear()) * 12 + (now.getMonth() - date.getMonth());
+    
+    if (monthsDiff === 0) return 'This month';
+    if (monthsDiff === 1) return 'Last month';
+    return `${monthsDiff} months ago`;
+  };
 
-  if (error && !offices?.length) {
-    return (
-      <div className="space-y-6">
-        <div className="flex flex-col space-y-3 mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <Building2 className="h-8 w-8 title-icon" />
-            <h1 className="text-4xl font-bold page-title">Partner Offices</h1>
-          </div>
-        </div>
-
-        <Card className="border-destructive">
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center text-center space-y-4">
-              <AlertCircle className="h-12 w-12 text-destructive" />
-              <div>
-                <h3 className="font-semibold text-lg">Failed to load offices</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {error instanceof Error ? error.message : 'An error occurred'}
-                </p>
-              </div>
-              <Button onClick={handleRefresh}>
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Try Again
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  const isAllSelected = filteredOffices.length > 0 && filteredOffices.every(o => selectedOffices.includes(o.id));
-
-  // Mobile Card View
-  if (isMobile) {
-    return (
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col space-y-3 mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <Building2 className="h-8 w-8 title-icon" />
-            <h1 className="text-4xl font-bold page-title">Partner Offices</h1>
-          </div>
-          <p className="text-muted-foreground text-lg">
-            Manage dental office partnerships and referral relationships
-          </p>
-        </div>
-
-        {isOffline && (
-          <Alert>
-            <WifiOff className="h-4 w-4" />
-            <AlertTitle>You're offline</AlertTitle>
-            <AlertDescription>
-              Showing cached data. Changes will sync when you're back online.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* Search & Actions */}
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search offices..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <AddOfficeDialog onOfficeAdded={handleOfficeAdded} />
-        </div>
-
-        {/* Office Cards */}
-        {!filteredOffices || filteredOffices.length === 0 ? (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center py-12">
-                <Building2 className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-                <h3 className="text-lg font-semibold mb-2">No offices found</h3>
-                <p className="text-muted-foreground mb-4">
-                  {searchTerm ? 'Try adjusting your search' : 'Start by adding your first office'}
-                </p>
-                {!searchTerm && (
-                  <AddOfficeDialog onOfficeAdded={handleOfficeAdded} />
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 gap-3">
-            {filteredOffices.map((office) => {
-              const isEditing = editingOffice === office.id;
-              const isSelected = selectedOffices.includes(office.id);
-
-              return (
-                <Card key={office.id} className={`hover:shadow-md transition-shadow ${isSelected ? 'ring-2 ring-primary' : ''}`}>
-                  <CardContent className="p-4 space-y-3">
-                    <div className="flex items-start gap-3">
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={(checked) => handleSelectOffice(office.id, checked as boolean)}
-                      />
-                      <div className="flex-1 min-w-0">
-                        {isEditing ? (
-                          <Input
-                            value={editForm.name || ''}
-                            onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
-                            className="mb-2"
-                          />
-                        ) : (
-                          <h3 className="font-semibold truncate">{office.name}</h3>
-                        )}
-                        {office.address && (
-                          <p className="text-sm text-muted-foreground line-clamp-1">{office.address}</p>
-                        )}
-                      </div>
-                      <Badge variant={office.is_active ? "default" : "secondary"} className="shrink-0">
-                        {office.is_active ? "Active" : "Inactive"}
-                      </Badge>
-                    </div>
-
-                    <div className="flex gap-2">
-                      {isEditing ? (
-                        <>
-                          <Button size="sm" onClick={handleSaveEdit} className="flex-1">
-                            <Check className="w-3 h-3 mr-1" />
-                            Save
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={handleCancelEdit} className="flex-1">
-                            <X className="w-3 h-3 mr-1" />
-                            Cancel
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <Button size="sm" variant="outline" onClick={() => handleViewOffice(office.id)} className="flex-1">
-                            <Eye className="w-3 h-3 mr-1" />
-                            View
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => handleEditOffice(office)} className="flex-1">
-                            <Edit className="w-3 h-3 mr-1" />
-                            Edit
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            onClick={() => setShowPatientModal({ officeId: office.id, officeName: office.name, currentLoad: office.patient_load || 0 })}
-                            className="flex-1"
-                          >
-                            <Users className="w-3 h-3 mr-1" />
-                            Patients
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-
-
-        {/* Patient Load Modal */}
-        {showPatientModal && (
-          <Dialog open={!!showPatientModal} onOpenChange={() => setShowPatientModal(null)}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Patient Counts - {showPatientModal.officeName}</DialogTitle>
-              </DialogHeader>
-              <PatientLoadHistoryEditor
-                officeId={showPatientModal.officeId}
-                officeName={showPatientModal.officeName}
-                currentLoad={showPatientModal.currentLoad}
-                onUpdate={(newLoad) => {
-                  setShowPatientModal(null);
-                  retry();
-                }}
-              />
-            </DialogContent>
-          </Dialog>
-        )}
-      </div>
-    );
-  }
-
-  // Desktop Table View
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
-      <div className="flex flex-col space-y-3 mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <Building2 className="h-8 w-8 title-icon" />
-          <h1 className="text-4xl font-bold page-title">Partner Offices</h1>
-        </div>
-        <p className="text-muted-foreground text-lg">
-          Manage dental office partnerships and referral relationships
-        </p>
-      </div>
-
-      {isOffline && (
-        <Alert>
-          <WifiOff className="h-4 w-4" />
-          <AlertTitle>You're offline</AlertTitle>
-          <AlertDescription>
-            Showing cached data. Changes will sync when you're back online.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Search & Actions */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search offices by name or address..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">Partner Offices</h1>
+          <p className="text-muted-foreground mt-1">Manage your referring partner offices</p>
         </div>
         <div className="flex gap-2">
-          {selectedOffices.length > 0 && (
-            <Badge variant="secondary" className="px-3 py-2">
-              {selectedOffices.length} selected
-            </Badge>
-          )}
-          <Button variant="outline" onClick={handleRefresh}>
+          <Button onClick={handleRefresh} variant="outline">
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
-          <AddOfficeDialog onOfficeAdded={handleOfficeAdded} />
+          <AddSourceDialog onOfficeAdded={handleRefresh} />
         </div>
       </div>
 
-      {/* Office Table */}
-      {!filteredOffices || filteredOffices.length === 0 ? (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center py-12">
-              <Building2 className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <h3 className="text-lg font-semibold mb-2">No offices found</h3>
-              <p className="text-muted-foreground mb-4">
-                {searchTerm ? 'Try adjusting your search criteria' : 'Start building your network by adding dental offices'}
-              </p>
-              {!searchTerm && (
-                <AddOfficeDialog onOfficeAdded={handleOfficeAdded} />
-              )}
+      {/* Stats Summary Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Partner Office Overview
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Total Partners</p>
+              <p className="text-2xl font-bold">{stats.total}</p>
             </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">🌟 VIP</p>
+              <p className="text-2xl font-bold">{stats.vip}</p>
+              <p className="text-xs text-muted-foreground">{stats.total > 0 ? Math.round((stats.vip / stats.total) * 100) : 0}%</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">🔥 Warm</p>
+              <p className="text-2xl font-bold">{stats.warm}</p>
+              <p className="text-xs text-muted-foreground">{stats.total > 0 ? Math.round((stats.warm / stats.total) * 100) : 0}%</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">💤 Dormant</p>
+              <p className="text-2xl font-bold">{stats.dormant}</p>
+              <p className="text-xs text-muted-foreground">{stats.total > 0 ? Math.round((stats.dormant / stats.total) * 100) : 0}%</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">❄️ Cold</p>
+              <p className="text-2xl font-bold">{stats.cold}</p>
+              <p className="text-xs text-muted-foreground">{stats.total > 0 ? Math.round((stats.cold / stats.total) * 100) : 0}%</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">L12 Referrals</p>
+              <p className="text-2xl font-bold">{stats.l12Total}</p>
+              <p className="text-xs text-muted-foreground">{stats.currentMonth} this month</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Search and Filters */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search offices by name or address..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                variant={tierFilter === 'All' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setTierFilter('All')}
+              >
+                All
+              </Button>
+              <Button
+                variant={tierFilter === 'VIP' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setTierFilter('VIP')}
+              >
+                🌟 VIP
+              </Button>
+              <Button
+                variant={tierFilter === 'Warm' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setTierFilter('Warm')}
+              >
+                🔥 Warm
+              </Button>
+              <Button
+                variant={tierFilter === 'Dormant' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setTierFilter('Dormant')}
+              >
+                💤 Dormant
+              </Button>
+              <Button
+                variant={tierFilter === 'Cold' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setTierFilter('Cold')}
+              >
+                ❄️ Cold
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Tier-Based Office Groups */}
+      {isLoading ? (
+        <Card>
+          <CardContent className="py-8 text-center text-muted-foreground">
+            Loading offices...
+          </CardContent>
+        </Card>
+      ) : error ? (
+        <Card>
+          <CardContent className="py-8 text-center">
+            <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+            <p className="text-destructive font-medium">Failed to load offices</p>
+            <p className="text-sm text-muted-foreground mt-2">Please try refreshing</p>
+          </CardContent>
+        </Card>
+      ) : filteredOffices.length === 0 ? (
+        <Card>
+          <CardContent className="py-8 text-center text-muted-foreground">
+            {searchTerm || tierFilter !== 'All' ? 'No offices found matching your filters' : 'No offices yet. Add your first partner office!'}
           </CardContent>
         </Card>
       ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Partner Offices ({filteredOffices.length})</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">
-                      <Checkbox
-                        checked={isAllSelected}
-                        onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
-                      />
-                    </TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredOffices.map((office) => {
-                    const isEditing = editingOffice === office.id;
-                    const isSelected = selectedOffices.includes(office.id);
+        <div className="space-y-4">
+          {(['VIP', 'Warm', 'Dormant', 'Cold'] as const).map((tier) => {
+            const tierOffices = groupedByTier[tier] || [];
+            if (tierOffices.length === 0) return null;
 
-                    return (
-                      <TableRow key={office.id} className={isSelected ? "bg-muted/50" : ""}>
-                        <TableCell>
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={(checked) => handleSelectOffice(office.id, checked as boolean)}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          {isEditing ? (
-                            <div className="space-y-2 min-w-[200px]">
-                              <Input
-                                value={editForm.name || ''}
-                                onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
-                                placeholder="Office name"
-                                className="text-sm"
-                              />
-                              <Input
-                                value={editForm.address || ''}
-                                onChange={(e) => setEditForm(prev => ({ ...prev, address: e.target.value }))}
-                                placeholder="Address"
-                                className="text-sm"
-                              />
-                            </div>
-                          ) : (
-                            <div>
-                              <div className="font-medium">{office.name}</div>
-                              {office.address && (
-                                <div className="text-sm text-muted-foreground truncate max-w-xs">
-                                  {office.address}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {isEditing ? (
-                            <div className="space-y-2 min-w-[180px]">
-                              <Input
-                                value={editForm.phone || ''}
-                                onChange={(e) => setEditForm(prev => ({ ...prev, phone: e.target.value }))}
-                                placeholder="Phone"
-                                className="text-sm"
-                              />
-                              <Input
-                                value={editForm.email || ''}
-                                onChange={(e) => setEditForm(prev => ({ ...prev, email: e.target.value }))}
-                                placeholder="Email"
-                                className="text-sm"
-                              />
-                            </div>
-                          ) : (
-                            <div className="text-sm">
-                              {office.phone && <div>{office.phone}</div>}
-                              {office.email && <div className="text-muted-foreground">{office.email}</div>}
-                              {!office.phone && !office.email && (
-                                <span className="text-muted-foreground">No contact info</span>
-                              )}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Badge variant={office.is_active ? "default" : "secondary"}>
-                              {office.is_active ? "Active" : "Inactive"}
-                            </Badge>
-                            {!isEditing && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleToggleActive(office.id, !office.is_active)}
-                              >
-                                <Power className="w-3 h-3" />
-                              </Button>
-                            )}
+            return (
+              <Card key={tier}>
+                <Collapsible
+                  open={openTiers[tier]}
+                  onOpenChange={(open) => setOpenTiers({ ...openTiers, [tier]: open })}
+                >
+                  <CollapsibleTrigger className="w-full">
+                    <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">{getTierIcon(tier)}</span>
+                          <div className="text-left">
+                            <CardTitle className="flex items-center gap-2">
+                              {tier} Partners
+                              <Badge variant={getTierBadgeVariant(tier)}>{tierOffices.length}</Badge>
+                            </CardTitle>
+                            <CardDescription className="mt-1">
+                              {getTierDescription(tier)}
+                            </CardDescription>
                           </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {isEditing ? (
-                            <div className="flex justify-end gap-2">
-                              <Button size="sm" onClick={handleSaveEdit}>
-                                <Check className="w-3 h-3 mr-1" />
-                                Save
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={handleCancelEdit}>
-                                <X className="w-3 h-3 mr-1" />
-                                Cancel
-                              </Button>
-                            </div>
-                          ) : (
-                            <div className="flex justify-end gap-2">
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                onClick={() => handleViewOffice(office.id)}
-                              >
-                                <Eye className="w-4 h-4" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                onClick={() => handleEditOffice(office)}
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                onClick={() => setShowPatientModal({ officeId: office.id, officeName: office.name, currentLoad: office.patient_load || 0 })}
-                              >
-                                <Users className="w-4 h-4" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                onClick={() => handleDeleteOffice(office.id)}
-                              >
-                                <Trash2 className="w-4 h-4 text-destructive" />
-                              </Button>
-                            </div>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+                        </div>
+                        <ChevronDown className={`h-5 w-5 transition-transform ${openTiers[tier] ? 'transform rotate-180' : ''}`} />
+                      </div>
+                    </CardHeader>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <CardContent>
+                      {/* Desktop Table View */}
+                      <div className="hidden md:block overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Office Name</TableHead>
+                              <TableHead className="text-center">L12</TableHead>
+                              <TableHead className="text-center">R3</TableHead>
+                              <TableHead className="text-center">Current</TableHead>
+                              <TableHead>Last Active</TableHead>
+                              <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {tierOffices.map((office) => (
+                              <TableRow key={office.id}>
+                                <TableCell>
+                                  <div>
+                                    <p className="font-medium">{office.name}</p>
+                                    <p className="text-sm text-muted-foreground flex items-center gap-1">
+                                      <MapPin className="h-3 w-3" />
+                                      {office.address || 'No address'}
+                                    </p>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <span className="font-semibold">{office.l12 || 0}</span>
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <span className="font-semibold">{office.r3 || 0}</span>
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <span className="font-semibold">{office.currentMonthReferrals || 0}</span>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                    <Calendar className="h-3 w-3" />
+                                    {formatLastActive(office.lastActiveMonth)}
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex justify-end gap-1">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleView(office)}
+                                      title="View Details"
+                                    >
+                                      <Eye className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleEdit(office)}
+                                      title="Edit"
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handlePatientCounts(office)}
+                                      title="Patient Counts"
+                                    >
+                                      <Users className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleDelete(office)}
+                                      title="Delete"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+
+                      {/* Mobile Card View */}
+                      <div className="md:hidden space-y-3">
+                        {tierOffices.map((office) => (
+                          <Card key={office.id}>
+                            <CardHeader className="pb-3">
+                              <CardTitle className="text-base">{office.name}</CardTitle>
+                              <CardDescription className="flex items-center gap-1">
+                                <MapPin className="h-3 w-3" />
+                                {office.address || 'No address'}
+                              </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                              <div className="grid grid-cols-4 gap-2 text-center">
+                                <div>
+                                  <p className="text-xs text-muted-foreground">L12</p>
+                                  <p className="text-lg font-bold">{office.l12 || 0}</p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-muted-foreground">R3</p>
+                                  <p className="text-lg font-bold">{office.r3 || 0}</p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Current</p>
+                                  <p className="text-lg font-bold">{office.currentMonthReferrals || 0}</p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-muted-foreground">MSLR</p>
+                                  <p className="text-lg font-bold">{office.mslr || 0}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                <Calendar className="h-3 w-3" />
+                                Last active: {formatLastActive(office.lastActiveMonth)}
+                              </div>
+                              <div className="flex gap-2">
+                                <Button size="sm" variant="outline" onClick={() => handleView(office)}>
+                                  <Eye className="h-4 w-4 mr-1" /> View
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={() => handleEdit(office)}>
+                                  <Edit className="h-4 w-4 mr-1" /> Edit
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={() => handlePatientCounts(office)}>
+                                  <Users className="h-4 w-4 mr-1" /> Count
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </CollapsibleContent>
+                </Collapsible>
+              </Card>
+            );
+          })}
+        </div>
       )}
 
-
-      {/* Patient Load Modal */}
-      {showPatientModal && (
-        <Dialog open={!!showPatientModal} onOpenChange={() => setShowPatientModal(null)}>
+      {/* Edit Office Dialog */}
+      {editingOffice && (
+        <Dialog open={!!editingOffice} onOpenChange={() => handleCancelEdit()}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Patient Counts - {showPatientModal.officeName}</DialogTitle>
+              <DialogTitle>Edit Office - {editingOffice.name}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">Name</label>
+                <Input
+                  value={editForm.name || ''}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Address</label>
+                <Input
+                  value={editForm.address || ''}
+                  onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Phone</label>
+                <Input
+                  value={editForm.phone || ''}
+                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Email</label>
+                <Input
+                  value={editForm.email || ''}
+                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={handleCancelEdit}>Cancel</Button>
+                <Button onClick={handleSaveEdit}>Save Changes</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Patient Load Modal */}
+      {patientLoadOffice && (
+        <Dialog open={!!patientLoadOffice} onOpenChange={() => setPatientLoadOffice(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Patient Counts - {patientLoadOffice.name}</DialogTitle>
             </DialogHeader>
             <PatientLoadHistoryEditor
-              officeId={showPatientModal.officeId}
-              officeName={showPatientModal.officeName}
-              currentLoad={showPatientModal.currentLoad}
+              officeId={patientLoadOffice.id}
+              officeName={patientLoadOffice.name}
+              currentLoad={patientLoadOffice.currentLoad}
               onUpdate={(newLoad) => {
-                setShowPatientModal(null);
-                retry();
+                setPatientLoadOffice(null);
+                refetch();
               }}
             />
           </DialogContent>
