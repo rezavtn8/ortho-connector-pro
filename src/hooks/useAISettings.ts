@@ -66,16 +66,21 @@ export function useAISettings() {
     try {
       const { data, error } = await supabase
         .from('ai_business_profiles')
-        .upsert({
-          user_id: user.id,
-          communication_style: updatedSettings.communication_style,
-          competitive_advantages: updatedSettings.competitive_advantages,
-          practice_values: updatedSettings.practice_values,
-          specialties: updatedSettings.specialties,
-          target_audience: updatedSettings.target_audience,
-          brand_voice: updatedSettings.brand_voice,
-          last_updated: new Date().toISOString(),
-        })
+        .upsert(
+          {
+            user_id: user.id,
+            communication_style: updatedSettings.communication_style,
+            competitive_advantages: updatedSettings.competitive_advantages,
+            practice_values: updatedSettings.practice_values,
+            specialties: updatedSettings.specialties,
+            target_audience: updatedSettings.target_audience,
+            brand_voice: updatedSettings.brand_voice,
+            last_updated: new Date().toISOString(),
+          },
+          {
+            onConflict: 'user_id',
+          }
+        )
         .select()
         .single();
 
