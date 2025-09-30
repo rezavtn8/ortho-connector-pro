@@ -5,8 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { useResilientQuery } from '@/hooks/useResilientQuery';
 import { supabase } from '@/integrations/supabase/client';
 import { ResilientErrorBoundary } from '@/components/ResilientErrorBoundary';
-import { EmailCampaignCreator } from '@/components/EmailCampaignCreator';
-import { PhysicalCampaignCreator } from '@/components/PhysicalCampaignCreator';
+import { EmailCampaignCreator } from '@/components/campaign/EmailCampaignCreator';
+import { PhysicalCampaignCreator } from '@/components/campaign/PhysicalCampaignCreator';
 import { 
   Megaphone, 
   Plus, 

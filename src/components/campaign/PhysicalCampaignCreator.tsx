@@ -10,7 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, Package, ArrowRight, ArrowLeft, Gift } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { EnhancedDatePicker } from './EnhancedDatePicker';
+import { EnhancedDatePicker } from '../EnhancedDatePicker';
 
 interface PhysicalCampaignCreatorProps {
   open: boolean;

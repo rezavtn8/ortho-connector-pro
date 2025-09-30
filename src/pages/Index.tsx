@@ -13,7 +13,7 @@ import { Dashboard } from '@/pages/Dashboard';
 import { Sources } from '@/pages/Sources';
 import { Offices } from '@/pages/Offices';
 import { MarketingVisits } from '@/pages/MarketingVisits';
-import { Campaigns } from '@/pages/Campaigns';
+import Campaigns from '@/pages/Campaigns';
 import { Settings } from '@/pages/Settings';
 import { Analytics } from '@/pages/Analytics';
 import { SourceDetail } from '@/pages/SourceDetail';
