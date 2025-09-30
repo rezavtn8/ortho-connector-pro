@@ -253,20 +253,25 @@ function OfficesContent() {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">Partner Offices</h1>
-          <p className="text-muted-foreground mt-1">Manage your referring partner offices</p>
+      <div className="flex flex-col space-y-3 mb-8">
+        <div className="flex items-center gap-3">
+          <Users className="h-8 w-8 title-icon" />
+          <h1 className="text-4xl font-bold page-title">Partner Offices</h1>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={handleRefresh} variant="outline">
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
-          <AddSourceDialog onOfficeAdded={handleRefresh} />
-        </div>
+        <p className="text-muted-foreground text-lg">
+          Manage your referring partner offices and track their referral performance
+        </p>
+      </div>
+
+      {/* Actions */}
+      <div className="flex justify-end gap-2">
+        <Button onClick={handleRefresh} variant="outline">
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Refresh
+        </Button>
+        <AddSourceDialog onOfficeAdded={handleRefresh} />
       </div>
 
       {/* Stats Summary Card */}
