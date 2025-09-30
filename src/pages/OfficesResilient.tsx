@@ -34,9 +34,6 @@ interface Office {
   r3?: number;
   mslr?: number;
   tier?: string;
-  score?: number;
-  percentageOfTotal?: number;
-  conditionalLabel?: 'At-Risk' | 'Emerging' | null;
 }
 
 function OfficesContent() {
@@ -47,7 +44,7 @@ function OfficesContent() {
   const [editForm, setEditForm] = useState<Partial<Office>>({});
   const [patientLoadOffice, setPatientLoadOffice] = useState<{ id: string; name: string; currentLoad: number } | null>(null);
   const [tierFilter, setTierFilter] = useState<string>('All');
-  const [sortField, setSortField] = useState<'name' | 'tier' | 'score' | 'l12' | 'r3' | 'current' | 'lastActive'>('score');
+  const [sortField, setSortField] = useState<'name' | 'tier' | 'l12' | 'r3' | 'total' | 'lastActive'>('total');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   // Fetch offices data with tier calculations
@@ -82,10 +79,6 @@ function OfficesContent() {
           aVal = tierOrder[a.tier as keyof typeof tierOrder] || 5;
           bVal = tierOrder[b.tier as keyof typeof tierOrder] || 5;
           break;
-        case 'score':
-          aVal = a.score || 0;
-          bVal = b.score || 0;
-          break;
         case 'l12':
           aVal = a.l12 || 0;
           bVal = b.l12 || 0;
@@ -94,9 +87,9 @@ function OfficesContent() {
           aVal = a.r3 || 0;
           bVal = b.r3 || 0;
           break;
-        case 'current':
-          aVal = a.currentMonthReferrals || 0;
-          bVal = b.currentMonthReferrals || 0;
+        case 'total':
+          aVal = a.totalReferrals || 0;
+          bVal = b.totalReferrals || 0;
           break;
         case 'lastActive':
           aVal = a.lastActiveMonth || '0000-00';
@@ -416,9 +409,9 @@ function OfficesContent() {
                     </TableHead>
                     <TableHead 
                       className="text-center cursor-pointer hover:bg-muted/50"
-                      onClick={() => handleSort('score')}
+                      onClick={() => handleSort('total')}
                     >
-                      Score / % {sortField === 'score' && (sortDirection === 'asc' ? '↑' : '↓')}
+                      Total {sortField === 'total' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </TableHead>
                     <TableHead 
                       className="text-center cursor-pointer hover:bg-muted/50"
@@ -431,12 +424,6 @@ function OfficesContent() {
                       onClick={() => handleSort('r3')}
                     >
                       R3 {sortField === 'r3' && (sortDirection === 'asc' ? '↑' : '↓')}
-                    </TableHead>
-                    <TableHead 
-                      className="text-center cursor-pointer hover:bg-muted/50"
-                      onClick={() => handleSort('current')}
-                    >
-                      Current {sortField === 'current' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </TableHead>
                     <TableHead 
                       className="cursor-pointer hover:bg-muted/50"
@@ -460,34 +447,18 @@ function OfficesContent() {
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
-                        <div className="flex flex-col gap-1 items-center">
-                          <Badge variant={getTierBadgeVariant(office.tier)}>
-                            {getTierIcon(office.tier || 'Cold')} {office.tier}
-                          </Badge>
-                          {office.conditionalLabel && (
-                            <Badge 
-                              variant={office.conditionalLabel === 'At-Risk' ? 'destructive' : 'default'} 
-                              className="text-xs"
-                            >
-                              {office.conditionalLabel}
-                            </Badge>
-                          )}
-                        </div>
+                        <Badge variant={getTierBadgeVariant(office.tier)}>
+                          {getTierIcon(office.tier || 'Cold')} {office.tier}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-center">
-                        <div className="flex flex-col items-center">
-                          <span className="font-semibold">{office.score?.toFixed(1) || '0.0'}</span>
-                          <span className="text-xs text-muted-foreground">{office.percentageOfTotal?.toFixed(1) || '0.0'}%</span>
-                        </div>
+                        <span className="font-semibold">{office.totalReferrals || 0}</span>
                       </TableCell>
                       <TableCell className="text-center">
                         <span className="font-semibold">{office.l12 || 0}</span>
                       </TableCell>
                       <TableCell className="text-center">
                         <span className="font-semibold">{office.r3 || 0}</span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <span className="font-semibold">{office.currentMonthReferrals || 0}</span>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
@@ -530,26 +501,15 @@ function OfficesContent() {
                           {office.address || 'No address'}
                         </p>
                       </div>
-                      <div className="flex flex-col gap-1 items-end">
-                        <Badge variant={getTierBadgeVariant(office.tier)}>
-                          {getTierIcon(office.tier || 'Cold')} {office.tier}
-                        </Badge>
-                        {office.conditionalLabel && (
-                          <Badge 
-                            variant={office.conditionalLabel === 'At-Risk' ? 'destructive' : 'default'} 
-                            className="text-xs"
-                          >
-                            {office.conditionalLabel}
-                          </Badge>
-                        )}
-                      </div>
+                      <Badge variant={getTierBadgeVariant(office.tier)}>
+                        {getTierIcon(office.tier || 'Cold')} {office.tier}
+                      </Badge>
                     </div>
                     
-                    <div className="grid grid-cols-4 gap-2 text-center py-2 border-y">
+                    <div className="grid grid-cols-3 gap-2 text-center py-2 border-y">
                       <div>
-                        <p className="text-xs text-muted-foreground">Score</p>
-                        <p className="text-sm font-bold">{office.score?.toFixed(1) || '0.0'}</p>
-                        <p className="text-xs text-muted-foreground">{office.percentageOfTotal?.toFixed(1) || '0.0'}%</p>
+                        <p className="text-xs text-muted-foreground">Total</p>
+                        <p className="text-lg font-bold">{office.totalReferrals || 0}</p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">L12</p>
@@ -558,10 +518,6 @@ function OfficesContent() {
                       <div>
                         <p className="text-xs text-muted-foreground">R3</p>
                         <p className="text-lg font-bold">{office.r3 || 0}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Current</p>
-                        <p className="text-lg font-bold">{office.currentMonthReferrals || 0}</p>
                       </div>
                     </div>
                     
