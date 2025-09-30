@@ -162,6 +162,30 @@ export function PhysicalCampaignCreator({ open, onOpenChange, onCampaignCreated 
     );
   };
 
+  const handleSelectAllInCategory = () => {
+    const currentFilteredIds = filteredOffices.map(o => o.id);
+    const allSelected = currentFilteredIds.every(id => selectedOffices.includes(id));
+    
+    if (allSelected) {
+      // Deselect all in current filter
+      setSelectedOffices(prev => prev.filter(id => !currentFilteredIds.includes(id)));
+    } else {
+      // Select all in current filter
+      setSelectedOffices(prev => {
+        const newSelection = [...prev];
+        currentFilteredIds.forEach(id => {
+          if (!newSelection.includes(id)) {
+            newSelection.push(id);
+          }
+        });
+        return newSelection;
+      });
+    }
+  };
+
+  const allInCategorySelected = filteredOffices.length > 0 && 
+    filteredOffices.every(o => selectedOffices.includes(o.id));
+
   const selectedBundle = GIFT_BUNDLES.find(b => b.id === selectedGiftBundle);
   const totalEstimatedCost = selectedBundle ? selectedBundle.estimatedCost * selectedOffices.length : 0;
 
@@ -181,7 +205,7 @@ export function PhysicalCampaignCreator({ open, onOpenChange, onCampaignCreated 
         .insert({
           name: campaignName,
           campaign_type: campaignType,
-          delivery_method: 'Physical',
+          delivery_method: 'physical',
           planned_delivery_date: plannedDate?.toISOString().split('T')[0],
           notes,
           status: 'Draft',
@@ -346,7 +370,17 @@ export function PhysicalCampaignCreator({ open, onOpenChange, onCampaignCreated 
           {step === 3 && (
             <div className="space-y-4">
               <div>
-                <Label className="text-lg font-semibold mb-3 block">Select Target Offices</Label>
+                <div className="flex items-center justify-between mb-3">
+                  <Label className="text-lg font-semibold">Select Target Offices</Label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSelectAllInCategory}
+                    disabled={filteredOffices.length === 0}
+                  >
+                    {allInCategorySelected ? 'Deselect' : 'Select'} All in {OFFICE_TIER_FILTERS.find(f => f.value === tierFilter)?.label}
+                  </Button>
+                </div>
                 <div className="flex gap-2 mb-4 flex-wrap">
                   {OFFICE_TIER_FILTERS.map(filter => (
                     <Badge
@@ -355,7 +389,7 @@ export function PhysicalCampaignCreator({ open, onOpenChange, onCampaignCreated 
                       className="cursor-pointer"
                       onClick={() => setTierFilter(filter.value)}
                     >
-                      {filter.label}
+                      {filter.label} ({filter.value === 'all' ? offices.length : offices.filter(o => o.tier === filter.value).length})
                     </Badge>
                   ))}
                 </div>

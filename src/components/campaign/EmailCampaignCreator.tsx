@@ -120,6 +120,30 @@ export function EmailCampaignCreator({ open, onOpenChange, onCampaignCreated }: 
     );
   };
 
+  const handleSelectAllInCategory = () => {
+    const currentFilteredIds = filteredOffices.map(o => o.id);
+    const allSelected = currentFilteredIds.every(id => selectedOffices.includes(id));
+    
+    if (allSelected) {
+      // Deselect all in current filter
+      setSelectedOffices(prev => prev.filter(id => !currentFilteredIds.includes(id)));
+    } else {
+      // Select all in current filter
+      setSelectedOffices(prev => {
+        const newSelection = [...prev];
+        currentFilteredIds.forEach(id => {
+          if (!newSelection.includes(id)) {
+            newSelection.push(id);
+          }
+        });
+        return newSelection;
+      });
+    }
+  };
+
+  const allInCategorySelected = filteredOffices.length > 0 && 
+    filteredOffices.every(o => selectedOffices.includes(o.id));
+
   const generateEmailContent = async () => {
     if (selectedOffices.length === 0) {
       toast.error('Please select at least one office');
@@ -128,24 +152,62 @@ export function EmailCampaignCreator({ open, onOpenChange, onCampaignCreated }: 
 
     setGeneratingContent(true);
     try {
+      // Get user profile for sender name
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('first_name, last_name, degrees, job_title')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      // Prepare comprehensive office data for AI
+      const officesData = selectedOffices.map(officeId => {
+        const office = offices.find(o => o.id === officeId);
+        if (!office) return null;
+        
+        return {
+          id: office.id,
+          name: office.name,
+          address: office.address || '',
+          source_type: 'Office', // Will be fetched by edge function
+          referral_tier: office.tier
+        };
+      }).filter(Boolean);
+
+      console.log('Calling edge function with offices:', officesData);
+
       const { data, error } = await supabase.functions.invoke('generate-campaign-emails', {
         body: {
-          campaign_type: campaignType,
-          office_ids: selectedOffices,
-          custom_instructions: aiInstructions || undefined,
+          offices: officesData,
+          campaign_name: campaignName || 'Email Campaign',
+          user_name: profile ? `${profile.first_name} ${profile.last_name}` : undefined,
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Edge function error:', error);
+        throw error;
+      }
 
-      if (data?.emails && data.emails.length > 0) {
-        setEmailSubject(data.emails[0].subject);
-        setEmailBody(data.emails[0].body);
-        toast.success('AI content generated!');
+      if (!data?.success) {
+        throw new Error(data?.error || 'Failed to generate emails');
+      }
+
+      if (data.emails && data.emails.length > 0) {
+        // Use the first email as template (they should all have similar structure)
+        const firstEmail = data.emails[0];
+        setEmailSubject(firstEmail.subject);
+        setEmailBody(firstEmail.body);
+        toast.success(`AI generated ${data.emails.length} personalized email${data.emails.length > 1 ? 's' : ''}!`);
         setStep(4);
+      } else {
+        throw new Error('No emails generated');
       }
     } catch (error: any) {
-      toast.error('Failed to generate content: ' + error.message);
+      console.error('Failed to generate content:', error);
+      toast.error('Failed to generate content: ' + (error.message || 'Unknown error'));
     } finally {
       setGeneratingContent(false);
     }
@@ -167,7 +229,7 @@ export function EmailCampaignCreator({ open, onOpenChange, onCampaignCreated }: 
         .insert({
           name: campaignName,
           campaign_type: campaignType,
-          delivery_method: 'Email',
+          delivery_method: 'email',
           planned_delivery_date: plannedDate?.toISOString().split('T')[0],
           notes,
           status: 'Draft',
@@ -179,16 +241,20 @@ export function EmailCampaignCreator({ open, onOpenChange, onCampaignCreated }: 
 
       if (campaignError) throw campaignError;
 
-      const deliveries = selectedOffices.map(officeId => ({
-        campaign_id: campaign.id,
-        office_id: officeId,
-        email_subject: emailSubject,
-        email_body: emailBody,
-        email_status: 'pending',
-        action_mode: 'email_only',
-        delivery_status: 'Not Started',
-        created_by: user.id,
-      }));
+      const deliveries = selectedOffices.map(officeId => {
+        const office = offices.find(o => o.id === officeId);
+        return {
+          campaign_id: campaign.id,
+          office_id: officeId,
+          email_subject: emailSubject,
+          email_body: emailBody,
+          email_status: 'pending',
+          action_mode: 'email_only',
+          delivery_status: 'Not Started',
+          referral_tier: office?.tier || 'Cold',
+          created_by: user.id,
+        };
+      });
 
       const { error: deliveriesError } = await supabase
         .from('campaign_deliveries')
@@ -307,7 +373,17 @@ export function EmailCampaignCreator({ open, onOpenChange, onCampaignCreated }: 
           {step === 3 && (
             <div className="space-y-4">
               <div>
-                <Label className="text-lg font-semibold mb-3 block">Select Target Offices</Label>
+                <div className="flex items-center justify-between mb-3">
+                  <Label className="text-lg font-semibold">Select Target Offices</Label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSelectAllInCategory}
+                    disabled={filteredOffices.length === 0}
+                  >
+                    {allInCategorySelected ? 'Deselect' : 'Select'} All in {OFFICE_TIER_FILTERS.find(f => f.value === tierFilter)?.label}
+                  </Button>
+                </div>
                 <div className="flex gap-2 mb-4 flex-wrap">
                   {OFFICE_TIER_FILTERS.map(filter => (
                     <Badge
@@ -316,7 +392,7 @@ export function EmailCampaignCreator({ open, onOpenChange, onCampaignCreated }: 
                       className="cursor-pointer"
                       onClick={() => setTierFilter(filter.value)}
                     >
-                      {filter.label}
+                      {filter.label} ({filter.value === 'all' ? offices.length : offices.filter(o => o.tier === filter.value).length})
                     </Badge>
                   ))}
                 </div>
