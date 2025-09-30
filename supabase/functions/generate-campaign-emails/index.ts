@@ -256,9 +256,17 @@ serve(async (req) => {
       else if (office.stats.relationshipStrength.includes('Strong') || office.stats.relationshipStrength.includes('Active')) mappedRelationship = 'Warm';
       else if (office.stats.relationshipStrength.includes('Growing') || office.stats.relationshipStrength.includes('Occasional')) mappedRelationship = 'Sporadic';
       
-      // Build structured context matching user's specification
+      // Build structured context with AI settings
       const comprehensiveContext = {
         task_type: 'email_generation',
+        ai_settings: {
+          communication_style: businessProfile?.communication_style || 'professional',
+          brand_voice: businessProfile?.brand_voice || { traits: ['Professional', 'Trustworthy', 'Caring'] },
+          competitive_advantages: businessProfile?.competitive_advantages || [],
+          specialties: businessProfile?.specialties || [],
+          practice_values: businessProfile?.practice_values || [],
+          target_audience: businessProfile?.target_audience || ''
+        },
         context: {
           // Structured Input Fields (matching user specification)
           office_name: office.name,
@@ -304,8 +312,9 @@ serve(async (req) => {
           practice_name: clinic?.name || userProfile?.clinic_name || 'Healthcare Practice',
         },
         parameters: {
-          tone: mappedRelationship === 'VIP' || mappedRelationship === 'Warm' 
-            ? 'warm_appreciative' : 'professional_welcoming',
+          tone: businessProfile?.communication_style || 
+                (mappedRelationship === 'VIP' || mappedRelationship === 'Warm' 
+                  ? 'warm' : 'professional'),
           style: 'personalized',
           include_data: true
         }

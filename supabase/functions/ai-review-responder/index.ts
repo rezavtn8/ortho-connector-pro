@@ -41,20 +41,38 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    const { google_review_id, action, response_text, quality_rating }: ReviewResponseRequest = await req.json();
+    const { google_review_id, action, response_text, quality_rating, review_context }: ReviewResponseRequest & { review_context?: any } = await req.json();
 
     if (action === 'generate') {
-      // Get review details from Reviews page context
-      // For now, we'll call the main AI assistant
+      // Fetch AI settings for personalized response
+      const { data: aiSettings } = await supabase
+        .from('ai_business_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      // Get user profile for practice context
+      const { data: userProfile } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      // Call AI assistant with settings
       const aiResponse = await supabase.functions.invoke('ai-assistant', {
         body: {
           task_type: 'review_response',
+          ai_settings: aiSettings,
           context: {
             google_review_id,
-            // Review details would be passed from frontend
+            review_text: review_context?.text || '',
+            reviewer_name: review_context?.author_name || 'Valued Patient',
+            rating: review_context?.rating || 5,
+            practice_name: userProfile?.clinic_name || 'Our Practice',
+            ...review_context
           },
           parameters: {
-            tone: 'professional and appreciative',
+            tone: aiSettings?.communication_style || 'professional',
           }
         },
         headers: {

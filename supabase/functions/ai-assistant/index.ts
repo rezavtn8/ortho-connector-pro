@@ -1,0 +1,222 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+const handler = async (req: Request): Promise<Response> => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    if (!OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY is not configured');
+    }
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      {
+        global: {
+          headers: { Authorization: req.headers.get('Authorization')! },
+        },
+      }
+    );
+
+    const authHeader = req.headers.get('Authorization')!;
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user } } = await supabase.auth.getUser(token);
+
+    if (!user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
+
+    const { task_type, context, parameters, ai_settings } = await req.json();
+
+    console.log('AI Assistant request:', { task_type, user_id: user.id });
+
+    // Fetch AI business profile if not provided
+    let aiProfile = ai_settings;
+    if (!aiProfile) {
+      const { data: profile } = await supabase
+        .from('ai_business_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      aiProfile = profile;
+    }
+
+    // Build system prompt with AI settings
+    const systemPrompt = buildSystemPrompt(task_type, aiProfile);
+    const userPrompt = buildUserPrompt(task_type, context, parameters, aiProfile);
+
+    console.log('Calling OpenAI for task:', task_type);
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        max_tokens: 800,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('OpenAI API Error:', errorData);
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || '';
+
+    console.log('AI Assistant response generated');
+
+    return new Response(JSON.stringify({
+      success: true,
+      content,
+      usage: {
+        tokens_used: data.usage?.total_tokens || 0
+      }
+    }), {
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    });
+
+  } catch (error: any) {
+    console.error('Error in ai-assistant:', error);
+
+    return new Response(JSON.stringify({ 
+      success: false,
+      error: error.message
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    });
+  }
+};
+
+function buildSystemPrompt(taskType: string, aiSettings: any): string {
+  const communicationStyle = aiSettings?.communication_style || 'professional';
+  const brandVoice = aiSettings?.brand_voice?.traits || ['Professional', 'Trustworthy', 'Caring'];
+  const competitiveAdvantages = aiSettings?.competitive_advantages || [];
+  const specialties = aiSettings?.specialties || [];
+  const practiceValues = aiSettings?.practice_values || [];
+  const targetAudience = aiSettings?.target_audience || '';
+
+  const basePrompt = `You are an expert healthcare marketing and communication specialist.
+
+BRAND IDENTITY:
+• Communication Style: ${communicationStyle}
+• Brand Voice Traits: ${brandVoice.join(', ')}
+• Target Audience: ${targetAudience || 'Healthcare professionals and patients'}
+
+PRACTICE STRENGTHS:
+${competitiveAdvantages.length > 0 ? `• Competitive Advantages: ${competitiveAdvantages.join(', ')}` : ''}
+${specialties.length > 0 ? `• Specialties: ${specialties.join(', ')}` : ''}
+${practiceValues.length > 0 ? `• Core Values: ${practiceValues.join(', ')}` : ''}
+
+CRITICAL INSTRUCTIONS:
+• Match the ${communicationStyle} communication style exactly
+• Embody these brand traits: ${brandVoice.join(', ')}
+• Naturally weave in practice strengths when relevant
+• Keep tone consistent with the practice's values
+• Be authentic and avoid generic templates`;
+
+  switch (taskType) {
+    case 'email_generation':
+      return `${basePrompt}
+
+TASK: Generate a professional email for a referral partner.
+OUTPUT FORMAT:
+- Start with a natural greeting
+- Use the sender's name and practice context
+- Reference specific referral data when provided
+- Include a clear, relevant call-to-action
+- End with professional signature
+- Keep total length under 300 words
+- Emphasize: ${competitiveAdvantages.slice(0, 2).join(' and ') || 'quality care'}`;
+
+    case 'review_response':
+      return `${basePrompt}
+
+TASK: Generate a thoughtful review response.
+OUTPUT FORMAT:
+- Thank the reviewer genuinely
+- Address specific points they mentioned
+- Subtly highlight: ${competitiveAdvantages.slice(0, 1).join(', ') || 'our commitment to excellence'}
+- Keep under 150 words
+- End with warm invitation to return`;
+
+    default:
+      return basePrompt;
+  }
+}
+
+function buildUserPrompt(taskType: string, context: any, parameters: any, aiSettings: any): string {
+  switch (taskType) {
+    case 'email_generation':
+      return `Generate an email for this referral partner:
+
+RECIPIENT:
+• Name: ${context.owner_name || context.office_name}
+• Office: ${context.office_name}
+• Role: ${context.owner_role || 'Healthcare Professional'}
+• Relationship: ${context.relationship_score || context.relationship_strength}
+
+REFERRAL DATA:
+• Total Referrals (12 months): ${context.referral_count_past_12_months || context.total_referrals || 0}
+• Recent Activity: ${context.recent_referrals_6months || 0} referrals in last 6 months
+• Last Referral: ${context.last_referral_date || context.last_referral_month || 'Recently'}
+• Frequency: ${context.referral_frequency || 'Occasional'}
+
+SENDER INFO:
+• Name: ${context.sender_name}
+${context.sender_degrees ? `• Credentials: ${context.sender_degrees}` : ''}
+${context.sender_title ? `• Title: ${context.sender_title}` : ''}
+• Practice: ${context.practice_name}
+
+${context.current_campaign ? `CAMPAIGN: ${context.current_campaign}` : ''}
+${context.gift_bundle ? `GIFT: ${context.gift_bundle.name || 'Special gift'}` : ''}
+${context.extra_notes ? `NOTES: ${context.extra_notes}` : ''}
+
+Create a personalized email that:
+1. Acknowledges the specific referral history
+2. Reflects the ${aiSettings?.communication_style || parameters?.tone || 'professional'} tone
+3. Naturally mentions: ${(aiSettings?.competitive_advantages || []).slice(0, 2).join(' and ') || 'our quality care'}
+4. Has a clear next step or call-to-action`;
+
+    case 'review_response':
+      return `Generate a review response:
+
+REVIEW CONTEXT:
+${JSON.stringify(context, null, 2)}
+
+Create a response that:
+1. Thanks the reviewer genuinely
+2. Addresses their specific feedback
+3. Embodies: ${(aiSettings?.brand_voice?.traits || []).join(', ')}
+4. Subtly mentions: ${(aiSettings?.competitive_advantages || [])[0] || 'our commitment to excellence'}
+5. Keeps a ${aiSettings?.communication_style || 'professional'} tone`;
+
+    default:
+      return JSON.stringify(context);
+  }
+}
+
+serve(handler);
