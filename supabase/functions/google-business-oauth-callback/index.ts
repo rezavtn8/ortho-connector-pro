@@ -17,9 +17,29 @@ const handler = async (req: Request): Promise<Response> => {
     const state = url.searchParams.get('state');
     const error = url.searchParams.get('error');
 
+    // Determine where to return the user (site origin if present and allowed)
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const lovableOrigin = supabaseUrl?.replace('.supabase.co', '.lovable.app') ?? '';
+    let siteOriginFromState: string | null = null;
+    try {
+      if (state) {
+        const parsed = JSON.parse(atob(state));
+        if (typeof parsed?.site_origin === 'string') siteOriginFromState = parsed.site_origin;
+      }
+    } catch (_) {}
+
+    const allowedOrigins = [
+      'https://nexoradental.com',
+      lovableOrigin,
+      'http://localhost:5173',
+      'http://localhost:3000',
+    ];
+
+    const targetBase = (siteOriginFromState && allowedOrigins.includes(siteOriginFromState)) ? siteOriginFromState : lovableOrigin;
+
     if (error) {
       // Redirect to app with error
-      return Response.redirect(`${Deno.env.get('SUPABASE_URL')?.replace('.supabase.co', '.lovable.app')}/review-magic?error=${error}`, 302);
+      return Response.redirect(`${targetBase}/review-magic?error=${error}`, 302);
     }
 
     if (!code || !state) {
@@ -38,8 +58,10 @@ const handler = async (req: Request): Promise<Response> => {
     // Exchange code for tokens
     const clientId = Deno.env.get('GOOGLE_OAUTH_CLIENT_ID');
     const clientSecret = Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET');
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const redirectUri = `${supabaseUrl}/functions/v1/google-business-oauth-callback`;
+    // redirect_uri MUST match the one used in the initial auth request
+    const redirectUri = (siteOriginFromState && allowedOrigins.includes(siteOriginFromState))
+      ? `${siteOriginFromState}/google-business/oauth/callback`
+      : `${supabaseUrl}/functions/v1/google-business-oauth-callback`;
 
     // Debug logging (safe)
     console.info('oauth-callback params', {

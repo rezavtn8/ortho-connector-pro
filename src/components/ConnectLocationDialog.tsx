@@ -20,8 +20,13 @@ export function ConnectLocationDialog({ clinicId, onConnected }: ConnectLocation
     try {
       setConnecting(true);
 
-      // Initiate OAuth flow
-      const { data, error } = await supabase.functions.invoke('google-business-oauth-init');
+      // Initiate OAuth flow with site-based redirect to avoid redirect_uri_mismatch
+      const { data, error } = await supabase.functions.invoke('google-business-oauth-init', {
+        body: {
+          redirect_target: 'site',
+          site_origin: window.location.origin,
+        },
+      });
 
       if (error) throw error;
 

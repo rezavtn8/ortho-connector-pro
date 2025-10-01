@@ -7,6 +7,7 @@ import { Layout } from '@/components/Layout';
 import { LandingPage } from '@/components/LandingPage';
 import { SessionTimeoutWarning } from '@/components/SessionTimeoutWarning';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import GoogleBusinessOAuthCallback from '@/pages/GoogleBusinessOAuthCallback';
 import { SuspenseWrapper } from '@/components/SuspenseWrapper';
 import { usePrefetch } from '@/hooks/usePrefetch';
 import { Dashboard } from '@/pages/Dashboard';
@@ -160,6 +161,14 @@ const Index = () => {
             element={
               <SuspenseWrapper type="page">
                 <Settings />
+              </SuspenseWrapper>
+            } 
+          />
+          <Route 
+            path="/google-business/oauth/callback" 
+            element={
+              <SuspenseWrapper type="page">
+                <GoogleBusinessOAuthCallback />
               </SuspenseWrapper>
             } 
           />

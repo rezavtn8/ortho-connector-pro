@@ -68,29 +68,26 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    // Generate state parameter for CSRF protection
-    const state = crypto.randomUUID();
-    const stateData = {
-      user_id: user.id,
-      clinic_id: clinics.id,
-      timestamp: Date.now(),
-    };
+    // We'll finalize the OAuth state after computing redirect strategy
+    let encodedState = '';
 
-    // Store state temporarily (you might want to use a proper session store)
-    // For now, we'll encode it in the state parameter
-    const encodedState = btoa(JSON.stringify(stateData));
-
-    // Get OAuth credentials
+    // Get OAuth credentials and determine redirect strategy
     const clientId = Deno.env.get('GOOGLE_OAUTH_CLIENT_ID');
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const redirectUri = `${supabaseUrl}/functions/v1/google-business-oauth-callback`;
 
-    // Debug logging (safe): verify values used to build the OAuth URL
-    console.info('oauth-init env', {
-      client_id_preview: clientId ? `${clientId.slice(0, 6)}...${clientId.slice(-4)}` : null,
-      redirect_uri: redirectUri,
-      supabase_url_matches_project: supabaseUrl?.includes('vqkzqwibbcvmdwgqladn.supabase.co') ?? false,
-    });
+    // Read optional body to decide redirect target
+    let preferredRedirect: 'supabase' | 'site' = 'supabase';
+    let siteOrigin: string | null = null;
+    try {
+      if (req.method === 'POST' && (req.headers.get('content-type') || '').includes('application/json')) {
+        const body = await req.json().catch(() => null);
+        if (body?.redirect_target === 'site') preferredRedirect = 'site';
+        if (typeof body?.site_origin === 'string') siteOrigin = body.site_origin;
+      }
+    } catch (_) {
+      // ignore body parse errors
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
 
     if (!clientId) {
       throw new Error('GOOGLE_OAUTH_CLIENT_ID not configured');
@@ -98,6 +95,44 @@ const handler = async (req: Request): Promise<Response> => {
     if (!supabaseUrl) {
       throw new Error('SUPABASE_URL not configured');
     }
+
+    // Allow-listed site origins that can be used for OAuth redirect
+    const allowedOrigins = [
+      'https://nexoradental.com',
+      supabaseUrl.replace('.supabase.co', '.lovable.app'),
+      'http://localhost:5173',
+      'http://localhost:3000',
+    ];
+
+    // Decide redirect URI
+    let redirectUri = `${supabaseUrl}/functions/v1/google-business-oauth-callback`;
+    if (preferredRedirect === 'site' && siteOrigin && allowedOrigins.includes(siteOrigin)) {
+      redirectUri = `${siteOrigin}/google-business/oauth/callback`;
+    }
+
+    // Debug logging (safe): verify values used to build the OAuth URL
+    console.info('oauth-init env', {
+      client_id_preview: clientId ? `${clientId.slice(0, 6)}...${clientId.slice(-4)}` : null,
+      redirect_uri: redirectUri,
+      supabase_url_matches_project: supabaseUrl?.includes('vqkzqwibbcvmdwgqladn.supabase.co') ?? false,
+      preferredRedirect,
+      siteOrigin,
+      siteOriginAllowed: siteOrigin ? allowedOrigins.includes(siteOrigin) : null,
+    });
+
+    // Finalize OAuth state now that redirect is decided
+    const statePayload: Record<string, unknown> = {
+      user_id: user.id,
+      clinic_id: clinics.id,
+      timestamp: Date.now(),
+    };
+    if (preferredRedirect === 'site' && siteOrigin && allowedOrigins.includes(siteOrigin)) {
+      // Include origin to let the callback redirect back to the same site domain
+      // (validated again server-side in the callback function)
+      // @ts-ignore - Deno runtime
+      statePayload.site_origin = siteOrigin;
+    }
+    encodedState = btoa(JSON.stringify(statePayload));
 
     // Build OAuth URL
     const scopes = [
