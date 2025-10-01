@@ -19,6 +19,7 @@ import { Analytics } from '@/pages/Analytics';
 import { SourceDetail } from '@/pages/SourceDetail';
 import { MapView } from '@/pages/MapView';
 import { Reviews } from '@/pages/Reviews';
+import ReviewMagic from '@/pages/ReviewMagic';
 import { Discover } from '@/pages/Discover';
 import { Logs } from '@/pages/Logs';
 import { AIAssistant } from '@/pages/AIAssistant';
@@ -111,6 +112,14 @@ const Index = () => {
             element={
               <SuspenseWrapper type="page">
                 <Reviews />
+              </SuspenseWrapper>
+            } 
+          />
+          <Route 
+            path="/review-magic/*" 
+            element={
+              <SuspenseWrapper type="page">
+                <ReviewMagic />
               </SuspenseWrapper>
             } 
           />
