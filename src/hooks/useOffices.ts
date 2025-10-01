@@ -72,10 +72,10 @@ export function useOffices() {
         const currentMonthReferrals = currentMonthData?.patient_count || 0;
         const totalReferrals = monthlyData.reduce((sum, m) => sum + m.patient_count, 0);
         
-        // Calculate last 12 months (L12)
+        // Calculate last 12 months (L12) - including current month
+        const now = new Date();
         const last12Months = Array.from({ length: 12 }, (_, i) => {
-          const date = new Date();
-          date.setMonth(date.getMonth() - i);
+          const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
           return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
         });
         
@@ -83,8 +83,11 @@ export function useOffices() {
           .filter(m => last12Months.includes(m.year_month))
           .reduce((sum, m) => sum + m.patient_count, 0);
         
-        // Calculate recent 3 months (R3)
-        const recent3Months = last12Months.slice(0, 3);
+        // Calculate recent 3 months (R3) - last 3 complete months
+        const recent3Months = Array.from({ length: 3 }, (_, i) => {
+          const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+        });
         const r3 = monthlyData
           .filter(m => recent3Months.includes(m.year_month))
           .reduce((sum, m) => sum + m.patient_count, 0);
