@@ -32,42 +32,48 @@ export function useOffices() {
       const currentMonth = getCurrentYearMonth();
       
       // Single optimized query with joins - using left join to include all offices
-      const { data: sources, error } = await supabase
-        .from('patient_sources')
-        .select(`
-          id,
-          name,
-          address,
-          phone,
-          latitude,
-          longitude,
-          email,
-          website,
-          notes,
-          google_rating,
-          monthly_patients(
-            year_month,
-            patient_count
-          )
-        `)
-        .eq('is_active', true)
-        .eq('source_type', 'Office')
-        .not('latitude', 'is', null)
-        .not('longitude', 'is', null);
+        const { data: sources, error } = await supabase
+          .from('patient_sources')
+          .select(`
+            id,
+            name,
+            address,
+            phone,
+            latitude,
+            longitude,
+            email,
+            website,
+            notes,
+            google_rating
+          `)
+          .eq('is_active', true)
+          .eq('source_type', 'Office');
 
       if (error) throw error;
 
-      // Fetch all marketing visits for these offices
-      const sourceIds = sources?.map(s => s.id) || [];
-      const { data: visits } = await supabase
-        .from('marketing_visits')
-        .select('office_id, visit_date, visited, star_rating')
-        .in('office_id', sourceIds)
-        .order('visit_date', { ascending: false });
+      // Build source list and fetch monthly patients for these offices
+      const sourceIds = sources?.map((s: any) => s.id) || [];
+
+      // Fetch monthly patient counts and group by source_id (avoids relying on DB FKs for nested selects)
+      let monthlyBySource = new Map<string, { year_month: string; patient_count: number }[]>();
+      if (sourceIds.length > 0) {
+        const { data: monthlyPatients, error: mpError } = await supabase
+          .from('monthly_patients')
+          .select('source_id, year_month, patient_count')
+          .in('source_id', sourceIds);
+        if (mpError) throw mpError;
+
+        monthlyBySource = new Map();
+        (monthlyPatients || []).forEach((row: any) => {
+          const list = monthlyBySource.get(row.source_id) || [];
+          list.push({ year_month: row.year_month, patient_count: row.patient_count });
+          monthlyBySource.set(row.source_id, list);
+        });
+      }
 
       // First pass: Calculate metrics for all offices
       const officesWithMetrics = (sources || []).map(source => {
-        const monthlyData = source.monthly_patients || [];
+        const monthlyData = monthlyBySource.get(source.id) || [];
         const currentMonthData = monthlyData.find(m => m.year_month === currentMonth);
         const currentMonthReferrals = currentMonthData?.patient_count || 0;
         const totalReferrals = monthlyData.reduce((sum, m) => sum + m.patient_count, 0);
