@@ -38,6 +38,8 @@ interface Campaign {
   planned_delivery_date: string | null;
   notes: string | null;
   selected_gift_bundle?: any;
+  office_tiers?: string[];
+  office_count?: number;
 }
 
 function CampaignsContent() {
@@ -61,13 +63,41 @@ function CampaignsContent() {
   const { data: campaigns, isLoading, error, refetch, isOffline } = useResilientQuery({
     queryKey: ['campaigns'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: campaignsData, error: campaignsError } = await supabase
         .from('campaigns')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return data || [];
+      if (campaignsError) throw campaignsError;
+
+      // Fetch campaign deliveries to get tier information
+      const { data: deliveriesData } = await supabase
+        .from('campaign_deliveries')
+        .select('campaign_id, referral_tier');
+
+      // Group deliveries by campaign
+      const deliveriesByCampaign = deliveriesData?.reduce((acc: any, delivery: any) => {
+        if (!acc[delivery.campaign_id]) {
+          acc[delivery.campaign_id] = { tiers: new Set(), count: 0 };
+        }
+        if (delivery.referral_tier) {
+          acc[delivery.campaign_id].tiers.add(delivery.referral_tier);
+        }
+        acc[delivery.campaign_id].count++;
+        return acc;
+      }, {});
+
+      // Add tier information to campaigns
+      const enrichedCampaigns = campaignsData?.map((campaign: any) => {
+        const deliveryInfo = deliveriesByCampaign?.[campaign.id];
+        return {
+          ...campaign,
+          office_tiers: deliveryInfo ? Array.from(deliveryInfo.tiers) : [],
+          office_count: deliveryInfo?.count || 0
+        };
+      });
+
+      return enrichedCampaigns || [];
     },
     fallbackData: [],
     retryMessage: 'Refreshing campaigns...'
@@ -114,10 +144,10 @@ function CampaignsContent() {
   };
 
   const renderEmailCampaignCard = (campaign: Campaign) => (
-    <Card key={campaign.id} className="hover:shadow-md transition-shadow border-primary/20">
+    <Card key={campaign.id} className="hover:shadow-md transition-shadow border-primary/20 cursor-pointer" onClick={() => handleExecuteEmail(campaign)}>
       <CardHeader>
         <div className="flex items-start justify-between">
-          <div>
+          <div className="flex-1">
             <CardTitle className="text-lg flex items-center gap-2">
               <Mail className="w-5 h-5 text-primary" />
               {campaign.name}
@@ -125,6 +155,29 @@ function CampaignsContent() {
             <p className="text-sm text-muted-foreground mt-1">
               {campaign.campaign_type}
             </p>
+            {campaign.office_count !== undefined && campaign.office_count > 0 && (
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                <span className="text-xs text-muted-foreground">
+                  {campaign.office_count} {campaign.office_count === 1 ? 'office' : 'offices'}
+                </span>
+                {campaign.office_tiers && campaign.office_tiers.length > 0 && (
+                  <>
+                    <span className="text-xs text-muted-foreground">•</span>
+                    <div className="flex gap-1 flex-wrap">
+                      {campaign.office_tiers.map((tier) => (
+                        <Badge 
+                          key={tier} 
+                          variant="secondary" 
+                          className="text-xs"
+                        >
+                          {tier}
+                        </Badge>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
           <Badge 
             variant="outline"
@@ -140,7 +193,7 @@ function CampaignsContent() {
             {campaign.notes}
           </p>
         )}
-        <div className="flex gap-2">
+        <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
           <Button
             variant="outline"
             size="sm"
@@ -155,24 +208,16 @@ function CampaignsContent() {
           >
             Edit
           </Button>
-          <Button
-            size="sm"
-            onClick={() => handleExecuteEmail(campaign)}
-            className="gap-1"
-          >
-            <Sparkles className="w-4 h-4" />
-            Generate & Send
-          </Button>
         </div>
       </CardContent>
     </Card>
   );
 
   const renderGiftCampaignCard = (campaign: Campaign) => (
-    <Card key={campaign.id} className="hover:shadow-md transition-shadow border-amber-200">
+    <Card key={campaign.id} className="hover:shadow-md transition-shadow border-amber-200 cursor-pointer" onClick={() => handleManageGiftDelivery(campaign)}>
       <CardHeader>
         <div className="flex items-start justify-between">
-          <div>
+          <div className="flex-1">
             <CardTitle className="text-lg flex items-center gap-2">
               <Gift className="w-5 h-5 text-amber-600" />
               {campaign.name}
@@ -185,6 +230,29 @@ function CampaignsContent() {
                 <Calendar className="w-3 h-3" />
                 {format(new Date(campaign.planned_delivery_date), 'MMM dd, yyyy')}
               </p>
+            )}
+            {campaign.office_count !== undefined && campaign.office_count > 0 && (
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                <span className="text-xs text-muted-foreground">
+                  {campaign.office_count} {campaign.office_count === 1 ? 'office' : 'offices'}
+                </span>
+                {campaign.office_tiers && campaign.office_tiers.length > 0 && (
+                  <>
+                    <span className="text-xs text-muted-foreground">•</span>
+                    <div className="flex gap-1 flex-wrap">
+                      {campaign.office_tiers.map((tier) => (
+                        <Badge 
+                          key={tier} 
+                          variant="secondary" 
+                          className="text-xs"
+                        >
+                          {tier}
+                        </Badge>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             )}
           </div>
           <Badge 
@@ -206,7 +274,7 @@ function CampaignsContent() {
             {campaign.notes}
           </p>
         )}
-        <div className="flex gap-2">
+        <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
           <Button
             variant="outline"
             size="sm"
@@ -220,14 +288,6 @@ function CampaignsContent() {
             onClick={() => handleEditGiftCampaign(campaign)}
           >
             Edit
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => handleManageGiftDelivery(campaign)}
-            className="gap-1 bg-amber-600 hover:bg-amber-700"
-          >
-            <Package className="w-4 h-4" />
-            Manage Deliveries
           </Button>
         </div>
       </CardContent>
