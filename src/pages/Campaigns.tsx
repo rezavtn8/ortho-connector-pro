@@ -99,6 +99,7 @@ function CampaignsContent() {
 
       return enrichedCampaigns || [];
     },
+    refetchInterval: 30000, // Auto-refresh every 30 seconds
     fallbackData: [],
     retryMessage: 'Refreshing campaigns...'
   });

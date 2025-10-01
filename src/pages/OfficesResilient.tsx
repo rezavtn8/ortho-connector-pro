@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ResilientErrorBoundary } from '@/components/ResilientErrorBoundary';
-import { Eye, Edit, Users, Trash2, Search, MapPin, Phone, Mail, AlertCircle, TrendingUp, Calendar, RefreshCw } from 'lucide-react';
+import { Eye, Edit, Users, Trash2, Search, MapPin, Phone, Mail, AlertCircle, TrendingUp, Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { PatientLoadHistoryEditor } from '@/components/PatientLoadHistoryEditor';
 import { AddOfficeDialog as AddSourceDialog } from '@/components/AddSourceDialog';
@@ -118,17 +118,6 @@ function OfficesContent() {
     return { filteredOffices: filtered, stats };
   }, [offices, searchTerm, tierFilter, sortField, sortDirection]);
 
-  const handleRefresh = async () => {
-    try {
-      await refetch();
-      toast({
-        title: 'Refreshed',
-        description: 'Office data has been refreshed'
-      });
-    } catch (error) {
-      console.error('Failed to refresh:', error);
-    }
-  };
 
   const handleView = (office: Office) => {
     navigate(`/sources/${office.id}`);
@@ -267,11 +256,7 @@ function OfficesContent() {
 
       {/* Actions */}
       <div className="flex justify-end gap-2">
-        <Button onClick={handleRefresh} variant="outline">
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Refresh
-        </Button>
-        <AddSourceDialog onOfficeAdded={handleRefresh} />
+        <AddSourceDialog onOfficeAdded={refetch} />
       </div>
 
       {/* Stats Summary Card */}
