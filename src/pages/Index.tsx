@@ -22,6 +22,7 @@ import { Reviews } from '@/pages/Reviews';
 import { Discover } from '@/pages/Discover';
 import { Logs } from '@/pages/Logs';
 import { AIAssistant } from '@/pages/AIAssistant';
+import ReviewMagic from '@/pages/ReviewMagic';
 
 import { useState } from 'react';
 
@@ -111,6 +112,14 @@ const Index = () => {
             element={
               <SuspenseWrapper type="page">
                 <Reviews />
+              </SuspenseWrapper>
+            } 
+          />
+          <Route 
+            path="/review-magic/*" 
+            element={
+              <SuspenseWrapper type="page">
+                <ReviewMagic />
               </SuspenseWrapper>
             } 
           />

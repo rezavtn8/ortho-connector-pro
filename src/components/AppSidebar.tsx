@@ -14,6 +14,7 @@ import {
   MessageSquare,
   Search,
   Bot,
+  Sparkles,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -49,6 +50,7 @@ const managementItems = [
   { id: 'campaigns', title: 'Campaigns', icon: Calendar, path: '/campaigns' },
   { id: 'discover', title: 'Find Offices', icon: Search, path: '/discover' },
   { id: 'reviews', title: 'Reviews', icon: MessageSquare, path: '/reviews' },
+  { id: 'review-magic', title: 'Review Magic', icon: Sparkles, path: '/review-magic' },
   { id: 'map-view', title: 'Map', icon: MapPin, path: '/map-view' },
 ];
 
