@@ -82,10 +82,21 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Get OAuth credentials
     const clientId = Deno.env.get('GOOGLE_OAUTH_CLIENT_ID');
-    const redirectUri = `${Deno.env.get('SUPABASE_URL')}/functions/v1/google-business-oauth-callback`;
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const redirectUri = `${supabaseUrl}/functions/v1/google-business-oauth-callback`;
+
+    // Debug logging (safe): verify values used to build the OAuth URL
+    console.info('oauth-init env', {
+      client_id_preview: clientId ? `${clientId.slice(0, 6)}...${clientId.slice(-4)}` : null,
+      redirect_uri: redirectUri,
+      supabase_url_matches_project: supabaseUrl?.includes('vqkzqwibbcvmdwgqladn.supabase.co') ?? false,
+    });
 
     if (!clientId) {
       throw new Error('GOOGLE_OAUTH_CLIENT_ID not configured');
+    }
+    if (!supabaseUrl) {
+      throw new Error('SUPABASE_URL not configured');
     }
 
     // Build OAuth URL
@@ -103,6 +114,8 @@ const handler = async (req: Request): Promise<Response> => {
     authUrl.searchParams.set('state', encodedState);
     authUrl.searchParams.set('access_type', 'offline');
     authUrl.searchParams.set('prompt', 'consent');
+
+    console.info('oauth-init authUrl constructed', { authorization_url: authUrl.toString() });
 
     return new Response(JSON.stringify({
       authorization_url: authUrl.toString(),

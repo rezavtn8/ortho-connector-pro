@@ -38,10 +38,23 @@ const handler = async (req: Request): Promise<Response> => {
     // Exchange code for tokens
     const clientId = Deno.env.get('GOOGLE_OAUTH_CLIENT_ID');
     const clientSecret = Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET');
-    const redirectUri = `${Deno.env.get('SUPABASE_URL')}/functions/v1/google-business-oauth-callback`;
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const redirectUri = `${supabaseUrl}/functions/v1/google-business-oauth-callback`;
+
+    // Debug logging (safe)
+    console.info('oauth-callback params', {
+      client_id_preview: clientId ? `${clientId.slice(0, 6)}...${clientId.slice(-4)}` : null,
+      redirect_uri: redirectUri,
+      code_present: Boolean(code),
+      state_length: state?.length ?? 0,
+      supabase_url_matches_project: supabaseUrl?.includes('vqkzqwibbcvmdwgqladn.supabase.co') ?? false,
+    });
 
     if (!clientId || !clientSecret) {
       throw new Error('OAuth credentials not configured');
+    }
+    if (!supabaseUrl) {
+      throw new Error('SUPABASE_URL not configured');
     }
 
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
