@@ -211,8 +211,7 @@ export function useOffices() {
       
       return offices;
     },
-    refetchInterval: 30000, // Auto-refresh every 30 seconds
-    staleTime: 30000, // Consider data stale after 30 seconds
+    staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
   });
 }
