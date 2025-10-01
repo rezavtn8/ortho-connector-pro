@@ -11,6 +11,7 @@ import { Loader2, Package, ArrowRight, ArrowLeft, Gift } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { EnhancedDatePicker } from '../EnhancedDatePicker';
+import { useOffices } from '@/hooks/useOffices';
 
 interface PhysicalCampaignCreatorProps {
   open: boolean;
@@ -92,8 +93,9 @@ const OFFICE_TIER_FILTERS = [
 export function PhysicalCampaignCreator({ open, onOpenChange, onCampaignCreated }: PhysicalCampaignCreatorProps) {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [offices, setOffices] = useState<Office[]>([]);
-  const [loadingOffices, setLoadingOffices] = useState(true);
+  const [selectedOffices, setSelectedOffices] = useState<string[]>([]);
+  const [tierFilter, setTierFilter] = useState('all');
+  const [materialsChecklist, setMaterialsChecklist] = useState<string[]>([]);
   
   // Form state
   const [campaignType, setCampaignType] = useState('referral_appreciation');
@@ -101,54 +103,21 @@ export function PhysicalCampaignCreator({ open, onOpenChange, onCampaignCreated 
   const [plannedDate, setPlannedDate] = useState<Date>();
   const [notes, setNotes] = useState('');
   const [selectedGiftBundle, setSelectedGiftBundle] = useState<string>('');
-  const [selectedOffices, setSelectedOffices] = useState<string[]>([]);
-  const [tierFilter, setTierFilter] = useState('all');
-  const [materialsChecklist, setMaterialsChecklist] = useState<string[]>([]);
 
-  // Fetch offices
-  useEffect(() => {
-    if (open) {
-      fetchOffices();
-    }
-  }, [open]);
-
-  const fetchOffices = async () => {
-    setLoadingOffices(true);
-    try {
-      const { data, error } = await supabase.from('office_metrics').select('*').order('name');
-      
-      if (error) throw error;
-      
-      const officesWithTiers = (data || []).map((office: any) => {
-        const l12 = office.l12 || 0;
-        const r3 = office.r3 || 0;
-        const mslr = office.mslr || 0;
-        
-        let tier = 'Cold';
-        if (l12 >= 12 && r3 >= 3 && mslr <= 4) tier = 'VIP';
-        else if (l12 >= 6 && r3 >= 2) tier = 'Warm';
-        else if (r3 === 0 && l12 > 0) tier = 'Dormant';
-        
-        return {
-          id: office.id,
-          name: office.name,
-          address: office.address,
-          phone: office.phone,
-          email: office.email,
-          l12,
-          r3,
-          mslr,
-          tier,
-        };
-      });
-      
-      setOffices(officesWithTiers);
-    } catch (error: any) {
-      toast.error('Failed to load offices');
-    } finally {
-      setLoadingOffices(false);
-    }
-  };
+  // Use the offices hook for consistent data
+  const { data: officesData, isLoading: loadingOffices } = useOffices();
+  
+  const offices: Office[] = (officesData || []).map(office => ({
+    id: office.id,
+    name: office.name || '',
+    address: office.address || '',
+    phone: office.phone || undefined,
+    email: office.email || undefined,
+    l12: office.l12 || 0,
+    r3: office.r3 || 0,
+    mslr: office.mslr || 0,
+    tier: office.tier || 'Cold',
+  }));
 
   const filteredOffices = tierFilter === 'all' 
     ? offices 
