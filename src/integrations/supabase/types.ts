@@ -611,6 +611,70 @@ export type Database = {
         }
         Relationships: []
       }
+      google_business_tokens: {
+        Row: {
+          access_token: string
+          clinic_id: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          office_id: string | null
+          refresh_token: string
+          scope: string
+          token_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          clinic_id?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          office_id?: string | null
+          refresh_token: string
+          scope: string
+          token_type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          clinic_id?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          office_id?: string | null
+          refresh_token?: string
+          scope?: string
+          token_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_business_tokens_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: true
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_business_tokens_office_id_fkey"
+            columns: ["office_id"]
+            isOneToOne: true
+            referencedRelation: "office_metrics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_business_tokens_office_id_fkey"
+            columns: ["office_id"]
+            isOneToOne: true
+            referencedRelation: "patient_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       google_places_audit_log: {
         Row: {
           action: string
@@ -649,6 +713,94 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      google_reviews: {
+        Row: {
+          author_name: string | null
+          author_profile_url: string | null
+          clinic_id: string | null
+          created_at: string
+          google_review_id: string
+          id: string
+          is_read: boolean
+          location_id: string
+          metadata: Json | null
+          needs_attention: boolean
+          office_id: string | null
+          posted_at: string
+          rating: number
+          review_reply: string | null
+          review_reply_updated_at: string | null
+          review_text: string | null
+          synced_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          author_name?: string | null
+          author_profile_url?: string | null
+          clinic_id?: string | null
+          created_at?: string
+          google_review_id: string
+          id?: string
+          is_read?: boolean
+          location_id: string
+          metadata?: Json | null
+          needs_attention?: boolean
+          office_id?: string | null
+          posted_at: string
+          rating: number
+          review_reply?: string | null
+          review_reply_updated_at?: string | null
+          review_text?: string | null
+          synced_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          author_name?: string | null
+          author_profile_url?: string | null
+          clinic_id?: string | null
+          created_at?: string
+          google_review_id?: string
+          id?: string
+          is_read?: boolean
+          location_id?: string
+          metadata?: Json | null
+          needs_attention?: boolean
+          office_id?: string | null
+          posted_at?: string
+          rating?: number
+          review_reply?: string | null
+          review_reply_updated_at?: string | null
+          review_text?: string | null
+          synced_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_reviews_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_reviews_office_id_fkey"
+            columns: ["office_id"]
+            isOneToOne: false
+            referencedRelation: "office_metrics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_reviews_office_id_fkey"
+            columns: ["office_id"]
+            isOneToOne: false
+            referencedRelation: "patient_sources"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       marketing_visits: {
         Row: {
@@ -1003,6 +1155,66 @@ export type Database = {
         }
         Relationships: []
       }
+      review_replies: {
+        Row: {
+          ai_content_id: string | null
+          created_at: string
+          error_message: string | null
+          google_reply_id: string | null
+          id: string
+          is_ai_generated: boolean
+          reply_text: string
+          review_id: string
+          sent_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_content_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          google_reply_id?: string | null
+          id?: string
+          is_ai_generated?: boolean
+          reply_text: string
+          review_id: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_content_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          google_reply_id?: string | null
+          id?: string
+          is_ai_generated?: boolean
+          reply_text?: string
+          review_id?: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_replies_ai_content_id_fkey"
+            columns: ["ai_content_id"]
+            isOneToOne: false
+            referencedRelation: "ai_generated_content"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "review_replies_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "google_reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       review_status: {
         Row: {
           clinic_id: string | null
@@ -1046,6 +1258,76 @@ export type Database = {
             columns: ["clinic_id"]
             isOneToOne: false
             referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      review_sync_log: {
+        Row: {
+          clinic_id: string | null
+          completed_at: string | null
+          error_message: string | null
+          id: string
+          location_id: string
+          next_sync_at: string | null
+          office_id: string | null
+          reviews_fetched: number
+          reviews_new: number
+          reviews_updated: number
+          started_at: string
+          sync_status: string
+          user_id: string | null
+        }
+        Insert: {
+          clinic_id?: string | null
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          location_id: string
+          next_sync_at?: string | null
+          office_id?: string | null
+          reviews_fetched?: number
+          reviews_new?: number
+          reviews_updated?: number
+          started_at?: string
+          sync_status?: string
+          user_id?: string | null
+        }
+        Update: {
+          clinic_id?: string | null
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          location_id?: string
+          next_sync_at?: string | null
+          office_id?: string | null
+          reviews_fetched?: number
+          reviews_new?: number
+          reviews_updated?: number
+          started_at?: string
+          sync_status?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_sync_log_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "review_sync_log_office_id_fkey"
+            columns: ["office_id"]
+            isOneToOne: false
+            referencedRelation: "office_metrics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "review_sync_log_office_id_fkey"
+            columns: ["office_id"]
+            isOneToOne: false
+            referencedRelation: "patient_sources"
             referencedColumns: ["id"]
           },
         ]
@@ -1142,6 +1424,95 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "patient_sources"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscription_plans: {
+        Row: {
+          created_at: string | null
+          features: Json | null
+          id: string
+          max_offices: number | null
+          max_users: number | null
+          name: string
+          plan_id: string
+          price_monthly: number
+          stripe_price_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          features?: Json | null
+          id?: string
+          max_offices?: number | null
+          max_users?: number | null
+          name: string
+          plan_id: string
+          price_monthly: number
+          stripe_price_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          features?: Json | null
+          id?: string
+          max_offices?: number | null
+          max_users?: number | null
+          name?: string
+          plan_id?: string
+          price_monthly?: number
+          stripe_price_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          cancel_at_period_end: boolean | null
+          created_at: string | null
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          plan_id: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          cancel_at_period_end?: boolean | null
+          created_at?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          plan_id: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          cancel_at_period_end?: boolean | null
+          created_at?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          plan_id?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["plan_id"]
           },
         ]
       }
