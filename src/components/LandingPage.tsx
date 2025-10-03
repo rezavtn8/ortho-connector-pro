@@ -14,6 +14,27 @@ interface LandingPageProps {
 
 export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth = false }) => {
   const { createCheckoutSession } = useSubscription();
+  const [selectedPlan, setSelectedPlan] = React.useState<string | null>(null);
+  
+  const handlePlanSelect = (planId: string) => {
+    if (showAuth) {
+      // User is viewing auth form, proceed with checkout after auth
+      setSelectedPlan(planId);
+    } else {
+      // Show auth form first
+      setSelectedPlan(planId);
+      onGetStarted();
+    }
+  };
+
+  // Trigger checkout after successful auth
+  React.useEffect(() => {
+    if (showAuth && selectedPlan) {
+      createCheckoutSession.mutate(selectedPlan);
+      setSelectedPlan(null);
+    }
+  }, [showAuth, selectedPlan, createCheckoutSession]);
+
   const features = [
     {
       icon: <Search className="w-8 h-8" />,
@@ -248,7 +269,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                         </ul>
                         <Button 
                           className="w-full bg-connection-primary/10 text-connection-primary hover:bg-connection-primary hover:text-white transition-all"
-                          onClick={() => createCheckoutSession.mutate('solo')}
+                          onClick={() => handlePlanSelect('solo')}
                           disabled={createCheckoutSession.isPending}
                         >
                           Get Started
@@ -289,7 +310,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                         </ul>
                         <Button 
                           className="w-full bg-connection-primary text-white hover:bg-connection-primary/90 transition-all"
-                          onClick={() => createCheckoutSession.mutate('group')}
+                          onClick={() => handlePlanSelect('group')}
                           disabled={createCheckoutSession.isPending}
                         >
                           Get Started
@@ -328,7 +349,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                         </ul>
                         <Button 
                           className="w-full bg-connection-primary/10 text-connection-primary hover:bg-connection-primary hover:text-white transition-all"
-                          onClick={() => createCheckoutSession.mutate('multi')}
+                          onClick={() => handlePlanSelect('multi')}
                           disabled={createCheckoutSession.isPending}
                         >
                           Get Started

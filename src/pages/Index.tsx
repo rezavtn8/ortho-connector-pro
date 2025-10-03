@@ -32,7 +32,15 @@ import { useState } from 'react';
 const Index = () => {
   const { user, loading } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
+  const [pendingPlan, setPendingPlan] = useState<string | null>(null);
   const { prefetchDashboardData, prefetchOfficesList, prefetchAnalytics, prefetchCampaigns } = usePrefetch();
+
+  const handleGetStarted = (planId?: string) => {
+    if (planId) {
+      setPendingPlan(planId);
+    }
+    setShowAuth(true);
+  };
 
   if (loading) {
     return (
@@ -46,7 +54,7 @@ const Index = () => {
   }
 
   if (!user) {
-    return <LandingPage onGetStarted={() => setShowAuth(true)} showAuth={showAuth} />;
+    return <LandingPage onGetStarted={handleGetStarted} showAuth={showAuth} />;
   }
 
   return (
