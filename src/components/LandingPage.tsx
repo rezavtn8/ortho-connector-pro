@@ -5,6 +5,7 @@ import { AuthForm } from './AuthForm';
 import { Building2, BarChart3, Users, Search, ArrowRight, CheckCircle, Globe, MessageSquare, MapPin, Star, TrendingUp, Brain, Bot } from 'lucide-react';
 import { NexoraLogo } from '@/components/NexoraLogo';
 import { AnimatedNexoraLogo } from '@/components/AnimatedNexoraLogo';
+import { useSubscription } from '@/hooks/useSubscription';
 
 interface LandingPageProps {
   onGetStarted: () => void;
@@ -12,6 +13,7 @@ interface LandingPageProps {
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth = false }) => {
+  const { createCheckoutSession } = useSubscription();
   const features = [
     {
       icon: <Search className="w-8 h-8" />,
@@ -244,7 +246,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                             <span className="text-sm text-connection-text">Basic features + email campaigns</span>
                           </li>
                         </ul>
-                        <Button className="w-full bg-connection-primary/10 text-connection-primary hover:bg-connection-primary hover:text-white transition-all">
+                        <Button 
+                          className="w-full bg-connection-primary/10 text-connection-primary hover:bg-connection-primary hover:text-white transition-all"
+                          onClick={() => createCheckoutSession.mutate('solo')}
+                          disabled={createCheckoutSession.isPending}
+                        >
                           Get Started
                         </Button>
                       </CardContent>
@@ -281,7 +287,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                             <span className="text-sm text-connection-text">Advanced analytics & automation</span>
                           </li>
                         </ul>
-                        <Button className="w-full bg-connection-primary text-white hover:bg-connection-primary/90 transition-all">
+                        <Button 
+                          className="w-full bg-connection-primary text-white hover:bg-connection-primary/90 transition-all"
+                          onClick={() => createCheckoutSession.mutate('group')}
+                          disabled={createCheckoutSession.isPending}
+                        >
                           Get Started
                         </Button>
                       </CardContent>
@@ -316,7 +326,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                             <span className="text-sm text-connection-text">Dedicated success manager</span>
                           </li>
                         </ul>
-                        <Button className="w-full bg-connection-primary/10 text-connection-primary hover:bg-connection-primary hover:text-white transition-all">
+                        <Button 
+                          className="w-full bg-connection-primary/10 text-connection-primary hover:bg-connection-primary hover:text-white transition-all"
+                          onClick={() => createCheckoutSession.mutate('multi')}
+                          disabled={createCheckoutSession.isPending}
+                        >
                           Get Started
                         </Button>
                       </CardContent>

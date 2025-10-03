@@ -19,8 +19,10 @@ import {
   Settings as SettingsIcon,
   AlertCircle,
   CheckCircle,
-  WifiOff
+  WifiOff,
+  CreditCard
 } from 'lucide-react';
+import { SubscriptionManagement } from '@/components/SubscriptionManagement';
 
 interface ClinicSettings {
   clinic_name: string;
@@ -362,6 +364,10 @@ function SettingsContent() {
                 <div className="text-xs font-medium text-muted-foreground px-3 py-2 uppercase tracking-wider border-t pt-4">
                   System
                 </div>
+                <TabsTrigger value="subscription" className="w-full justify-start px-3 py-3 text-left">
+                  <CreditCard className="w-4 h-4 mr-3" />
+                  Subscription & Billing
+                </TabsTrigger>
                 <TabsTrigger value="security" className="w-full justify-start px-3 py-3 text-left">
                   <Shield className="w-4 h-4 mr-3" />
                   Security & Privacy
@@ -705,6 +711,11 @@ function SettingsContent() {
                     </p>
                   </CardContent>
                 </Card>
+              </TabsContent>
+
+              {/* Subscription */}
+              <TabsContent value="subscription" className="mt-0">
+                <SubscriptionManagement />
               </TabsContent>
             </div>
           </div>

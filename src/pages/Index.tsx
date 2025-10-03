@@ -24,6 +24,8 @@ import ReviewMagic from '@/pages/ReviewMagic';
 import { Discover } from '@/pages/Discover';
 import { Logs } from '@/pages/Logs';
 import { AIAssistant } from '@/pages/AIAssistant';
+import SubscriptionSuccess from '@/pages/SubscriptionSuccess';
+import SubscriptionCancel from '@/pages/SubscriptionCancel';
 
 import { useState } from 'react';
 
@@ -169,6 +171,22 @@ const Index = () => {
             element={
               <SuspenseWrapper type="page">
                 <GoogleBusinessOAuthCallback />
+              </SuspenseWrapper>
+            } 
+          />
+          <Route 
+            path="/subscription/success" 
+            element={
+              <SuspenseWrapper type="page">
+                <SubscriptionSuccess />
+              </SuspenseWrapper>
+            } 
+          />
+          <Route 
+            path="/subscription/cancel" 
+            element={
+              <SuspenseWrapper type="page">
+                <SubscriptionCancel />
               </SuspenseWrapper>
             } 
           />
