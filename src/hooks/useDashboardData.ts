@@ -103,7 +103,15 @@ export function useDashboardStats() {
   const { data } = useDashboardData();
   const currentMonth = getCurrentYearMonth();
   
-  if (!data) return null;
+  // Defensive checks to ensure data structure exists
+  if (!data || !data.sources || !data.monthlyData) {
+    return {
+      totalSources: 0,
+      activeSources: 0,
+      totalPatients: 0,
+      thisMonthPatients: 0
+    };
+  }
   
   const { sources, monthlyData } = data;
   
