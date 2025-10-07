@@ -90,13 +90,27 @@ export function sanitizeURL(url: string): string {
 }
 
 /**
- * Sanitizes phone numbers by removing all non-digit characters except +, -, (), and spaces
+ * Sanitizes phone numbers by keeping only digits and optional leading +
+ * Removes all formatting characters to comply with database constraints
  */
 export function sanitizePhone(phone: string): string {
+  if (!phone || typeof phone !== 'string') {
+    return '';
+  }
+  
   const sanitized = sanitizeText(phone);
   
-  // Allow only digits, +, -, (), and spaces
-  return sanitized.replace(/[^0-9+\-() ]/g, '');
+  // Keep only digits and optional leading +
+  // Remove all other characters (spaces, dashes, parentheses, etc)
+  let cleaned = sanitized.replace(/[^0-9+]/g, '');
+  
+  // Ensure + is only at the start if present
+  if (cleaned.includes('+')) {
+    const parts = cleaned.split('+');
+    cleaned = '+' + parts.join('');
+  }
+  
+  return cleaned;
 }
 
 /**
