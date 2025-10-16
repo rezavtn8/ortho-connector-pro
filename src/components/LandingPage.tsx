@@ -163,9 +163,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
 
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                     {features.map((feature, index) => (
-                      <Card key={index} className="group hover:shadow-elegant transition-all duration-300 border-connection-primary/20 hover:border-connection-primary/40 bg-gradient-card">
+                      <Card 
+                        key={index} 
+                        className="group hover:shadow-elegant hover:-translate-y-1 transition-all duration-300 border-connection-primary/20 hover:border-connection-primary/40 bg-gradient-card animate-fade-in"
+                        style={{ animationDelay: `${index * 0.1}s`, animationFillMode: 'both' }}
+                      >
                         <CardContent className="p-8 text-center">
-                          <div className="w-16 h-16 mx-auto mb-6 rounded-xl bg-connection-bg flex items-center justify-center text-connection-primary group-hover:bg-connection-primary group-hover:text-white transition-all duration-300 shadow-sm">
+                          <div className="w-16 h-16 mx-auto mb-6 rounded-xl bg-connection-bg flex items-center justify-center text-connection-primary group-hover:bg-connection-primary group-hover:text-white group-hover:scale-110 transition-all duration-300 shadow-sm">
                             {feature.icon}
                           </div>
                           <h3 className="text-xl font-semibold text-connection-text mb-4">
@@ -247,7 +251,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
 
                   <div className="grid lg:grid-cols-3 gap-6 max-w-4xl mx-auto">
                     {/* Solo Practice Plan */}
-                    <Card className="group hover:shadow-elegant transition-all duration-300 border-connection-primary/20 hover:border-connection-primary/40 bg-gradient-card">
+                    <Card className="group hover:shadow-elegant hover:-translate-y-1 transition-all duration-300 border-connection-primary/20 hover:border-connection-primary/40 bg-gradient-card animate-fade-in" style={{ animationDelay: '0.1s', animationFillMode: 'both' }}>
                       <CardContent className="p-6">
                         <div className="text-center mb-6">
                           <h3 className="text-xl font-bold text-connection-text mb-2">Solo Practice</h3>
@@ -278,7 +282,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                     </Card>
 
                     {/* Group Practice Plan - Most Popular */}
-                    <Card className="group hover:shadow-elegant transition-all duration-300 border-connection-primary/40 hover:border-connection-primary bg-gradient-card relative scale-105">
+                    <Card className="group hover:shadow-elegant hover:-translate-y-1 transition-all duration-300 border-connection-primary/40 hover:border-connection-primary bg-gradient-card relative scale-105 animate-fade-in" style={{ animationDelay: '0.2s', animationFillMode: 'both' }}>
                       <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
                         <div className="bg-connection-primary text-white px-3 py-1 rounded-full text-xs font-medium flex items-center space-x-1">
                           <span>⭐</span>
@@ -319,7 +323,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                     </Card>
 
                     {/* Multi-Location Plan */}
-                    <Card className="group hover:shadow-elegant transition-all duration-300 border-connection-primary/20 hover:border-connection-primary/40 bg-gradient-card">
+                    <Card className="group hover:shadow-elegant hover:-translate-y-1 transition-all duration-300 border-connection-primary/20 hover:border-connection-primary/40 bg-gradient-card animate-fade-in" style={{ animationDelay: '0.3s', animationFillMode: 'both' }}>
                       <CardContent className="p-6">
                         <div className="text-center mb-6">
                           <h3 className="text-xl font-bold text-connection-text mb-2">Multi-Location</h3>
