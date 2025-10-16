@@ -14,7 +14,7 @@ const MAX_ATTEMPTS = 5;
 const LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes in milliseconds
 
 // Session timeout constants
-const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
+const SESSION_TIMEOUT = 120 * 60 * 1000; // 2 hours in milliseconds
 const WARNING_TIMEOUT = 5 * 60 * 1000; // 5 minutes warning
 const SESSION_ACTIVITY_KEY = 'session_last_activity';
 
