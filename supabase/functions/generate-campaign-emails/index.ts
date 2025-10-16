@@ -374,6 +374,29 @@ serve(async (req) => {
         emailSubject = `${campaign_name} - ${userProfile?.first_name || 'Dr.'} ${userProfile?.last_name || 'Doctor'}`;
       }
 
+      // Enforce precise signature and eliminate placeholders
+      const senderLineNameExact = (`${userProfile?.first_name || ''} ${userProfile?.last_name || ''}`.trim()) || (userProfile?.full_name || '').trim() || 'Doctor';
+      const practiceNameExact = clinic?.name || userProfile?.clinic_name || 'Healthcare Practice';
+      const signatureBlock = [
+        'Respectfully,',
+        `${senderLineNameExact}${userProfile?.degrees ? `, ${userProfile.degrees}` : ''}`,
+        userProfile?.job_title || '',
+        practiceNameExact
+      ].filter(Boolean).join('\n');
+
+      // Replace common placeholders in body
+      emailBody = emailBody
+        .replace(/\bthe team at (?:the practice|our practice|practice)\b/gi, practiceNameExact)
+        .replace(/\b(the practice|our practice)\b/gi, practiceNameExact)
+        .replace(/\[(?:practice name|your practice|doctor name|name)\]/gi, practiceNameExact);
+
+      // Ensure it ends with the exact signature
+      const hasSender = new RegExp(senderLineNameExact.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&'), 'i').test(emailBody);
+      if (!hasSender || /the team\b/i.test(emailBody)) {
+        emailBody = emailBody.replace(/(?:\n)*(?:Regards|Sincerely|Best|Warm regards|Thank you)[^]*$/i, '').trim();
+        emailBody += `\n\n${signatureBlock}`;
+      }
+
       generatedEmails.push({
         office_id: office.id,
         office_name: office.name,

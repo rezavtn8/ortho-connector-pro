@@ -142,14 +142,15 @@ CRITICAL INSTRUCTIONS:
     case 'email_generation':
       return `${basePrompt}
 
-TASK: Generate a professional email for a referral partner.
-OUTPUT FORMAT:
-- Start with a natural greeting
-- Use the sender's name and practice context
-- Reference specific referral data when provided
-- Include a clear, relevant call-to-action
-- End with professional signature
-- Keep total length under 300 words
+TASK: Generate a referral outreach email.
+
+HARD REQUIREMENTS:
+- Greet the recipient by name
+- Reference SPECIFIC referral/visit data provided
+- Use the sender's real name and practice details (provided in the user prompt)
+- NO placeholders like [Practice Name], [Your Name], or "the team at the practice"
+- Signature MUST be exactly the sender block (name, optional credentials, optional title, exact practice name)
+- Keep total length between 120–180 words, concise and specific
 - Emphasize: ${competitiveAdvantages.slice(0, 2).join(' and ') || 'quality care'}`;
 
     case 'review_response':
@@ -186,7 +187,7 @@ FORBIDDEN:
 function buildUserPrompt(taskType: string, context: any, parameters: any, aiSettings: any, businessContext?: any): string {
   switch (taskType) {
     case 'email_generation':
-      return `Generate an email for this referral partner:
+      return `Generate a personalized referral outreach email.
 
 RECIPIENT:
 • Name: ${context.owner_name || context.office_name}
@@ -196,25 +197,30 @@ RECIPIENT:
 
 REFERRAL DATA:
 • Total Referrals (12 months): ${context.referral_count_past_12_months || context.total_referrals || 0}
-• Recent Activity: ${context.recent_referrals_6months || 0} referrals in last 6 months
+• Recent Activity: ${context.recent_referrals_6months || 0} in last 6 months
 • Last Referral: ${context.last_referral_date || context.last_referral_month || 'Recently'}
 • Frequency: ${context.referral_frequency || 'Occasional'}
 
-SENDER INFO:
+SENDER (USE EXACT DETAILS – NO PLACEHOLDERS):
 • Name: ${context.sender_name}
 ${context.sender_degrees ? `• Credentials: ${context.sender_degrees}` : ''}
 ${context.sender_title ? `• Title: ${context.sender_title}` : ''}
 • Practice: ${context.practice_name}
 
-${context.current_campaign ? `CAMPAIGN: ${context.current_campaign}` : ''}
-${context.gift_bundle ? `GIFT: ${context.gift_bundle.name || 'Special gift'}` : ''}
-${context.extra_notes ? `NOTES: ${context.extra_notes}` : ''}
+GUIDELINES (120–180 words):
+1) Open with their name and 1–2 specifics from the data above
+2) Mention "${context.practice_name}" exactly once in the body (do not say "our practice" or "the practice")
+3) Clear, relevant next step (offer forms/materials/quick call)
+4) Close with this EXACT signature block:
 
-Create a personalized email that:
-1. Acknowledges the specific referral history
-2. Reflects the ${aiSettings?.communication_style || parameters?.tone || 'professional'} tone
-3. Naturally mentions: ${(aiSettings?.competitive_advantages || []).slice(0, 2).join(' and ') || 'our quality care'}
-4. Has a clear next step or call-to-action`;
+${context.sender_name}${context.sender_degrees ? `, ${context.sender_degrees}` : ''}
+${context.sender_title ? context.sender_title : ''}
+${context.practice_name}
+
+FORBIDDEN:
+- Any placeholders (e.g., [Practice Name], [Your Name])
+- "the team at the practice" or "our practice"
+- Changing or paraphrasing real names or the practice name`;
 
     case 'review_response':
       const practiceName = businessContext?.practice_name || 'the practice';
