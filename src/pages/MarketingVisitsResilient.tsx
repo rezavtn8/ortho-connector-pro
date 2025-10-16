@@ -6,6 +6,8 @@ import { useMarketingVisits } from '@/hooks/useMarketingVisits';
 import { ResilientErrorBoundary } from '@/components/ResilientErrorBoundary';
 import { MarketingVisitDialog } from '@/components/MarketingVisitDialog';
 import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import { 
   Car, 
   Plus, 
@@ -15,7 +17,8 @@ import {
   Calendar,
   MapPin,
   User,
-  Star
+  Star,
+  Trash2
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -23,7 +26,9 @@ function MarketingVisitsContent() {
   const { data: visits = [], isLoading, error, retry, isOffline } = useMarketingVisits();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingVisit, setEditingVisit] = useState<any>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const handleSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ['marketing-visits'] });
@@ -37,6 +42,36 @@ function MarketingVisitsContent() {
   const handleAdd = () => {
     setEditingVisit(null);
     setDialogOpen(true);
+  };
+
+  const handleDelete = async (visitId: string) => {
+    if (!confirm('Are you sure you want to delete this visit?')) return;
+    
+    setDeletingId(visitId);
+    try {
+      const { error } = await supabase
+        .from('marketing_visits')
+        .delete()
+        .eq('id', visitId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Visit Deleted",
+        description: "Marketing visit has been deleted successfully"
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ['marketing-visits'] });
+    } catch (error) {
+      console.error('Error deleting visit:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete marketing visit",
+        variant: "destructive"
+      });
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   if (isLoading) {
@@ -152,103 +187,91 @@ function MarketingVisitsContent() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid gap-3">
           {visits.map((visit) => (
-            <Card key={visit.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">
-                    {visit.patient_sources?.name || 'Unknown Office'}
-                  </CardTitle>
-                  <div className="flex gap-2">
-                    <Badge variant={visit.visited ? 'default' : 'secondary'}>
-                      {visit.visited ? 'Completed' : 'Planned'}
-                    </Badge>
-                    <Badge variant="outline">
-                      {visit.visit_type}
-                    </Badge>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid md:grid-cols-3 gap-4">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm font-medium">Visit Date</p>
-                      <p className="text-sm text-muted-foreground">
+            <Card key={visit.id} className="hover:shadow-md transition-shadow">
+              <CardContent className="pt-4 pb-3">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-semibold text-base truncate">
+                        {visit.patient_sources?.name || 'Unknown Office'}
+                      </h3>
+                      <Badge variant={visit.visited ? 'default' : 'secondary'} className="shrink-0 text-xs">
+                        {visit.visited ? 'Done' : 'Planned'}
+                      </Badge>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
                         {new Date(visit.visit_date).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm font-medium">Rep</p>
-                      <p className="text-sm text-muted-foreground">
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <User className="h-3 w-3" />
                         {visit.rep_name}
-                      </p>
+                      </span>
+                      <Badge variant="outline" className="text-xs py-0">
+                        {visit.visit_type}
+                      </Badge>
+                      {visit.star_rating && (
+                        <span className="flex items-center gap-1">
+                          <Star className="h-3 w-3 fill-current" />
+                          {visit.star_rating}/5
+                        </span>
+                      )}
                     </div>
                   </div>
+                  <div className="flex gap-1 shrink-0">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      disabled={isOffline} 
+                      onClick={() => handleEdit(visit)}
+                      className="h-8 px-2"
+                    >
+                      Edit
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      disabled={isOffline || deletingId === visit.id} 
+                      onClick={() => handleDelete(visit.id)}
+                      className="h-8 px-2 text-destructive hover:text-destructive"
+                    >
+                      {deletingId === visit.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
 
-                  {visit.star_rating && (
-                    <div className="flex items-center gap-2">
-                      <Star className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="text-sm font-medium">Rating</p>
-                        <p className="text-sm text-muted-foreground">
-                          {visit.star_rating}/5 stars
-                        </p>
+                {(visit.contact_person || visit.materials_handed_out?.length > 0 || visit.follow_up_notes) && (
+                  <div className="space-y-2 mt-3 pt-3 border-t">
+                    {visit.contact_person && (
+                      <p className="text-xs">
+                        <span className="font-medium">Contact:</span> {visit.contact_person}
+                      </p>
+                    )}
+                    
+                    {visit.materials_handed_out && visit.materials_handed_out.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {visit.materials_handed_out.map((material: string) => (
+                          <Badge key={material} variant="secondary" className="text-xs py-0">
+                            {material}
+                          </Badge>
+                        ))}
                       </div>
-                    </div>
-                  )}
-                </div>
+                    )}
 
-                {visit.patient_sources?.address && (
-                  <div className="flex items-start gap-2 mt-4">
-                    <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium">Location</p>
-                      <p className="text-sm text-muted-foreground">
-                        {visit.patient_sources.address}
+                    {visit.follow_up_notes && (
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        {visit.follow_up_notes}
                       </p>
-                    </div>
+                    )}
                   </div>
                 )}
-
-                {visit.contact_person && (
-                  <div className="mt-4">
-                    <p className="text-sm font-medium mb-1">Contact Person</p>
-                    <p className="text-sm text-muted-foreground">{visit.contact_person}</p>
-                  </div>
-                )}
-
-                {visit.materials_handed_out && visit.materials_handed_out.length > 0 && (
-                  <div className="mt-4">
-                    <p className="text-sm font-medium mb-2">Materials Handed Out</p>
-                    <div className="flex flex-wrap gap-2">
-                      {visit.materials_handed_out.map((material: string) => (
-                        <Badge key={material} variant="secondary">
-                          {material}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {visit.follow_up_notes && (
-                  <div className="mt-4">
-                    <p className="text-sm font-medium mb-1">Notes</p>
-                    <p className="text-sm text-muted-foreground">{visit.follow_up_notes}</p>
-                  </div>
-                )}
-
-                <div className="flex gap-2 mt-4">
-                  <Button variant="outline" size="sm" disabled={isOffline} onClick={() => handleEdit(visit)}>
-                    Edit
-                  </Button>
-                </div>
               </CardContent>
             </Card>
           ))}

@@ -6,10 +6,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { useOffices } from '@/hooks/useOffices';
+import { cn } from '@/lib/utils';
 
 interface MarketingVisit {
   id?: string;
@@ -264,28 +266,27 @@ export function MarketingVisitDialog({ open, onOpenChange, visit, onSuccess }: M
 
           <div className="space-y-2">
             <Label>Materials Handed Out</Label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-wrap gap-2">
               {['Gift', 'Booklet', 'Referral Slips', 'Business Cards', 'Brochures', 'Samples'].map((material) => (
-                <div key={material} className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id={`material-${material}`}
-                    checked={formData.materials_handed_out.includes(material)}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setFormData(prev => ({
-                        ...prev,
-                        materials_handed_out: checked
-                          ? [...prev.materials_handed_out, material]
-                          : prev.materials_handed_out.filter(m => m !== material)
-                      }));
-                    }}
-                    className="h-4 w-4 rounded border-input"
-                  />
-                  <Label htmlFor={`material-${material}`} className="text-sm font-normal cursor-pointer">
-                    {material}
-                  </Label>
-                </div>
+                <Badge
+                  key={material}
+                  variant={formData.materials_handed_out.includes(material) ? 'default' : 'outline'}
+                  className={cn(
+                    "cursor-pointer transition-all hover:scale-105",
+                    formData.materials_handed_out.includes(material) && "shadow-sm"
+                  )}
+                  onClick={() => {
+                    const isSelected = formData.materials_handed_out.includes(material);
+                    setFormData(prev => ({
+                      ...prev,
+                      materials_handed_out: isSelected
+                        ? prev.materials_handed_out.filter(m => m !== material)
+                        : [...prev.materials_handed_out, material]
+                    }));
+                  }}
+                >
+                  {material}
+                </Badge>
               ))}
             </div>
           </div>
