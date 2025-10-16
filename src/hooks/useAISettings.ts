@@ -10,6 +10,7 @@ interface AISettings {
   specialties: string[];
   target_audience?: string;
   brand_voice?: any;
+  business_persona?: any;
 }
 
 export function useAISettings() {
@@ -40,6 +41,7 @@ export function useAISettings() {
           specialties: data.specialties || [],
           target_audience: data.target_audience,
           brand_voice: data.brand_voice,
+          business_persona: data.business_persona,
         });
       } else {
         // Create default settings

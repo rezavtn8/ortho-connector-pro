@@ -39,37 +39,46 @@ export function AISettingsTab() {
     jobTitle: string;
   } | null>(null);
 
-  // Fetch business information
+  // Extract business information from AI settings
   useEffect(() => {
-    const fetchBusinessInfo = async () => {
-      if (!user?.id) return;
+    if (settings?.business_persona) {
+      const persona = settings.business_persona as any;
+      setBusinessInfo({
+        practiceName: persona.practice_name || 'Not set',
+        ownerName: persona.owner_name || 'Not set',
+        degrees: persona.degrees || 'Not set',
+        jobTitle: persona.owner_title || 'Not set',
+      });
+    } else if (settings && !settings.business_persona) {
+      // Fallback: fetch from user profile if business_persona doesn't exist
+      const fetchFromProfile = async () => {
+        if (!user?.id) return;
+        
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('first_name, last_name, full_name, degrees, job_title, clinic_id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (profile?.clinic_id) {
+          const { data: clinic } = await supabase
+            .from('clinics')
+            .select('name')
+            .eq('id', profile.clinic_id)
+            .maybeSingle();
+
+          setBusinessInfo({
+            practiceName: clinic?.name || 'Not set',
+            ownerName: profile.full_name || `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Not set',
+            degrees: profile.degrees || 'Not set',
+            jobTitle: profile.job_title || 'Not set',
+          });
+        }
+      };
       
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select(`
-          first_name,
-          last_name,
-          full_name,
-          degrees,
-          job_title,
-          clinics!inner(name)
-        `)
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (profile) {
-        const clinicData = profile.clinics as any;
-        setBusinessInfo({
-          practiceName: clinicData?.name || 'Not set',
-          ownerName: profile.full_name || `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Not set',
-          degrees: profile.degrees || 'Not set',
-          jobTitle: profile.job_title || 'Not set',
-        });
-      }
-    };
-
-    fetchBusinessInfo();
-  }, [user]);
+      fetchFromProfile();
+    }
+  }, [settings, user]);
 
   // Update local state when settings load
   useEffect(() => {
