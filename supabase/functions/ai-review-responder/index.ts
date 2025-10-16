@@ -51,24 +51,44 @@ const handler = async (req: Request): Promise<Response> => {
         .eq('user_id', user.id)
         .maybeSingle();
 
-      // Get user profile for practice context
+      // Get user profile with clinic data for practice context
       const { data: userProfile } = await supabase
         .from('user_profiles')
-        .select('*')
+        .select(`
+          *,
+          clinic:clinics(name, address)
+        `)
         .eq('user_id', user.id)
         .maybeSingle();
+
+      const practiceName = userProfile?.clinic?.name || 'the practice';
+      const practiceAddress = userProfile?.clinic?.address;
+      
+      // Build comprehensive business context
+      const businessContext = {
+        practice_name: practiceName,
+        practice_address: practiceAddress,
+        specialties: aiSettings?.specialties || [],
+        practice_values: aiSettings?.practice_values || [],
+        communication_style: aiSettings?.communication_style || 'professional',
+        competitive_advantages: aiSettings?.competitive_advantages || [],
+        target_audience: aiSettings?.target_audience,
+        doctor_name: userProfile?.full_name || `${userProfile?.first_name} ${userProfile?.last_name}`.trim(),
+        degrees: userProfile?.degrees,
+        job_title: userProfile?.job_title,
+      };
 
       // Call AI assistant with settings
       const aiResponse = await supabase.functions.invoke('ai-assistant', {
         body: {
           task_type: 'review_response',
           ai_settings: aiSettings,
+          business_context: businessContext,
           context: {
             google_review_id,
             review_text: review_context?.text || '',
             reviewer_name: review_context?.author_name || 'Valued Patient',
             rating: review_context?.rating || 5,
-            practice_name: userProfile?.clinic_name || 'Our Practice',
             ...review_context
           },
           parameters: {

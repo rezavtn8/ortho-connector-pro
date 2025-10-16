@@ -39,7 +39,7 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    const { task_type, context, parameters, ai_settings } = await req.json();
+    const { task_type, context, parameters, ai_settings, business_context } = await req.json();
 
     console.log('AI Assistant request:', { task_type, user_id: user.id });
 
@@ -55,8 +55,8 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Build system prompt with AI settings
-    const systemPrompt = buildSystemPrompt(task_type, aiProfile);
-    const userPrompt = buildUserPrompt(task_type, context, parameters, aiProfile);
+    const systemPrompt = buildSystemPrompt(task_type, aiProfile, business_context);
+    const userPrompt = buildUserPrompt(task_type, context, parameters, aiProfile, business_context);
 
     console.log('Calling OpenAI for task:', task_type);
 
@@ -111,7 +111,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 };
 
-function buildSystemPrompt(taskType: string, aiSettings: any): string {
+function buildSystemPrompt(taskType: string, aiSettings: any, businessContext?: any): string {
   const communicationStyle = aiSettings?.communication_style || 'professional';
   const brandVoice = aiSettings?.brand_voice?.traits || ['Professional', 'Trustworthy', 'Caring'];
   const competitiveAdvantages = aiSettings?.competitive_advantages || [];
@@ -153,22 +153,32 @@ OUTPUT FORMAT:
 - Emphasize: ${competitiveAdvantages.slice(0, 2).join(' and ') || 'quality care'}`;
 
     case 'review_response':
+      const practiceName = businessContext?.practice_name || 'our practice';
       return `${basePrompt}
 
+PRACTICE DETAILS:
+• Practice Name: ${practiceName}
+${businessContext?.doctor_name ? `• Doctor: ${businessContext.doctor_name}` : ''}
+${businessContext?.degrees ? `• Credentials: ${businessContext.degrees}` : ''}
+${businessContext?.job_title ? `• Title: ${businessContext.job_title}` : ''}
+
 TASK: Generate a thoughtful review response.
-OUTPUT FORMAT:
+CRITICAL INSTRUCTIONS:
+- ALWAYS use the actual practice name "${practiceName}" - NEVER use placeholders like [practice name] or [your practice name]
+- Sign with the actual doctor's name if provided
 - Thank the reviewer genuinely
 - Address specific points they mentioned
 - Subtly highlight: ${competitiveAdvantages.slice(0, 1).join(', ') || 'our commitment to excellence'}
 - Keep under 150 words
-- End with warm invitation to return`;
+- End with warm invitation to return
+- Use real names and details only - NO PLACEHOLDERS`;
 
     default:
       return basePrompt;
   }
 }
 
-function buildUserPrompt(taskType: string, context: any, parameters: any, aiSettings: any): string {
+function buildUserPrompt(taskType: string, context: any, parameters: any, aiSettings: any, businessContext?: any): string {
   switch (taskType) {
     case 'email_generation':
       return `Generate an email for this referral partner:
@@ -202,17 +212,36 @@ Create a personalized email that:
 4. Has a clear next step or call-to-action`;
 
     case 'review_response':
+      const practiceName = businessContext?.practice_name || 'the practice';
+      const doctorName = businessContext?.doctor_name || '';
+      const doctorTitle = businessContext?.job_title || '';
+      const doctorDegrees = businessContext?.degrees || '';
+      
       return `Generate a review response:
 
-REVIEW CONTEXT:
-${JSON.stringify(context, null, 2)}
+PRACTICE INFORMATION (USE THESE EXACT DETAILS):
+• Practice Name: ${practiceName}
+${doctorName ? `• Doctor Name: ${doctorName}` : ''}
+${doctorTitle ? `• Title: ${doctorTitle}` : ''}
+${doctorDegrees ? `• Credentials: ${doctorDegrees}` : ''}
 
-Create a response that:
-1. Thanks the reviewer genuinely
-2. Addresses their specific feedback
-3. Embodies: ${(aiSettings?.brand_voice?.traits || []).join(', ')}
-4. Subtly mentions: ${(aiSettings?.competitive_advantages || [])[0] || 'our commitment to excellence'}
-5. Keeps a ${aiSettings?.communication_style || 'professional'} tone`;
+REVIEW DETAILS:
+• Reviewer: ${context.reviewer_name}
+• Rating: ${context.rating}/5 stars
+• Review Text: "${context.review_text}"
+${context.review_date ? `• Date: ${context.review_date}` : ''}
+
+CRITICAL REQUIREMENTS:
+1. Use "${practiceName}" exactly as written - NEVER use placeholders
+2. Thank ${context.reviewer_name} by name
+3. Address their specific feedback points
+4. Sign with ${doctorName || 'the team'} - NO PLACEHOLDERS
+5. Embody: ${(aiSettings?.brand_voice?.traits || []).join(', ')}
+6. Keep a ${aiSettings?.communication_style || 'professional'} tone
+7. Subtly mention: ${(aiSettings?.competitive_advantages || [])[0] || 'our commitment to excellence'}
+8. Keep under 150 words
+
+ABSOLUTELY NO PLACEHOLDERS - use only the real practice name and doctor name provided above.`;
 
     default:
       return JSON.stringify(context);
