@@ -55,29 +55,51 @@ const handler = async (req: Request): Promise<Response> => {
         console.error('Error fetching AI settings:', aiSettingsError);
       }
 
-      // Get user profile with clinic data for practice context
-      const { data: userProfile, error: profileError } = await supabase
-        .from('user_profiles')
-        .select(`
-          *,
-          clinics!inner(name, address)
-        `)
-        .eq('user_id', user.id)
-        .maybeSingle();
+      // Get business persona from AI settings (contains practice name, owner info)
+      const businessPersona = aiSettings?.business_persona as any;
+      
+      // Fallback: Get user profile and clinic data if business_persona not available
+      let practiceName = businessPersona?.practice_name;
+      let practiceAddress = businessPersona?.practice_address;
+      let doctorName = businessPersona?.owner_name;
+      let degrees = businessPersona?.degrees;
+      let jobTitle = businessPersona?.owner_title;
+      
+      if (!practiceName) {
+        const { data: userProfile, error: profileError } = await supabase
+          .from('user_profiles')
+          .select('first_name, last_name, full_name, degrees, job_title, clinic_id')
+          .eq('user_id', user.id)
+          .maybeSingle();
 
-      if (profileError) {
-        console.error('Error fetching user profile:', profileError);
+        if (profileError) {
+          console.error('Error fetching user profile:', profileError);
+        }
+
+        doctorName = userProfile?.full_name || `${userProfile?.first_name} ${userProfile?.last_name}`.trim();
+        degrees = userProfile?.degrees;
+        jobTitle = userProfile?.job_title;
+
+        // Get clinic info if clinic_id exists
+        if (userProfile?.clinic_id) {
+          const { data: clinic } = await supabase
+            .from('clinics')
+            .select('name, address')
+            .eq('id', userProfile.clinic_id)
+            .maybeSingle();
+          
+          if (clinic) {
+            practiceName = clinic.name;
+            practiceAddress = clinic.address;
+          }
+        }
       }
-
-      // Extract clinic data
-      const clinicData = userProfile?.clinics as any;
-      const practiceName = clinicData?.name || userProfile?.clinic_name || 'your practice';
-      const practiceAddress = clinicData?.address || userProfile?.clinic_address;
       
       console.log('Practice context:', {
         practiceName,
         practiceAddress,
-        hasClinic: !!clinicData,
+        doctorName,
+        hasBusinessPersona: !!businessPersona,
         userId: user.id
       });
       
@@ -90,9 +112,9 @@ const handler = async (req: Request): Promise<Response> => {
         communication_style: aiSettings?.communication_style || 'professional',
         competitive_advantages: aiSettings?.competitive_advantages || [],
         target_audience: aiSettings?.target_audience,
-        doctor_name: userProfile?.full_name || `${userProfile?.first_name} ${userProfile?.last_name}`.trim() || '',
-        degrees: userProfile?.degrees,
-        job_title: userProfile?.job_title,
+        doctor_name: doctorName || '',
+        degrees: degrees,
+        job_title: jobTitle,
       };
 
       console.log('Business context for AI:', businessContext);
