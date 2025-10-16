@@ -6,6 +6,7 @@ import { Building2, BarChart3, Users, Search, ArrowRight, CheckCircle, Globe, Me
 import { NexoraLogo } from '@/components/NexoraLogo';
 import { AnimatedNexoraLogo } from '@/components/AnimatedNexoraLogo';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useIntersectionObserver } from '@/hooks/useIntersectionObserver';
 
 interface LandingPageProps {
   onGetStarted: () => void;
@@ -15,6 +16,11 @@ interface LandingPageProps {
 export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth = false }) => {
   const { createCheckoutSession } = useSubscription();
   const [selectedPlan, setSelectedPlan] = React.useState<string | null>(null);
+  
+  // Intersection observers for scroll animations
+  const featuresSection = useIntersectionObserver({ threshold: 0.1 });
+  const benefitsSection = useIntersectionObserver({ threshold: 0.1 });
+  const pricingSection = useIntersectionObserver({ threshold: 0.1 });
   
   const handlePlanSelect = (planId: string) => {
     if (showAuth) {
@@ -153,7 +159,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
           {!showAuth && (
             <>
               {/* Features Section */}
-              <section id="features-section" className="px-6 py-24 bg-white/60 backdrop-blur-sm">
+              <section id="features-section" className="px-6 py-24 bg-white/60 backdrop-blur-sm" ref={featuresSection.ref}>
                 <div className="max-w-6xl mx-auto">
                   <div className="text-center mb-16">
                     <p className="text-2xl md:text-3xl text-connection-text max-w-4xl mx-auto leading-relaxed" style={{ fontFamily: '"Dancing Script", cursive', fontWeight: 400 }}>
@@ -163,7 +169,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
 
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                     {features.map((feature, index) => (
-                      <Card key={index} className="group hover:shadow-elegant transition-all duration-300 border-connection-primary/20 hover:border-connection-primary/40 bg-gradient-card animate-fade-in" style={{ animationDelay: `${index * 0.1}s`, animationFillMode: 'both' }}>
+                      <Card 
+                        key={index} 
+                        className={`group hover:shadow-elegant transition-all duration-300 border-connection-primary/20 hover:border-connection-primary/40 bg-gradient-card ${featuresSection.isVisible ? 'animate-fade-in' : 'opacity-0'}`}
+                        style={{ animationDelay: featuresSection.isVisible ? `${index * 0.1}s` : '0s', animationFillMode: 'both' }}
+                      >
                         <CardContent className="p-8 text-center">
                           <div className="w-16 h-16 mx-auto mb-6 rounded-xl bg-connection-bg flex items-center justify-center text-connection-primary group-hover:bg-connection-primary group-hover:text-white transition-all duration-300 shadow-sm">
                             {feature.icon}
@@ -182,7 +192,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
               </section>
 
               {/* Benefits Section */}
-              <section className="relative z-20 px-6 py-24">
+              <section className="relative z-20 px-6 py-24" ref={benefitsSection.ref}>
                 <div className="max-w-4xl mx-auto">
                   <div className="text-center mb-16">
                     <h2 className="text-4xl md:text-5xl font-bold text-connection-text mb-6">
@@ -196,21 +206,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                   <div className="grid md:grid-cols-2 gap-12 items-center">
                     <div>
                       <ul className="space-y-6">
-                        <li className="flex items-start space-x-4 animate-fade-in" style={{ animationDelay: '0.1s', animationFillMode: 'both' }}>
+                        <li className={`flex items-start space-x-4 ${benefitsSection.isVisible ? 'animate-fade-in' : 'opacity-0'}`} style={{ animationDelay: benefitsSection.isVisible ? '0.1s' : '0s', animationFillMode: 'both' }}>
                           <CheckCircle className="w-6 h-6 text-connection-primary flex-shrink-0 mt-1" />
                           <div>
                             <h4 className="font-semibold text-connection-text mb-2">AI-Driven Practice Analysis</h4>
                             <p className="text-connection-muted">AI Assistant analyzes relationship health, identifies growth opportunities, and provides automated insights for better decision making.</p>
                           </div>
                         </li>
-                        <li className="flex items-start space-x-4 animate-fade-in" style={{ animationDelay: '0.2s', animationFillMode: 'both' }}>
+                        <li className={`flex items-start space-x-4 ${benefitsSection.isVisible ? 'animate-fade-in' : 'opacity-0'}`} style={{ animationDelay: benefitsSection.isVisible ? '0.2s' : '0s', animationFillMode: 'both' }}>
                           <CheckCircle className="w-6 h-6 text-connection-primary flex-shrink-0 mt-1" />
                           <div>
                             <h4 className="font-semibold text-connection-text mb-2">Google Reviews & Reputation</h4>
                             <p className="text-connection-muted">Monitor all Google reviews across your network, track competitor ratings, and get alerts for new reviews requiring attention.</p>
                           </div>
                         </li>
-                        <li className="flex items-start space-x-4 animate-fade-in" style={{ animationDelay: '0.3s', animationFillMode: 'both' }}>
+                        <li className={`flex items-start space-x-4 ${benefitsSection.isVisible ? 'animate-fade-in' : 'opacity-0'}`} style={{ animationDelay: benefitsSection.isVisible ? '0.3s' : '0s', animationFillMode: 'both' }}>
                           <CheckCircle className="w-6 h-6 text-connection-primary flex-shrink-0 mt-1" />
                           <div>
                             <h4 className="font-semibold text-connection-text mb-2">Advanced Office Discovery</h4>
@@ -219,7 +229,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                         </li>
                       </ul>
                     </div>
-                    <div className="relative animate-fade-in" style={{ animationDelay: '0.4s', animationFillMode: 'both' }}>
+                    <div className={`relative ${benefitsSection.isVisible ? 'animate-fade-in' : 'opacity-0'}`} style={{ animationDelay: benefitsSection.isVisible ? '0.4s' : '0s', animationFillMode: 'both' }}>
                       <div className="w-full h-64 bg-gradient-glow rounded-2xl flex items-center justify-center relative overflow-hidden border border-connection-primary/20">
                         <div className="flex items-center space-x-4">
                           <Bot className="w-12 h-12 text-connection-primary opacity-80" />
@@ -234,7 +244,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
 
 
               {/* Pricing Section */}
-              <section id="pricing-section" className="px-6 py-24 bg-white/60 backdrop-blur-sm">
+              <section id="pricing-section" className="px-6 py-24 bg-white/60 backdrop-blur-sm" ref={pricingSection.ref}>
                 <div className="max-w-6xl mx-auto">
                   <div className="text-center mb-16">
                     <h2 className="text-4xl md:text-5xl font-bold text-connection-text mb-6">
@@ -247,7 +257,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
 
                   <div className="grid lg:grid-cols-3 gap-6 max-w-4xl mx-auto">
                     {/* Solo Practice Plan */}
-                    <Card className="group hover:shadow-elegant transition-all duration-300 border-connection-primary/20 hover:border-connection-primary/40 bg-gradient-card animate-fade-in" style={{ animationDelay: '0.1s', animationFillMode: 'both' }}>
+                    <Card className={`group hover:shadow-elegant transition-all duration-300 border-connection-primary/20 hover:border-connection-primary/40 bg-gradient-card ${pricingSection.isVisible ? 'animate-fade-in' : 'opacity-0'}`} style={{ animationDelay: pricingSection.isVisible ? '0.1s' : '0s', animationFillMode: 'both' }}>
                       <CardContent className="p-6">
                         <div className="text-center mb-6">
                           <h3 className="text-xl font-bold text-connection-text mb-2">Solo Practice</h3>
@@ -278,7 +288,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                     </Card>
 
                     {/* Group Practice Plan - Most Popular */}
-                    <Card className="group hover:shadow-elegant transition-all duration-300 border-connection-primary/40 hover:border-connection-primary bg-gradient-card relative scale-105 animate-fade-in" style={{ animationDelay: '0.2s', animationFillMode: 'both' }}>
+                    <Card className={`group hover:shadow-elegant transition-all duration-300 border-connection-primary/40 hover:border-connection-primary bg-gradient-card relative scale-105 ${pricingSection.isVisible ? 'animate-fade-in' : 'opacity-0'}`} style={{ animationDelay: pricingSection.isVisible ? '0.2s' : '0s', animationFillMode: 'both' }}>
                       <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
                         <div className="bg-connection-primary text-white px-3 py-1 rounded-full text-xs font-medium flex items-center space-x-1">
                           <span>⭐</span>
@@ -319,7 +329,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                     </Card>
 
                     {/* Multi-Location Plan */}
-                    <Card className="group hover:shadow-elegant transition-all duration-300 border-connection-primary/20 hover:border-connection-primary/40 bg-gradient-card animate-fade-in" style={{ animationDelay: '0.3s', animationFillMode: 'both' }}>
+                    <Card className={`group hover:shadow-elegant transition-all duration-300 border-connection-primary/20 hover:border-connection-primary/40 bg-gradient-card ${pricingSection.isVisible ? 'animate-fade-in' : 'opacity-0'}`} style={{ animationDelay: pricingSection.isVisible ? '0.3s' : '0s', animationFillMode: 'both' }}>
                       <CardContent className="p-6">
                         <div className="text-center mb-6">
                           <h3 className="text-xl font-bold text-connection-text mb-2">Multi-Location</h3>
