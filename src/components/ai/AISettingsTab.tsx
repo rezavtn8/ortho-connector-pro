@@ -7,11 +7,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { Plus, X, Save, Sparkles, Users, Award, Target, MessageCircle, Lightbulb, RefreshCw } from 'lucide-react';
+import { Plus, X, Save, Sparkles, Users, Award, Target, MessageCircle, Lightbulb, RefreshCw, Building2, UserCircle } from 'lucide-react';
 import { useAISettings } from '@/hooks/useAISettings';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 export function AISettingsTab() {
+  const { user } = useAuth();
   const { settings, loading, updateSettings, refetch } = useAISettings();
   const [tone, setTone] = useState(settings?.communication_style || 'professional');
   const [highlights, setHighlights] = useState<string[]>(settings?.competitive_advantages || []);
@@ -27,6 +30,46 @@ export function AISettingsTab() {
   const [newSpecialty, setNewSpecialty] = useState('');
   const [newVoiceTrait, setNewVoiceTrait] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Business info state
+  const [businessInfo, setBusinessInfo] = useState<{
+    practiceName: string;
+    ownerName: string;
+    degrees: string;
+    jobTitle: string;
+  } | null>(null);
+
+  // Fetch business information
+  useEffect(() => {
+    const fetchBusinessInfo = async () => {
+      if (!user?.id) return;
+      
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select(`
+          first_name,
+          last_name,
+          full_name,
+          degrees,
+          job_title,
+          clinics!inner(name)
+        `)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (profile) {
+        const clinicData = profile.clinics as any;
+        setBusinessInfo({
+          practiceName: clinicData?.name || 'Not set',
+          ownerName: profile.full_name || `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Not set',
+          degrees: profile.degrees || 'Not set',
+          jobTitle: profile.job_title || 'Not set',
+        });
+      }
+    };
+
+    fetchBusinessInfo();
+  }, [user]);
 
   // Update local state when settings load
   useEffect(() => {
@@ -180,6 +223,71 @@ export function AISettingsTab() {
       </div>
 
       <div className="grid gap-6">
+        {/* Business Information Card */}
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-primary" />
+              <CardTitle>Business Information</CardTitle>
+            </div>
+            <CardDescription>
+              Your practice details used by AI for personalized responses
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium flex items-center gap-2">
+                  <Building2 className="h-4 w-4" />
+                  Practice Name
+                </Label>
+                <p className="text-lg font-semibold">
+                  {businessInfo?.practiceName || 'Loading...'}
+                </p>
+                {businessInfo?.practiceName === 'Not set' && (
+                  <p className="text-xs text-muted-foreground">
+                    Set this in Settings → Clinic Information
+                  </p>
+                )}
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-sm font-medium flex items-center gap-2">
+                  <UserCircle className="h-4 w-4" />
+                  Owner / Doctor
+                </Label>
+                <div>
+                  <p className="text-lg font-semibold">
+                    {businessInfo?.ownerName || 'Loading...'}
+                  </p>
+                  {businessInfo?.degrees && businessInfo.degrees !== 'Not set' && (
+                    <p className="text-sm text-muted-foreground">
+                      {businessInfo.degrees}
+                    </p>
+                  )}
+                  {businessInfo?.jobTitle && businessInfo.jobTitle !== 'Not set' && (
+                    <p className="text-sm text-muted-foreground">
+                      {businessInfo.jobTitle}
+                    </p>
+                  )}
+                </div>
+                {businessInfo?.ownerName === 'Not set' && (
+                  <p className="text-xs text-muted-foreground">
+                    Set this in Settings → Profile Settings
+                  </p>
+                )}
+              </div>
+            </div>
+            
+            <div className="bg-muted/50 rounded-lg p-3 mt-4">
+              <p className="text-xs text-muted-foreground flex items-center gap-2">
+                <Sparkles className="h-3 w-3" />
+                AI will use "{businessInfo?.practiceName}" and "{businessInfo?.ownerName}" in all generated content
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Communication Tone */}
         <Card className="border-primary/20">
           <CardHeader>
