@@ -170,8 +170,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                     {features.map((feature, index) => (
                       <Card 
-                        key={index} 
-                        className={`group hover:shadow-elegant transition-all duration-300 border-connection-primary/20 hover:border-connection-primary/40 bg-gradient-card ${featuresSection.isVisible ? 'animate-fade-in' : 'opacity-0'}`}
+                        key={index}
+                        variant="glass"
+                        className={`group border-connection-primary/20 hover:border-connection-primary/40 ${featuresSection.isVisible ? 'animate-fade-in' : 'opacity-0'}`}
                         style={{ animationDelay: featuresSection.isVisible ? `${index * 0.1}s` : '0s', animationFillMode: 'both' }}
                       >
                         <CardContent className="p-8 text-center">
@@ -257,7 +258,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
 
                   <div className="grid lg:grid-cols-3 gap-6 max-w-4xl mx-auto">
                     {/* Solo Practice Plan */}
-                    <Card className={`group hover:shadow-elegant transition-all duration-300 border-connection-primary/20 hover:border-connection-primary/40 bg-gradient-card ${pricingSection.isVisible ? 'animate-fade-in' : 'opacity-0'}`} style={{ animationDelay: pricingSection.isVisible ? '0.1s' : '0s', animationFillMode: 'both' }}>
+                    <Card variant="glass" className={`group border-connection-primary/20 hover:border-connection-primary/40 ${pricingSection.isVisible ? 'animate-fade-in' : 'opacity-0'}`} style={{ animationDelay: pricingSection.isVisible ? '0.1s' : '0s', animationFillMode: 'both' }}>
                       <CardContent className="p-6">
                         <div className="text-center mb-6">
                           <h3 className="text-xl font-bold text-connection-text mb-2">Solo Practice</h3>
@@ -288,7 +289,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                     </Card>
 
                     {/* Group Practice Plan - Most Popular */}
-                    <Card className={`group hover:shadow-elegant transition-all duration-300 border-connection-primary/40 hover:border-connection-primary bg-gradient-card relative scale-105 ${pricingSection.isVisible ? 'animate-fade-in' : 'opacity-0'}`} style={{ animationDelay: pricingSection.isVisible ? '0.2s' : '0s', animationFillMode: 'both' }}>
+                    <Card variant="glass" className={`group border-connection-primary/40 hover:border-connection-primary relative scale-105 ${pricingSection.isVisible ? 'animate-fade-in' : 'opacity-0'}`} style={{ animationDelay: pricingSection.isVisible ? '0.2s' : '0s', animationFillMode: 'both' }}>
                       <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
                         <div className="bg-connection-primary text-white px-3 py-1 rounded-full text-xs font-medium flex items-center space-x-1">
                           <span>⭐</span>
@@ -329,7 +330,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                     </Card>
 
                     {/* Multi-Location Plan */}
-                    <Card className={`group hover:shadow-elegant transition-all duration-300 border-connection-primary/20 hover:border-connection-primary/40 bg-gradient-card ${pricingSection.isVisible ? 'animate-fade-in' : 'opacity-0'}`} style={{ animationDelay: pricingSection.isVisible ? '0.3s' : '0s', animationFillMode: 'both' }}>
+                    <Card variant="glass" className={`group border-connection-primary/20 hover:border-connection-primary/40 ${pricingSection.isVisible ? 'animate-fade-in' : 'opacity-0'}`} style={{ animationDelay: pricingSection.isVisible ? '0.3s' : '0s', animationFillMode: 'both' }}>
                       <CardContent className="p-6">
                         <div className="text-center mb-6">
                           <h3 className="text-xl font-bold text-connection-text mb-2">Multi-Location</h3>

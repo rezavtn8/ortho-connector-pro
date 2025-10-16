@@ -11,7 +11,8 @@ const cardVariants = cva(
         default: "bg-card shadow-card",
         elevated: "bg-gradient-card shadow-elegant hover:shadow-glow transition-spring",
         outline: "border-2 bg-background hover:bg-accent/50 transition-smooth",
-        medical: "bg-gradient-card shadow-elegant border-primary/10"
+        medical: "bg-gradient-card shadow-elegant border-primary/10",
+        glass: "bg-white/40 dark:bg-white/5 backdrop-blur-md border-white/20 shadow-elegant hover:shadow-glow hover:bg-white/50 dark:hover:bg-white/10 transition-spring"
       }
     },
     defaultVariants: {
