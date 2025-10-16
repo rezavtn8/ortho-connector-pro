@@ -45,24 +45,41 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (action === 'generate') {
       // Fetch AI settings for personalized response
-      const { data: aiSettings } = await supabase
+      const { data: aiSettings, error: aiSettingsError } = await supabase
         .from('ai_business_profiles')
         .select('*')
         .eq('user_id', user.id)
         .maybeSingle();
 
+      if (aiSettingsError) {
+        console.error('Error fetching AI settings:', aiSettingsError);
+      }
+
       // Get user profile with clinic data for practice context
-      const { data: userProfile } = await supabase
+      const { data: userProfile, error: profileError } = await supabase
         .from('user_profiles')
         .select(`
           *,
-          clinic:clinics(name, address)
+          clinics!inner(name, address)
         `)
         .eq('user_id', user.id)
         .maybeSingle();
 
-      const practiceName = userProfile?.clinic?.name || 'the practice';
-      const practiceAddress = userProfile?.clinic?.address;
+      if (profileError) {
+        console.error('Error fetching user profile:', profileError);
+      }
+
+      // Extract clinic data
+      const clinicData = userProfile?.clinics as any;
+      const practiceName = clinicData?.name || userProfile?.clinic_name || 'your practice';
+      const practiceAddress = clinicData?.address || userProfile?.clinic_address;
+      
+      console.log('Practice context:', {
+        practiceName,
+        practiceAddress,
+        hasClinic: !!clinicData,
+        userId: user.id
+      });
       
       // Build comprehensive business context
       const businessContext = {
@@ -73,10 +90,12 @@ const handler = async (req: Request): Promise<Response> => {
         communication_style: aiSettings?.communication_style || 'professional',
         competitive_advantages: aiSettings?.competitive_advantages || [],
         target_audience: aiSettings?.target_audience,
-        doctor_name: userProfile?.full_name || `${userProfile?.first_name} ${userProfile?.last_name}`.trim(),
+        doctor_name: userProfile?.full_name || `${userProfile?.first_name} ${userProfile?.last_name}`.trim() || '',
         degrees: userProfile?.degrees,
         job_title: userProfile?.job_title,
       };
+
+      console.log('Business context for AI:', businessContext);
 
       // Call AI assistant with settings
       const aiResponse = await supabase.functions.invoke('ai-assistant', {
