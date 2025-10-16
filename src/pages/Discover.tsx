@@ -72,12 +72,43 @@ export const Discover = () => {
   const { user } = useAuth();
   const { toast } = useToast();
 
+  // Load persisted discovery results on mount
   useEffect(() => {
     if (user) {
       loadUserProfile();
       loadWeeklyUsage();
+      loadPersistedResults();
     }
   }, [user]);
+
+  // Persist results whenever they change
+  useEffect(() => {
+    if (currentSession && discoveredOffices.length > 0) {
+      localStorage.setItem('discovery_session', JSON.stringify(currentSession));
+      localStorage.setItem('discovered_offices', JSON.stringify(discoveredOffices));
+      if (cacheMetadata) {
+        localStorage.setItem('discovery_cache_metadata', JSON.stringify(cacheMetadata));
+      }
+    }
+  }, [currentSession, discoveredOffices, cacheMetadata]);
+
+  const loadPersistedResults = () => {
+    try {
+      const sessionStr = localStorage.getItem('discovery_session');
+      const officesStr = localStorage.getItem('discovered_offices');
+      const cacheStr = localStorage.getItem('discovery_cache_metadata');
+      
+      if (sessionStr && officesStr) {
+        setCurrentSession(JSON.parse(sessionStr));
+        setDiscoveredOffices(JSON.parse(officesStr));
+        if (cacheStr) {
+          setCacheMetadata(JSON.parse(cacheStr));
+        }
+      }
+    } catch (error) {
+      console.error('Error loading persisted discovery results:', error);
+    }
+  };
 
   const loadUserProfile = async () => {
     if (!user) return;
@@ -346,6 +377,10 @@ export const Discover = () => {
     setCurrentSession(null);
     setDiscoveredOffices([]);
     setCacheMetadata(null);
+    // Clear persisted results
+    localStorage.removeItem('discovery_session');
+    localStorage.removeItem('discovered_offices');
+    localStorage.removeItem('discovery_cache_metadata');
   };
 
   const handleClearCache = async () => {
@@ -370,7 +405,7 @@ export const Discover = () => {
 
       toast({
         title: "Cache Cleared",
-        description: "Cached results removed. Next search will fetch fresh data.",
+        description: "Cached results removed. Ready for a new search.",
       });
 
       handleStartOver();
