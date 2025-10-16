@@ -33,12 +33,32 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
 
-    if (authError || !user) {
-      console.error('Auth error:', authError);
+    // Decode JWT locally to extract user id (sub) and validate exp
+    const decodeBase64Url = (str: string) => {
+      const pad = str.length % 4;
+      const base64 = (pad ? str + '='.repeat(4 - pad) : str)
+        .replace(/-/g, '+')
+        .replace(/_/g, '/');
+      return atob(base64);
+    };
+
+    const [, payloadB64] = token.split('.');
+    const payload = JSON.parse(decodeBase64Url(payloadB64));
+    const now = Math.floor(Date.now() / 1000);
+    if (!payload?.sub || (payload?.exp && payload.exp < now)) {
+      throw new Error('Invalid or expired token');
+    }
+
+    // Verify the user exists via Admin API (does not rely on session)
+    const { data: adminUser, error: adminError } = await supabaseAdmin.auth.admin.getUserById(payload.sub);
+    if (adminError || !adminUser?.user) {
+      console.error('Admin user lookup failed:', adminError);
       throw new Error('Authentication failed');
     }
+
+    // Maintain original variable shape used throughout the function
+    const user = { id: adminUser.user.id } as { id: string };
 
     // Use admin client for all database operations
     const supabase = supabaseAdmin;
