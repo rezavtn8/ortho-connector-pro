@@ -220,7 +220,7 @@ export const Discover = () => {
       const officesCount = data.offices?.length || 0;
       console.log(`✅ callGooglePlacesAPI: Success! ${officesCount} offices found (cached: ${data.cached})`);
       
-      // Store cache metadata
+      // Store cache metadata for display
       if (data.cached && data.cacheAge !== undefined && data.expiresIn !== undefined) {
         setCacheMetadata({
           cacheAge: data.cacheAge,
@@ -230,22 +230,14 @@ export const Discover = () => {
         setCacheMetadata(null);
       }
       
-      if (data.cached) {
-        const ageMinutes = Math.floor((data.cacheAge || 0) / 60);
-        const expiresMinutes = Math.floor((data.expiresIn || 0) / 60);
-        const expiresDays = Math.floor(expiresMinutes / (60 * 24));
-        toast({
-          title: "Cached Results",
-          description: `Found ${officesCount} cached offices (${ageMinutes} min old, expires in ${expiresDays}d)`,
-        });
-      } else {
-        toast({
-          title: "Success",
-          description: data.newOfficesCount > 0 
-            ? `✅ Discovered ${data.newOfficesCount} new dental offices!`
-            : `Found ${officesCount} offices matching your criteria`,
-        });
-      }
+      // Single unified success message
+      const newCount = data.newOfficesCount || 0;
+      toast({
+        title: "Offices Found",
+        description: newCount > 0 
+          ? `Found ${newCount} new offices nearby`
+          : `Found ${officesCount} offices matching your criteria`,
+      });
 
       // Calculate distances for returned offices
       const officesWithDistance = (data.offices || []).map((office: any) => {
@@ -405,37 +397,6 @@ export const Discover = () => {
         </p>
       </div>
 
-      {/* Cache Info & Action Buttons */}
-      {cacheMetadata && (
-        <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800 mb-4">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="text-blue-600 dark:text-blue-400">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Cached Results</p>
-                  <p className="text-xs text-muted-foreground">
-                    Fetched {Math.floor(cacheMetadata.cacheAge / 60)} minutes ago • 
-                    Expires in {Math.floor(cacheMetadata.expiresIn / (60 * 60 * 24))} days
-                  </p>
-                </div>
-              </div>
-              <Button 
-                onClick={handleClearCache}
-                variant="outline"
-                size="sm"
-                className="text-xs"
-              >
-                Clear Cache
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Action Buttons */}
       <div className="flex justify-end gap-2 mb-6">
