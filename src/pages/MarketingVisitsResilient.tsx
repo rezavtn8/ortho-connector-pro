@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useMarketingVisits } from '@/hooks/useMarketingVisits';
 import { ResilientErrorBoundary } from '@/components/ResilientErrorBoundary';
+import { MarketingVisitDialog } from '@/components/MarketingVisitDialog';
+import { useQueryClient } from '@tanstack/react-query';
 import { 
   Car, 
   Plus, 
@@ -19,6 +21,23 @@ import { formatDistanceToNow } from 'date-fns';
 
 function MarketingVisitsContent() {
   const { data: visits = [], isLoading, error, retry, isOffline } = useMarketingVisits();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingVisit, setEditingVisit] = useState<any>(null);
+  const queryClient = useQueryClient();
+
+  const handleSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['marketing-visits'] });
+  };
+
+  const handleEdit = (visit: any) => {
+    setEditingVisit(visit);
+    setDialogOpen(true);
+  };
+
+  const handleAdd = () => {
+    setEditingVisit(null);
+    setDialogOpen(true);
+  };
 
   if (isLoading) {
     return (
@@ -104,11 +123,18 @@ function MarketingVisitsContent() {
       {/* Add Visit Button */}
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-semibold">Your Visits ({visits.length})</h2>
-        <Button className="gap-2" disabled={isOffline}>
+        <Button className="gap-2" disabled={isOffline} onClick={handleAdd}>
           <Plus className="h-4 w-4" />
           Log Visit
         </Button>
       </div>
+
+      <MarketingVisitDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        visit={editingVisit}
+        onSuccess={handleSuccess}
+      />
 
       {/* Visits List */}
       {visits.length === 0 ? (
@@ -119,7 +145,7 @@ function MarketingVisitsContent() {
             <p className="text-muted-foreground mb-4">
               Start tracking your marketing visits to build stronger relationships with referral sources.
             </p>
-            <Button className="gap-2" disabled={isOffline}>
+            <Button className="gap-2" disabled={isOffline} onClick={handleAdd}>
               <Plus className="h-4 w-4" />
               Log Your First Visit
             </Button>
@@ -206,10 +232,7 @@ function MarketingVisitsContent() {
                 )}
 
                 <div className="flex gap-2 mt-4">
-                  <Button variant="outline" size="sm" disabled={isOffline}>
-                    View Details
-                  </Button>
-                  <Button variant="outline" size="sm" disabled={isOffline}>
+                  <Button variant="outline" size="sm" disabled={isOffline} onClick={() => handleEdit(visit)}>
                     Edit
                   </Button>
                 </div>
