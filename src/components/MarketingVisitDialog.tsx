@@ -40,12 +40,13 @@ export function MarketingVisitDialog({ open, onOpenChange, visit, onSuccess }: M
   const [formData, setFormData] = useState({
     office_id: '',
     visit_date: new Date().toISOString().split('T')[0],
-    visit_type: 'Drop-In',
+    visit_type: 'New Target',
     rep_name: '',
     visited: false,
     contact_person: '',
     star_rating: 0,
     follow_up_notes: '',
+    materials_handed_out: [] as string[],
     group_tag: ''
   });
 
@@ -60,18 +61,20 @@ export function MarketingVisitDialog({ open, onOpenChange, visit, onSuccess }: M
         contact_person: visit.contact_person || '',
         star_rating: visit.star_rating || 0,
         follow_up_notes: visit.follow_up_notes || '',
+        materials_handed_out: visit.materials_handed_out || [],
         group_tag: visit.group_tag || ''
       });
     } else {
       setFormData({
         office_id: '',
         visit_date: new Date().toISOString().split('T')[0],
-        visit_type: 'Drop-In',
+        visit_type: 'New Target',
         rep_name: '',
         visited: false,
         contact_person: '',
         star_rating: 0,
         follow_up_notes: '',
+        materials_handed_out: [],
         group_tag: ''
       });
     }
@@ -102,8 +105,9 @@ export function MarketingVisitDialog({ open, onOpenChange, visit, onSuccess }: M
         rep_name: formData.rep_name,
         visited: formData.visited,
         contact_person: formData.contact_person || null,
-        star_rating: formData.star_rating || null,
+        star_rating: formData.star_rating > 0 ? formData.star_rating : null,
         follow_up_notes: formData.follow_up_notes || null,
+        materials_handed_out: formData.materials_handed_out.length > 0 ? formData.materials_handed_out : null,
         group_tag: formData.group_tag || null,
         user_id: user.id
       };
@@ -181,6 +185,7 @@ export function MarketingVisitDialog({ open, onOpenChange, visit, onSuccess }: M
                 id="visit_date"
                 type="date"
                 value={formData.visit_date}
+                max={new Date().toISOString().split('T')[0]}
                 onChange={(e) => setFormData({ ...formData, visit_date: e.target.value })}
                 required
               />
@@ -195,10 +200,10 @@ export function MarketingVisitDialog({ open, onOpenChange, visit, onSuccess }: M
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Drop-In">Drop-In</SelectItem>
-                  <SelectItem value="Scheduled">Scheduled</SelectItem>
-                  <SelectItem value="Follow-Up">Follow-Up</SelectItem>
-                  <SelectItem value="Lunch & Learn">Lunch & Learn</SelectItem>
+                  <SelectItem value="New Target">New Target</SelectItem>
+                  <SelectItem value="Routine">Routine</SelectItem>
+                  <SelectItem value="Reconnect">Reconnect</SelectItem>
+                  <SelectItem value="Follow-up">Follow-up</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -255,6 +260,34 @@ export function MarketingVisitDialog({ open, onOpenChange, visit, onSuccess }: M
               onChange={(e) => setFormData({ ...formData, group_tag: e.target.value })}
               placeholder="e.g., High Priority, Northwest Region"
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Materials Handed Out</Label>
+            <div className="grid grid-cols-2 gap-3">
+              {['Gift', 'Booklet', 'Referral Slips', 'Business Cards', 'Brochures', 'Samples'].map((material) => (
+                <div key={material} className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id={`material-${material}`}
+                    checked={formData.materials_handed_out.includes(material)}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setFormData(prev => ({
+                        ...prev,
+                        materials_handed_out: checked
+                          ? [...prev.materials_handed_out, material]
+                          : prev.materials_handed_out.filter(m => m !== material)
+                      }));
+                    }}
+                    className="h-4 w-4 rounded border-input"
+                  />
+                  <Label htmlFor={`material-${material}`} className="text-sm font-normal cursor-pointer">
+                    {material}
+                  </Label>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="space-y-2">

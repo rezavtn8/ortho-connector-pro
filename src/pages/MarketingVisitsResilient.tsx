@@ -224,6 +224,19 @@ function MarketingVisitsContent() {
                   </div>
                 )}
 
+                {visit.materials_handed_out && visit.materials_handed_out.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-sm font-medium mb-2">Materials Handed Out</p>
+                    <div className="flex flex-wrap gap-2">
+                      {visit.materials_handed_out.map((material: string) => (
+                        <Badge key={material} variant="secondary">
+                          {material}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {visit.follow_up_notes && (
                   <div className="mt-4">
                     <p className="text-sm font-medium mb-1">Notes</p>
