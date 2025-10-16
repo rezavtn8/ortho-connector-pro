@@ -481,6 +481,10 @@ serve(async (req) => {
         }
       }
 
+      // Calculate total before using it
+      const totalFound = offices.length + alreadyInNetworkOffices.length;
+      console.log(`✅ Successfully processed ${totalFound} offices (${offices.length} new, ${alreadyInNetworkOffices.length} already in network)`);
+
       // Insert new offices
       if (offices.length > 0) {
         const apiResponseTime = Date.now() - cacheStartTime;
@@ -504,7 +508,7 @@ serve(async (req) => {
           throw insertError;
         }
         
-        // Update session with API response time
+        // Update session with API response time and results count
         await supabase
           .from('discovery_sessions')
           .update({ 
@@ -514,15 +518,6 @@ serve(async (req) => {
           .eq('id', session.id);
       }
     }
-
-    const totalFound = offices.length + alreadyInNetworkOffices.length;
-    console.log(`✅ Successfully processed ${totalFound} offices (${offices.length} new, ${alreadyInNetworkOffices.length} already in network)`);
-
-    // Update session with results count
-    await supabase
-      .from('discovery_sessions')
-      .update({ results_count: totalFound })
-      .eq('id', session.id);
 
     // PHASE 3: Enhanced metadata in response
     return new Response(
