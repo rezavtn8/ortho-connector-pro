@@ -154,24 +154,29 @@ OUTPUT FORMAT:
 
     case 'review_response':
       const practiceName = businessContext?.practice_name || 'our practice';
+      const doctorName = businessContext?.doctor_name || '';
       return `${basePrompt}
 
 PRACTICE DETAILS:
 • Practice Name: ${practiceName}
-${businessContext?.doctor_name ? `• Doctor: ${businessContext.doctor_name}` : ''}
+${doctorName ? `• Doctor: ${doctorName}` : ''}
 ${businessContext?.degrees ? `• Credentials: ${businessContext.degrees}` : ''}
 ${businessContext?.job_title ? `• Title: ${businessContext.job_title}` : ''}
 
 TASK: Generate a thoughtful review response.
 CRITICAL INSTRUCTIONS:
-- ALWAYS use the actual practice name "${practiceName}" - NEVER use placeholders like [practice name] or [your practice name]
-- Sign with the actual doctor's name if provided
-- Thank the reviewer genuinely
-- Address specific points they mentioned
-- Subtly highlight: ${competitiveAdvantages.slice(0, 1).join(', ') || 'our commitment to excellence'}
-- Keep under 150 words
-- End with warm invitation to return
-- Use real names and details only - NO PLACEHOLDERS`;
+- Thank the reviewer by their actual name warmly and specifically
+- Reference SPECIFIC points they mentioned in their review (procedure, staff names, experience details)
+- Sign ONLY with "${doctorName || 'The Team'}" - write this EXACT name, NO variations or additions
+- Naturally mention "${practiceName}" once in the response body
+- Keep response between 80-120 words - be concise and genuine
+- End with a brief, warm closing
+
+FORBIDDEN:
+- NO generic phrases like "we appreciate your feedback"
+- NO placeholders like [Practice Name], [Your Name], [Doctor Name]
+- NO signing with titles like "Dr. [Name] and Team" - use ONLY the exact name provided
+- NO vague statements - be specific to their review`;
 
     default:
       return basePrompt;
@@ -217,31 +222,35 @@ Create a personalized email that:
       const doctorTitle = businessContext?.job_title || '';
       const doctorDegrees = businessContext?.degrees || '';
       
-      return `Generate a review response:
+      return `Generate a personalized review response for this 5-star review.
 
-PRACTICE INFORMATION (USE THESE EXACT DETAILS):
-• Practice Name: ${practiceName}
-${doctorName ? `• Doctor Name: ${doctorName}` : ''}
-${doctorTitle ? `• Title: ${doctorTitle}` : ''}
-${doctorDegrees ? `• Credentials: ${doctorDegrees}` : ''}
+EXACT INFORMATION TO USE:
+Practice Name: "${practiceName}" (use this exact name in your response)
+${doctorName ? `Doctor's Name: "${doctorName}" (sign with ONLY this name, nothing else)` : 'Sign with: "The Team"'}
+${doctorTitle ? `Title: ${doctorTitle}` : ''}
+${doctorDegrees ? `Credentials: ${doctorDegrees}` : ''}
 
 REVIEW DETAILS:
-• Reviewer: ${context.reviewer_name}
-• Rating: ${context.rating}/5 stars
-• Review Text: "${context.review_text}"
-${context.review_date ? `• Date: ${context.review_date}` : ''}
+Reviewer Name: ${context.reviewer_name}
+Rating: ${context.rating}/5 stars
+Review: "${context.review_text}"
 
-CRITICAL REQUIREMENTS:
-1. Use "${practiceName}" exactly as written - NEVER use placeholders
-2. Thank ${context.reviewer_name} by name
-3. Address their specific feedback points
-4. Sign with ${doctorName || 'the team'} - NO PLACEHOLDERS
-5. Embody: ${(aiSettings?.brand_voice?.traits || []).join(', ')}
-6. Keep a ${aiSettings?.communication_style || 'professional'} tone
-7. Subtly mention: ${(aiSettings?.competitive_advantages || [])[0] || 'our commitment to excellence'}
-8. Keep under 150 words
+RESPONSE STRUCTURE (80-120 words):
+1. Opening: Thank ${context.reviewer_name} by name and reference a SPECIFIC detail from their review
+2. Body: Mention "${practiceName}" naturally while addressing their specific experience
+3. Closing: Brief warm statement
+4. Signature: "${doctorName || 'The Team'}" ONLY - no additions
 
-ABSOLUTELY NO PLACEHOLDERS - use only the real practice name and doctor name provided above.`;
+MUST REFERENCE SPECIFICALLY FROM REVIEW:
+- If they mention staff names → acknowledge those staff members
+- If they mention procedure type → reference that specific procedure  
+- If they mention emotions (nervous, comfortable, etc.) → acknowledge those feelings
+- If they mention pain/comfort level → reference that specific point
+
+FORBIDDEN - DO NOT:
+- Write [Practice Name], [Doctor Name], or any brackets
+- Sign with "Dr. [Name] and the Team" - use ONLY the exact name
+- Use generic phrases - every sentence must be specific to THIS review`;
 
     default:
       return JSON.stringify(context);
