@@ -69,7 +69,7 @@ export function PricingSection({ onPlanSelect }: PricingSectionProps) {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+        <div className="grid grid-cols-3 gap-4 max-w-6xl mx-auto">
           {plans.map((plan) => (
             <Card
               key={plan.id}
@@ -81,32 +81,32 @@ export function PricingSection({ onPlanSelect }: PricingSectionProps) {
               }`}
             >
               {plan.popular && (
-                <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-3 py-1 text-xs font-semibold rounded-bl-lg">
-                  Most Popular
+                <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-2 py-0.5 text-[10px] font-semibold rounded-bl-lg">
+                  Popular
                 </div>
               )}
-              <CardContent className="p-6 space-y-6">
+              <CardContent className="p-4 space-y-4">
                 <div>
-                  <h3 className="text-lg font-bold text-foreground mb-1">{plan.name}</h3>
-                  <p className="text-xs text-muted-foreground">{plan.description}</p>
+                  <h3 className="text-base font-bold text-foreground mb-0.5">{plan.name}</h3>
+                  <p className="text-[11px] text-muted-foreground">{plan.description}</p>
                 </div>
                 
                 <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-bold text-foreground">${plan.price}</span>
-                  <span className="text-sm text-muted-foreground">/mo</span>
+                  <span className="text-3xl font-bold text-foreground">${plan.price}</span>
+                  <span className="text-xs text-muted-foreground">/mo</span>
                 </div>
 
-                <ul className="space-y-2">
+                <ul className="space-y-1.5">
                   {plan.features.map((feature, featureIndex) => (
-                    <li key={featureIndex} className="flex items-start gap-2 text-sm">
-                      <CheckCircle className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
-                      <span className="text-muted-foreground leading-relaxed">{feature}</span>
+                    <li key={featureIndex} className="flex items-start gap-1.5 text-xs">
+                      <CheckCircle className="w-3.5 h-3.5 text-primary flex-shrink-0 mt-0.5" />
+                      <span className="text-muted-foreground leading-snug">{feature}</span>
                     </li>
                   ))}
                 </ul>
 
                 <Button
-                  className={`w-full ${
+                  className={`w-full text-sm ${
                     plan.popular
                       ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                       : 'bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground'
