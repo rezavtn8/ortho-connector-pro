@@ -144,36 +144,29 @@ Analyze the comprehensive business data and RETURN structured insights by callin
             type: 'function',
             function: {
               name: 'emit_analysis',
-              description: 'Return executive summary analysis in a strict schema',
+              description: 'Return executive summary analysis in a strict schema aligned to Nexora narrative style',
               parameters: {
                 type: 'object',
                 properties: {
                   narrative_sections: {
                     type: 'array',
-                    minItems: 3,
+                    minItems: 4,
                     maxItems: 4,
                     items: {
                       type: 'object',
                       properties: {
-                        title: { type: 'string' },
-                        content: { type: 'string' },
-                        key_findings: { type: 'array', items: { type: 'string' } }
+                        title: { type: 'string', enum: ['Referral Network Health','Marketing & Outreach','Growth & Forecast','Opportunity Radar'] },
+                        content: { type: 'string' }
                       },
-                      required: ['title','content','key_findings'],
+                      required: ['title','content'],
                       additionalProperties: false
                     }
                   },
-                  recommendations: {
+                  action_summary: {
                     type: 'array',
-                    items: {
-                      type: 'object',
-                      properties: {
-                        title: { type: 'string' },
-                        action: { type: 'string' }
-                      },
-                      required: ['title','action'],
-                      additionalProperties: false
-                    }
+                    minItems: 3,
+                    maxItems: 3,
+                    items: { type: 'string' }
                   },
                   metrics: {
                     type: 'object',
@@ -187,7 +180,7 @@ Analyze the comprehensive business data and RETURN structured insights by callin
                     additionalProperties: false
                   }
                 },
-                required: ['narrative_sections','metrics'],
+                required: ['narrative_sections','action_summary','metrics'],
                 additionalProperties: false
               }
             }
@@ -253,47 +246,26 @@ Analyze the comprehensive business data and RETURN structured insights by callin
           analysis = {
             narrative_sections: [
               {
-                title: 'Referral Network Performance Analysis',
-                content: `Your referral network includes ${totalSources} sources. Production concentrates in a small subset while many are inactive. Prioritize the top offices with scheduled touches and define clear expectations (case types, turnaround). Use tiering (Strong/Moderate/Cold) based on 3‑month yield to direct field time.`,
-                key_findings: [
-                  `Breadth: ${totalSources} sources; depth concentrated in a few producers`,
-                  'Inactive sources have >60–90 days with no patients',
-                  'Consistent cadence + feedback loops increase yield'
-                ]
+                title: 'Referral Network Health',
+                content: `Your referral base spans ${totalSources} sources, but consistent production concentrates in a small cohort. A handful of relationships are still carrying growth while many have gone quiet. Treat this like relationship maintenance: protect the top offices with reliable touchpoints and expectations, and re‑warm lapsed partners with simple wins (case photos, turnarounds, gratitude).`
               },
               {
-                title: 'Patient Volume & Growth Trajectory',
-                content: `Last‑12‑months volume totals ${totalPatients}. The recent quarter trend is ${growth_trend}. Stabilize inflow by aligning outreach with seasonality (benefit resets, back‑to‑school) and adding recall nudges for lapsed sources.`,
-                key_findings: [
-                  `12‑month patients: ${totalPatients}`,
-                  `Recent trend: ${growth_trend}`,
-                  'Volatility correlates with campaign inactivity and inconsistent follow‑ups'
-                ]
+                title: 'Marketing & Outreach',
+                content: `Campaign activity is ${((businessData.campaigns || []).filter((c: any) => (c.status || '').toLowerCase() === 'active').length > 0) ? 'present but inconsistent' : 'light'} and field visits are ${((businessData.visits || []).filter((v: any) => v.visited).length > 0) ? 'sporadic' : 'minimal'}. The efforts that move the needle pair a clear message with quick follow‑ups: a concise intro email, a helpful one‑pager, and a 2‑week check‑in tied to a case outcome. Focus energy on the 10 offices most likely to respond rather than broad, low‑touch blasts.`
               },
               {
-                title: 'Marketing & Campaign Effectiveness',
-                content: `Active campaigns: ${(businessData.campaigns || []).filter((c: any) => (c.status || '').toLowerCase() === 'active').length}. Draft or paused initiatives suppress visibility. Standardize a lightweight campaign sequence (intro email + flyer + 2‑week follow‑up) and iterate monthly on open/appointment conversion.`,
-                key_findings: [
-                  `Active campaigns: ${(businessData.campaigns || []).filter((c: any) => (c.status || '').toLowerCase() === 'active').length}`,
-                  'Execution gaps across email and rep cadence',
-                  'Small, templatized motions unlock faster throughput'
-                ]
+                title: 'Growth & Forecast',
+                content: `Last‑12‑months patients total ${totalPatients}. The recent quarter trend is ${growth_trend}. Momentum will improve fastest by concentrating outreach on proven believers while giving cold sources one clean re‑engagement cycle before you move on. This creates steadier month‑over‑month inflow without overextending the team.`
               },
               {
-                title: 'Operational Next Steps',
-                content: 'Create a single dashboard for tiering, monthly patients, and campaign status. Run a 90‑minute weekly review to adjust tiers, clear follow‑ups, and share quick wins.',
-                key_findings: [
-                  'Weekly operating rhythm solidifies habits',
-                  'Close the loop to reinforce referrals',
-                  'Track leading indicators, not just totals'
-                ]
+                title: 'Opportunity Radar',
+                content: `Dormant or untagged sources, paused campaigns, and low review volume represent quick lifts. Tagging sources and standardizing a starter sequence surfaces who responds; a single review‑generation nudge each week compounds credibility. Remove energy sinks that don’t convert and redirect time toward the responsive middle.`
               }
             ],
-            recommendations: [
-              { title: 'Tier and Cadence', action: 'Classify all sources and set outreach frequency per tier; focus on top 10 first.' },
-              { title: 'Starter Campaign', action: 'Launch intro sequence to top sources with a recent case or testimonial.' },
-              { title: 'Re‑engage Cold Sources', action: 'Two‑step recall: email then phone within 72 hours if unopened.' },
-              { title: 'Weekly Ops Review', action: 'Block 90 minutes to review movement and assign next actions.' }
+            action_summary: [
+              'Protect top referrers with a simple monthly cadence and fast feedback loops',
+              'Run a 30‑day re‑engagement sprint on lapsed sources, then prune non‑responders',
+              'Standardize one lightweight campaign and ship it to the 10 highest‑potential offices'
             ],
             metrics: {
               total_sources: totalSources,

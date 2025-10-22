@@ -8,8 +8,9 @@ interface AIAnalysis {
   narrative_sections?: {
     title: string;
     content: string;
-    key_findings: string[];
+    key_findings?: string[];
   }[];
+  action_summary?: string[]; // exactly 3 concise actions
   recommendations?: {
     title: string;
     action: string;
@@ -21,6 +22,7 @@ interface AIAnalysis {
   };
   generated_at: string;
   cached_until: string;
+  format_version?: 'v2' | string;
 }
 
 export function useAIAnalysis() {
@@ -49,6 +51,10 @@ export function useAIAnalysis() {
 
       if (data) {
         const analysisData = JSON.parse(data.generated_text);
+        // Only accept cached analysis if it matches latest format
+        if (analysisData?.format_version !== 'v2') {
+          return null;
+        }
         const cacheExpiry = new Date(data.created_at);
         cacheExpiry.setHours(cacheExpiry.getHours() + 24); // Cache for 24 hours
         
@@ -82,7 +88,7 @@ export function useAIAnalysis() {
     }
 
     // Cache the new analysis only if we have valid JSON
-    const generatedText = JSON.stringify(data.analysis);
+    const generatedText = JSON.stringify({ ...data.analysis, format_version: 'v2' });
     if (generatedText) {
       const { error: insertError } = await supabase
         .from('ai_generated_content')
@@ -107,6 +113,7 @@ export function useAIAnalysis() {
       id: crypto.randomUUID(),
       generated_at: new Date().toISOString(),
       cached_until: cacheExpiry.toISOString(),
+      format_version: 'v2',
     };
   };
 
@@ -132,15 +139,18 @@ export function useAIAnalysis() {
       setError(null);
 
       try {
-        // Only load cached analysis - don't auto-generate
+        // Prefer cached analysis; auto-generate if missing or outdated
         const cachedAnalysis = await fetchCachedAnalysis();
         
         if (cachedAnalysis) {
           setAnalysis(cachedAnalysis);
+        } else {
+          const fresh = await generateNewAnalysis();
+          setAnalysis(fresh);
         }
       } catch (err: any) {
-        console.error('Failed to load cached analysis:', err);
-        setError(err.message || 'Failed to load cached analysis');
+        console.error('Failed to load analysis:', err);
+        setError(err.message || 'Failed to load analysis');
       } finally {
         setLoading(false);
       }

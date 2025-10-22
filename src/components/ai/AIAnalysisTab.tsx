@@ -167,10 +167,12 @@ export function AIAnalysisTab() {
           const sections = (analysis.narrative_sections || []).filter((s: any) => {
             const hasTitle = typeof s?.title === 'string' && s.title.trim().length > 0;
             const hasContent = typeof s?.content === 'string' && s.content.trim().length > 0;
-            const hasFindings = Array.isArray(s?.key_findings) && s.key_findings.length > 0;
-            return hasTitle || hasContent || hasFindings;
+            return hasTitle || hasContent;
           });
           if (sections.length === 0) return null;
+          // Optional: enforce desired order if titles match expected set
+          const order = ['Referral Network Health','Marketing & Outreach','Growth & Forecast','Opportunity Radar'];
+          sections.sort((a: any, b: any) => order.indexOf(a.title) - order.indexOf(b.title));
           return sections.map((section: any, index: number) => (
             <Card key={index}>
               <CardHeader>
@@ -185,27 +187,32 @@ export function AIAnalysisTab() {
                     {section.content}
                   </p>
                 )}
-                {Array.isArray(section.key_findings) && section.key_findings.length > 0 && (
-                  <div className="bg-muted/50 rounded-lg p-4">
-                    <p className="font-medium mb-2">Key Findings:</p>
-                    <ul className="space-y-2">
-                      {section.key_findings.map((finding: string, fIndex: number) => (
-                        <li key={fIndex} className="flex items-start gap-2">
-                          <span className="text-primary mt-1">•</span>
-                          <span className="text-sm">{finding}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
               </CardContent>
             </Card>
           ));
         })()}
       </div>
 
-      {/* Strategic Recommendations - Purple AI accent */}
-      {(() => {
+      {/* Action Summary (3-point) */}
+      {Array.isArray((analysis as any).action_summary) && (analysis as any).action_summary.length > 0 ? (
+        <Card className="border-purple-200 bg-gradient-to-br from-purple-50/50 to-blue-50/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Brain className="h-5 w-5 text-purple-600" />
+              Action Summary
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {(analysis as any).action_summary.map((item: string, idx: number) => (
+                <div key={idx} className="bg-white rounded-lg p-4 border border-purple-100">
+                  <p className="text-sm text-muted-foreground">{item}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      ) : (() => {
         const recs = (analysis.recommendations || []).filter((r: any) =>
           (typeof r?.title === 'string' && r.title.trim()) || (typeof r?.action === 'string' && r.action.trim())
         );
