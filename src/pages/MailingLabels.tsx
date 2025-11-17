@@ -52,14 +52,15 @@ interface MailingLabelData {
   zip: string;
 }
 
-// Parse address into components - PHASE 1: Enhanced regex and logic
+// PHASE 1: Enhanced address parsing with proper handling of "United States" suffix
 const parseAddress = (address: string | null): ParsedAddress => {
   if (!address) {
     return { address1: '', address2: '', city: '', state: '', zip: '' };
   }
 
-  // Clean up address
-  const cleanAddress = address.trim();
+  // Clean up address - remove "United States" or "USA" from the end
+  let cleanAddress = address.trim();
+  cleanAddress = cleanAddress.replace(/,?\s*(United States|USA)\s*$/i, '');
   
   // Split by comma
   const parts = cleanAddress.split(',').map(p => p.trim());
@@ -73,6 +74,8 @@ const parseAddress = (address: string | null): ParsedAddress => {
   if (parts.length >= 2) {
     // Get the last part which should contain state and zip
     const lastPart = parts[parts.length - 1];
+    
+    // Match patterns like "CA 92618" or "CA 92618-1234"
     const stateZipMatch = lastPart.match(/^([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
     
     if (stateZipMatch) {
@@ -90,10 +93,9 @@ const parseAddress = (address: string | null): ParsedAddress => {
       if (addressParts.length > 0) {
         const fullAddress = addressParts.join(', ').trim();
         
-        // Try to split street address from suite/unit
-        // Patterns: "123 Main St #100", "123 Main St Suite 100", "123 Main St Ste 100"
-        // Also handle: "#100", "# 100", "Suite 100", "Ste 100", "Unit 100", "Apt 100"
-        const suiteMatch = fullAddress.match(/^(.*?)\s+(Suite|Unit|Apt|Ste|Building|Bldg|#)\s*(.+)$/i);
+        // Try to split street address from suite/unit/apt
+        // Match patterns: "#170-B", "Suite 100", "STE 300", "Unit A", etc.
+        const suiteMatch = fullAddress.match(/^(.*?)\s+(Suite|Unit|Apt|Ste|STE|Building|Bldg|#)\s*(.+)$/i);
         
         if (suiteMatch) {
           address1 = suiteMatch[1].trim();
@@ -103,7 +105,7 @@ const parseAddress = (address: string | null): ParsedAddress => {
           if (suiteType === '#') {
             address2 = `#${suiteNum}`;
           } else {
-            address2 = `${suiteType.toUpperCase()} ${suiteNum}`;
+            address2 = `${suiteType.charAt(0).toUpperCase() + suiteType.slice(1).toLowerCase()} ${suiteNum}`;
           }
         } else {
           address1 = fullAddress;
@@ -111,8 +113,35 @@ const parseAddress = (address: string | null): ParsedAddress => {
       }
     } else {
       // Fallback: couldn't parse state/zip from last part
-      // Just put everything in address1
-      address1 = cleanAddress;
+      // Try to find state and zip anywhere in the address
+      const stateZipAnywhere = cleanAddress.match(/([A-Z]{2})\s+(\d{5}(?:-\d{4})?)/);
+      if (stateZipAnywhere) {
+        state = stateZipAnywhere[1];
+        zip = stateZipAnywhere[2];
+        
+        // Try to extract city (word before state)
+        const cityMatch = cleanAddress.match(/,?\s*([^,]+?)\s*,?\s*[A-Z]{2}\s+\d{5}/);
+        if (cityMatch) {
+          city = cityMatch[1].trim();
+        }
+        
+        // Extract address before city/state/zip
+        const addressBeforeCityState = cleanAddress.split(city)[0];
+        if (addressBeforeCityState) {
+          const addrMatch = addressBeforeCityState.match(/^(.*?)\s+(Suite|Unit|Apt|Ste|STE|#)\s*(.+?)$/i);
+          if (addrMatch) {
+            address1 = addrMatch[1].trim().replace(/,$/, '');
+            const suiteType = addrMatch[2].trim();
+            const suiteNum = addrMatch[3].trim().replace(/,$/, '');
+            address2 = suiteType === '#' ? `#${suiteNum}` : `${suiteType.charAt(0).toUpperCase() + suiteType.slice(1).toLowerCase()} ${suiteNum}`;
+          } else {
+            address1 = addressBeforeCityState.trim().replace(/,$/, '');
+          }
+        }
+      } else {
+        // Ultimate fallback: just use everything as address1
+        address1 = cleanAddress;
+      }
     }
   } else {
     // Single part address - just use as-is
@@ -120,6 +149,38 @@ const parseAddress = (address: string | null): ParsedAddress => {
   }
 
   return { address1, address2, city, state, zip };
+};
+
+// PHASE 2: Extract doctor name from office name for contact
+const extractContactName = (officeName: string): string => {
+  if (!officeName) return '';
+  
+  // Pattern 1: "Practice Name: Dr. FirstName LastName" or "Practice Name - Dr. FirstName LastName"
+  const colonPattern = officeName.match(/[:–-]\s*Dr\.?\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i);
+  if (colonPattern) {
+    return `Dr. ${colonPattern[1].trim()}`;
+  }
+  
+  // Pattern 2: "Dr. FirstName LastName" at the start
+  const startPattern = officeName.match(/^Dr\.?\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i);
+  if (startPattern) {
+    return `Dr. ${startPattern[1].trim()}`;
+  }
+  
+  // Pattern 3: "FirstName LastName DDS/DMD/DDS" etc at the end or anywhere
+  const degreePattern = officeName.match(/([A-Z][a-z]+\s+[A-Z][a-z]+)\s*,?\s*(DDS|DMD|MD|PhD|D\.D\.S\.|D\.M\.D\.)/i);
+  if (degreePattern) {
+    return `Dr. ${degreePattern[1].trim()}`;
+  }
+  
+  // Pattern 4: Just "FirstName LastName" if office name is a person's name (2-3 words, each capitalized)
+  const personNamePattern = officeName.match(/^([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)$/);
+  if (personNamePattern) {
+    return `Dr. ${personNamePattern[1].trim()}`;
+  }
+  
+  // Fallback: return the office name as-is
+  return officeName;
 };
 
 export function MailingLabels() {
@@ -178,7 +239,7 @@ export function MailingLabels() {
           
           return {
             officeName: office.name,
-            contactName: '', // Partner offices don't have contact name
+            contactName: extractContactName(office.name),
             ...parsed,
           };
         });
@@ -207,7 +268,7 @@ export function MailingLabels() {
             
             return {
               officeName: office.name,
-              contactName: '', // Discovered offices don't have contact name
+              contactName: extractContactName(office.name),
               ...parsed,
             };
           });

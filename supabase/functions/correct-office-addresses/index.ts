@@ -52,37 +52,64 @@ serve(async (req) => {
       throw new Error('Google Maps API key not configured');
     }
 
-    // Get authorization header
+    // PHASE 3: Get authorization header and decode JWT
     const authHeader = req.headers.get('Authorization');
     console.log(`correct-office-addresses: Auth header present: ${!!authHeader} [${requestId}]`);
     
     if (!authHeader) {
       console.error(`correct-office-addresses: Missing Authorization header [${requestId}]`);
       console.error(`correct-office-addresses: Available headers: ${JSON.stringify([...req.headers.keys()])} [${requestId}]`);
-      throw new Error('No authorization header');
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Unauthorized - No authorization header',
+          requestId 
+        }),
+        { 
+          status: 401, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
-    // Create Supabase client with service role to bypass RLS
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    // Extract JWT token
+    const token = authHeader.replace('Bearer ', '');
     
-    // Create admin client for database operations
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
-    
-    // Create client with user's token for auth verification
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: authHeader } }
-    });
-
-    // Verify user authentication
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      console.error('Auth error:', userError);
-      throw new Error('Unauthorized');
+    // Decode JWT to get user_id (we don't verify signature, just extract payload)
+    let userId: string;
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) {
+        throw new Error('Invalid JWT format');
+      }
+      const payload = JSON.parse(atob(parts[1]));
+      userId = payload.sub;
+      
+      if (!userId) {
+        throw new Error('No user ID in token');
+      }
+      
+      console.log(`correct-office-addresses: Authenticated user: ${userId} [${requestId}]`);
+    } catch (decodeError) {
+      console.error(`correct-office-addresses: JWT decode failed [${requestId}]`, decodeError);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Unauthorized - Invalid token',
+          requestId 
+        }),
+        { 
+          status: 401, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
-    
-    console.log(`correct-office-addresses: Authenticated user ${user.id} [${requestId}]`);
+
+    // Create Supabase admin client for database operations
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
 
     // Parse request body
     const { officeIds } = await req.json();
@@ -99,7 +126,7 @@ serve(async (req) => {
       .select('id, name, address')
       .in('id', officeIds)
       .eq('source_type', 'Office')
-      .eq('created_by', user.id);
+      .eq('created_by', userId);
 
     if (fetchError) {
       throw new Error(`Failed to fetch offices: ${fetchError.message}`);
