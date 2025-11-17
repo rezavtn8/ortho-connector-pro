@@ -28,37 +28,63 @@ serve(async (req) => {
   }
 
   try {
-    // Get authorization header
+    // PHASE 3: Get authorization header and decode JWT
     const authHeader = req.headers.get('Authorization');
     console.log(`apply-address-corrections: Auth header present: ${!!authHeader} [${requestId}]`);
     
     if (!authHeader) {
       console.error(`apply-address-corrections: Missing Authorization header [${requestId}]`);
       console.error(`apply-address-corrections: Available headers: ${JSON.stringify([...req.headers.keys()])} [${requestId}]`);
-      throw new Error('No authorization header');
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Unauthorized - No authorization header',
+          requestId 
+        }),
+        { 
+          status: 401, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
-    // Create Supabase client with service role to bypass RLS
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    // Extract JWT token and decode to get user_id
+    const token = authHeader.replace('Bearer ', '');
+    let userId: string;
     
-    // Create admin client for database operations
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
-    
-    // Create client with user's token for auth verification
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: authHeader } }
-    });
-
-    // Verify user authentication
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      console.error('Auth error:', userError);
-      throw new Error('Unauthorized');
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) {
+        throw new Error('Invalid JWT format');
+      }
+      const payload = JSON.parse(atob(parts[1]));
+      userId = payload.sub;
+      
+      if (!userId) {
+        throw new Error('No user ID in token');
+      }
+      
+      console.log(`apply-address-corrections: Authenticated user: ${userId} [${requestId}]`);
+    } catch (decodeError) {
+      console.error(`apply-address-corrections: JWT decode failed [${requestId}]`, decodeError);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Unauthorized - Invalid token',
+          requestId 
+        }),
+        { 
+          status: 401, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
-    
-    console.log(`apply-address-corrections: Authenticated user ${user.id} [${requestId}]`);
+
+    // Create Supabase admin client for database operations
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
 
     // Parse request body
     const { updates } = await req.json();
@@ -75,11 +101,11 @@ serve(async (req) => {
 
     for (const update of updates as AddressUpdate[]) {
       try {
-        const { error: updateError } = await supabaseAdmin
-          .from('patient_sources')
-          .update({ address: update.address })
-          .eq('id', update.id)
-          .eq('created_by', user.id);
+      const { error: updateError } = await supabaseAdmin
+        .from('patient_sources')
+        .update({ address: update.address })
+        .eq('id', update.id)
+        .eq('created_by', userId);
 
         if (updateError) {
           errors.push({
