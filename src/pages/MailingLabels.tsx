@@ -327,25 +327,14 @@ export function MailingLabels() {
         description: `Processing ${partnerOfficeIds.length} offices with Google Maps API...`,
       });
 
-      // Call edge function to get corrections (no auto-update)
-      const response = await fetch(
-        `https://vqkzqwibbcvmdwgqladn.supabase.co/functions/v1/correct-office-addresses`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ officeIds: partnerOfficeIds }),
-        }
-      );
+      // Call edge function via supabase client to get corrections (no auto-update)
+      const { data: result, error: fnError } = await supabase.functions.invoke('correct-office-addresses', {
+        body: { officeIds: partnerOfficeIds }
+      });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Address correction failed');
+      if (fnError) {
+        throw new Error(fnError.message || 'Address correction failed');
       }
-
-      const result = await response.json();
       
       // Map results with office names
       const resultsWithNames = result.results.map((r: any) => {
@@ -390,24 +379,14 @@ export function MailingLabels() {
         .filter(r => selectedIds.includes(r.id))
         .map(r => ({ id: r.id, address: r.corrected }));
 
-      const response = await fetch(
-        `https://vqkzqwibbcvmdwgqladn.supabase.co/functions/v1/apply-address-corrections`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ updates }),
-        }
-      );
+      // Invoke edge function to apply selected corrections
+      const { data: result, error: fnError } = await supabase.functions.invoke('apply-address-corrections', {
+        body: { updates }
+      });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to apply corrections');
+      if (fnError) {
+        throw new Error(fnError.message || 'Failed to apply corrections');
       }
-
-      const result = await response.json();
       
       toast({
         title: "Addresses updated",
