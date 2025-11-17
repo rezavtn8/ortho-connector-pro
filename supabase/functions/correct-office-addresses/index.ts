@@ -58,18 +58,27 @@ serve(async (req) => {
       throw new Error('No authorization header');
     }
 
-    // Create Supabase client
+    // Create Supabase client with service role to bypass RLS
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    
+    // Create admin client for database operations
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    
+    // Create client with user's token for auth verification
     const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey, {
       global: { headers: { Authorization: authHeader } }
     });
 
-    // Get user
+    // Verify user authentication
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
+      console.error('Auth error:', userError);
       throw new Error('Unauthorized');
     }
+    
+    console.log(`correct-office-addresses: Authenticated user ${user.id} [${requestId}]`);
 
     // Parse request body
     const { officeIds } = await req.json();
@@ -80,8 +89,8 @@ serve(async (req) => {
 
     console.log(`correct-office-addresses: Processing ${officeIds.length} offices [${requestId}]`);
 
-    // Fetch offices from database
-    const { data: offices, error: fetchError } = await supabase
+    // Fetch offices from database using admin client
+    const { data: offices, error: fetchError } = await supabaseAdmin
       .from('patient_sources')
       .select('id, name, address')
       .in('id', officeIds)
