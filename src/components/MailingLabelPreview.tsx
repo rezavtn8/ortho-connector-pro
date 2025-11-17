@@ -4,6 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Printer, Settings } from "lucide-react";
 import { useState } from "react";
 import { LabelCustomizationDialog, LabelCustomization, LogoPosition, ReturnAddressPosition } from "./LabelCustomizationDialog";
+import { calculateOptimalSizes } from "@/utils/labelSizing";
 
 interface MailingLabelData {
   contact: string;
@@ -76,17 +77,22 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
     showBranding: false,
     showFromLabel: true,
     showToLabel: true,
-    logoSize: 16,
-    logoSizeUnit: "px",
+    logoSizeMultiplier: 1.0,
+    fontSizeMultiplier: 1.0,
     logoPosition: "top-left" as LogoPosition,
     returnAddressPosition: "top-left" as ReturnAddressPosition,
-    fontSize: 10,
-    returnAddressFontSize: 8,
   });
   
   const template = AVERY_TEMPLATES[selectedTemplate];
   const labelsPerPage = template.cols * template.rows;
   const totalPages = Math.ceil(data.length / labelsPerPage);
+  
+  // Calculate dynamic sizes for current template
+  const calculatedSizes = calculateOptimalSizes(
+    { width: template.width, height: template.height },
+    customization.logoSizeMultiplier,
+    customization.fontSizeMultiplier
+  );
 
   const handlePrint = () => {
     window.print();
@@ -165,9 +171,9 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
                           key={labelIndex}
                           className="border border-dashed border-muted relative"
                           style={{
-                            fontSize: `${customization.fontSize}px`,
+                            fontSize: `${calculatedSizes.mainFontSize}px`,
                             lineHeight: "1.3",
-                            padding: "4px",
+                            padding: `${calculatedSizes.padding}px`,
                           }}
                         >
                           {label ? (
@@ -188,12 +194,9 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
                                     src={customization.logoUrl} 
                                     alt="Logo" 
                                     style={{ 
-                                      height: customization.logoSizeUnit === "px" 
-                                        ? `${customization.logoSize}px`
-                                        : `${(customization.logoSize / 100) * (template.height * 96)}px`,
+                                      height: `${calculatedSizes.logoHeight}px`,
                                       width: "auto",
-                                      maxHeight: `${template.height * 96 * 0.8}px`,
-                                      maxWidth: `${template.width * 96 * 0.9}px`,
+                                      maxWidth: `${calculatedSizes.maxLogoWidth}px`,
                                     }}
                                   />
                                 </div>
@@ -204,7 +207,7 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
                                 <div
                                   style={{
                                     position: "absolute",
-                                    fontSize: `${customization.returnAddressFontSize}px`,
+                                    fontSize: `${calculatedSizes.returnFontSize}px`,
                                     lineHeight: "1.2",
                                     maxWidth: "45%",
                                     ...(customization.returnAddressPosition === "top-left" && { top: "2px", left: "2px" }),
