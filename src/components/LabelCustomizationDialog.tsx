@@ -17,6 +17,7 @@ export type ReturnAddressPosition = "top-left" | "top-right" | "bottom-left" | "
 export interface LabelCustomization {
   logoUrl?: string;
   logoSize: number;
+  logoSizeUnit: "px" | "percent";
   logoPosition: LogoPosition;
   returnAddress?: string;
   returnAddressPosition: ReturnAddressPosition;
@@ -35,6 +36,7 @@ interface LabelCustomizationDialogProps {
   onOpenChange: (open: boolean) => void;
   customization: LabelCustomization;
   onSave: (customization: LabelCustomization) => void;
+  templateDimensions?: { width: number; height: number };
 }
 
 interface SavedTemplate {
@@ -49,7 +51,8 @@ export const LabelCustomizationDialog = ({
   open, 
   onOpenChange, 
   customization,
-  onSave 
+  onSave,
+  templateDimensions = { width: 2.625, height: 1 }
 }: LabelCustomizationDialogProps) => {
   const [localCustomization, setLocalCustomization] = useState<LabelCustomization>(customization);
   const [savedTemplates, setSavedTemplates] = useState<SavedTemplate[]>([]);
@@ -192,20 +195,58 @@ export const LabelCustomizationDialog = ({
                       </div>
                     )}
 
-                    <div className="space-y-2">
+                    {/* Phase 1: Adaptive Logo Size Based on Label Dimensions */}
+                    <div className="space-y-3">
                       <Label>Logo Size</Label>
+                      
+                      <div className="flex gap-2 mb-2">
+                        <Button
+                          variant={localCustomization.logoSizeUnit === "px" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setLocalCustomization(prev => ({ 
+                            ...prev, 
+                            logoSizeUnit: "px",
+                            logoSize: prev.logoSizeUnit === "percent" ? Math.round(prev.logoSize * 0.3) : prev.logoSize
+                          }))}
+                        >
+                          Fixed (px)
+                        </Button>
+                        <Button
+                          variant={localCustomization.logoSizeUnit === "percent" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setLocalCustomization(prev => ({ 
+                            ...prev, 
+                            logoSizeUnit: "percent",
+                            logoSize: prev.logoSizeUnit === "px" ? Math.round((prev.logoSize / (templateDimensions.height * 96)) * 100) : prev.logoSize
+                          }))}
+                        >
+                          Responsive (%)
+                        </Button>
+                      </div>
+
                       <div className="flex items-center gap-4">
                         <Slider
                           value={[localCustomization.logoSize]}
                           onValueChange={([value]) => 
                             setLocalCustomization(prev => ({ ...prev, logoSize: value }))
                           }
-                          min={8}
-                          max={32}
-                          step={2}
+                          min={localCustomization.logoSizeUnit === "px" ? 8 : 10}
+                          max={localCustomization.logoSizeUnit === "px" ? 
+                            Math.min(96, Math.round(templateDimensions.height * 96 * 0.8)) : 80}
+                          step={localCustomization.logoSizeUnit === "px" ? 2 : 5}
                           className="flex-1"
                         />
-                        <span className="text-sm text-muted-foreground w-12">{localCustomization.logoSize}px</span>
+                        <span className="text-sm text-muted-foreground w-16">
+                          {localCustomization.logoSize}{localCustomization.logoSizeUnit === "px" ? "px" : "%"}
+                        </span>
+                      </div>
+
+                      <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
+                        {localCustomization.logoSizeUnit === "px" ? (
+                          <span>Fixed size works best for consistent branding across all label sizes</span>
+                        ) : (
+                          <span>Responsive size scales with label dimensions (current: ~{Math.round((localCustomization.logoSize / 100) * templateDimensions.height * 96)}px on {templateDimensions.height}" labels)</span>
+                        )}
                       </div>
                     </div>
 
@@ -367,97 +408,177 @@ export const LabelCustomizationDialog = ({
                 </Select>
               </div>
 
-              {/* Preview Section */}
-              <div className="space-y-2">
+              {/* Phase 2: Multi-Size Preview Section */}
+              <div className="space-y-3">
                 <Label className="text-base font-medium">Layout Preview</Label>
-                <div className="border-2 border-border rounded-lg p-4 bg-muted/20">
-                  <div 
-                    className="bg-background border border-border rounded"
-                    style={{ 
-                      width: "200px", 
-                      height: "80px",
-                      position: "relative",
-                      padding: "8px"
-                    }}
-                  >
-                    {/* Logo Preview */}
-                    {localCustomization.showLogo && localCustomization.logoUrl && (
-                      <div
-                        style={{
-                          position: "absolute",
-                          ...(localCustomization.logoPosition === "top-left" && { top: "4px", left: "4px" }),
-                          ...(localCustomization.logoPosition === "top-center" && { top: "4px", left: "50%", transform: "translateX(-50%)" }),
-                          ...(localCustomization.logoPosition === "top-right" && { top: "4px", right: "4px" }),
-                          ...(localCustomization.logoPosition === "center" && { top: "50%", left: "50%", transform: "translate(-50%, -50%)" }),
+                <p className="text-sm text-muted-foreground">
+                  Preview how your design looks across different label sizes
+                </p>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Small Label Preview (1" x 2.625") */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Small (1" × 2.625")</Label>
+                    <div className="border-2 border-border rounded-lg p-3 bg-muted/20">
+                      <div 
+                        className="bg-background border border-border rounded"
+                        style={{ 
+                          width: "160px", 
+                          height: "60px",
+                          position: "relative",
+                          padding: "4px"
                         }}
                       >
-                        <img 
-                          src={localCustomization.logoUrl} 
-                          alt="Logo" 
-                          style={{ 
-                            height: `${localCustomization.logoSize}px`,
-                            width: "auto"
-                          }}
-                        />
-                      </div>
-                    )}
-
-                    {/* Return Address Preview */}
-                    {localCustomization.showReturnAddress && localCustomization.returnAddress && (
-                      <div
-                        style={{
-                          position: "absolute",
-                          fontSize: `${localCustomization.returnAddressFontSize}px`,
-                          lineHeight: "1.2",
-                          ...(localCustomization.returnAddressPosition === "top-left" && { top: "4px", left: "4px" }),
-                          ...(localCustomization.returnAddressPosition === "top-right" && { top: "4px", right: "4px", textAlign: "right" }),
-                          ...(localCustomization.returnAddressPosition === "bottom-left" && { bottom: "4px", left: "4px" }),
-                          ...(localCustomization.returnAddressPosition === "bottom-right" && { bottom: "4px", right: "4px", textAlign: "right" }),
-                        }}
-                      >
-                        {localCustomization.showFromLabel && (
-                          <div className="font-semibold text-muted-foreground">From:</div>
+                        {localCustomization.showLogo && localCustomization.logoUrl && (
+                          <div
+                            style={{
+                              position: "absolute",
+                              ...(localCustomization.logoPosition === "top-left" && { top: "3px", left: "3px" }),
+                              ...(localCustomization.logoPosition === "top-center" && { top: "3px", left: "50%", transform: "translateX(-50%)" }),
+                              ...(localCustomization.logoPosition === "top-right" && { top: "3px", right: "3px" }),
+                              ...(localCustomization.logoPosition === "center" && { top: "50%", left: "50%", transform: "translate(-50%, -50%)" }),
+                            }}
+                          >
+                            <img 
+                              src={localCustomization.logoUrl} 
+                              alt="Logo" 
+                              style={{ 
+                                height: localCustomization.logoSizeUnit === "px" 
+                                  ? `${localCustomization.logoSize * 0.6}px`
+                                  : `${(localCustomization.logoSize / 100) * 60}px`,
+                                width: "auto"
+                              }}
+                            />
+                          </div>
                         )}
-                        {localCustomization.returnAddress.split('\n').slice(0, 2).map((line, i) => (
-                          <div key={i}>{line}</div>
-                        ))}
+                        {localCustomization.showReturnAddress && localCustomization.returnAddress && (
+                          <div
+                            style={{
+                              position: "absolute",
+                              fontSize: "6px",
+                              lineHeight: "1.2",
+                              maxWidth: "40%",
+                              ...(localCustomization.returnAddressPosition === "top-left" && { top: "2px", left: "2px" }),
+                              ...(localCustomization.returnAddressPosition === "top-right" && { top: "2px", right: "2px", textAlign: "right" }),
+                              ...(localCustomization.returnAddressPosition === "bottom-left" && { bottom: "2px", left: "2px" }),
+                              ...(localCustomization.returnAddressPosition === "bottom-right" && { bottom: "2px", right: "2px", textAlign: "right" }),
+                            }}
+                          >
+                            {localCustomization.showFromLabel && (
+                              <div className="font-semibold">From:</div>
+                            )}
+                            {localCustomization.returnAddress.split('\n').slice(0, 2).map((line, i) => (
+                              <div key={i} className="truncate">{line}</div>
+                            ))}
+                          </div>
+                        )}
+                        <div style={{ position: "absolute", fontSize: "7px", lineHeight: "1.3", top: "50%", left: "50%", transform: "translate(-50%, -50%)", textAlign: "center" }}>
+                          {localCustomization.showToLabel && <div className="font-semibold">To:</div>}
+                          <div className="font-medium">Sample Office</div>
+                          <div>123 Main St</div>
+                          <div>City, ST 12345</div>
+                        </div>
                       </div>
-                    )}
-
-                    {/* Main Address Preview */}
-                    <div
-                      style={{
-                        position: "absolute",
-                        fontSize: `${localCustomization.fontSize}px`,
-                        lineHeight: "1.3",
-                        top: "50%",
-                        left: "50%",
-                        transform: "translate(-50%, -50%)",
-                      }}
-                    >
-                      {localCustomization.showToLabel && (
-                        <div className="font-semibold text-muted-foreground">To:</div>
-                      )}
-                      <div className="font-medium">Sample Office</div>
-                      <div>123 Main Street</div>
-                      <div>City, ST 12345</div>
                     </div>
+                  </div>
 
-                    {/* Branding Preview */}
-                    {localCustomization.showBranding && localCustomization.brandingText && (
-                      <div
-                        style={{
-                          position: "absolute",
-                          bottom: "4px",
-                          left: "50%",
-                          transform: "translateX(-50%)",
-                          fontSize: "8px",
-                          fontWeight: 600,
+                  {/* Large Label Preview (2" x 4") */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Large (2" × 4")</Label>
+                    <div className="border-2 border-border rounded-lg p-3 bg-muted/20">
+                      <div 
+                        className="bg-background border border-border rounded"
+                        style={{ 
+                          width: "160px", 
+                          height: "80px",
+                          position: "relative",
+                          padding: "6px"
                         }}
                       >
-                        {localCustomization.brandingText}
+                        {/* Logo Preview */}
+                        {localCustomization.showLogo && localCustomization.logoUrl && (
+                          <div
+                            style={{
+                              position: "absolute",
+                              ...(localCustomization.logoPosition === "top-left" && { top: "4px", left: "4px" }),
+                              ...(localCustomization.logoPosition === "top-center" && { top: "4px", left: "50%", transform: "translateX(-50%)" }),
+                              ...(localCustomization.logoPosition === "top-right" && { top: "4px", right: "4px" }),
+                              ...(localCustomization.logoPosition === "center" && { top: "50%", left: "50%", transform: "translate(-50%, -50%)" }),
+                            }}
+                          >
+                            <img 
+                              src={localCustomization.logoUrl} 
+                              alt="Logo" 
+                              style={{ 
+                                height: localCustomization.logoSizeUnit === "px" 
+                                  ? `${localCustomization.logoSize}px`
+                                  : `${(localCustomization.logoSize / 100) * 80}px`,
+                                width: "auto"
+                              }}
+                            />
+                          </div>
+                        )}
+
+                        {/* Return Address Preview */}
+                        {localCustomization.showReturnAddress && localCustomization.returnAddress && (
+                          <div
+                            style={{
+                              position: "absolute",
+                              fontSize: "8px",
+                              lineHeight: "1.2",
+                              maxWidth: "45%",
+                              ...(localCustomization.returnAddressPosition === "top-left" && { top: "3px", left: "3px" }),
+                              ...(localCustomization.returnAddressPosition === "top-right" && { top: "3px", right: "3px", textAlign: "right" }),
+                              ...(localCustomization.returnAddressPosition === "bottom-left" && { bottom: "3px", left: "3px" }),
+                              ...(localCustomization.returnAddressPosition === "bottom-right" && { bottom: "3px", right: "3px", textAlign: "right" }),
+                            }}
+                          >
+                            {localCustomization.showFromLabel && (
+                              <div className="font-semibold">From:</div>
+                            )}
+                            {localCustomization.returnAddress.split('\n').slice(0, 2).map((line, i) => (
+                              <div key={i} className="truncate">{line}</div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Main Address Preview */}
+                        <div
+                          style={{
+                            position: "absolute",
+                            fontSize: "9px",
+                            lineHeight: "1.3",
+                            top: "50%",
+                            left: "50%",
+                            transform: "translate(-50%, -50%)",
+                            textAlign: "center"
+                          }}
+                        >
+                          {localCustomization.showToLabel && (
+                            <div className="font-semibold">To:</div>
+                          )}
+                          <div className="font-medium">Sample Office</div>
+                          <div>123 Main Street</div>
+                          <div>City, ST 12345</div>
+                        </div>
+
+                        {/* Branding Preview */}
+                        {localCustomization.showBranding && localCustomization.brandingText && (
+                          <div
+                            style={{
+                              position: "absolute",
+                              bottom: "3px",
+                              left: "50%",
+                              transform: "translateX(-50%)",
+                              fontSize: "7px",
+                              fontWeight: 600,
+                            }}
+                          >
+                            {localCustomization.brandingText}
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </div>
                 </div>
               </div>

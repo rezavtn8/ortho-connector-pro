@@ -77,6 +77,7 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
     showFromLabel: true,
     showToLabel: true,
     logoSize: 16,
+    logoSizeUnit: "px",
     logoPosition: "top-left" as LogoPosition,
     returnAddressPosition: "top-left" as ReturnAddressPosition,
     fontSize: 10,
@@ -171,7 +172,7 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
                         >
                           {label ? (
                             <div className="h-full relative">
-                              {/* Logo positioning */}
+                              {/* Logo positioning with dynamic sizing */}
                               {customization.showLogo && customization.logoUrl && (
                                 <div
                                   style={{
@@ -187,8 +188,12 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
                                     src={customization.logoUrl} 
                                     alt="Logo" 
                                     style={{ 
-                                      height: `${customization.logoSize}px`,
-                                      width: "auto"
+                                      height: customization.logoSizeUnit === "px" 
+                                        ? `${customization.logoSize}px`
+                                        : `${(customization.logoSize / 100) * (template.height * 96)}px`,
+                                      width: "auto",
+                                      maxHeight: `${template.height * 96 * 0.8}px`,
+                                      maxWidth: `${template.width * 96 * 0.9}px`,
                                     }}
                                   />
                                 </div>
@@ -278,6 +283,7 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
         onOpenChange={setShowCustomization}
         customization={customization}
         onSave={setCustomization}
+        templateDimensions={{ width: template.width, height: template.height }}
       />
 
       <style>{`
