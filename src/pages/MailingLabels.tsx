@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Download, Search, Filter, FileSpreadsheet } from 'lucide-react';
+import { Download, Search, Filter, FileSpreadsheet, MapPin, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { useOffices } from '@/hooks/useOffices';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -26,6 +26,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from '@/components/ui/alert';
+import { Progress } from '@/components/ui/progress';
 
 interface ParsedAddress {
   address1: string;
@@ -121,6 +127,12 @@ export function MailingLabels() {
   const [includeDiscovered, setIncludeDiscovered] = useState(false);
   const [sourceFilter, setSourceFilter] = useState<'all' | 'partner' | 'discovered'>('all');
   const [showParseErrors, setShowParseErrors] = useState(false);
+  
+  // PHASE 1: Address Correction State
+  const [isCorrecting, setIsCorrecting] = useState(false);
+  const [correctionProgress, setCorrectionProgress] = useState(0);
+  const [correctionResults, setCorrectionResults] = useState<any>(null);
+  const [hasBeenCorrected, setHasBeenCorrected] = useState(false);
 
   const { data: offices = [], isLoading: officesLoading } = useOffices();
   
@@ -265,6 +277,97 @@ export function MailingLabels() {
     );
   };
 
+  // PHASE 2: Address Correction Handler
+  const handleCorrectAddresses = async () => {
+    if (hasBeenCorrected) {
+      toast({
+        title: "Already corrected",
+        description: "Addresses have already been corrected once. Refresh the page to run again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Get all partner office IDs that are currently filtered
+    const partnerOfficeIds = offices
+      .filter(office => {
+        const matchesTier = selectedTiers.includes(office.tier);
+        const matchesSearch = searchTerm === '' || 
+          office.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (office.address?.toLowerCase().includes(searchTerm.toLowerCase()));
+        
+        return matchesTier && matchesSearch && office.address;
+      })
+      .map(office => office.id);
+
+    if (partnerOfficeIds.length === 0) {
+      toast({
+        title: "No addresses to correct",
+        description: "No partner offices with addresses found in current filter.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsCorrecting(true);
+    setCorrectionProgress(0);
+    setCorrectionResults(null);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      toast({
+        title: "Starting address correction",
+        description: `Processing ${partnerOfficeIds.length} offices with Google Maps API...`,
+      });
+
+      // Call edge function
+      const response = await fetch(
+        `https://vqkzqwibbcvmdwgqladn.supabase.co/functions/v1/correct-office-addresses`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ officeIds: partnerOfficeIds }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Address correction failed');
+      }
+
+      const result = await response.json();
+      setCorrectionResults(result);
+      setHasBeenCorrected(true);
+      setCorrectionProgress(100);
+
+      toast({
+        title: "Address correction complete",
+        description: `Processed ${result.processed} offices, updated ${result.updated} addresses.`,
+      });
+
+      // Refresh office data
+      window.location.reload();
+
+    } catch (error) {
+      console.error('Address correction error:', error);
+      toast({
+        title: "Correction failed",
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        variant: "destructive",
+      });
+    } finally {
+      setIsCorrecting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Phase 1: Header */}
@@ -374,6 +477,75 @@ export function MailingLabels() {
               </label>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* PHASE 3: Address Correction Tool */}
+      <Card className="border-2 border-primary/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MapPin className="w-5 h-5 text-primary" />
+            Address Correction Tool
+          </CardTitle>
+          <CardDescription>
+            Use Google Maps API to validate and standardize all partner office addresses (one-time use)
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {hasBeenCorrected && correctionResults ? (
+            <Alert>
+              <CheckCircle2 className="h-4 w-4" />
+              <AlertTitle>Correction Complete</AlertTitle>
+              <AlertDescription>
+                Processed {correctionResults.processed} offices, updated {correctionResults.updated} addresses. 
+                Refresh the page to run correction again.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <>
+              <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                <div className="space-y-2 flex-1">
+                  <p className="text-sm font-medium">How it works:</p>
+                  <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                    <li>Sends each partner office address to Google Maps Geocoding API</li>
+                    <li>Receives standardized, validated addresses with proper formatting</li>
+                    <li>Updates your database with corrected addresses automatically</li>
+                    <li>Can only be used once per page load (refresh to run again)</li>
+                  </ul>
+                </div>
+              </div>
+
+              {isCorrecting && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span>Processing addresses...</span>
+                    <span>{Math.round(correctionProgress)}%</span>
+                  </div>
+                  <Progress value={correctionProgress} />
+                </div>
+              )}
+
+              <Button
+                onClick={handleCorrectAddresses}
+                disabled={isCorrecting || hasBeenCorrected || officesLoading}
+                className="w-full gap-2"
+                size="lg"
+              >
+                {isCorrecting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Correcting Addresses...
+                  </>
+                ) : (
+                  <>
+                    <MapPin className="w-4 h-4" />
+                    Correct All Partner Office Addresses
+                  </>
+                )}
+              </Button>
+            </>
+          )}
         </CardContent>
       </Card>
 
