@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Printer, Settings } from "lucide-react";
 import { useState } from "react";
-import { LabelCustomizationDialog, LabelCustomization } from "./LabelCustomizationDialog";
+import { LabelCustomizationDialog, LabelCustomization, LogoPosition, ReturnAddressPosition } from "./LabelCustomizationDialog";
 
 interface MailingLabelData {
   contact: string;
@@ -74,6 +74,13 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
     showLogo: false,
     showReturnAddress: false,
     showBranding: false,
+    showFromLabel: true,
+    showToLabel: true,
+    logoSize: 16,
+    logoPosition: "top-left" as LogoPosition,
+    returnAddressPosition: "top-left" as ReturnAddressPosition,
+    fontSize: 10,
+    returnAddressFontSize: 8,
   });
   
   const template = AVERY_TEMPLATES[selectedTemplate];
@@ -155,53 +162,97 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
                       return (
                         <div
                           key={labelIndex}
-                          className="border border-dashed border-muted flex flex-col p-1"
+                          className="border border-dashed border-muted relative"
                           style={{
-                            fontSize: template.height < 1 ? "7px" : template.height < 1.5 ? "9px" : "10px",
-                            lineHeight: template.height < 1 ? "1.2" : "1.3",
+                            fontSize: `${customization.fontSize}px`,
+                            lineHeight: "1.3",
+                            padding: "4px",
                           }}
                         >
                           {label ? (
-                            <div className="flex flex-col h-full">
-                              {/* Top section with logo and return address */}
-                              {(customization.showLogo || customization.showReturnAddress) && (
-                                <div className="flex items-start justify-between mb-1 pb-1 border-b border-dashed border-muted">
-                                  {customization.showLogo && customization.logoUrl && (
-                                    <img 
-                                      src={customization.logoUrl} 
-                                      alt="Logo" 
-                                      className="h-4 w-auto object-contain"
-                                      style={{ maxHeight: template.height < 1.5 ? "12px" : "16px" }}
-                                    />
+                            <div className="h-full relative">
+                              {/* Logo positioning */}
+                              {customization.showLogo && customization.logoUrl && (
+                                <div
+                                  style={{
+                                    position: "absolute",
+                                    ...(customization.logoPosition === "top-left" && { top: "2px", left: "2px" }),
+                                    ...(customization.logoPosition === "top-center" && { top: "2px", left: "50%", transform: "translateX(-50%)" }),
+                                    ...(customization.logoPosition === "top-right" && { top: "2px", right: "2px" }),
+                                    ...(customization.logoPosition === "center" && { top: "50%", left: "50%", transform: "translate(-50%, -50%)" }),
+                                    zIndex: 1,
+                                  }}
+                                >
+                                  <img 
+                                    src={customization.logoUrl} 
+                                    alt="Logo" 
+                                    style={{ 
+                                      height: `${customization.logoSize}px`,
+                                      width: "auto"
+                                    }}
+                                  />
+                                </div>
+                              )}
+
+                              {/* Return Address with positioning */}
+                              {customization.showReturnAddress && customization.returnAddress && (
+                                <div
+                                  style={{
+                                    position: "absolute",
+                                    fontSize: `${customization.returnAddressFontSize}px`,
+                                    lineHeight: "1.2",
+                                    maxWidth: "45%",
+                                    ...(customization.returnAddressPosition === "top-left" && { top: "2px", left: "2px" }),
+                                    ...(customization.returnAddressPosition === "top-right" && { top: "2px", right: "2px", textAlign: "right" }),
+                                    ...(customization.returnAddressPosition === "bottom-left" && { bottom: "2px", left: "2px" }),
+                                    ...(customization.returnAddressPosition === "bottom-right" && { bottom: "2px", right: "2px", textAlign: "right" }),
+                                    zIndex: 1,
+                                  }}
+                                >
+                                  {customization.showFromLabel && (
+                                    <div className="font-semibold">From:</div>
                                   )}
-                                  {customization.showReturnAddress && customization.returnAddress && (
-                                    <div className="text-left" style={{ fontSize: "0.7em" }}>
-                                      {customization.returnAddress.split('\n').slice(0, 2).map((line, i) => (
-                                        <div key={i} className="truncate">{line}</div>
-                                      ))}
-                                    </div>
-                                  )}
+                                  {customization.returnAddress.split('\n').slice(0, 3).map((line, i) => (
+                                    <div key={i} className="truncate">{line}</div>
+                                  ))}
                                 </div>
                               )}
                               
-                              {/* Main address section */}
-                              <div className="flex-1 flex items-center">
-                                <div className="text-left w-full px-1">
-                                  <div className="font-medium truncate">{label.contact}</div>
-                                  <div className="truncate">{label.address1}</div>
-                                  {label.address2 && <div className="truncate">{label.address2}</div>}
-                                  <div className="truncate">
-                                    {label.city}{label.city && label.state ? ", " : ""}{label.state} {label.zip}
-                                  </div>
+                              {/* Main recipient address - centered */}
+                              <div
+                                style={{
+                                  position: "absolute",
+                                  top: "50%",
+                                  left: "50%",
+                                  transform: "translate(-50%, -50%)",
+                                  textAlign: "center",
+                                  width: "90%",
+                                }}
+                              >
+                                {customization.showToLabel && (
+                                  <div className="font-semibold mb-1">To:</div>
+                                )}
+                                <div className="font-medium truncate">{label.contact}</div>
+                                <div className="truncate">{label.address1}</div>
+                                {label.address2 && <div className="truncate">{label.address2}</div>}
+                                <div className="truncate">
+                                  {label.city}{label.city && label.state ? ", " : ""}{label.state} {label.zip}
                                 </div>
                               </div>
                               
                               {/* Branding footer */}
                               {customization.showBranding && customization.brandingText && (
-                                <div className="text-center mt-1 pt-1 border-t border-dashed border-muted">
-                                  <div className="truncate font-medium" style={{ fontSize: "0.8em" }}>
-                                    {customization.brandingText}
-                                  </div>
+                                <div
+                                  style={{
+                                    position: "absolute",
+                                    bottom: "2px",
+                                    left: "50%",
+                                    transform: "translateX(-50%)",
+                                    fontSize: "0.7em",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  <div className="truncate">{customization.brandingText}</div>
                                 </div>
                               )}
                             </div>
