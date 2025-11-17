@@ -121,8 +121,8 @@ export function AddressCorrectionDialog({
           )}
         </div>
 
-        <ScrollArea className="flex-1 pr-4">
-          <div className="space-y-4">
+        <ScrollArea className="flex-1 pr-4 max-h-[50vh] overflow-y-auto">
+          <div className="space-y-4 pb-4">
             {/* Successful Changes */}
             {successfulChanges.length > 0 && (
               <div className="space-y-3">
