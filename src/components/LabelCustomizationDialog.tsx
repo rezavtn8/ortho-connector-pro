@@ -7,17 +7,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { Upload, X, Save, Trash2, Download } from "lucide-react";
+import { Upload, X, Save, Trash2, Download, Info } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { calculateOptimalSizes, getCustomizationRanges } from "@/utils/labelSizing";
 
 export type LogoPosition = "top-left" | "top-center" | "top-right" | "center";
 export type ReturnAddressPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
 export interface LabelCustomization {
   logoUrl?: string;
-  logoSize: number;
-  logoSizeUnit: "px" | "percent";
+  logoSizeMultiplier: number;  // 0.5 to 1.5
+  fontSizeMultiplier: number;  // 0.8 to 1.2
   logoPosition: LogoPosition;
   returnAddress?: string;
   returnAddressPosition: ReturnAddressPosition;
@@ -27,8 +28,6 @@ export interface LabelCustomization {
   showBranding: boolean;
   showFromLabel: boolean;
   showToLabel: boolean;
-  fontSize: number;
-  returnAddressFontSize: number;
 }
 
 interface LabelCustomizationDialogProps {
@@ -57,6 +56,15 @@ export const LabelCustomizationDialog = ({
   const [localCustomization, setLocalCustomization] = useState<LabelCustomization>(customization);
   const [savedTemplates, setSavedTemplates] = useState<SavedTemplate[]>([]);
   const [templateName, setTemplateName] = useState("");
+  
+  // Calculate optimal sizes based on current template dimensions
+  const calculatedSizes = calculateOptimalSizes(
+    templateDimensions,
+    localCustomization.logoSizeMultiplier,
+    localCustomization.fontSizeMultiplier
+  );
+  
+  const ranges = getCustomizationRanges(templateDimensions);
 
   useEffect(() => {
     loadTemplates();
@@ -195,58 +203,43 @@ export const LabelCustomizationDialog = ({
                       </div>
                     )}
 
-                    {/* Phase 1: Adaptive Logo Size Based on Label Dimensions */}
-                    <div className="space-y-3">
-                      <Label>Logo Size</Label>
-                      
-                      <div className="flex gap-2 mb-2">
-                        <Button
-                          variant={localCustomization.logoSizeUnit === "px" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setLocalCustomization(prev => ({ 
-                            ...prev, 
-                            logoSizeUnit: "px",
-                            logoSize: prev.logoSizeUnit === "percent" ? Math.round(prev.logoSize * 0.3) : prev.logoSize
-                          }))}
-                        >
-                          Fixed (px)
-                        </Button>
-                        <Button
-                          variant={localCustomization.logoSizeUnit === "percent" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setLocalCustomization(prev => ({ 
-                            ...prev, 
-                            logoSizeUnit: "percent",
-                            logoSize: prev.logoSizeUnit === "px" ? Math.round((prev.logoSize / (templateDimensions.height * 96)) * 100) : prev.logoSize
-                          }))}
-                        >
-                          Responsive (%)
-                        </Button>
+                    {/* Dynamic Logo Sizing */}
+                    <div className="space-y-4">
+                      <div className="flex items-start gap-2">
+                        <Label>Logo Size</Label>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                            <Info className="h-3 w-3" />
+                            <span>Automatically scales to {calculatedSizes.logoHeight}px on this {templateDimensions.height}" label</span>
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-4">
+                      <div className="space-y-2 pl-4 border-l-2 border-border">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Smaller</span>
+                          <span className="font-medium">
+                            {Math.round(localCustomization.logoSizeMultiplier * 100)}%
+                          </span>
+                          <span className="text-muted-foreground">Larger</span>
+                        </div>
                         <Slider
-                          value={[localCustomization.logoSize]}
+                          value={[localCustomization.logoSizeMultiplier]}
                           onValueChange={([value]) => 
-                            setLocalCustomization(prev => ({ ...prev, logoSize: value }))
+                            setLocalCustomization(prev => ({ ...prev, logoSizeMultiplier: value }))
                           }
-                          min={localCustomization.logoSizeUnit === "px" ? 8 : 10}
-                          max={localCustomization.logoSizeUnit === "px" ? 
-                            Math.min(96, Math.round(templateDimensions.height * 96 * 0.8)) : 80}
-                          step={localCustomization.logoSizeUnit === "px" ? 2 : 5}
+                          min={ranges.logoMultiplier.min}
+                          max={ranges.logoMultiplier.max}
+                          step={ranges.logoMultiplier.step}
                           className="flex-1"
                         />
-                        <span className="text-sm text-muted-foreground w-16">
-                          {localCustomization.logoSize}{localCustomization.logoSizeUnit === "px" ? "px" : "%"}
-                        </span>
-                      </div>
-
-                      <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
-                        {localCustomization.logoSizeUnit === "px" ? (
-                          <span>Fixed size works best for consistent branding across all label sizes</span>
-                        ) : (
-                          <span>Responsive size scales with label dimensions (current: ~{Math.round((localCustomization.logoSize / 100) * templateDimensions.height * 96)}px on {templateDimensions.height}" labels)</span>
-                        )}
+                        <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded flex items-start gap-2">
+                          <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                          <span>
+                            {ranges.description}. Logo will be {calculatedSizes.logoHeight}px tall 
+                            (max width: {calculatedSizes.maxLogoWidth}px)
+                          </span>
+                        </div>
                       </div>
                     </div>
 
@@ -335,22 +328,6 @@ export const LabelCustomizationDialog = ({
                       className="resize-none"
                     />
 
-                    <div className="space-y-2">
-                      <Label>Return Address Font Size</Label>
-                      <div className="flex items-center gap-4">
-                        <Slider
-                          value={[localCustomization.returnAddressFontSize]}
-                          onValueChange={([value]) => 
-                            setLocalCustomization(prev => ({ ...prev, returnAddressFontSize: value }))
-                          }
-                          min={6}
-                          max={12}
-                          step={1}
-                          className="flex-1"
-                        />
-                        <span className="text-sm text-muted-foreground w-12">{localCustomization.returnAddressFontSize}px</span>
-                      </div>
-                    </div>
                   </div>
                 )}
               </div>
@@ -367,20 +344,38 @@ export const LabelCustomizationDialog = ({
                   <Label htmlFor="show-to-label" className="text-base font-medium">Show "To:" label for recipient address</Label>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Main Address Font Size</Label>
-                  <div className="flex items-center gap-4">
+                <div className="space-y-3">
+                  <div className="flex items-start gap-2">
+                    <Label>Font Scaling</Label>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                        <Info className="h-3 w-3" />
+                        <span>
+                          Auto-sizes to {calculatedSizes.mainFontSize}px (main), 
+                          {calculatedSizes.returnFontSize}px (return address)
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 pl-4 border-l-2 border-border">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Smaller</span>
+                      <span className="font-medium">
+                        {Math.round(localCustomization.fontSizeMultiplier * 100)}%
+                      </span>
+                      <span className="text-muted-foreground">Larger</span>
+                    </div>
                     <Slider
-                      value={[localCustomization.fontSize]}
+                      value={[localCustomization.fontSizeMultiplier]}
                       onValueChange={([value]) => 
-                        setLocalCustomization(prev => ({ ...prev, fontSize: value }))
+                        setLocalCustomization(prev => ({ ...prev, fontSizeMultiplier: value }))
                       }
-                      min={8}
-                      max={14}
-                      step={1}
+                      min={ranges.fontMultiplier.min}
+                      max={ranges.fontMultiplier.max}
+                      step={ranges.fontMultiplier.step}
                       className="flex-1"
                     />
-                    <span className="text-sm text-muted-foreground w-12">{localCustomization.fontSize}px</span>
                   </div>
                 </div>
               </div>
@@ -443,9 +438,7 @@ export const LabelCustomizationDialog = ({
                               src={localCustomization.logoUrl} 
                               alt="Logo" 
                               style={{ 
-                                height: localCustomization.logoSizeUnit === "px" 
-                                  ? `${localCustomization.logoSize * 0.6}px`
-                                  : `${(localCustomization.logoSize / 100) * 60}px`,
+                                height: `${calculateOptimalSizes({ width: 2.625, height: 1 }, localCustomization.logoSizeMultiplier, localCustomization.fontSizeMultiplier).logoHeight * 0.6}px`,
                                 width: "auto"
                               }}
                             />
@@ -455,7 +448,7 @@ export const LabelCustomizationDialog = ({
                           <div
                             style={{
                               position: "absolute",
-                              fontSize: "6px",
+                              fontSize: `${calculateOptimalSizes({ width: 2.625, height: 1 }, localCustomization.logoSizeMultiplier, localCustomization.fontSizeMultiplier).returnFontSize * 0.6}px`,
                               lineHeight: "1.2",
                               maxWidth: "40%",
                               ...(localCustomization.returnAddressPosition === "top-left" && { top: "2px", left: "2px" }),
@@ -472,7 +465,15 @@ export const LabelCustomizationDialog = ({
                             ))}
                           </div>
                         )}
-                        <div style={{ position: "absolute", fontSize: "7px", lineHeight: "1.3", top: "50%", left: "50%", transform: "translate(-50%, -50%)", textAlign: "center" }}>
+                        <div style={{ 
+                          position: "absolute", 
+                          fontSize: `${calculateOptimalSizes({ width: 2.625, height: 1 }, localCustomization.logoSizeMultiplier, localCustomization.fontSizeMultiplier).mainFontSize * 0.7}px`, 
+                          lineHeight: "1.3", 
+                          top: "50%", 
+                          left: "50%", 
+                          transform: "translate(-50%, -50%)", 
+                          textAlign: "center" 
+                        }}>
                           {localCustomization.showToLabel && <div className="font-semibold">To:</div>}
                           <div className="font-medium">Sample Office</div>
                           <div>123 Main St</div>
@@ -510,10 +511,9 @@ export const LabelCustomizationDialog = ({
                               src={localCustomization.logoUrl} 
                               alt="Logo" 
                               style={{ 
-                                height: localCustomization.logoSizeUnit === "px" 
-                                  ? `${localCustomization.logoSize}px`
-                                  : `${(localCustomization.logoSize / 100) * 80}px`,
-                                width: "auto"
+                                height: `${calculateOptimalSizes({ width: 4, height: 2 }, localCustomization.logoSizeMultiplier, localCustomization.fontSizeMultiplier).logoHeight}px`,
+                                width: "auto",
+                                maxWidth: `${calculateOptimalSizes({ width: 4, height: 2 }, localCustomization.logoSizeMultiplier, localCustomization.fontSizeMultiplier).maxLogoWidth}px`
                               }}
                             />
                           </div>
@@ -524,7 +524,7 @@ export const LabelCustomizationDialog = ({
                           <div
                             style={{
                               position: "absolute",
-                              fontSize: "8px",
+                              fontSize: `${calculateOptimalSizes({ width: 4, height: 2 }, localCustomization.logoSizeMultiplier, localCustomization.fontSizeMultiplier).returnFontSize}px`,
                               lineHeight: "1.2",
                               maxWidth: "45%",
                               ...(localCustomization.returnAddressPosition === "top-left" && { top: "3px", left: "3px" }),
@@ -546,7 +546,7 @@ export const LabelCustomizationDialog = ({
                         <div
                           style={{
                             position: "absolute",
-                            fontSize: "9px",
+                            fontSize: `${calculateOptimalSizes({ width: 4, height: 2 }, localCustomization.logoSizeMultiplier, localCustomization.fontSizeMultiplier).mainFontSize}px`,
                             lineHeight: "1.3",
                             top: "50%",
                             left: "50%",
@@ -570,7 +570,7 @@ export const LabelCustomizationDialog = ({
                               bottom: "3px",
                               left: "50%",
                               transform: "translateX(-50%)",
-                              fontSize: "7px",
+                              fontSize: `${calculateOptimalSizes({ width: 4, height: 2 }, localCustomization.logoSizeMultiplier, localCustomization.fontSizeMultiplier).brandingFontSize}px`,
                               fontWeight: 600,
                             }}
                           >
