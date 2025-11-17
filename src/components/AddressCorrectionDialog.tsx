@@ -75,27 +75,25 @@ export function AddressCorrectionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Review Address Corrections</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b border-border">
+          <DialogTitle className="text-xl">Review Address Corrections</DialogTitle>
+          <DialogDescription className="text-muted-foreground">
             Review the corrected addresses below. Select which ones to apply to your database.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex items-center gap-2 text-sm">
-          <Badge variant="outline" className="gap-1">
-            <CheckCircle2 className="w-3 h-3 text-green-600" />
-            {successfulChanges.length} Changes
-          </Badge>
-          <Badge variant="outline" className="gap-1">
-            <AlertTriangle className="w-3 h-3 text-yellow-600" />
-            {noChanges.length} No Change
+        <div className="flex items-center gap-2 px-6 py-3 bg-muted/30 border-b border-border text-sm flex-wrap">
+          <Badge variant="outline" className="gap-1.5 bg-background">
+            <CheckCircle2 className="w-3.5 h-3.5 text-green-600 dark:text-green-500" />
+            <span className="font-medium">{successfulChanges.length}</span>
+            <span className="text-muted-foreground">Changes</span>
           </Badge>
           {failures.length > 0 && (
-            <Badge variant="outline" className="gap-1">
-              <XCircle className="w-3 h-3 text-red-600" />
-              {failures.length} Failed
+            <Badge variant="outline" className="gap-1.5 bg-background">
+              <XCircle className="w-3.5 h-3.5 text-destructive" />
+              <span className="font-medium">{failures.length}</span>
+              <span className="text-muted-foreground">Failed</span>
             </Badge>
           )}
           
@@ -106,6 +104,7 @@ export function AddressCorrectionDialog({
                 size="sm"
                 onClick={selectAll}
                 disabled={isConfirming}
+                className="h-8"
               >
                 Select All
               </Button>
@@ -114,6 +113,7 @@ export function AddressCorrectionDialog({
                 size="sm"
                 onClick={deselectAll}
                 disabled={isConfirming}
+                className="h-8"
               >
                 Deselect All
               </Button>
@@ -121,23 +121,23 @@ export function AddressCorrectionDialog({
           )}
         </div>
 
-        <ScrollArea className="flex-1 pr-4 max-h-[50vh] overflow-y-auto">
-          <div className="space-y-4 pb-4">
+        <div className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
+          <div className="space-y-4 pb-2">
             {/* Successful Changes */}
             {successfulChanges.length > 0 && (
               <div className="space-y-3">
-                <h3 className="text-sm font-semibold text-green-600 flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-green-600 dark:text-green-500 flex items-center gap-2 sticky top-0 bg-background py-2 z-10">
                   <CheckCircle2 className="w-4 h-4" />
-                  Corrected Addresses ({successfulChanges.length})
+                  Addresses Needing Correction ({successfulChanges.length})
                 </h3>
                 {successfulChanges.map((correction) => (
                   <div
                     key={correction.id}
                     className={cn(
-                      "border rounded-lg p-4 transition-colors cursor-pointer",
+                      "border rounded-lg p-4 transition-all cursor-pointer hover:shadow-sm",
                       selectedIds.has(correction.id)
-                        ? "border-primary bg-primary/5"
-                        : "border-border hover:border-primary/50"
+                        ? "border-primary bg-primary/10 shadow-sm"
+                        : "border-border hover:border-primary/50 bg-card"
                     )}
                     onClick={() => toggleSelection(correction.id)}
                   >
@@ -146,19 +146,19 @@ export function AddressCorrectionDialog({
                         type="checkbox"
                         checked={selectedIds.has(correction.id)}
                         onChange={() => toggleSelection(correction.id)}
-                        className="mt-1 cursor-pointer"
+                        className="mt-1 cursor-pointer w-4 h-4 accent-primary"
                         onClick={(e) => e.stopPropagation()}
                       />
-                      <div className="flex-1 space-y-2">
-                        <p className="font-medium text-sm">{correction.officeName}</p>
-                        <div className="grid grid-cols-2 gap-3 text-sm">
-                          <div>
-                            <p className="text-xs text-muted-foreground mb-1">Before:</p>
-                            <p className="text-red-600 line-through">{correction.original}</p>
+                      <div className="flex-1 space-y-3">
+                        <p className="font-semibold text-sm text-foreground">{correction.officeName}</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Before:</p>
+                            <p className="text-sm text-destructive line-through leading-relaxed">{correction.original}</p>
                           </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground mb-1">After:</p>
-                            <p className="text-green-600 font-medium">{correction.corrected}</p>
+                          <div className="space-y-1">
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">After:</p>
+                            <p className="text-sm text-green-600 dark:text-green-500 font-medium leading-relaxed">{correction.corrected}</p>
                           </div>
                         </div>
                       </div>
@@ -168,61 +168,43 @@ export function AddressCorrectionDialog({
               </div>
             )}
 
-            {/* No Changes */}
-            {noChanges.length > 0 && (
-              <div className="space-y-3">
-                <h3 className="text-sm font-semibold text-yellow-600 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4" />
-                  Already Correct ({noChanges.length})
-                </h3>
-                {noChanges.map((correction) => (
-                  <div
-                    key={correction.id}
-                    className="border border-border rounded-lg p-4 bg-muted/30"
-                  >
-                    <p className="font-medium text-sm mb-1">{correction.officeName}</p>
-                    <p className="text-sm text-muted-foreground">{correction.original}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-
             {/* Failures */}
             {failures.length > 0 && (
-              <div className="space-y-3">
-                <h3 className="text-sm font-semibold text-red-600 flex items-center gap-2">
+              <div className="space-y-3 mt-6">
+                <h3 className="text-sm font-semibold text-destructive flex items-center gap-2 sticky top-0 bg-background py-2 z-10">
                   <XCircle className="w-4 h-4" />
                   Failed to Correct ({failures.length})
                 </h3>
                 {failures.map((correction) => (
                   <div
                     key={correction.id}
-                    className="border border-red-200 rounded-lg p-4 bg-red-50 dark:bg-red-950/20"
+                    className="border border-destructive/30 rounded-lg p-4 bg-destructive/5"
                   >
-                    <p className="font-medium text-sm mb-1">{correction.officeName}</p>
-                    <p className="text-sm text-muted-foreground mb-1">{correction.original}</p>
+                    <p className="font-semibold text-sm mb-2 text-foreground">{correction.officeName}</p>
+                    <p className="text-sm text-muted-foreground mb-2">{correction.original}</p>
                     {correction.error && (
-                      <p className="text-xs text-red-600 mt-2">Error: {correction.error}</p>
+                      <p className="text-xs text-destructive mt-2 font-medium">Error: {correction.error}</p>
                     )}
                   </div>
                 ))}
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="gap-2 px-6 py-4 border-t border-border bg-muted/30">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={isConfirming}
+            className="min-w-24"
           >
             Cancel
           </Button>
           <Button
             onClick={handleConfirm}
             disabled={selectedIds.size === 0 || isConfirming}
-            className="gap-2"
+            className="gap-2 min-w-32"
           >
             {isConfirming ? (
               <>
@@ -231,7 +213,8 @@ export function AddressCorrectionDialog({
               </>
             ) : (
               <>
-                Apply {selectedIds.size} Selected {selectedIds.size === 1 ? 'Change' : 'Changes'}
+                <CheckCircle2 className="w-4 h-4" />
+                Apply {selectedIds.size} {selectedIds.size === 1 ? 'Change' : 'Changes'}
               </>
             )}
           </Button>
