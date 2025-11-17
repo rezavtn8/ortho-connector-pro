@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Download, Search, Filter, FileSpreadsheet, MapPin, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Download, Search, Filter, FileSpreadsheet, MapPin, CheckCircle2, AlertCircle, Loader2, FileText } from 'lucide-react';
 import { useOffices } from '@/hooks/useOffices';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { AddressCorrectionDialog } from '@/components/AddressCorrectionDialog';
+import { MailingLabelPreview } from '@/components/MailingLabelPreview';
 
 interface ParsedAddress {
   address1: string;
@@ -196,6 +197,7 @@ export function MailingLabels() {
   const [showCorrectionDialog, setShowCorrectionDialog] = useState(false);
   const [correctionResults, setCorrectionResults] = useState<any[]>([]);
   const [hasBeenCorrected, setHasBeenCorrected] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   const { data: offices = [], isLoading: officesLoading } = useOffices();
   
@@ -670,14 +672,25 @@ export function MailingLabels() {
                 {isLoading ? 'Loading...' : `${filteredData.length} offices selected`}
               </CardDescription>
             </div>
-            <Button 
-              onClick={handleExportToExcel}
-              disabled={isLoading || filteredData.length === 0}
-              className="gap-2"
-            >
-              <Download className="w-4 h-4" />
-              Export to Excel
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => setShowPreview(true)}
+                disabled={isLoading || filteredData.length === 0}
+                variant="outline"
+                className="gap-2"
+              >
+                <FileText className="w-4 h-4" />
+                Preview Labels
+              </Button>
+              <Button 
+                onClick={handleExportToExcel}
+                disabled={isLoading || filteredData.length === 0}
+                className="gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Export to Excel
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -746,6 +759,20 @@ export function MailingLabels() {
         onOpenChange={setShowCorrectionDialog}
         corrections={correctionResults}
         onConfirm={handleApplyCorrections}
+      />
+
+      {/* Mailing Label Preview */}
+      <MailingLabelPreview
+        open={showPreview}
+        onOpenChange={setShowPreview}
+        data={filteredData.map(item => ({
+          contact: item.contactName,
+          address1: item.address1,
+          address2: item.address2,
+          city: item.city,
+          state: item.state,
+          zip: item.zip,
+        }))}
       />
     </div>
   );
