@@ -24,6 +24,7 @@ import ReviewMagic from '@/pages/ReviewMagic';
 import { Discover } from '@/pages/Discover';
 import { Logs } from '@/pages/Logs';
 import { AIAssistant } from '@/pages/AIAssistant';
+import { MailingLabels } from '@/pages/MailingLabels';
 import SubscriptionSuccess from '@/pages/SubscriptionSuccess';
 import SubscriptionCancel from '@/pages/SubscriptionCancel';
 
@@ -155,6 +156,14 @@ const Index = () => {
             element={
               <SuspenseWrapper type="page">
                 <AIAssistant />
+              </SuspenseWrapper>
+            } 
+          />
+          <Route 
+            path="/mailing-labels/*" 
+            element={
+              <SuspenseWrapper type="page">
+                <MailingLabels />
               </SuspenseWrapper>
             } 
           />
