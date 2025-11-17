@@ -15,6 +15,7 @@ import {
   Search,
   Bot,
   Sparkles,
+  Mail,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -48,6 +49,7 @@ const mainNavItems = [
 const managementItems = [
   { id: 'marketing-visits', title: 'Outreach Visits', icon: UserPlus, path: '/marketing-visits' },
   { id: 'campaigns', title: 'Campaigns', icon: Calendar, path: '/campaigns' },
+  { id: 'mailing-labels', title: 'Mailing Labels', icon: Mail, path: '/mailing-labels' },
   { id: 'discover', title: 'Find Offices', icon: Search, path: '/discover' },
   { id: 'reviews', title: 'Reviews', icon: MessageSquare, path: '/reviews' },
   { id: 'review-magic', title: 'Reviews Magic', icon: Sparkles, path: '/review-magic' },

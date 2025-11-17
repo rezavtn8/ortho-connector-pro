@@ -1130,7 +1130,7 @@ export type Database = {
           created_at: string
           endpoint: string
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           request_count: number
           user_id: string | null
           window_start: string
@@ -1139,7 +1139,7 @@ export type Database = {
           created_at?: string
           endpoint: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           request_count?: number
           user_id?: string | null
           window_start?: string
@@ -1148,7 +1148,7 @@ export type Database = {
           created_at?: string
           endpoint?: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           request_count?: number
           user_id?: string | null
           window_start?: string
@@ -1337,7 +1337,7 @@ export type Database = {
           action_type: string
           details: Json | null
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           record_id: string | null
           table_name: string | null
           timestamp: string
@@ -1348,7 +1348,7 @@ export type Database = {
           action_type: string
           details?: Json | null
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           record_id?: string | null
           table_name?: string | null
           timestamp?: string
@@ -1359,7 +1359,7 @@ export type Database = {
           action_type?: string
           details?: Json | null
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           record_id?: string | null
           table_name?: string | null
           timestamp?: string
@@ -1732,10 +1732,7 @@ export type Database = {
       }
     }
     Functions: {
-      accept_invitation: {
-        Args: { p_token: string }
-        Returns: Json
-      }
+      accept_invitation: { Args: { p_token: string }; Returns: Json }
       adjust_patient_count: {
         Args: { p_delta: number; p_source_id: string; p_year_month: string }
         Returns: number
@@ -1752,14 +1749,8 @@ export type Database = {
         }
         Returns: boolean
       }
-      cleanup_expired_discovered_offices: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      cleanup_old_audit_logs: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
+      cleanup_expired_discovered_offices: { Args: never; Returns: undefined }
+      cleanup_old_audit_logs: { Args: never; Returns: number }
       create_clinic_for_user: {
         Args: {
           p_address?: string
@@ -1769,12 +1760,9 @@ export type Database = {
         }
         Returns: Json
       }
-      encrypt_pin_code: {
-        Args: { pin_text: string }
-        Returns: string
-      }
+      encrypt_pin_code: { Args: { pin_text: string }; Returns: string }
       get_current_month_patients: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           current_month_patients: number
           is_office: boolean
@@ -1785,7 +1773,7 @@ export type Database = {
         }[]
       }
       get_current_month_sources: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           current_month_patients: number
           month_year: string
@@ -1795,14 +1783,14 @@ export type Database = {
         }[]
       }
       get_dashboard_data: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           recent_activity: Json
           summary: Json
         }[]
       }
       get_office_data_with_relations: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           address: string
           created_at: string
@@ -1832,14 +1820,8 @@ export type Database = {
           yelp_rating: number
         }[]
       }
-      get_user_clinic_id: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      get_user_role: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      get_user_clinic_id: { Args: never; Returns: string }
+      get_user_role: { Args: never; Returns: string }
       log_activity: {
         Args: {
           p_action_type: string
@@ -1901,26 +1883,14 @@ export type Database = {
         Args: { p_new_count: number; p_source_id: string }
         Returns: Json
       }
-      update_user_pin_code: {
-        Args: { new_pin: string }
-        Returns: Json
-      }
-      user_has_clinic_admin_access: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      validate_auth_context: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
+      update_user_pin_code: { Args: { new_pin: string }; Returns: Json }
+      user_has_clinic_admin_access: { Args: never; Returns: boolean }
+      validate_auth_context: { Args: never; Returns: Json }
       verify_pin_code: {
         Args: { encrypted_pin: string; pin_text: string }
         Returns: boolean
       }
-      verify_user_pin_code: {
-        Args: { input_pin: string }
-        Returns: Json
-      }
+      verify_user_pin_code: { Args: { input_pin: string }; Returns: Json }
     }
     Enums: {
       source_type:
