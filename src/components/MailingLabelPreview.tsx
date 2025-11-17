@@ -1,8 +1,9 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Printer } from "lucide-react";
+import { Printer, Settings } from "lucide-react";
 import { useState } from "react";
+import { LabelCustomizationDialog, LabelCustomization } from "./LabelCustomizationDialog";
 
 interface MailingLabelData {
   contact: string;
@@ -68,6 +69,12 @@ const AVERY_TEMPLATES = {
 
 export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPreviewProps) => {
   const [selectedTemplate, setSelectedTemplate] = useState<keyof typeof AVERY_TEMPLATES>("5160");
+  const [showCustomization, setShowCustomization] = useState(false);
+  const [customization, setCustomization] = useState<LabelCustomization>({
+    showLogo: false,
+    showReturnAddress: false,
+    showBranding: false,
+  });
   
   const template = AVERY_TEMPLATES[selectedTemplate];
   const labelsPerPage = template.cols * template.rows;
@@ -101,6 +108,14 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
                   ))}
                 </SelectContent>
               </Select>
+              <Button 
+                variant="outline" 
+                onClick={() => setShowCustomization(true)} 
+                className="gap-2"
+              >
+                <Settings className="h-4 w-4" />
+                Customize
+              </Button>
               <Button onClick={handlePrint} className="gap-2">
                 <Printer className="h-4 w-4" />
                 Print Labels
@@ -140,20 +155,55 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
                       return (
                         <div
                           key={labelIndex}
-                          className="border border-dashed border-muted flex items-center justify-center p-1"
+                          className="border border-dashed border-muted flex flex-col p-1"
                           style={{
-                            fontSize: template.height < 1 ? "8px" : template.height < 1.5 ? "10px" : "11px",
+                            fontSize: template.height < 1 ? "7px" : template.height < 1.5 ? "9px" : "10px",
                             lineHeight: template.height < 1 ? "1.2" : "1.3",
                           }}
                         >
                           {label ? (
-                            <div className="text-left w-full px-1">
-                              <div className="font-medium truncate">{label.contact}</div>
-                              <div className="truncate">{label.address1}</div>
-                              {label.address2 && <div className="truncate">{label.address2}</div>}
-                              <div className="truncate">
-                                {label.city}{label.city && label.state ? ", " : ""}{label.state} {label.zip}
+                            <div className="flex flex-col h-full">
+                              {/* Top section with logo and return address */}
+                              {(customization.showLogo || customization.showReturnAddress) && (
+                                <div className="flex items-start justify-between mb-1 pb-1 border-b border-dashed border-muted">
+                                  {customization.showLogo && customization.logoUrl && (
+                                    <img 
+                                      src={customization.logoUrl} 
+                                      alt="Logo" 
+                                      className="h-4 w-auto object-contain"
+                                      style={{ maxHeight: template.height < 1.5 ? "12px" : "16px" }}
+                                    />
+                                  )}
+                                  {customization.showReturnAddress && customization.returnAddress && (
+                                    <div className="text-left" style={{ fontSize: "0.7em" }}>
+                                      {customization.returnAddress.split('\n').slice(0, 2).map((line, i) => (
+                                        <div key={i} className="truncate">{line}</div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              
+                              {/* Main address section */}
+                              <div className="flex-1 flex items-center">
+                                <div className="text-left w-full px-1">
+                                  <div className="font-medium truncate">{label.contact}</div>
+                                  <div className="truncate">{label.address1}</div>
+                                  {label.address2 && <div className="truncate">{label.address2}</div>}
+                                  <div className="truncate">
+                                    {label.city}{label.city && label.state ? ", " : ""}{label.state} {label.zip}
+                                  </div>
+                                </div>
                               </div>
+                              
+                              {/* Branding footer */}
+                              {customization.showBranding && customization.brandingText && (
+                                <div className="text-center mt-1 pt-1 border-t border-dashed border-muted">
+                                  <div className="truncate font-medium" style={{ fontSize: "0.8em" }}>
+                                    {customization.brandingText}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <span className="text-muted-foreground text-xs">Empty</span>
@@ -171,6 +221,13 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
           </div>
         </div>
       </DialogContent>
+
+      <LabelCustomizationDialog
+        open={showCustomization}
+        onOpenChange={setShowCustomization}
+        customization={customization}
+        onSave={setCustomization}
+      />
 
       <style>{`
         @media print {
