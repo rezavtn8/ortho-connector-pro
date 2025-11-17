@@ -54,7 +54,11 @@ serve(async (req) => {
 
     // Get authorization header
     const authHeader = req.headers.get('Authorization');
+    console.log(`correct-office-addresses: Auth header present: ${!!authHeader} [${requestId}]`);
+    
     if (!authHeader) {
+      console.error(`correct-office-addresses: Missing Authorization header [${requestId}]`);
+      console.error(`correct-office-addresses: Available headers: ${JSON.stringify([...req.headers.keys()])} [${requestId}]`);
       throw new Error('No authorization header');
     }
 

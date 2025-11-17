@@ -322,6 +322,8 @@ export function MailingLabels() {
         throw new Error('Not authenticated');
       }
 
+      console.log('Session token available:', !!session.access_token);
+
       toast({
         title: "Starting address correction",
         description: `Processing ${partnerOfficeIds.length} offices with Google Maps API...`,
@@ -334,6 +336,8 @@ export function MailingLabels() {
           Authorization: `Bearer ${session.access_token}`
         }
       });
+
+      console.log('Function invoke result:', { hasData: !!result, hasError: !!fnError });
 
       if (fnError) {
         throw new Error(fnError.message || 'Address correction failed');
