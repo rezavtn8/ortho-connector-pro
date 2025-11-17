@@ -329,7 +329,10 @@ export function MailingLabels() {
 
       // Call edge function via supabase client to get corrections (no auto-update)
       const { data: result, error: fnError } = await supabase.functions.invoke('correct-office-addresses', {
-        body: { officeIds: partnerOfficeIds }
+        body: { officeIds: partnerOfficeIds },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
       });
 
       if (fnError) {
@@ -381,7 +384,10 @@ export function MailingLabels() {
 
       // Invoke edge function to apply selected corrections
       const { data: result, error: fnError } = await supabase.functions.invoke('apply-address-corrections', {
-        body: { updates }
+        body: { updates },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
       });
 
       if (fnError) {
