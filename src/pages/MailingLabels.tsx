@@ -45,18 +45,17 @@ interface MailingLabelData {
   zip: string;
 }
 
-// Parse address into components
+// Parse address into components - PHASE 1: Enhanced regex and logic
 const parseAddress = (address: string | null): ParsedAddress => {
   if (!address) {
     return { address1: '', address2: '', city: '', state: '', zip: '' };
   }
 
-  // Common patterns:
-  // "123 Main St, Suite 200, Irvine, CA 92618"
-  // "123 Main St, Irvine, CA 92618"
-  // "123 Main St Suite 200, Irvine CA 92618"
+  // Clean up address
+  const cleanAddress = address.trim();
   
-  const parts = address.split(',').map(p => p.trim());
+  // Split by comma
+  const parts = cleanAddress.split(',').map(p => p.trim());
   
   let address1 = '';
   let address2 = '';
@@ -64,46 +63,53 @@ const parseAddress = (address: string | null): ParsedAddress => {
   let state = '';
   let zip = '';
 
-  if (parts.length >= 3) {
-    // Check if first part has Suite/Unit/Apt
-    const firstPart = parts[0];
-    const suiteMatch = firstPart.match(/^(.*?)\s+(Suite|Unit|Apt|#|Ste|Building)\s+(.+)$/i);
+  if (parts.length >= 2) {
+    // Get the last part which should contain state and zip
+    const lastPart = parts[parts.length - 1];
+    const stateZipMatch = lastPart.match(/^([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
     
-    if (suiteMatch) {
-      address1 = suiteMatch[1].trim();
-      address2 = `${suiteMatch[2]} ${suiteMatch[3]}`.trim();
-      city = parts[1]?.trim() || '';
+    if (stateZipMatch) {
+      state = stateZipMatch[1];
+      zip = stateZipMatch[2];
       
-      // Last part should have state and zip
-      const lastPart = parts[2];
-      const stateZipMatch = lastPart.match(/([A-Z]{2})\s+(\d{5}(?:-\d{4})?)/);
-      if (stateZipMatch) {
-        state = stateZipMatch[1];
-        zip = stateZipMatch[2];
+      // City is the second-to-last part
+      if (parts.length >= 2) {
+        city = parts[parts.length - 2].trim();
+      }
+      
+      // Everything before city is address
+      const addressParts = parts.slice(0, parts.length - 2);
+      
+      if (addressParts.length > 0) {
+        const fullAddress = addressParts.join(', ').trim();
+        
+        // Try to split street address from suite/unit
+        // Patterns: "123 Main St #100", "123 Main St Suite 100", "123 Main St Ste 100"
+        // Also handle: "#100", "# 100", "Suite 100", "Ste 100", "Unit 100", "Apt 100"
+        const suiteMatch = fullAddress.match(/^(.*?)\s+(Suite|Unit|Apt|Ste|Building|Bldg|#)\s*(.+)$/i);
+        
+        if (suiteMatch) {
+          address1 = suiteMatch[1].trim();
+          const suiteType = suiteMatch[2].trim();
+          const suiteNum = suiteMatch[3].trim();
+          // Normalize the suite format
+          if (suiteType === '#') {
+            address2 = `#${suiteNum}`;
+          } else {
+            address2 = `${suiteType.toUpperCase()} ${suiteNum}`;
+          }
+        } else {
+          address1 = fullAddress;
+        }
       }
     } else {
-      // Check if there's a separate suite part
-      if (parts.length >= 4) {
-        address1 = parts[0];
-        address2 = parts[1];
-        city = parts[2];
-        const lastPart = parts[3];
-        const stateZipMatch = lastPart.match(/([A-Z]{2})\s+(\d{5}(?:-\d{4})?)/);
-        if (stateZipMatch) {
-          state = stateZipMatch[1];
-          zip = stateZipMatch[2];
-        }
-      } else {
-        address1 = parts[0];
-        city = parts[1];
-        const lastPart = parts[2];
-        const stateZipMatch = lastPart.match(/([A-Z]{2})\s+(\d{5}(?:-\d{4})?)/);
-        if (stateZipMatch) {
-          state = stateZipMatch[1];
-          zip = stateZipMatch[2];
-        }
-      }
+      // Fallback: couldn't parse state/zip from last part
+      // Just put everything in address1
+      address1 = cleanAddress;
     }
+  } else {
+    // Single part address - just use as-is
+    address1 = cleanAddress;
   }
 
   return { address1, address2, city, state, zip };
@@ -114,6 +120,7 @@ export function MailingLabels() {
   const [selectedTiers, setSelectedTiers] = useState<string[]>(['VIP', 'Warm', 'Cold', 'Dormant']);
   const [includeDiscovered, setIncludeDiscovered] = useState(false);
   const [sourceFilter, setSourceFilter] = useState<'all' | 'partner' | 'discovered'>('all');
+  const [showParseErrors, setShowParseErrors] = useState(false);
 
   const { data: offices = [], isLoading: officesLoading } = useOffices();
   
@@ -131,9 +138,10 @@ export function MailingLabels() {
     enabled: includeDiscovered || sourceFilter === 'discovered',
   });
 
-  // Phase 2: Filtering Logic
+  // Phase 2: Filtering Logic + Error Detection
   const filteredData = useMemo(() => {
     let results: MailingLabelData[] = [];
+    let errors: string[] = [];
 
     // Filter partner offices
     if (sourceFilter === 'all' || sourceFilter === 'partner') {
@@ -148,6 +156,12 @@ export function MailingLabels() {
         })
         .map(office => {
           const parsed = parseAddress(office.address);
+          
+          // Detect potential parsing errors
+          if (!parsed.city || !parsed.state || !parsed.zip) {
+            errors.push(`${office.name}: Missing city/state/zip - "${office.address}"`);
+          }
+          
           return {
             officeName: office.name,
             contactName: '', // Partner offices don't have contact name
@@ -171,6 +185,12 @@ export function MailingLabels() {
           })
           .map(office => {
             const parsed = parseAddress(office.address);
+            
+            // Detect potential parsing errors
+            if (!parsed.city || !parsed.state || !parsed.zip) {
+              errors.push(`${office.name}: Missing city/state/zip - "${office.address}"`);
+            }
+            
             return {
               officeName: office.name,
               contactName: '', // Discovered offices don't have contact name
@@ -182,8 +202,13 @@ export function MailingLabels() {
       }
     }
 
+    // Log errors if any
+    if (errors.length > 0 && showParseErrors) {
+      console.warn('Address parsing errors:', errors);
+    }
+
     return results;
-  }, [offices, discoveredOffices, selectedTiers, includeDiscovered, searchTerm, sourceFilter]);
+  }, [offices, discoveredOffices, selectedTiers, includeDiscovered, searchTerm, sourceFilter, showParseErrors]);
 
   // Phase 4: Excel Export
   const handleExportToExcel = () => {
@@ -332,6 +357,23 @@ export function MailingLabels() {
               </label>
             </div>
           )}
+
+          {/* PHASE 2: Show Parse Errors Toggle */}
+          <div className="pt-2 border-t">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="show-parse-errors"
+                checked={showParseErrors}
+                onCheckedChange={(checked) => setShowParseErrors(checked as boolean)}
+              />
+              <label
+                htmlFor="show-parse-errors"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+              >
+                Log address parsing errors to console
+              </label>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
