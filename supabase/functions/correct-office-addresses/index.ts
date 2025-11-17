@@ -191,32 +191,18 @@ serve(async (req) => {
       }
     }
 
-    // Batch update addresses in database
-    let updateCount = 0;
-    if (updates.length > 0) {
-      for (const update of updates) {
-        const { error: updateError } = await supabase
-          .from('patient_sources')
-          .update({ address: update.address })
-          .eq('id', update.id)
-          .eq('created_by', user.id);
-
-        if (!updateError) {
-          updateCount++;
-        } else {
-          console.error(`Failed to update office ${update.id}:`, updateError);
-        }
-      }
-    }
-
-    console.log(`correct-office-addresses: Processed ${offices.length} offices, updated ${updateCount} [${requestId}]`);
+    // Don't auto-update - return results for review
+    console.log(`correct-office-addresses: Processed ${offices.length} offices, ${updates.length} need updates [${requestId}]`);
 
     return new Response(
       JSON.stringify({
         success: true,
         processed: offices.length,
-        updated: updateCount,
-        results,
+        needsUpdate: updates.length,
+        results: results.map(r => ({
+          ...r,
+          changed: updates.some(u => u.id === r.id)
+        })),
         requestId
       }),
       { 

@@ -32,6 +32,7 @@ import {
   AlertTitle,
 } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
+import { AddressCorrectionDialog } from '@/components/AddressCorrectionDialog';
 
 interface ParsedAddress {
   address1: string;
@@ -131,7 +132,8 @@ export function MailingLabels() {
   // PHASE 1: Address Correction State
   const [isCorrecting, setIsCorrecting] = useState(false);
   const [correctionProgress, setCorrectionProgress] = useState(0);
-  const [correctionResults, setCorrectionResults] = useState<any>(null);
+  const [showCorrectionDialog, setShowCorrectionDialog] = useState(false);
+  const [correctionResults, setCorrectionResults] = useState<any[]>([]);
   const [hasBeenCorrected, setHasBeenCorrected] = useState(false);
 
   const { data: offices = [], isLoading: officesLoading } = useOffices();
@@ -277,7 +279,7 @@ export function MailingLabels() {
     );
   };
 
-  // PHASE 2: Address Correction Handler
+  // PHASE 2: Address Correction Handler - Now shows review dialog
   const handleCorrectAddresses = async () => {
     if (hasBeenCorrected) {
       toast({
@@ -289,7 +291,7 @@ export function MailingLabels() {
     }
 
     // Get all partner office IDs that are currently filtered
-    const partnerOfficeIds = offices
+    const officesWithIds = offices
       .filter(office => {
         const matchesTier = selectedTiers.includes(office.tier);
         const matchesSearch = searchTerm === '' || 
@@ -297,8 +299,9 @@ export function MailingLabels() {
           (office.address?.toLowerCase().includes(searchTerm.toLowerCase()));
         
         return matchesTier && matchesSearch && office.address;
-      })
-      .map(office => office.id);
+      });
+
+    const partnerOfficeIds = officesWithIds.map(office => office.id);
 
     if (partnerOfficeIds.length === 0) {
       toast({
@@ -311,7 +314,6 @@ export function MailingLabels() {
 
     setIsCorrecting(true);
     setCorrectionProgress(0);
-    setCorrectionResults(null);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -325,7 +327,7 @@ export function MailingLabels() {
         description: `Processing ${partnerOfficeIds.length} offices with Google Maps API...`,
       });
 
-      // Call edge function
+      // Call edge function to get corrections (no auto-update)
       const response = await fetch(
         `https://vqkzqwibbcvmdwgqladn.supabase.co/functions/v1/correct-office-addresses`,
         {
@@ -344,17 +346,24 @@ export function MailingLabels() {
       }
 
       const result = await response.json();
-      setCorrectionResults(result);
-      setHasBeenCorrected(true);
-      setCorrectionProgress(100);
-
-      toast({
-        title: "Address correction complete",
-        description: `Processed ${result.processed} offices, updated ${result.updated} addresses.`,
+      
+      // Map results with office names
+      const resultsWithNames = result.results.map((r: any) => {
+        const office = officesWithIds.find(o => o.id === r.id);
+        return {
+          ...r,
+          officeName: office?.name || 'Unknown Office',
+        };
       });
 
-      // Refresh office data
-      window.location.reload();
+      setCorrectionResults(resultsWithNames);
+      setCorrectionProgress(100);
+      setShowCorrectionDialog(true);
+
+      toast({
+        title: "Analysis complete",
+        description: `Found ${result.needsUpdate} addresses that can be improved.`,
+      });
 
     } catch (error) {
       console.error('Address correction error:', error);
@@ -365,6 +374,59 @@ export function MailingLabels() {
       });
     } finally {
       setIsCorrecting(false);
+    }
+  };
+
+  // PHASE 3: Apply selected corrections
+  const handleApplyCorrections = async (selectedIds: string[]) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      const updates = correctionResults
+        .filter(r => selectedIds.includes(r.id))
+        .map(r => ({ id: r.id, address: r.corrected }));
+
+      const response = await fetch(
+        `https://vqkzqwibbcvmdwgqladn.supabase.co/functions/v1/apply-address-corrections`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ updates }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to apply corrections');
+      }
+
+      const result = await response.json();
+      
+      toast({
+        title: "Addresses updated",
+        description: `Successfully updated ${result.updated} of ${result.total} addresses.`,
+      });
+
+      setHasBeenCorrected(true);
+      
+      // Refresh page to show updated addresses
+      setTimeout(() => window.location.reload(), 1500);
+
+    } catch (error) {
+      console.error('Apply corrections error:', error);
+      toast({
+        title: "Update failed",
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        variant: "destructive",
+      });
+      throw error;
     }
   };
 
@@ -492,13 +554,12 @@ export function MailingLabels() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {hasBeenCorrected && correctionResults ? (
+          {hasBeenCorrected ? (
             <Alert>
               <CheckCircle2 className="h-4 w-4" />
               <AlertTitle>Correction Complete</AlertTitle>
               <AlertDescription>
-                Processed {correctionResults.processed} offices, updated {correctionResults.updated} addresses. 
-                Refresh the page to run correction again.
+                Addresses have been updated successfully. Refresh the page to run correction again.
               </AlertDescription>
             </Alert>
           ) : (
@@ -628,6 +689,14 @@ export function MailingLabels() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Address Correction Dialog */}
+      <AddressCorrectionDialog
+        open={showCorrectionDialog}
+        onOpenChange={setShowCorrectionDialog}
+        corrections={correctionResults}
+        onConfirm={handleApplyCorrections}
+      />
     </div>
   );
 }
