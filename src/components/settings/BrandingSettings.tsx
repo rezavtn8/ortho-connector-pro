@@ -4,8 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Palette, Upload, Image, Type, Globe, Loader2, Eye } from 'lucide-react';
+import { Upload, Loader2 } from 'lucide-react';
 import { useBrand } from '@/contexts/BrandContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -14,9 +13,8 @@ export const BrandingSettings = () => {
   const { settings, saving, updateSettings } = useBrand();
   const [localSettings, setLocalSettings] = useState(settings);
   const [uploading, setUploading] = useState(false);
-  const [previewMode, setPreviewMode] = useState(false);
 
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'logo_dark' | 'favicon') => {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !settings.clinic_id) return;
 
@@ -33,7 +31,7 @@ export const BrandingSettings = () => {
     setUploading(true);
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${settings.clinic_id}-${type}-${Date.now()}.${fileExt}`;
+      const fileName = `${settings.clinic_id}-logo-${Date.now()}.${fileExt}`;
       
       const { error: uploadError } = await supabase.storage
         .from('clinic-logos')
@@ -45,10 +43,9 @@ export const BrandingSettings = () => {
         .from('clinic-logos')
         .getPublicUrl(fileName);
 
-      const updateKey = type === 'logo' ? 'logo_url' : type === 'logo_dark' ? 'logo_dark_url' : 'favicon_url';
-      setLocalSettings(prev => ({ ...prev, [updateKey]: publicUrl }));
+      setLocalSettings(prev => ({ ...prev, logo_url: publicUrl }));
       
-      toast({ title: 'Success', description: `${type === 'favicon' ? 'Favicon' : 'Logo'} uploaded successfully` });
+      toast({ title: 'Success', description: 'Logo uploaded successfully' });
     } catch (error: any) {
       console.error('Error uploading:', error);
       toast({ title: 'Error', description: error.message || 'Failed to upload', variant: 'destructive' });
