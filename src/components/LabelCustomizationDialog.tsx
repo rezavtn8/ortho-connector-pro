@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { calculateOptimalSizes } from "@/utils/labelSizing";
 import { optimizeLabelLayout, explainOptimization } from "@/utils/labelOptimization";
 import type { LogoPosition, ReturnAddressPosition } from "@/utils/labelOptimization";
+import { useClinicLogo } from "@/hooks/useClinicLogo";
 
 export type { LogoPosition, ReturnAddressPosition };
 
@@ -43,7 +44,19 @@ export const LabelCustomizationDialog = ({
   onSave,
   templateDimensions = { width: 2.625, height: 1 }
 }: LabelCustomizationDialogProps) => {
+  const { logoUrl: clinicLogoUrl, loading: clinicLogoLoading } = useClinicLogo();
   const [localCustomization, setLocalCustomization] = useState<LabelCustomization>(customization);
+  
+  // Auto-fill clinic logo if available and no logo is set
+  useEffect(() => {
+    if (clinicLogoUrl && !localCustomization.logoUrl && !clinicLogoLoading) {
+      setLocalCustomization(prev => ({
+        ...prev,
+        logoUrl: clinicLogoUrl,
+        showLogo: true
+      }));
+    }
+  }, [clinicLogoUrl, clinicLogoLoading]);
   
   // Phase 1-3: Auto-optimize on content changes
   useEffect(() => {
@@ -143,6 +156,25 @@ export const LabelCustomizationDialog = ({
 
             {localCustomization.showLogo && (
               <div className="space-y-3">
+                {/* Show clinic logo info if available */}
+                {clinicLogoUrl && !localCustomization.logoUrl && (
+                  <div className="p-3 bg-muted rounded-lg border">
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Using clinic brand logo from settings
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={clinicLogoUrl}
+                        alt="Clinic logo"
+                        className="h-16 w-16 object-contain border rounded p-1"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        To use a different logo, upload one below
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
                 {localCustomization.logoUrl ? (
                   <div className="relative w-32 h-32 border border-border rounded-lg overflow-hidden bg-muted/30">
                     <img 
@@ -154,10 +186,18 @@ export const LabelCustomizationDialog = ({
                       variant="destructive"
                       size="icon"
                       className="absolute top-1 right-1 h-6 w-6"
-                      onClick={() => setLocalCustomization(prev => ({ ...prev, logoUrl: undefined }))}
+                      onClick={() => setLocalCustomization(prev => ({ 
+                        ...prev, 
+                        logoUrl: clinicLogoUrl || undefined 
+                      }))}
                     >
                       <X className="h-3 w-3" />
                     </Button>
+                    {localCustomization.logoUrl === clinicLogoUrl && (
+                      <div className="absolute bottom-1 left-1 right-1 bg-primary/90 text-primary-foreground text-xs px-2 py-0.5 rounded text-center">
+                        Clinic Logo
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="relative">
@@ -173,7 +213,9 @@ export const LabelCustomizationDialog = ({
                       className="flex items-center justify-center gap-2 h-32 border-2 border-dashed border-border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
                     >
                       <Upload className="h-5 w-5 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Upload logo (max 2MB)</span>
+                      <span className="text-sm text-muted-foreground">
+                        {clinicLogoUrl ? 'Upload custom logo (max 2MB)' : 'Upload logo (max 2MB)'}
+                      </span>
                     </Label>
                   </div>
                 )}

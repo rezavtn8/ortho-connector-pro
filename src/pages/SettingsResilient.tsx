@@ -28,6 +28,7 @@ interface ClinicSettings {
   clinic_name: string;
   clinic_address: string;
   google_place_id: string;
+  logo_url: string;
 }
 
 interface NotificationSettings {
@@ -40,7 +41,8 @@ interface NotificationSettings {
 const initialClinicSettings: ClinicSettings = {
   clinic_name: '',
   clinic_address: '',
-  google_place_id: ''
+  google_place_id: '',
+  logo_url: ''
 };
 
 const initialNotificationSettings: NotificationSettings = {
@@ -62,6 +64,7 @@ function SettingsContent() {
   const [localProfile, setLocalProfile] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [clinicLoading, setClinicLoading] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
 
   // Load clinic settings when profile loads
   useEffect(() => {
@@ -88,7 +91,7 @@ function SettingsContent() {
     try {
       const { data, error } = await supabase
         .from('clinics')
-        .select('name, address, google_place_id')
+        .select('name, address, google_place_id, logo_url')
         .eq('id', clinicId)
         .maybeSingle();
 
@@ -98,7 +101,8 @@ function SettingsContent() {
         setClinicSettings({
           clinic_name: data.name || '',
           clinic_address: data.address || '',
-          google_place_id: data.google_place_id || ''
+          google_place_id: data.google_place_id || '',
+          logo_url: data.logo_url || ''
         });
       }
     } catch (error: any) {
@@ -178,6 +182,7 @@ function SettingsContent() {
             name: clinicSettings.clinic_name,
             address: clinicSettings.clinic_address,
             google_place_id: clinicSettings.google_place_id || null,
+            logo_url: clinicSettings.logo_url || null,
             updated_at: new Date().toISOString()
           })
           .eq('id', clinicId);
@@ -191,6 +196,7 @@ function SettingsContent() {
             name: clinicSettings.clinic_name,
             address: clinicSettings.clinic_address,
             google_place_id: clinicSettings.google_place_id || null,
+            logo_url: clinicSettings.logo_url || null,
             owner_id: user.id
           })
           .select()
@@ -232,6 +238,96 @@ function SettingsContent() {
     setEditingClinic(false);
     if (profile?.clinic_id) {
       loadClinicSettings(profile.clinic_id);
+    }
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !profile?.clinic_id) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Error',
+        description: 'Please upload an image file',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        title: 'Error',
+        description: 'Image must be less than 2MB',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setLogoUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${profile.clinic_id}-${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      // Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('clinic-logos')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('clinic-logos')
+        .getPublicUrl(filePath);
+
+      setClinicSettings(prev => ({ ...prev, logo_url: publicUrl }));
+
+      toast({
+        title: 'Success',
+        description: 'Logo uploaded successfully',
+      });
+    } catch (error: any) {
+      console.error('Error uploading logo:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to upload logo',
+        variant: 'destructive',
+      });
+    } finally {
+      setLogoUploading(false);
+    }
+  };
+
+  const handleLogoRemove = async () => {
+    if (!clinicSettings.logo_url) return;
+
+    try {
+      // Extract file path from URL
+      const url = new URL(clinicSettings.logo_url);
+      const pathParts = url.pathname.split('/');
+      const filePath = pathParts[pathParts.length - 1];
+
+      // Delete from storage
+      await supabase.storage
+        .from('clinic-logos')
+        .remove([filePath]);
+
+      setClinicSettings(prev => ({ ...prev, logo_url: '' }));
+
+      toast({
+        title: 'Success',
+        description: 'Logo removed successfully',
+      });
+    } catch (error: any) {
+      console.error('Error removing logo:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to remove logo',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -566,6 +662,21 @@ function SettingsContent() {
                       /* Display Mode */
                       <div className="space-y-4">
                         <div className="space-y-1">
+                          <Label className="text-sm font-medium text-muted-foreground">Clinic Logo</Label>
+                          {clinicSettings.logo_url ? (
+                            <div className="flex items-center gap-4">
+                              <img 
+                                src={clinicSettings.logo_url} 
+                                alt="Clinic Logo" 
+                                className="h-16 w-16 object-contain border rounded"
+                              />
+                            </div>
+                          ) : (
+                            <p className="text-base font-medium text-muted-foreground">No logo uploaded</p>
+                          )}
+                        </div>
+
+                        <div className="space-y-1">
                           <Label className="text-sm font-medium text-muted-foreground">Clinic Name</Label>
                           <p className="text-base font-medium">{clinicSettings.clinic_name || 'Not set'}</p>
                         </div>
@@ -583,6 +694,57 @@ function SettingsContent() {
                     ) : (
                       /* Edit Mode */
                       <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>Clinic Logo</Label>
+                          <div className="flex items-center gap-4">
+                            {clinicSettings.logo_url && (
+                              <img 
+                                src={clinicSettings.logo_url} 
+                                alt="Clinic Logo" 
+                                className="h-16 w-16 object-contain border rounded"
+                              />
+                            )}
+                            <div className="flex gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={logoUploading}
+                                onClick={() => document.getElementById('logo-upload')?.click()}
+                              >
+                                {logoUploading ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Uploading...
+                                  </>
+                                ) : (
+                                  'Upload Logo'
+                                )}
+                              </Button>
+                              {clinicSettings.logo_url && (
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={handleLogoRemove}
+                                >
+                                  Remove
+                                </Button>
+                              )}
+                            </div>
+                            <input
+                              id="logo-upload"
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={handleLogoUpload}
+                            />
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Recommended: Square image, max 2MB
+                          </p>
+                        </div>
+
                         <div className="space-y-2">
                           <Label htmlFor="clinic_name">Clinic Name *</Label>
                           <Input

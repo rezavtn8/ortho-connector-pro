@@ -387,6 +387,7 @@ export type Database = {
           google_place_id: string | null
           id: string
           latitude: number | null
+          logo_url: string | null
           longitude: number | null
           name: string
           owner_id: string
@@ -398,6 +399,7 @@ export type Database = {
           google_place_id?: string | null
           id?: string
           latitude?: number | null
+          logo_url?: string | null
           longitude?: number | null
           name: string
           owner_id: string
@@ -409,6 +411,7 @@ export type Database = {
           google_place_id?: string | null
           id?: string
           latitude?: number | null
+          logo_url?: string | null
           longitude?: number | null
           name?: string
           owner_id?: string
