@@ -380,6 +380,92 @@ export type Database = {
           },
         ]
       }
+      clinic_brand_settings: {
+        Row: {
+          accent_color: string | null
+          address: string | null
+          background_color: string | null
+          brand_name: string | null
+          brand_voice: string | null
+          clinic_id: string
+          created_at: string
+          created_by: string | null
+          custom_css: string | null
+          email: string | null
+          favicon_url: string | null
+          font_family: string | null
+          foreground_color: string | null
+          id: string
+          logo_dark_url: string | null
+          logo_url: string | null
+          phone: string | null
+          primary_color: string | null
+          secondary_color: string | null
+          social_links: Json | null
+          tagline: string | null
+          updated_at: string
+          website_url: string | null
+        }
+        Insert: {
+          accent_color?: string | null
+          address?: string | null
+          background_color?: string | null
+          brand_name?: string | null
+          brand_voice?: string | null
+          clinic_id: string
+          created_at?: string
+          created_by?: string | null
+          custom_css?: string | null
+          email?: string | null
+          favicon_url?: string | null
+          font_family?: string | null
+          foreground_color?: string | null
+          id?: string
+          logo_dark_url?: string | null
+          logo_url?: string | null
+          phone?: string | null
+          primary_color?: string | null
+          secondary_color?: string | null
+          social_links?: Json | null
+          tagline?: string | null
+          updated_at?: string
+          website_url?: string | null
+        }
+        Update: {
+          accent_color?: string | null
+          address?: string | null
+          background_color?: string | null
+          brand_name?: string | null
+          brand_voice?: string | null
+          clinic_id?: string
+          created_at?: string
+          created_by?: string | null
+          custom_css?: string | null
+          email?: string | null
+          favicon_url?: string | null
+          font_family?: string | null
+          foreground_color?: string | null
+          id?: string
+          logo_dark_url?: string | null
+          logo_url?: string | null
+          phone?: string | null
+          primary_color?: string | null
+          secondary_color?: string | null
+          social_links?: Json | null
+          tagline?: string | null
+          updated_at?: string
+          website_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clinic_brand_settings_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: true
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clinics: {
         Row: {
           address: string | null

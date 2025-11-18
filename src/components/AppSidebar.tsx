@@ -36,6 +36,7 @@ import { NexoraLogo } from '@/components/NexoraLogo';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { usePrefetch } from '@/hooks/usePrefetch';
+import { useBrand } from '@/contexts/BrandContext';
 
 const mainNavItems = [
   { id: 'dashboard', title: 'Dashboard', icon: Home, path: '/dashboard' },
@@ -64,6 +65,7 @@ const systemItems = [
 export function AppSidebar() {
   const { user, signOut } = useAuth();
   const { state, setOpenMobile } = useSidebar();
+  const { settings } = useBrand();
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const location = useLocation();
@@ -121,12 +123,24 @@ export function AppSidebar() {
       <SidebarHeader className="border-b p-4">
         <div className="flex items-center gap-2">
           <div className="flex items-center justify-center">
-            <NexoraLogo size={24} className="text-foreground" />
+            {settings.logo_url ? (
+              <img 
+                src={settings.logo_url} 
+                alt={settings.brand_name || 'Clinic Logo'} 
+                className="h-6 w-6 object-contain"
+              />
+            ) : (
+              <NexoraLogo size={24} className="text-foreground" />
+            )}
           </div>
           {!isCollapsed && (
             <div className="flex flex-col">
-              <span className="font-semibold text-sm">Nexora</span>
-              <span className="text-xs text-muted-foreground">Dental Platform</span>
+              <span className="font-semibold text-sm">
+                {settings.brand_name || 'Nexora'}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {settings.tagline || 'Dental Platform'}
+              </span>
             </div>
           )}
         </div>

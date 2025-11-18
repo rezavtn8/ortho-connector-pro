@@ -20,9 +20,11 @@ import {
   AlertCircle,
   CheckCircle,
   WifiOff,
-  CreditCard
+  CreditCard,
+  Palette
 } from 'lucide-react';
 import { SubscriptionManagement } from '@/components/SubscriptionManagement';
+import { BrandingSettings } from '@/components/settings/BrandingSettings';
 
 interface ClinicSettings {
   clinic_name: string;
@@ -454,6 +456,10 @@ function SettingsContent() {
                   <MapPin className="w-4 h-4 mr-3" />
                   Clinic Information
                 </TabsTrigger>
+                <TabsTrigger value="branding" className="w-full justify-start px-3 py-3 text-left">
+                  <Palette className="w-4 h-4 mr-3" />
+                  Brand Identity
+                </TabsTrigger>
               </div>
 
               <div className="w-full">
@@ -778,6 +784,11 @@ function SettingsContent() {
                     )}
                   </CardContent>
                 </Card>
+              </TabsContent>
+
+              {/* Brand Identity */}
+              <TabsContent value="branding" className="mt-0">
+                <BrandingSettings />
               </TabsContent>
 
               {/* Notifications */}
