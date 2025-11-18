@@ -108,7 +108,8 @@ function DashboardContent() {
 
   // Memoized calculations for better performance
   const getSourceGroupData = useMemo((): SourceGroupData[] => {
-    if (!data) return [];
+    // Phase 1: Comprehensive null safety checks
+    if (!data || !data.sources || !data.monthlyData) return [];
     
     const groups = [
       {
@@ -132,11 +133,18 @@ function DashboardContent() {
     ];
 
     return groups.map(group => {
-      const groupSources = data.sources.filter(source => group.types.includes(source.source_type));
+      // Phase 2: Safe array operations with fallbacks
+      const groupSources = (data.sources || []).filter(source => 
+        group.types.includes(source.source_type)
+      );
       const sourceIds = groupSources.map(s => s.id);
       
-      const groupMonthlyData = data.monthlyData.filter(m => sourceIds.includes(m.source_id));
-      const thisMonthData = groupMonthlyData.filter(m => m.year_month === currentMonth);
+      const groupMonthlyData = (data.monthlyData || []).filter(m => 
+        sourceIds.includes(m.source_id)
+      );
+      const thisMonthData = groupMonthlyData.filter(m => 
+        m.year_month === currentMonth
+      );
       
       return {
         ...group,
