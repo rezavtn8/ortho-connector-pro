@@ -28,6 +28,14 @@ interface ClinicSettings {
   clinic_name: string;
   clinic_address: string;
   google_place_id: string;
+  logo_url: string;
+  website_url: string;
+  social_links: {
+    facebook?: string;
+    instagram?: string;
+    twitter?: string;
+    linkedin?: string;
+  };
 }
 
 interface NotificationSettings {
@@ -40,7 +48,10 @@ interface NotificationSettings {
 const initialClinicSettings: ClinicSettings = {
   clinic_name: '',
   clinic_address: '',
-  google_place_id: ''
+  google_place_id: '',
+  logo_url: '',
+  website_url: '',
+  social_links: {}
 };
 
 const initialNotificationSettings: NotificationSettings = {
@@ -94,11 +105,21 @@ function SettingsContent() {
 
       if (error) throw error;
 
+      // Load brand settings
+      const { data: brandData } = await supabase
+        .from('clinic_brand_settings')
+        .select('logo_url, website_url, social_links')
+        .eq('clinic_id', clinicId)
+        .maybeSingle();
+
       if (data) {
         setClinicSettings({
           clinic_name: data.name || '',
           clinic_address: data.address || '',
-          google_place_id: data.google_place_id || ''
+          google_place_id: data.google_place_id || '',
+          logo_url: brandData?.logo_url || '',
+          website_url: brandData?.website_url || '',
+          social_links: (brandData?.social_links as any) || {}
         });
       }
     } catch (error: any) {
@@ -199,6 +220,22 @@ function SettingsContent() {
         if (createError) throw createError;
         clinicId = newClinic.id;
       }
+
+      // Upsert brand settings
+      const { error: brandError } = await supabase
+        .from('clinic_brand_settings')
+        .upsert({
+          clinic_id: clinicId,
+          logo_url: clinicSettings.logo_url || null,
+          website_url: clinicSettings.website_url || null,
+          social_links: clinicSettings.social_links || {},
+          updated_at: new Date().toISOString(),
+          created_by: user.id,
+        }, {
+          onConflict: 'clinic_id'
+        });
+
+      if (brandError) throw brandError;
 
       // Update user profile with clinic info
       const { error: profileError } = await supabase
@@ -571,8 +608,36 @@ function SettingsContent() {
                         </div>
 
                         <div className="space-y-1">
+                          <Label className="text-sm font-medium text-muted-foreground">Logo</Label>
+                          {clinicSettings.logo_url ? (
+                            <img src={clinicSettings.logo_url} alt="Clinic logo" className="h-16 w-auto object-contain" />
+                          ) : (
+                            <p className="text-base font-medium">Not set</p>
+                          )}
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-sm font-medium text-muted-foreground">Website</Label>
+                          <p className="text-base font-medium">{clinicSettings.website_url || 'Not set'}</p>
+                        </div>
+
+                        <div className="space-y-1">
                           <Label className="text-sm font-medium text-muted-foreground">Address</Label>
                           <p className="text-base font-medium">{clinicSettings.clinic_address || 'Not set'}</p>
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-sm font-medium text-muted-foreground">Social Media</Label>
+                          <div className="space-y-1">
+                            {clinicSettings.social_links?.facebook && <p className="text-sm">Facebook: {clinicSettings.social_links.facebook}</p>}
+                            {clinicSettings.social_links?.instagram && <p className="text-sm">Instagram: {clinicSettings.social_links.instagram}</p>}
+                            {clinicSettings.social_links?.twitter && <p className="text-sm">Twitter: {clinicSettings.social_links.twitter}</p>}
+                            {clinicSettings.social_links?.linkedin && <p className="text-sm">LinkedIn: {clinicSettings.social_links.linkedin}</p>}
+                            {!clinicSettings.social_links?.facebook && !clinicSettings.social_links?.instagram && 
+                             !clinicSettings.social_links?.twitter && !clinicSettings.social_links?.linkedin && (
+                              <p className="text-base font-medium">Not set</p>
+                            )}
+                          </div>
                         </div>
 
                         <div className="space-y-1">
@@ -594,6 +659,29 @@ function SettingsContent() {
                         </div>
 
                         <div className="space-y-2">
+                          <Label htmlFor="logo_url">Logo URL</Label>
+                          <Input
+                            id="logo_url"
+                            value={clinicSettings.logo_url}
+                            onChange={(e) => setClinicSettings(prev => ({ ...prev, logo_url: e.target.value }))}
+                            placeholder="Enter logo image URL..."
+                          />
+                          {clinicSettings.logo_url && (
+                            <img src={clinicSettings.logo_url} alt="Logo preview" className="h-16 w-auto object-contain mt-2" />
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="website_url">Website</Label>
+                          <Input
+                            id="website_url"
+                            value={clinicSettings.website_url}
+                            onChange={(e) => setClinicSettings(prev => ({ ...prev, website_url: e.target.value }))}
+                            placeholder="https://yourwebsite.com"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
                           <Label htmlFor="clinic_address">Address</Label>
                           <Input
                             id="clinic_address"
@@ -604,13 +692,52 @@ function SettingsContent() {
                         </div>
 
                         <div className="space-y-2">
+                          <Label>Social Media Links</Label>
+                          <div className="space-y-2">
+                            <Input
+                              placeholder="Facebook URL"
+                              value={clinicSettings.social_links?.facebook || ''}
+                              onChange={(e) => setClinicSettings(prev => ({ 
+                                ...prev, 
+                                social_links: { ...prev.social_links, facebook: e.target.value }
+                              }))}
+                            />
+                            <Input
+                              placeholder="Instagram URL"
+                              value={clinicSettings.social_links?.instagram || ''}
+                              onChange={(e) => setClinicSettings(prev => ({ 
+                                ...prev, 
+                                social_links: { ...prev.social_links, instagram: e.target.value }
+                              }))}
+                            />
+                            <Input
+                              placeholder="Twitter URL"
+                              value={clinicSettings.social_links?.twitter || ''}
+                              onChange={(e) => setClinicSettings(prev => ({ 
+                                ...prev, 
+                                social_links: { ...prev.social_links, twitter: e.target.value }
+                              }))}
+                            />
+                            <Input
+                              placeholder="LinkedIn URL"
+                              value={clinicSettings.social_links?.linkedin || ''}
+                              onChange={(e) => setClinicSettings(prev => ({ 
+                                ...prev, 
+                                social_links: { ...prev.social_links, linkedin: e.target.value }
+                              }))}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
                           <Label htmlFor="google_place_id">Google Place ID</Label>
                           <Input
                             id="google_place_id"
                             value={clinicSettings.google_place_id}
                             onChange={(e) => setClinicSettings(prev => ({ ...prev, google_place_id: e.target.value }))}
-                            placeholder="Enter Google Place ID..."
+                            placeholder="Enter Google Place ID (optional)..."
                           />
+                          <p className="text-xs text-muted-foreground">Used for Google Business integration</p>
                         </div>
                       </div>
                     )}
