@@ -20,7 +20,9 @@ import {
   AlertCircle,
   CheckCircle,
   WifiOff,
-  CreditCard
+  CreditCard,
+  Upload,
+  Trash2
 } from 'lucide-react';
 import { SubscriptionManagement } from '@/components/SubscriptionManagement';
 
@@ -73,6 +75,7 @@ function SettingsContent() {
   const [localProfile, setLocalProfile] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [clinicLoading, setClinicLoading] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   // Load clinic settings when profile loads
   useEffect(() => {
@@ -269,6 +272,116 @@ function SettingsContent() {
     setEditingClinic(false);
     if (profile?.clinic_id) {
       loadClinicSettings(profile.clinic_id);
+    }
+  };
+
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user?.id) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Error',
+        description: 'Please upload an image file',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        title: 'Error',
+        description: 'Image size must be less than 2MB',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setUploadingLogo(true);
+    try {
+      const clinicId = profile?.clinic_id;
+      if (!clinicId) {
+        throw new Error('No clinic found');
+      }
+
+      // Create a unique filename
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${clinicId}-${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      // Delete old logo if exists
+      if (clinicSettings.logo_url) {
+        const oldPath = clinicSettings.logo_url.split('/').pop();
+        if (oldPath) {
+          await supabase.storage.from('clinic-logos').remove([oldPath]);
+        }
+      }
+
+      // Upload new logo
+      const { error: uploadError } = await supabase.storage
+        .from('clinic-logos')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('clinic-logos')
+        .getPublicUrl(filePath);
+
+      // Update local state
+      setClinicSettings(prev => ({ ...prev, logo_url: publicUrl }));
+
+      toast({
+        title: 'Success',
+        description: 'Logo uploaded successfully',
+      });
+    } catch (error: any) {
+      console.error('Error uploading logo:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to upload logo',
+        variant: 'destructive',
+      });
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleDeleteLogo = async () => {
+    if (!clinicSettings.logo_url) return;
+
+    setUploadingLogo(true);
+    try {
+      const fileName = clinicSettings.logo_url.split('/').pop();
+      if (fileName) {
+        const { error } = await supabase.storage
+          .from('clinic-logos')
+          .remove([fileName]);
+
+        if (error) throw error;
+      }
+
+      setClinicSettings(prev => ({ ...prev, logo_url: '' }));
+
+      toast({
+        title: 'Success',
+        description: 'Logo deleted successfully',
+      });
+    } catch (error: any) {
+      console.error('Error deleting logo:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to delete logo',
+        variant: 'destructive',
+      });
+    } finally {
+      setUploadingLogo(false);
     }
   };
 
@@ -659,16 +772,53 @@ function SettingsContent() {
                         </div>
 
                         <div className="space-y-2">
-                          <Label htmlFor="logo_url">Logo URL</Label>
-                          <Input
-                            id="logo_url"
-                            value={clinicSettings.logo_url}
-                            onChange={(e) => setClinicSettings(prev => ({ ...prev, logo_url: e.target.value }))}
-                            placeholder="Enter logo image URL..."
-                          />
-                          {clinicSettings.logo_url && (
-                            <img src={clinicSettings.logo_url} alt="Logo preview" className="h-16 w-auto object-contain mt-2" />
-                          )}
+                          <Label>Logo</Label>
+                          <div className="space-y-3">
+                            {clinicSettings.logo_url ? (
+                              <div className="flex items-start gap-4">
+                                <img 
+                                  src={clinicSettings.logo_url} 
+                                  alt="Logo preview" 
+                                  className="h-20 w-auto object-contain border rounded-md p-2" 
+                                />
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={handleDeleteLogo}
+                                  disabled={uploadingLogo}
+                                >
+                                  {uploadingLogo ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="border-2 border-dashed rounded-md p-6 text-center">
+                                <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                                <p className="text-sm text-muted-foreground mb-2">
+                                  Upload your clinic logo
+                                </p>
+                                <p className="text-xs text-muted-foreground mb-4">
+                                  PNG, JPG up to 2MB
+                                </p>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleLogoUpload}
+                                disabled={uploadingLogo}
+                                className="cursor-pointer"
+                              />
+                              {uploadingLogo && (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              )}
+                            </div>
+                          </div>
                         </div>
 
                         <div className="space-y-2">
