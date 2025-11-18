@@ -64,6 +64,13 @@ export const useBrandSettings = () => {
       if (profileError) throw profileError;
 
       if (profile?.clinic_id) {
+        // Get clinic info for fallback
+        const { data: clinicData } = await supabase
+          .from('clinics')
+          .select('name, logo_url')
+          .eq('id', profile.clinic_id)
+          .single();
+
         // Get brand settings
         const { data: brandData, error: brandError } = await supabase
           .from('clinic_brand_settings')
@@ -77,15 +84,20 @@ export const useBrandSettings = () => {
           setSettings({
             ...defaultBrandSettings,
             ...brandData,
+            // Use clinic name as fallback if brand_name is not set
+            brand_name: brandData.brand_name || clinicData?.name || '',
+            logo_url: brandData.logo_url || clinicData?.logo_url || '',
             social_links: (brandData.social_links as any) || {},
           });
         } else {
-          // Create default settings
+          // Create default settings with clinic name
           const { data: newSettings, error: createError } = await supabase
             .from('clinic_brand_settings')
             .insert({
               clinic_id: profile.clinic_id,
               ...defaultBrandSettings,
+              brand_name: clinicData?.name || '',
+              logo_url: clinicData?.logo_url || '',
               created_by: user.id,
             })
             .select()
@@ -95,6 +107,8 @@ export const useBrandSettings = () => {
           setSettings({ 
             ...defaultBrandSettings, 
             ...newSettings,
+            brand_name: newSettings.brand_name || clinicData?.name || '',
+            logo_url: newSettings.logo_url || clinicData?.logo_url || '',
             social_links: (newSettings.social_links as any) || {},
           });
         }
