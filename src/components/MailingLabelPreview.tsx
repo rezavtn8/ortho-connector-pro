@@ -1,11 +1,11 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Printer, Settings } from "lucide-react";
+import { Printer, Settings, FileDown } from "lucide-react";
 import { useState } from "react";
 import { LabelCustomizationDialog, LabelCustomization, LogoPosition, ReturnAddressPosition } from "./LabelCustomizationDialog";
 import { calculateOptimalSizes } from "@/utils/labelSizing";
-
+import { toast } from "@/hooks/use-toast";
 interface MailingLabelData {
   contact: string;
   address1: string;
@@ -98,6 +98,15 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
     window.print();
   };
 
+  const handleExportPDF = () => {
+    toast({
+      title: "Exporting to PDF",
+      description: "Select 'Save as PDF' as your printer destination.",
+    });
+    // Use print dialog - user can choose "Save as PDF" as destination
+    setTimeout(() => window.print(), 500);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[95vw] max-h-[95vh] w-full">
@@ -130,9 +139,13 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
                 <Settings className="h-4 w-4" />
                 Customize
               </Button>
+              <Button variant="outline" onClick={handleExportPDF} className="gap-2">
+                <FileDown className="h-4 w-4" />
+                Save PDF
+              </Button>
               <Button onClick={handlePrint} className="gap-2">
                 <Printer className="h-4 w-4" />
-                Print Labels
+                Print
               </Button>
             </div>
           </div>
