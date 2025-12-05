@@ -197,7 +197,7 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] max-h-[95vh] w-full flex flex-col">
+      <DialogContent className="max-w-[95vw] max-h-[95vh] w-full flex flex-col" aria-describedby={undefined}>
         <DialogHeader className="px-6 pt-6 pb-4 border-b border-border flex-shrink-0">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>

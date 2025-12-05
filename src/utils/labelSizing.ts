@@ -25,15 +25,21 @@ export function calculateOptimalSizes(
   logoSizeMultiplier: number = 1.0,  // 0.5 to 1.5 range
   fontSizeMultiplier: number = 1.0   // 0.8 to 1.2 range
 ): CalculatedSizes {
-  const widthPx = dimensions.width * DPI;
-  const heightPx = dimensions.height * DPI;
+  // Defensive checks for invalid dimensions
+  const safeWidth = Math.max(0.5, dimensions?.width || 2.625);
+  const safeHeight = Math.max(0.5, dimensions?.height || 1);
+  const safeLogoMultiplier = Math.max(0.5, Math.min(1.5, logoSizeMultiplier || 1.0));
+  const safeFontMultiplier = Math.max(0.8, Math.min(1.2, fontSizeMultiplier || 1.0));
+  
+  const widthPx = safeWidth * DPI;
+  const heightPx = safeHeight * DPI;
   
   // Base calculations on the smaller dimension for consistency
   const baseDimension = Math.min(widthPx, heightPx);
   
   // Logo sizing: 20-35% of label height, scaled by multiplier
   const baseLogoHeight = heightPx * 0.25;
-  const logoHeight = Math.round(baseLogoHeight * logoSizeMultiplier);
+  const logoHeight = Math.round(baseLogoHeight * safeLogoMultiplier);
   
   // Font sizing based on label size with smart scaling
   let baseFontSize: number;
@@ -48,9 +54,9 @@ export function calculateOptimalSizes(
     baseFontSize = 13;
   }
   
-  const mainFontSize = Math.round(baseFontSize * fontSizeMultiplier);
-  const returnFontSize = Math.round((baseFontSize - 2) * fontSizeMultiplier);
-  const brandingFontSize = Math.round((baseFontSize - 3) * fontSizeMultiplier);
+  const mainFontSize = Math.round(baseFontSize * safeFontMultiplier);
+  const returnFontSize = Math.round((baseFontSize - 2) * safeFontMultiplier);
+  const brandingFontSize = Math.round((baseFontSize - 3) * safeFontMultiplier);
   
   // Spacing calculations
   const padding = Math.max(4, Math.round(baseDimension * 0.05));

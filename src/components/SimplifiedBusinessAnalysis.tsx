@@ -545,7 +545,7 @@ export function SimplifiedBusinessAnalysis() {
                         <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                    <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto" aria-describedby={undefined}>
                       <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                           <insight.icon className="h-5 w-5 text-primary" />
