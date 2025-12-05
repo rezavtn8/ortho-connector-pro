@@ -65,11 +65,13 @@ export function useDashboardData() {
         if (monthlyResult.error) throw monthlyResult.error;
         if (recentResult.error) throw recentResult.error;
 
-        const recentActivity = recentResult.data?.map(item => ({
-          ...item,
-          source_name: item.patient_sources.name,
-          source_type: item.patient_sources.source_type
-        })) || [];
+        const recentActivity = (recentResult.data || [])
+          .filter(item => item.patient_sources) // Filter out items without patient_sources
+          .map(item => ({
+            ...item,
+            source_name: item.patient_sources?.name || 'Unknown',
+            source_type: item.patient_sources?.source_type || 'Other'
+          }));
 
         return {
           sources: sourcesResult.data || [],

@@ -406,7 +406,7 @@ function DashboardContent() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {data?.recentActivity.length === 0 ? (
+              {!data?.recentActivity || data.recentActivity.length === 0 ? (
                 <div className="text-center py-8">
                   <TrendingUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                   <p className="text-muted-foreground">No recent activity to display</p>
@@ -415,7 +415,7 @@ function DashboardContent() {
                   </p>
                 </div>
               ) : (
-                data?.recentActivity.map((activity) => (
+                data.recentActivity.map((activity) => (
                   <div key={activity.id} className="flex items-center justify-between p-3 bg-card rounded-lg border">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-primary/10 rounded-lg">

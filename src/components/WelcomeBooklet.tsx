@@ -672,7 +672,7 @@ Make all content professional, welcoming, and specific to ${bookletData.specialt
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 gap-0">
+      <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 gap-0" aria-describedby={undefined}>
         <div className="flex items-center justify-between p-4 border-b">
           <h2 className="text-xl font-semibold">Welcome Booklet</h2>
           <Button

@@ -120,6 +120,16 @@ export function generateLabelsPDF(
   templateKey: string,
   customization: LabelCustomization = {}
 ): jsPDF {
+  // Defensive check for empty labels array
+  if (!labels || labels.length === 0) {
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'pt',
+      format: 'letter',
+    });
+    return pdf;
+  }
+
   const template = AVERY_TEMPLATES[templateKey] || AVERY_TEMPLATES["5160"];
   const labelsPerPage = template.cols * template.rows;
   const totalPages = Math.ceil(labels.length / labelsPerPage);
