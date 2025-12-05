@@ -367,9 +367,21 @@ export function MailingLabels() {
     const partnerOfficeIds = officesWithIds.map(office => office.id);
 
     if (partnerOfficeIds.length === 0) {
+      const hasAnyOffices = offices.length > 0;
+      const hasAddresses = offices.some(o => o.address);
+      
+      let description = "No partner offices with addresses found in current filter.";
+      if (!hasAnyOffices) {
+        description = "You don't have any partner offices yet. Add offices from the Offices page first.";
+      } else if (!hasAddresses) {
+        description = "Your offices don't have addresses. Add addresses to your offices first.";
+      } else {
+        description = "No offices match the current tier/search filters. Try adjusting your filters.";
+      }
+      
       toast({
         title: "No addresses to correct",
-        description: "No partner offices with addresses found in current filter.",
+        description,
         variant: "destructive",
       });
       return;
