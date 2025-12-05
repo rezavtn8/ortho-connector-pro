@@ -139,7 +139,7 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
-          <div className="space-y-8">
+          <div className="print-area space-y-8">
             {Array.from({ length: totalPages }).map((_, pageIndex) => {
               const startIndex = pageIndex * labelsPerPage;
               const pageLabels = data.slice(startIndex, startIndex + labelsPerPage);
@@ -147,7 +147,7 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
               return (
                 <div
                   key={pageIndex}
-                  className="mx-auto bg-white shadow-lg"
+                  className="label-page mx-auto bg-white shadow-lg print:shadow-none"
                   style={{
                     width: "8.5in",
                     height: "11in",
@@ -169,7 +169,7 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
                       return (
                         <div
                           key={labelIndex}
-                          className="border border-dashed border-muted relative"
+                          className="border border-dashed border-muted print:border-transparent relative"
                           style={{
                             fontSize: `${calculatedSizes.mainFontSize}px`,
                             lineHeight: "1.3",
@@ -265,13 +265,13 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
                               )}
                             </div>
                           ) : (
-                            <span className="text-muted-foreground text-xs">Empty</span>
+                            <span className="text-muted-foreground print:hidden text-xs">Empty</span>
                           )}
                         </div>
                       );
                     })}
                   </div>
-                  <div className="text-center text-xs text-muted-foreground mt-2">
+                  <div className="text-center text-xs text-muted-foreground mt-2 print:hidden">
                     Page {pageIndex + 1} of {totalPages}
                   </div>
                 </div>
@@ -291,16 +291,37 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
 
       <style>{`
         @media print {
+          /* Hide everything except print area */
           body * {
-            visibility: hidden;
+            visibility: hidden !important;
           }
-          .print-area, .print-area * {
-            visibility: visible;
+          
+          .print-area,
+          .print-area * {
+            visibility: visible !important;
           }
+          
           .print-area {
-            position: absolute;
-            left: 0;
-            top: 0;
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            z-index: 9999 !important;
+          }
+          
+          .label-page {
+            page-break-after: always;
+            margin: 0 !important;
+            box-shadow: none !important;
+          }
+          
+          .label-page:last-child {
+            page-break-after: auto;
+          }
+          
+          @page {
+            size: letter;
+            margin: 0;
           }
         }
       `}</style>
