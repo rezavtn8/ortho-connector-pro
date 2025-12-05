@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Download, Search, Filter, FileSpreadsheet, MapPin, CheckCircle2, AlertCircle, Loader2, FileText } from 'lucide-react';
+import { Download, Search, Filter, FileSpreadsheet, MapPin, CheckCircle2, AlertCircle, Loader2, FileText, FileDown } from 'lucide-react';
+import { downloadLabelsPDF } from '@/utils/pdfLabelGenerator';
 import { useOffices } from '@/hooks/useOffices';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -684,7 +685,7 @@ export function MailingLabels() {
                 {isLoading ? 'Loading...' : `${filteredData.length} offices selected`}
               </CardDescription>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Button 
                 onClick={() => setShowPreview(true)}
                 disabled={isLoading || filteredData.length === 0}
@@ -695,12 +696,36 @@ export function MailingLabels() {
                 Preview Labels
               </Button>
               <Button 
+                onClick={() => {
+                  const pdfData = filteredData.map(item => ({
+                    contact: item.contactName,
+                    address1: item.address1,
+                    address2: item.address2,
+                    city: item.city,
+                    state: item.state,
+                    zip: item.zip,
+                  }));
+                  const filename = `mailing-labels-${new Date().toISOString().split('T')[0]}.pdf`;
+                  downloadLabelsPDF(pdfData, '5160', { showToLabel: true }, filename);
+                  toast({
+                    title: "PDF Downloaded",
+                    description: `Exported ${filteredData.length} labels using Avery 5160 template.`,
+                  });
+                }}
+                disabled={isLoading || filteredData.length === 0}
+                variant="secondary"
+                className="gap-2"
+              >
+                <FileDown className="w-4 h-4" />
+                Quick PDF
+              </Button>
+              <Button 
                 onClick={handleExportToExcel}
                 disabled={isLoading || filteredData.length === 0}
                 className="gap-2"
               >
                 <Download className="w-4 h-4" />
-                Export to Excel
+                Export Excel
               </Button>
             </div>
           </div>

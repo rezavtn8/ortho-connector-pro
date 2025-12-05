@@ -1,11 +1,13 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Printer, Settings, FileDown } from "lucide-react";
+import { Printer, Settings, FileDown, Eye } from "lucide-react";
 import { useState } from "react";
 import { LabelCustomizationDialog, LabelCustomization, LogoPosition, ReturnAddressPosition } from "./LabelCustomizationDialog";
 import { calculateOptimalSizes } from "@/utils/labelSizing";
 import { toast } from "@/hooks/use-toast";
+import { downloadLabelsPDF, previewLabelsPDF, AVERY_TEMPLATES as PDF_TEMPLATES } from "@/utils/pdfLabelGenerator";
+
 interface MailingLabelData {
   contact: string;
   address1: string;
@@ -71,6 +73,7 @@ const AVERY_TEMPLATES = {
 export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPreviewProps) => {
   const [selectedTemplate, setSelectedTemplate] = useState<keyof typeof AVERY_TEMPLATES>("5160");
   const [showCustomization, setShowCustomization] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [customization, setCustomization] = useState<LabelCustomization>({
     showLogo: false,
     showReturnAddress: false,
@@ -98,27 +101,112 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
     window.print();
   };
 
-  const handleExportPDF = () => {
-    toast({
-      title: "Exporting to PDF",
-      description: "Select 'Save as PDF' as your printer destination.",
-    });
-    // Use print dialog - user can choose "Save as PDF" as destination
-    setTimeout(() => window.print(), 500);
+  const handleExportPDF = async () => {
+    if (data.length === 0) {
+      toast({
+        title: "No labels to export",
+        description: "Add some addresses first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGenerating(true);
+    
+    try {
+      // Small delay for UI feedback
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const filename = `mailing-labels-${selectedTemplate}-${new Date().toISOString().split('T')[0]}.pdf`;
+      
+      downloadLabelsPDF(
+        data,
+        selectedTemplate,
+        {
+          showReturnAddress: customization.showReturnAddress,
+          returnAddress: customization.returnAddress,
+          showFromLabel: customization.showFromLabel,
+          showToLabel: customization.showToLabel,
+          showBranding: customization.showBranding,
+          brandingText: customization.brandingText,
+          fontSizeMultiplier: customization.fontSizeMultiplier,
+        },
+        filename
+      );
+      
+      toast({
+        title: "PDF Generated Successfully",
+        description: `Downloaded ${data.length} labels in ${totalPages} page${totalPages > 1 ? 's' : ''} using ${template.name}.`,
+      });
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      toast({
+        title: "PDF Generation Failed",
+        description: "There was an error generating the PDF. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handlePreviewPDF = async () => {
+    if (data.length === 0) {
+      toast({
+        title: "No labels to preview",
+        description: "Add some addresses first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGenerating(true);
+    
+    try {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      previewLabelsPDF(
+        data,
+        selectedTemplate,
+        {
+          showReturnAddress: customization.showReturnAddress,
+          returnAddress: customization.returnAddress,
+          showFromLabel: customization.showFromLabel,
+          showToLabel: customization.showToLabel,
+          showBranding: customization.showBranding,
+          brandingText: customization.brandingText,
+          fontSizeMultiplier: customization.fontSizeMultiplier,
+        }
+      );
+      
+      toast({
+        title: "PDF Preview Opened",
+        description: "The PDF has been opened in a new tab for preview.",
+      });
+    } catch (error) {
+      console.error('PDF preview error:', error);
+      toast({
+        title: "Preview Failed",
+        description: "There was an error generating the preview.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] max-h-[95vh] w-full">
-        <DialogHeader className="px-6 pt-6 pb-4 border-b border-border">
-          <div className="flex items-center justify-between">
+      <DialogContent className="max-w-[95vw] max-h-[95vh] w-full flex flex-col">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b border-border flex-shrink-0">
+          <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
               <DialogTitle className="text-xl font-semibold">Mailing Label Preview</DialogTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                {data.length} labels • {totalPages} page{totalPages !== 1 ? "s" : ""}
+                {data.length} labels • {totalPages} page{totalPages !== 1 ? "s" : ""} • {template.name}
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 flex-wrap">
               <Select value={selectedTemplate} onValueChange={(value) => setSelectedTemplate(value as keyof typeof AVERY_TEMPLATES)}>
                 <SelectTrigger className="w-[200px]">
                   <SelectValue />
@@ -133,17 +221,39 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
               </Select>
               <Button 
                 variant="outline" 
+                size="sm"
                 onClick={() => setShowCustomization(true)} 
                 className="gap-2"
               >
                 <Settings className="h-4 w-4" />
                 Customize
               </Button>
-              <Button variant="outline" onClick={handleExportPDF} className="gap-2">
-                <FileDown className="h-4 w-4" />
-                Save PDF
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handlePreviewPDF} 
+                disabled={isGenerating || data.length === 0}
+                className="gap-2"
+              >
+                <Eye className="h-4 w-4" />
+                Preview PDF
               </Button>
-              <Button onClick={handlePrint} className="gap-2">
+              <Button 
+                variant="default"
+                size="sm"
+                onClick={handleExportPDF} 
+                disabled={isGenerating || data.length === 0}
+                className="gap-2"
+              >
+                <FileDown className="h-4 w-4" />
+                {isGenerating ? 'Generating...' : 'Download PDF'}
+              </Button>
+              <Button 
+                variant="secondary" 
+                size="sm"
+                onClick={handlePrint} 
+                className="gap-2"
+              >
                 <Printer className="h-4 w-4" />
                 Print
               </Button>
@@ -182,7 +292,7 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
                       return (
                         <div
                           key={labelIndex}
-                          className="border border-dashed border-muted print:border-transparent relative"
+                          className="border border-dashed border-muted print:border-transparent relative overflow-hidden"
                           style={{
                             fontSize: `${calculatedSizes.mainFontSize}px`,
                             lineHeight: "1.3",
@@ -302,9 +412,23 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
         templateDimensions={{ width: template.width, height: template.height }}
       />
 
+      {/* Professional Print Styles */}
       <style>{`
         @media print {
-          /* Hide everything except print area */
+          /* Reset all page elements */
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          
+          /* Hide browser UI and non-print elements */
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 8.5in !important;
+            height: 11in !important;
+          }
+          
           body * {
             visibility: hidden !important;
           }
@@ -315,25 +439,33 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
           }
           
           .print-area {
-            position: fixed !important;
+            position: absolute !important;
             left: 0 !important;
             top: 0 !important;
-            width: 100% !important;
-            z-index: 9999 !important;
+            width: 8.5in !important;
+            margin: 0 !important;
+            padding: 0 !important;
           }
           
           .label-page {
-            page-break-after: always;
+            page-break-after: always !important;
+            page-break-inside: avoid !important;
             margin: 0 !important;
+            padding-top: ${template.marginTop}in !important;
+            padding-left: ${template.marginLeft}in !important;
+            padding-right: ${template.marginLeft}in !important;
             box-shadow: none !important;
+            border: none !important;
+            background: white !important;
           }
           
           .label-page:last-child {
-            page-break-after: auto;
+            page-break-after: auto !important;
           }
           
+          /* Perfect page setup for Avery labels */
           @page {
-            size: letter;
+            size: letter portrait;
             margin: 0;
           }
         }
