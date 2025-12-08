@@ -10,7 +10,8 @@ import {
   Building2,
   Globe,
   MessageSquare,
-  BarChart3
+  BarChart3,
+  CalendarDays
 } from 'lucide-react';
 import { SkeletonCard } from '@/components/ui/skeleton-card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -26,6 +27,7 @@ import {
 import { useDashboardData, useDashboardStats } from '@/hooks/useDashboardData';
 import { ResilientErrorBoundary } from '@/components/ResilientErrorBoundary';
 import { useNavigate } from 'react-router-dom';
+import { DailyPatientEntry } from '@/components/DailyPatientEntry';
 
 interface SourceGroupData {
   name: string;
@@ -312,6 +314,32 @@ function DashboardContent() {
             <p className="text-xs text-muted-foreground mt-1">
               Analytics & insights
             </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Daily Patient Entry Quick Widget */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <DailyPatientEntry className="lg:col-span-1" />
+        
+        <Card 
+          className="lg:col-span-2 cursor-pointer hover:shadow-lg transition-all duration-200"
+          onClick={() => navigate('/daily-patients')}
+        >
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <CalendarDays className="w-4 h-4" />
+              Daily Patient Calendar
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-3">
+              Track patients by day, view trends, and manage daily entries with the calendar view.
+            </p>
+            <Button variant="outline" size="sm" className="gap-2">
+              <CalendarDays className="w-4 h-4" />
+              Open Calendar
+            </Button>
           </CardContent>
         </Card>
       </div>

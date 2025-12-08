@@ -25,6 +25,7 @@ import { Discover } from '@/pages/Discover';
 import { Logs } from '@/pages/Logs';
 import { AIAssistant } from '@/pages/AIAssistant';
 import { MailingLabels } from '@/pages/MailingLabels';
+import DailyPatients from '@/pages/DailyPatients';
 import SubscriptionSuccess from '@/pages/SubscriptionSuccess';
 import SubscriptionCancel from '@/pages/SubscriptionCancel';
 
@@ -68,6 +69,14 @@ const Index = () => {
             element={
               <SuspenseWrapper type="page">
                 <Dashboard />
+              </SuspenseWrapper>
+            } 
+          />
+          <Route 
+            path="/daily-patients/*" 
+            element={
+              <SuspenseWrapper type="page">
+                <DailyPatients />
               </SuspenseWrapper>
             } 
           />
