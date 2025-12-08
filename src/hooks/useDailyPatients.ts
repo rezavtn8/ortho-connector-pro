@@ -80,36 +80,44 @@ export function useAddDailyPatients() {
     mutationFn: async (inputs: AddDailyPatientsInput[]) => {
       const results = [];
       
-      for (const input of inputs) {
-        const { data, error } = await supabase.rpc('add_daily_patients', {
+      // Process in parallel for better performance
+      const promises = inputs.map(input => 
+        supabase.rpc('add_daily_patients', {
           p_source_id: input.source_id,
           p_date: format(input.date, 'yyyy-MM-dd'),
           p_count: input.count,
           p_notes: input.notes || null
-        });
+        })
+      );
 
-        if (error) throw error;
-        results.push(data);
+      const responses = await Promise.all(promises);
+      
+      for (const response of responses) {
+        if (response.error) throw response.error;
+        results.push(response.data);
       }
       
       return results;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['daily-patients'] });
       queryClient.invalidateQueries({ queryKey: ['daily-patients-date'] });
       queryClient.invalidateQueries({ queryKey: ['patient-sources'] });
       queryClient.invalidateQueries({ queryKey: ['monthly-patients'] });
       
+      const totalPatients = variables.reduce((sum, v) => sum + v.count, 0);
+      const dateStr = format(variables[0].date, 'MMM d');
+      
       toast({
-        title: "Success",
-        description: "Daily patients added successfully",
+        title: "Patients Added",
+        description: `Added ${totalPatients} patient${totalPatients !== 1 ? 's' : ''} for ${dateStr}`,
       });
     },
     onError: (error) => {
       console.error('Error adding daily patients:', error);
       toast({
         title: "Error",
-        description: "Failed to add daily patients",
+        description: "Failed to add daily patients. Please try again.",
         variant: "destructive",
       });
     },
