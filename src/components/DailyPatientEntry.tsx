@@ -17,9 +17,29 @@ export function DailyPatientEntry({ className }: DailyPatientEntryProps) {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const today = new Date();
   
-  const { data: todayEntries = [], isLoading, refetch } = useDailyPatientsForDate(today);
+  const { data: todayEntries = [], isLoading, error, refetch } = useDailyPatientsForDate(today);
   
   const totalToday = todayEntries.reduce((sum, e) => sum + e.patient_count, 0);
+
+  // Handle error state gracefully
+  if (error) {
+    return (
+      <Card className={className}>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <CalendarPlus className="w-4 h-4" />
+            Today's Patients
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-4 text-muted-foreground text-sm">
+            <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
+            Unable to load data
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <>

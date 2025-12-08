@@ -11,7 +11,8 @@ import {
   Globe,
   MessageSquare,
   BarChart3,
-  CalendarDays
+  CalendarDays,
+  Activity
 } from 'lucide-react';
 import { SkeletonCard } from '@/components/ui/skeleton-card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -26,6 +27,7 @@ import {
 } from 'recharts';
 import { useDashboardData, useDashboardStats } from '@/hooks/useDashboardData';
 import { ResilientErrorBoundary } from '@/components/ResilientErrorBoundary';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useNavigate } from 'react-router-dom';
 import { DailyPatientEntry } from '@/components/DailyPatientEntry';
 
@@ -318,17 +320,19 @@ function DashboardContent() {
         </Card>
       </div>
 
-      {/* Daily Patient Entry Quick Widget */}
+      {/* Daily Patient Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <DailyPatientEntry className="lg:col-span-1" />
+        <ErrorBoundary level="component">
+          <DailyPatientEntry className="lg:col-span-1" />
+        </ErrorBoundary>
         
         <Card 
-          className="lg:col-span-2 cursor-pointer hover:shadow-lg transition-all duration-200"
+          className="lg:col-span-2 cursor-pointer hover:shadow-lg transition-all duration-200 group"
           onClick={() => navigate('/daily-patients')}
         >
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              <CalendarDays className="w-4 h-4" />
+              <CalendarDays className="w-4 h-4 text-primary" />
               Daily Patient Calendar
             </CardTitle>
           </CardHeader>
@@ -336,7 +340,7 @@ function DashboardContent() {
             <p className="text-sm text-muted-foreground mb-3">
               Track patients by day, view trends, and manage daily entries with the calendar view.
             </p>
-            <Button variant="outline" size="sm" className="gap-2">
+            <Button variant="outline" size="sm" className="gap-2 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
               <CalendarDays className="w-4 h-4" />
               Open Calendar
             </Button>
