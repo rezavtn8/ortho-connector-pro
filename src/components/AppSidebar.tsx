@@ -39,11 +39,11 @@ import { usePrefetch } from '@/hooks/usePrefetch';
 
 const mainNavItems = [
   { id: 'dashboard', title: 'Dashboard', icon: Home, path: '/dashboard' },
+  { id: 'daily-patients', title: 'Daily Patients', icon: Calendar, path: '/daily-patients' },
   { id: 'sources', title: 'Patient Sources', icon: Users, path: '/sources' },
   { id: 'offices', title: 'Partner Offices', icon: Building, path: '/offices' },
   { id: 'analytics', title: 'Reports', icon: TrendingUp, path: '/analytics' },
   { id: 'ai-assistant', title: 'AI Assistant', icon: Bot, path: '/ai-assistant' },
-  
 ];
 
 const managementItems = [

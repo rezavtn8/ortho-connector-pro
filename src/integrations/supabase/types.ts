@@ -505,6 +505,64 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_patients: {
+        Row: {
+          clinic_id: string | null
+          created_at: string | null
+          id: string
+          notes: string | null
+          patient_count: number
+          patient_date: string
+          source_id: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          clinic_id?: string | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          patient_count?: number
+          patient_date: string
+          source_id?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          clinic_id?: string | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          patient_count?: number
+          patient_date?: string
+          source_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_patients_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_patients_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "office_metrics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_patients_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "patient_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       discovered_offices: {
         Row: {
           address: string | null
@@ -1822,6 +1880,15 @@ export type Database = {
     }
     Functions: {
       accept_invitation: { Args: { p_token: string }; Returns: Json }
+      add_daily_patients: {
+        Args: {
+          p_count: number
+          p_date: string
+          p_notes?: string
+          p_source_id: string
+        }
+        Returns: Json
+      }
       adjust_patient_count: {
         Args: { p_delta: number; p_source_id: string; p_year_month: string }
         Returns: number
@@ -1849,6 +1916,7 @@ export type Database = {
         }
         Returns: Json
       }
+      delete_daily_patients: { Args: { p_entry_id: string }; Returns: Json }
       encrypt_pin_code: { Args: { pin_text: string }; Returns: string }
       get_current_month_patients: {
         Args: never
@@ -1866,6 +1934,18 @@ export type Database = {
         Returns: {
           current_month_patients: number
           month_year: string
+          source_id: string
+          source_name: string
+          source_type: string
+        }[]
+      }
+      get_daily_patients_for_month: {
+        Args: { p_year_month: string }
+        Returns: {
+          id: string
+          notes: string
+          patient_count: number
+          patient_date: string
           source_id: string
           source_name: string
           source_type: string
