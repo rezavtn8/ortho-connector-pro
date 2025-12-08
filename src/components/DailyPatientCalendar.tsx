@@ -6,10 +6,12 @@ import { DailyPatientsStats } from '@/components/daily-patients/DailyPatientsSta
 import { DailyPatientsList } from '@/components/daily-patients/DailyPatientsList';
 import { SourceBreakdown } from '@/components/daily-patients/SourceBreakdown';
 import { CalendarGrid } from '@/components/daily-patients/CalendarGrid';
-import { QuickAddButton } from '@/components/daily-patients/QuickAddButton';
+import { QuickEntryBar } from '@/components/daily-patients/QuickEntryBar';
+import { MissedDaysAlert } from '@/components/daily-patients/MissedDaysAlert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, LayoutGrid, List } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Calendar, List, Plus } from 'lucide-react';
 
 interface DailyPatientCalendarProps {
   className?: string;
@@ -68,6 +70,7 @@ export function DailyPatientCalendar({ className }: DailyPatientCalendarProps) {
               <Skeleton key={i} className="h-32 rounded-lg" />
             ))}
           </div>
+          <Skeleton className="h-24 rounded-lg" />
           <Skeleton className="h-[500px] rounded-lg" />
         </div>
       </div>
@@ -76,7 +79,7 @@ export function DailyPatientCalendar({ className }: DailyPatientCalendarProps) {
 
   return (
     <div className={className}>
-      <div className="space-y-6">
+      <div className="space-y-5">
         {/* Statistics Dashboard */}
         <DailyPatientsStats 
           dailyPatients={dailyPatients}
@@ -84,10 +87,17 @@ export function DailyPatientCalendar({ className }: DailyPatientCalendarProps) {
           previousMonthPatients={prevMonthPatients}
         />
 
-        {/* Quick Add + View Toggle */}
+        {/* Missed Days Alert */}
+        <MissedDaysAlert 
+          dailyPatients={dailyPatients}
+          onAddClick={handleAddClick}
+        />
+
+        {/* Quick Entry Bar */}
+        <QuickEntryBar onSuccess={() => refetch()} />
+
+        {/* View Toggle + Full Dialog Button */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <QuickAddButton onAddClick={handleAddClick} />
-          
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'calendar' | 'list')}>
             <TabsList>
               <TabsTrigger value="calendar" className="gap-2">
@@ -100,6 +110,15 @@ export function DailyPatientCalendar({ className }: DailyPatientCalendarProps) {
               </TabsTrigger>
             </TabsList>
           </Tabs>
+          
+          <Button 
+            variant="outline" 
+            className="gap-2"
+            onClick={() => handleAddClick(new Date())}
+          >
+            <Plus className="w-4 h-4" />
+            Add Multiple Sources
+          </Button>
         </div>
 
         {/* Main Content */}

@@ -15,8 +15,19 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Plus, Minus, Loader2, Users, Search, X } from 'lucide-react';
-import { format } from 'date-fns';
+import { 
+  CalendarIcon, 
+  Plus, 
+  Minus, 
+  Loader2, 
+  Users, 
+  Search, 
+  X, 
+  ChevronLeft, 
+  ChevronRight,
+  Zap
+} from 'lucide-react';
+import { format, subDays, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAddDailyPatients } from '@/hooks/useDailyPatients';
@@ -42,6 +53,8 @@ interface AddDailyPatientsDialogProps {
   onSuccess?: () => void;
 }
 
+const NUMBER_PRESETS = [1, 2, 3, 5, 10, 15, 20, 25];
+
 export function AddDailyPatientsDialog({
   open,
   onOpenChange,
@@ -54,6 +67,7 @@ export function AddDailyPatientsDialog({
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [calendarOpen, setCalendarOpen] = useState(false);
   
   const addDailyPatients = useAddDailyPatients();
 
@@ -130,6 +144,17 @@ export function AddDailyPatientsDialog({
     }));
   };
 
+  const handlePresetClick = (sourceId: string, preset: number) => {
+    setSourceEntries(prev => ({
+      ...prev,
+      [sourceId]: {
+        ...prev[sourceId],
+        count: preset,
+        selected: true
+      }
+    }));
+  };
+
   const handleSubmit = async () => {
     const selectedEntries = Object.values(sourceEntries).filter(e => e.selected);
     
@@ -194,45 +219,93 @@ export function AddDailyPatientsDialog({
     return acc;
   }, {} as Record<string, PatientSource[]>);
 
+  const formatDateLabel = (d: Date) => {
+    if (isToday(d)) return 'Today';
+    if (isYesterday(d)) return 'Yesterday';
+    if (isTomorrow(d)) return 'Tomorrow';
+    return format(d, 'EEE, MMM d');
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
         <DialogHeader className="pb-2">
           <DialogTitle className="flex items-center gap-2 text-xl">
             <Users className="w-5 h-5 text-primary" />
             Add Daily Patients
           </DialogTitle>
           <DialogDescription>
-            Record patient visits for {format(date, 'EEEE, MMMM d, yyyy')}
+            Record patient visits for a specific date
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden flex flex-col space-y-4">
-          {/* Date Picker */}
+          {/* Enhanced Date Picker with Navigation */}
           <div className="space-y-2">
             <Label className="text-sm font-medium">Date</Label>
-            <Popover>
-              <PopoverTrigger asChild>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                className="shrink-0"
+                onClick={() => setDate(subDays(date, 1))}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              
+              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "flex-1 justify-center text-center font-medium h-11 text-base",
+                      isToday(date) && "border-primary text-primary"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formatDateLabel(date)}
+                    {!isToday(date) && (
+                      <span className="ml-2 text-muted-foreground text-sm">
+                        ({format(date, 'MMM d, yyyy')})
+                      </span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="center">
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={(d) => {
+                      if (d) {
+                        setDate(d);
+                        setCalendarOpen(false);
+                      }
+                    }}
+                    initialFocus
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+              
+              <Button
+                variant="outline"
+                size="icon"
+                className="shrink-0"
+                onClick={() => setDate(addDays(date, 1))}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+              
+              {!isToday(date) && (
                 <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal h-11",
-                    !date && "text-muted-foreground"
-                  )}
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setDate(new Date())}
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date ? format(date, 'EEEE, MMMM d, yyyy') : <span>Pick a date</span>}
+                  Today
                 </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={date}
-                  onSelect={(d) => d && setDate(d)}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
+              )}
+            </div>
           </div>
 
           {/* Search */}
@@ -256,7 +329,7 @@ export function AddDailyPatientsDialog({
             )}
           </div>
 
-          {/* Source Selection */}
+          {/* Source Selection with Enhanced Count Controls */}
           <div className="flex-1 overflow-hidden">
             {loading ? (
               <div className="flex items-center justify-center py-12">
@@ -272,20 +345,20 @@ export function AddDailyPatientsDialog({
                 )}
               </div>
             ) : (
-              <ScrollArea className="h-[280px] border rounded-lg p-3">
+              <ScrollArea className="h-[300px] border rounded-lg p-3">
                 <div className="space-y-4">
                   {Object.entries(groupedSources).map(([type, typeSources]) => {
                     const config = SOURCE_TYPE_CONFIG[type as SourceType];
                     return (
                       <div key={type} className="space-y-2">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground sticky top-0 bg-background py-1">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground sticky top-0 bg-background py-1 z-10">
                           <span className="text-lg">{config?.icon || '📌'}</span>
                           <span>{config?.label || type}</span>
                           <Badge variant="secondary" className="text-xs">
                             {typeSources.length}
                           </Badge>
                         </div>
-                        <div className="space-y-1 pl-2">
+                        <div className="space-y-2 pl-2">
                           {typeSources.map(source => {
                             const entry = sourceEntries[source.id];
                             if (!entry) return null;
@@ -294,64 +367,88 @@ export function AddDailyPatientsDialog({
                               <div
                                 key={source.id}
                                 className={cn(
-                                  "flex items-center justify-between p-2.5 rounded-lg transition-all cursor-pointer group",
+                                  "rounded-lg transition-all border-2",
                                   entry.selected 
-                                    ? "bg-primary/10 border-2 border-primary/30 shadow-sm" 
-                                    : "hover:bg-muted/50 border-2 border-transparent"
+                                    ? "bg-primary/5 border-primary/30 shadow-sm" 
+                                    : "hover:bg-muted/50 border-transparent"
                                 )}
-                                onClick={() => handleToggleSource(source.id)}
                               >
-                                <div className="flex items-center gap-3 flex-1">
-                                  <Checkbox
-                                    checked={entry.selected}
-                                    className="data-[state=checked]:bg-primary"
-                                  />
-                                  <span className={cn(
-                                    "text-sm font-medium truncate transition-colors",
-                                    entry.selected && "text-primary"
-                                  )}>
-                                    {source.name}
-                                  </span>
+                                {/* Source Header */}
+                                <div
+                                  className="flex items-center justify-between p-3 cursor-pointer"
+                                  onClick={() => handleToggleSource(source.id)}
+                                >
+                                  <div className="flex items-center gap-3 flex-1">
+                                    <Checkbox
+                                      checked={entry.selected}
+                                      className="data-[state=checked]:bg-primary"
+                                    />
+                                    <span className={cn(
+                                      "text-sm font-medium truncate transition-colors",
+                                      entry.selected && "text-primary"
+                                    )}>
+                                      {source.name}
+                                    </span>
+                                  </div>
+                                  
+                                  {/* Count Controls */}
+                                  <div 
+                                    className="flex items-center gap-1"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-8 w-8 rounded-full"
+                                      onClick={() => handleCountChange(source.id, -1)}
+                                      disabled={entry.count <= 1}
+                                    >
+                                      <Minus className="w-3.5 h-3.5" />
+                                    </Button>
+                                    <Input
+                                      type="number"
+                                      min="1"
+                                      value={entry.count}
+                                      onChange={(e) => handleDirectCountChange(source.id, e.target.value)}
+                                      className={cn(
+                                        "w-16 h-9 text-center font-bold text-lg p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+                                        entry.selected && "border-primary/30 bg-background"
+                                      )}
+                                    />
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-8 w-8 rounded-full"
+                                      onClick={() => handleCountChange(source.id, 1)}
+                                    >
+                                      <Plus className="w-3.5 h-3.5" />
+                                    </Button>
+                                  </div>
                                 </div>
                                 
-                                <div 
-                                  className="flex items-center gap-1"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className={cn(
-                                      "h-7 w-7 rounded-full",
-                                      entry.selected && "hover:bg-primary/20"
-                                    )}
-                                    onClick={() => handleCountChange(source.id, -1)}
-                                    disabled={entry.count <= 1}
+                                {/* Quick Presets - shown when selected */}
+                                {entry.selected && (
+                                  <div 
+                                    className="px-3 pb-3 flex items-center gap-1.5 flex-wrap"
+                                    onClick={(e) => e.stopPropagation()}
                                   >
-                                    <Minus className="w-3 h-3" />
-                                  </Button>
-                                  <Input
-                                    type="number"
-                                    min="1"
-                                    value={entry.count}
-                                    onChange={(e) => handleDirectCountChange(source.id, e.target.value)}
-                                    className={cn(
-                                      "w-12 h-7 text-center font-bold text-sm p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
-                                      entry.selected && "border-primary/30"
-                                    )}
-                                  />
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className={cn(
-                                      "h-7 w-7 rounded-full",
-                                      entry.selected && "hover:bg-primary/20"
-                                    )}
-                                    onClick={() => handleCountChange(source.id, 1)}
-                                  >
-                                    <Plus className="w-3 h-3" />
-                                  </Button>
-                                </div>
+                                    <Zap className="w-3.5 h-3.5 text-muted-foreground mr-1" />
+                                    {NUMBER_PRESETS.map((preset) => (
+                                      <Button
+                                        key={preset}
+                                        variant={entry.count === preset ? 'default' : 'outline'}
+                                        size="sm"
+                                        className={cn(
+                                          "h-7 min-w-[2rem] px-2 text-xs font-bold",
+                                          entry.count === preset && "shadow-sm"
+                                        )}
+                                        onClick={() => handlePresetClick(source.id, preset)}
+                                      >
+                                        {preset}
+                                      </Button>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
@@ -407,7 +504,7 @@ export function AddDailyPatientsDialog({
               <Button
                 onClick={handleSubmit}
                 disabled={selectedCount === 0 || addDailyPatients.isPending}
-                className="min-w-[140px]"
+                className="min-w-[160px]"
               >
                 {addDailyPatients.isPending ? (
                   <>
