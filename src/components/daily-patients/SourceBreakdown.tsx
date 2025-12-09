@@ -2,50 +2,93 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { PieChart, TrendingUp } from 'lucide-react';
-import { DailyPatientEntry } from '@/hooks/useDailyPatients';
+import { PieChart, TrendingUp, Database } from 'lucide-react';
+import { DailyPatientEntry, MonthlyPatientData } from '@/hooks/useDailyPatients';
 import { SOURCE_TYPE_CONFIG, SourceType } from '@/lib/database.types';
 import { cn } from '@/lib/utils';
 
 interface SourceBreakdownProps {
   entries: DailyPatientEntry[];
+  // Optional: monthly data for fallback when no daily entries
+  monthlyData?: MonthlyPatientData[];
 }
 
-export function SourceBreakdown({ entries }: SourceBreakdownProps) {
-  // Group by source
-  const sourceStats = entries.reduce((acc, entry) => {
-    const key = entry.source_id;
-    if (!acc[key]) {
-      acc[key] = {
-        source_id: entry.source_id,
-        source_name: entry.source_name,
-        source_type: entry.source_type,
-        total: 0,
-        entries: 0,
-      };
-    }
-    acc[key].total += entry.patient_count;
-    acc[key].entries += 1;
-    return acc;
-  }, {} as Record<string, { source_id: string; source_name: string; source_type: string; total: number; entries: number }>);
+export function SourceBreakdown({ entries, monthlyData }: SourceBreakdownProps) {
+  const hasDailyData = entries.length > 0;
+  const hasMonthlyData = (monthlyData?.length || 0) > 0;
+  
+  // Use daily data if available, otherwise fall back to monthly
+  let sourceStats: Record<string, { 
+    source_id: string; 
+    source_name: string; 
+    source_type: string; 
+    total: number; 
+    entries: number 
+  }>;
+  let totalPatients: number;
+  let dataSource: 'daily' | 'monthly' | 'none';
+  
+  if (hasDailyData) {
+    // Group by source from daily entries
+    sourceStats = entries.reduce((acc, entry) => {
+      const key = entry.source_id;
+      if (!acc[key]) {
+        acc[key] = {
+          source_id: entry.source_id,
+          source_name: entry.source_name,
+          source_type: entry.source_type,
+          total: 0,
+          entries: 0,
+        };
+      }
+      acc[key].total += entry.patient_count;
+      acc[key].entries += 1;
+      return acc;
+    }, {} as typeof sourceStats);
+    
+    totalPatients = entries.reduce((sum, e) => sum + e.patient_count, 0);
+    dataSource = 'daily';
+  } else if (hasMonthlyData && monthlyData) {
+    // Use monthly data
+    sourceStats = monthlyData.reduce((acc, entry) => {
+      const key = entry.source_id;
+      if (!acc[key]) {
+        acc[key] = {
+          source_id: entry.source_id,
+          source_name: entry.source_name,
+          source_type: entry.source_type,
+          total: 0,
+          entries: 1,
+        };
+      }
+      acc[key].total += entry.patient_count;
+      return acc;
+    }, {} as typeof sourceStats);
+    
+    totalPatients = monthlyData.reduce((sum, e) => sum + e.patient_count, 0);
+    dataSource = 'monthly';
+  } else {
+    sourceStats = {};
+    totalPatients = 0;
+    dataSource = 'none';
+  }
 
-  const totalPatients = entries.reduce((sum, e) => sum + e.patient_count, 0);
   const sortedSources = Object.values(sourceStats).sort((a, b) => b.total - a.total);
 
   // Get color for source type
   const getSourceColor = (sourceType: string, index: number) => {
     const colors = [
       'bg-primary',
-      'bg-success',
-      'bg-info',
-      'bg-warning',
-      'bg-destructive',
-      'bg-accent',
+      'bg-green-500',
+      'bg-blue-500',
+      'bg-amber-500',
+      'bg-red-500',
+      'bg-purple-500',
     ];
     return colors[index % colors.length];
   };
 
-  if (entries.length === 0) {
+  if (dataSource === 'none') {
     return (
       <Card className="h-full">
         <CardHeader>
@@ -66,16 +109,24 @@ export function SourceBreakdown({ entries }: SourceBreakdownProps) {
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <PieChart className="w-5 h-5" />
-          Source Breakdown
+        <CardTitle className="text-lg flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            <PieChart className="w-5 h-5" />
+            Source Breakdown
+          </span>
+          {dataSource === 'monthly' && (
+            <Badge variant="outline" className="text-xs gap-1">
+              <Database className="w-3 h-3" />
+              Monthly
+            </Badge>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="flex-1">
         {/* Visual representation */}
         <div className="flex h-3 rounded-full overflow-hidden mb-6 bg-muted">
           {sortedSources.map((source, index) => {
-            const percentage = (source.total / totalPatients) * 100;
+            const percentage = totalPatients > 0 ? (source.total / totalPatients) * 100 : 0;
             return (
               <div
                 key={source.source_id}

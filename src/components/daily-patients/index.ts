@@ -5,3 +5,4 @@ export { CalendarGrid } from './CalendarGrid';
 export { QuickAddButton } from './QuickAddButton';
 export { QuickEntryBar } from './QuickEntryBar';
 export { MissedDaysAlert } from './MissedDaysAlert';
+export { MonthlyDataNotice } from './MonthlyDataNotice';
