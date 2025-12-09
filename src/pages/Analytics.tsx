@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   PatientSource,
   MonthlyPatients,
@@ -27,7 +28,9 @@ import {
   Building2,
   ArrowUp,
   ArrowDown,
-  Target
+  Target,
+  Database,
+  Info
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -55,9 +58,16 @@ interface SourceAnalytics {
   monthlyData: MonthlyPatients[];
 }
 
+interface DailyPatientSummary {
+  total: number;
+  uniqueDays: number;
+  hasData: boolean;
+}
+
 export function Analytics() {
   const [sources, setSources] = useState<PatientSource[]>([]);
   const [monthlyData, setMonthlyData] = useState<MonthlyPatients[]>([]);
+  const [dailySummary, setDailySummary] = useState<DailyPatientSummary>({ total: 0, uniqueDays: 0, hasData: false });
   const [analytics, setAnalytics] = useState<SourceAnalytics[]>([]);
   const [selectedType, setSelectedType] = useState<SourceType | 'all' | 'online' | 'offices' | 'insurance' | 'word-of-mouth' | 'other'>('all');
   const [selectedPeriod, setSelectedPeriod] = useState<'3m' | '6m' | '12m' | 'all'>('6m');
@@ -102,8 +112,9 @@ export function Analytics() {
       }
 
       const startYearMonth = `${startDate.getFullYear()}-${(startDate.getMonth() + 1).toString().padStart(2, '0')}`;
+      const startDateStr = `${startDate.getFullYear()}-${(startDate.getMonth() + 1).toString().padStart(2, '0')}-01`;
 
-      // Load monthly data
+      // Load monthly data (aggregated totals)
       const { data: monthlyDataResult, error: monthlyError } = await supabase
         .from('monthly_patients')
         .select('*')
@@ -112,10 +123,28 @@ export function Analytics() {
 
       if (monthlyError) throw monthlyError;
 
+      // Load daily data summary to check if user is using daily tracking
+      const { data: dailyDataResult, error: dailyError } = await supabase
+        .from('daily_patients')
+        .select('id, patient_count, patient_date')
+        .gte('patient_date', startDateStr);
+
+      if (dailyError) throw dailyError;
+
+      // Calculate daily summary
+      const dailyTotal = (dailyDataResult || []).reduce((sum, d) => sum + d.patient_count, 0);
+      const uniqueDays = new Set((dailyDataResult || []).map(d => d.patient_date)).size;
+      
+      setDailySummary({
+        total: dailyTotal,
+        uniqueDays,
+        hasData: dailyDataResult && dailyDataResult.length > 0
+      });
+
       setSources(sourcesData || []);
       setMonthlyData(monthlyDataResult || []);
 
-      // Calculate analytics for each source
+      // Calculate analytics for each source (using monthly data for trends)
       const analyticsData: SourceAnalytics[] = (sourcesData || []).map(source => {
         const sourceMonthlyData = (monthlyDataResult || []).filter(m => m.source_id === source.id);
         const totalPatients = sourceMonthlyData.reduce((sum, m) => sum + m.patient_count, 0);
@@ -123,13 +152,14 @@ export function Analytics() {
           ? Math.round(totalPatients / sourceMonthlyData.length)
           : 0;
 
-        // Calculate trend
+        // Calculate trend based on last 2 months with data
         let trend: 'up' | 'down' | 'stable' = 'stable';
         let trendPercentage = 0;
 
         if (sourceMonthlyData.length >= 2) {
-          const recent = sourceMonthlyData[sourceMonthlyData.length - 1].patient_count;
-          const previous = sourceMonthlyData[sourceMonthlyData.length - 2].patient_count;
+          const sortedData = [...sourceMonthlyData].sort((a, b) => a.year_month.localeCompare(b.year_month));
+          const recent = sortedData[sortedData.length - 1].patient_count;
+          const previous = sortedData[sortedData.length - 2].patient_count;
           
           if (recent > previous) {
             trend = 'up';
@@ -166,6 +196,8 @@ export function Analytics() {
       setLoading(false);
     }
   };
+
+
 
   // Helper function to determine source category
   const getSourceCategory = (sourceType: SourceType) => {
@@ -309,6 +341,88 @@ export function Analytics() {
         <p className="text-muted-foreground text-lg">
           Performance insights and data visualization for your practice
         </p>
+      </div>
+
+      {/* Data Source Indicator */}
+      <Alert className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-800">
+        <Database className="h-4 w-4 text-blue-600" />
+        <AlertDescription className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+            Data Source:
+          </span>
+          <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900 dark:text-blue-200">
+            Monthly Totals ({monthlyData.length} records)
+          </Badge>
+          {dailySummary.hasData && (
+            <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-200">
+              + Daily Entries ({dailySummary.uniqueDays} days tracked)
+            </Badge>
+          )}
+          <span className="text-xs text-muted-foreground ml-2">
+            <Info className="w-3 h-3 inline mr-1" />
+            Analytics use monthly aggregates for trend analysis
+          </span>
+        </AlertDescription>
+      </Alert>
+
+      {/* Controls */}
+      <div className="flex justify-between items-center">
+        <div className="flex gap-4">
+          <Select value={selectedType} onValueChange={(v) => setSelectedType(v as any)}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="All Categories" />
+            </SelectTrigger>
+            <SelectContent className="bg-background border z-50">
+              <SelectItem value="all">All Categories</SelectItem>
+              <SelectItem value="online">
+                <span className="flex items-center gap-2">
+                  <span>🌐</span>
+                  Online Sources
+                </span>
+              </SelectItem>
+              <SelectItem value="offices">
+                <span className="flex items-center gap-2">
+                  <span>🏢</span>
+                  Offices
+                </span>
+              </SelectItem>
+              <SelectItem value="insurance">
+                <span className="flex items-center gap-2">
+                  <span>📋</span>
+                  Insurance
+                </span>
+              </SelectItem>
+              <SelectItem value="word-of-mouth">
+                <span className="flex items-center gap-2">
+                  <span>💬</span>
+                  Word of Mouth
+                </span>
+              </SelectItem>
+              <SelectItem value="other">
+                <span className="flex items-center gap-2">
+                  <span>📌</span>
+                  Other
+                </span>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={selectedPeriod} onValueChange={(v) => setSelectedPeriod(v as '3m' | '6m' | '12m' | 'all')}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Time Period" />
+            </SelectTrigger>
+            <SelectContent className="bg-background border z-50">
+              <SelectItem value="3m">Last 3 Months</SelectItem>
+              <SelectItem value="6m">Last 6 Months</SelectItem>
+              <SelectItem value="12m">Last 12 Months</SelectItem>
+              <SelectItem value="all">All Time</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <Button onClick={exportData} variant="outline">
+          <Download className="w-4 h-4 mr-2" />
+          Export Data
+        </Button>
       </div>
 
       {/* Controls */}

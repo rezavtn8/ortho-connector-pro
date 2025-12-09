@@ -1,6 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { format, addMonths, subMonths } from 'date-fns';
-import { useDailyPatients, useDeleteDailyPatient, DailyPatientEntry } from '@/hooks/useDailyPatients';
+import { 
+  useDailyPatients, 
+  useDeleteDailyPatient, 
+  useMonthlyPatients,
+  DailyPatientEntry 
+} from '@/hooks/useDailyPatients';
 import { AddDailyPatientsDialog } from '@/components/AddDailyPatientsDialog';
 import { DailyPatientsStats } from '@/components/daily-patients/DailyPatientsStats';
 import { DailyPatientsList } from '@/components/daily-patients/DailyPatientsList';
@@ -8,10 +13,12 @@ import { SourceBreakdown } from '@/components/daily-patients/SourceBreakdown';
 import { CalendarGrid } from '@/components/daily-patients/CalendarGrid';
 import { QuickEntryBar } from '@/components/daily-patients/QuickEntryBar';
 import { MissedDaysAlert } from '@/components/daily-patients/MissedDaysAlert';
+import { MonthlyDataNotice } from '@/components/daily-patients/MonthlyDataNotice';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Calendar, List, Plus } from 'lucide-react';
+import { Calendar, List, Plus, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface DailyPatientCalendarProps {
   className?: string;
@@ -27,9 +34,18 @@ export function DailyPatientCalendar({ className }: DailyPatientCalendarProps) {
   const yearMonth = format(currentDate, 'yyyy-MM');
   const prevYearMonth = format(subMonths(currentDate, 1), 'yyyy-MM');
   
-  const { data: dailyPatients = [], isLoading, refetch } = useDailyPatients(yearMonth);
-  const { data: prevMonthPatients = [] } = useDailyPatients(prevYearMonth);
+  // Fetch both daily and monthly data
+  const { data: dailyPatients = [], isLoading: dailyLoading, refetch: refetchDaily } = useDailyPatients(yearMonth);
+  const { data: prevMonthDailyPatients = [] } = useDailyPatients(prevYearMonth);
+  const { data: monthlyPatients = [], isLoading: monthlyLoading, refetch: refetchMonthly } = useMonthlyPatients(yearMonth);
+  const { data: prevMonthlyPatients = [] } = useMonthlyPatients(prevYearMonth);
+  
   const deleteDailyPatient = useDeleteDailyPatient();
+  
+  // Determine data availability
+  const hasDailyData = dailyPatients.length > 0;
+  const hasMonthlyData = monthlyPatients.length > 0;
+  const isLoading = dailyLoading || monthlyLoading;
 
   const patientsByDate = useMemo(() => {
     return dailyPatients.reduce((acc, entry) => {
@@ -54,6 +70,11 @@ export function DailyPatientCalendar({ className }: DailyPatientCalendarProps) {
   const handleDeleteEntry = async (entryId: string) => {
     await deleteDailyPatient.mutateAsync(entryId);
   };
+  
+  const refetchAll = () => {
+    refetchDaily();
+    refetchMonthly();
+  };
 
   if (isLoading) {
     return (
@@ -74,21 +95,34 @@ export function DailyPatientCalendar({ className }: DailyPatientCalendarProps) {
   return (
     <div className={className}>
       <div className="space-y-4">
-        {/* Compact Stats Row */}
+        {/* Stats with unified data */}
         <DailyPatientsStats 
           dailyPatients={dailyPatients}
           currentDate={currentDate}
-          previousMonthPatients={prevMonthPatients}
+          previousMonthPatients={prevMonthDailyPatients}
+          monthlyData={monthlyPatients}
+          previousMonthlyData={prevMonthlyPatients}
         />
+
+        {/* Show notice when using monthly data only */}
+        {!hasDailyData && hasMonthlyData && (
+          <MonthlyDataNotice 
+            monthlyTotal={monthlyPatients.reduce((sum, e) => sum + e.patient_count, 0)}
+            sourceCount={monthlyPatients.length}
+            onAddClick={() => handleAddClick(new Date())}
+          />
+        )}
 
         {/* Quick Entry Bar */}
-        <QuickEntryBar onSuccess={() => refetch()} />
+        <QuickEntryBar onSuccess={refetchAll} />
 
-        {/* Missed Days Alert */}
-        <MissedDaysAlert 
-          dailyPatients={dailyPatients}
-          onAddClick={handleAddClick}
-        />
+        {/* Missed Days Alert (only show if we have some daily data) */}
+        {hasDailyData && (
+          <MissedDaysAlert 
+            dailyPatients={dailyPatients}
+            onAddClick={handleAddClick}
+          />
+        )}
 
         {/* View Toggle + Actions */}
         <div className="flex items-center justify-between gap-2">
@@ -134,7 +168,10 @@ export function DailyPatientCalendar({ className }: DailyPatientCalendarProps) {
               />
             </div>
             <div className="xl:col-span-1">
-              <SourceBreakdown entries={dailyPatients} />
+              <SourceBreakdown 
+                entries={dailyPatients} 
+                monthlyData={!hasDailyData ? monthlyPatients : undefined}
+              />
             </div>
           </div>
         ) : (
@@ -149,7 +186,10 @@ export function DailyPatientCalendar({ className }: DailyPatientCalendarProps) {
               />
             </div>
             <div className="lg:col-span-1">
-              <SourceBreakdown entries={dailyPatients} />
+              <SourceBreakdown 
+                entries={dailyPatients}
+                monthlyData={!hasDailyData ? monthlyPatients : undefined}
+              />
             </div>
           </div>
         )}
@@ -159,7 +199,7 @@ export function DailyPatientCalendar({ className }: DailyPatientCalendarProps) {
         open={showAddDialog}
         onOpenChange={setShowAddDialog}
         initialDate={addDialogDate}
-        onSuccess={() => refetch()}
+        onSuccess={refetchAll}
       />
     </div>
   );
