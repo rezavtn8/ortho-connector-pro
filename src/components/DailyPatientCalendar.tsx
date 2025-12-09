@@ -9,7 +9,7 @@ import { CalendarGrid } from '@/components/daily-patients/CalendarGrid';
 import { QuickEntryBar } from '@/components/daily-patients/QuickEntryBar';
 import { MissedDaysAlert } from '@/components/daily-patients/MissedDaysAlert';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Calendar, List, Plus } from 'lucide-react';
 
@@ -31,7 +31,6 @@ export function DailyPatientCalendar({ className }: DailyPatientCalendarProps) {
   const { data: prevMonthPatients = [] } = useDailyPatients(prevYearMonth);
   const deleteDailyPatient = useDeleteDailyPatient();
 
-  // Group patients by date
   const patientsByDate = useMemo(() => {
     return dailyPatients.reduce((acc, entry) => {
       const dateKey = entry.patient_date;
@@ -41,22 +40,17 @@ export function DailyPatientCalendar({ className }: DailyPatientCalendarProps) {
     }, {} as Record<string, DailyPatientEntry[]>);
   }, [dailyPatients]);
 
-  const handleDateClick = (date: Date) => {
-    setSelectedDate(date);
-  };
-
+  const handleDateClick = (date: Date) => setSelectedDate(date);
   const handleAddClick = (date: Date) => {
     setAddDialogDate(date);
     setShowAddDialog(true);
   };
-
   const handlePrevMonth = () => setCurrentDate(subMonths(currentDate, 1));
   const handleNextMonth = () => setCurrentDate(addMonths(currentDate, 1));
   const handleToday = () => {
     setCurrentDate(new Date());
     setSelectedDate(new Date());
   };
-
   const handleDeleteEntry = async (entryId: string) => {
     await deleteDailyPatient.mutateAsync(entryId);
   };
@@ -64,14 +58,14 @@ export function DailyPatientCalendar({ className }: DailyPatientCalendarProps) {
   if (isLoading) {
     return (
       <div className={className}>
-        <div className="space-y-6">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="space-y-4">
+          <div className="grid grid-cols-4 gap-2">
             {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-32 rounded-lg" />
+              <Skeleton key={i} className="h-16 rounded-lg" />
             ))}
           </div>
-          <Skeleton className="h-24 rounded-lg" />
-          <Skeleton className="h-[500px] rounded-lg" />
+          <Skeleton className="h-12 rounded-lg" />
+          <Skeleton className="h-[400px] rounded-lg" />
         </div>
       </div>
     );
@@ -79,13 +73,16 @@ export function DailyPatientCalendar({ className }: DailyPatientCalendarProps) {
 
   return (
     <div className={className}>
-      <div className="space-y-5">
-        {/* Statistics Dashboard */}
+      <div className="space-y-4">
+        {/* Compact Stats Row */}
         <DailyPatientsStats 
           dailyPatients={dailyPatients}
           currentDate={currentDate}
           previousMonthPatients={prevMonthPatients}
         />
+
+        {/* Quick Entry Bar */}
+        <QuickEntryBar onSuccess={() => refetch()} />
 
         {/* Missed Days Alert */}
         <MissedDaysAlert 
@@ -93,38 +90,36 @@ export function DailyPatientCalendar({ className }: DailyPatientCalendarProps) {
           onAddClick={handleAddClick}
         />
 
-        {/* Quick Entry Bar */}
-        <QuickEntryBar onSuccess={() => refetch()} />
-
-        {/* View Toggle + Full Dialog Button */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* View Toggle + Actions */}
+        <div className="flex items-center justify-between gap-2">
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'calendar' | 'list')}>
-            <TabsList>
-              <TabsTrigger value="calendar" className="gap-2">
-                <Calendar className="w-4 h-4" />
-                Calendar
+            <TabsList className="h-8">
+              <TabsTrigger value="calendar" className="gap-1.5 text-xs h-7 px-2.5">
+                <Calendar className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Calendar</span>
               </TabsTrigger>
-              <TabsTrigger value="list" className="gap-2">
-                <List className="w-4 h-4" />
-                List
+              <TabsTrigger value="list" className="gap-1.5 text-xs h-7 px-2.5">
+                <List className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">List</span>
               </TabsTrigger>
             </TabsList>
           </Tabs>
           
           <Button 
             variant="outline" 
-            className="gap-2"
+            size="sm"
+            className="gap-1.5 h-8 text-xs"
             onClick={() => handleAddClick(new Date())}
           >
-            <Plus className="w-4 h-4" />
-            Add Multiple Sources
+            <Plus className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Multi-Source</span>
+            <span className="sm:hidden">Add</span>
           </Button>
         </div>
 
         {/* Main Content */}
         {viewMode === 'calendar' ? (
-          <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-            {/* Calendar - Takes 3 columns */}
+          <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
             <div className="xl:col-span-3">
               <CalendarGrid
                 currentDate={currentDate}
@@ -138,15 +133,12 @@ export function DailyPatientCalendar({ className }: DailyPatientCalendarProps) {
                 onToday={handleToday}
               />
             </div>
-
-            {/* Sidebar - Source Breakdown */}
             <div className="xl:col-span-1">
               <SourceBreakdown entries={dailyPatients} />
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Activity List - Takes 2 columns */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2">
               <DailyPatientsList
                 entries={dailyPatients}
@@ -156,8 +148,6 @@ export function DailyPatientCalendar({ className }: DailyPatientCalendarProps) {
                 onDateClick={handleDateClick}
               />
             </div>
-
-            {/* Source Breakdown */}
             <div className="lg:col-span-1">
               <SourceBreakdown entries={dailyPatients} />
             </div>

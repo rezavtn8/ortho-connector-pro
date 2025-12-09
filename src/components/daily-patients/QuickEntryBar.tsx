@@ -3,28 +3,33 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { 
   Plus, 
   Minus, 
   Users, 
   Loader2, 
-  ChevronDown,
   Calendar,
-  Check
+  Check,
+  ChevronDown
 } from 'lucide-react';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { format, subDays, isToday, isYesterday } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAddDailyPatients } from '@/hooks/useDailyPatients';
 import { SOURCE_TYPE_CONFIG, SourceType } from '@/lib/database.types';
-import { useToast } from '@/hooks/use-toast';
 
 interface PatientSource {
   id: string;
@@ -45,7 +50,6 @@ export function QuickEntryBar({ onSuccess }: QuickEntryBarProps) {
   const [dateOpen, setDateOpen] = useState(false);
   
   const addDailyPatients = useAddDailyPatients();
-  const { toast } = useToast();
 
   useEffect(() => {
     loadSources();
@@ -93,166 +97,163 @@ export function QuickEntryBar({ onSuccess }: QuickEntryBarProps) {
   const quickDates = [
     { label: 'Today', date: new Date() },
     { label: 'Yesterday', date: subDays(new Date(), 1) },
-    { label: format(subDays(new Date(), 2), 'EEE'), date: subDays(new Date(), 2) },
-    { label: format(subDays(new Date(), 3), 'EEE'), date: subDays(new Date(), 3) },
   ];
 
   if (loading) {
     return (
-      <Card className="p-4">
+      <Card className="p-3">
         <div className="flex items-center justify-center py-2">
-          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
         </div>
       </Card>
     );
   }
 
+  if (sources.length === 0) {
+    return null;
+  }
+
   return (
-    <Card className="p-4 bg-gradient-to-r from-primary/5 to-transparent border-primary/20">
-      <div className="flex flex-col gap-4">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-primary/10">
-              <Users className="w-4 h-4 text-primary" />
-            </div>
-            <span className="font-semibold text-sm">Quick Add Patients</span>
-          </div>
-          
-          {/* Quick Date Picker */}
-          <div className="flex items-center gap-1">
-            {quickDates.map((qd) => (
-              <Button
-                key={qd.label}
-                variant={format(date, 'yyyy-MM-dd') === format(qd.date, 'yyyy-MM-dd') ? 'default' : 'ghost'}
-                size="sm"
-                className={cn(
-                  "h-7 text-xs px-2",
-                  format(date, 'yyyy-MM-dd') === format(qd.date, 'yyyy-MM-dd') && "shadow-sm"
-                )}
-                onClick={() => setDate(qd.date)}
-              >
-                {qd.label}
-              </Button>
-            ))}
-            <Popover open={dateOpen} onOpenChange={setDateOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-7 px-2">
-                  <Calendar className="w-3.5 h-3.5" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
-                <CalendarComponent
-                  mode="single"
-                  selected={date}
-                  onSelect={(d) => {
-                    if (d) {
-                      setDate(d);
-                      setDateOpen(false);
-                    }
-                  }}
-                  initialFocus
-                  className="pointer-events-auto"
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
+    <Card className="p-3 bg-gradient-to-r from-primary/5 to-transparent border-primary/20">
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Label */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Users className="w-4 h-4 text-primary" />
+          <span className="font-medium text-sm hidden sm:inline">Quick Add:</span>
         </div>
 
-        {/* Source Selection + Count + Submit */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          {/* Source Pills */}
-          <div className="flex-1">
-            <ScrollArea className="w-full whitespace-nowrap">
-              <div className="flex gap-2 pb-2">
-                {sources.map((source) => {
-                  const config = SOURCE_TYPE_CONFIG[source.source_type];
-                  const isSelected = selectedSource?.id === source.id;
-                  return (
-                    <Button
-                      key={source.id}
-                      variant={isSelected ? 'default' : 'outline'}
-                      size="sm"
-                      className={cn(
-                        "shrink-0 gap-1.5 h-9 transition-all",
-                        isSelected && "shadow-md ring-2 ring-primary/20"
-                      )}
-                      onClick={() => setSelectedSource(source)}
-                    >
-                      <span>{config?.icon || '📌'}</span>
-                      <span className="max-w-[100px] truncate">{source.name}</span>
-                      {isSelected && <Check className="w-3 h-3 ml-1" />}
-                    </Button>
-                  );
-                })}
-              </div>
-              <ScrollBar orientation="horizontal" />
-            </ScrollArea>
-          </div>
-
-          {/* Count Control + Submit */}
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="flex items-center bg-muted rounded-lg p-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 rounded-md"
-                onClick={() => setCount(Math.max(1, count - 1))}
-                disabled={count <= 1}
-              >
-                <Minus className="w-4 h-4" />
-              </Button>
-              <Input
-                type="number"
-                min="1"
-                value={count}
-                onChange={(e) => setCount(Math.max(1, parseInt(e.target.value) || 1))}
-                className="w-14 h-8 text-center font-bold text-lg border-0 bg-transparent focus-visible:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 rounded-md"
-                onClick={() => setCount(count + 1)}
-              >
-                <Plus className="w-4 h-4" />
-              </Button>
-            </div>
-
-            {/* Quick Presets */}
-            <div className="hidden md:flex gap-1">
-              {[5, 10, 15].map((preset) => (
-                <Button
-                  key={preset}
-                  variant={count === preset ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="h-8 w-8 p-0 text-xs font-bold"
-                  onClick={() => setCount(preset)}
-                >
-                  {preset}
-                </Button>
-              ))}
-            </div>
-
+        {/* Date Selector */}
+        <div className="flex items-center gap-1">
+          {quickDates.map((qd) => (
             <Button
-              onClick={handleQuickAdd}
-              disabled={!selectedSource || addDailyPatients.isPending}
-              className="h-10 px-4 gap-2 shadow-md"
+              key={qd.label}
+              variant={format(date, 'yyyy-MM-dd') === format(qd.date, 'yyyy-MM-dd') ? 'default' : 'outline'}
+              size="sm"
+              className="h-8 text-xs px-2.5"
+              onClick={() => setDate(qd.date)}
             >
-              {addDailyPatients.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <>
-                  <Plus className="w-4 h-4" />
-                  <span className="hidden sm:inline">Add</span>
-                  <Badge variant="secondary" className="ml-1 font-bold">
-                    {count}
-                  </Badge>
-                </>
-              )}
+              {qd.label}
             </Button>
-          </div>
+          ))}
+          <Popover open={dateOpen} onOpenChange={setDateOpen}>
+            <PopoverTrigger asChild>
+              <Button 
+                variant={!isToday(date) && !isYesterday(date) ? 'default' : 'outline'} 
+                size="sm" 
+                className="h-8 px-2"
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                {!isToday(date) && !isYesterday(date) && (
+                  <span className="ml-1 text-xs">{format(date, 'M/d')}</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0 z-50 bg-popover" align="start">
+              <CalendarComponent
+                mode="single"
+                selected={date}
+                onSelect={(d) => {
+                  if (d) {
+                    setDate(d);
+                    setDateOpen(false);
+                  }
+                }}
+                initialFocus
+                className="pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
         </div>
+
+        {/* Source Selector */}
+        <Select 
+          value={selectedSource?.id} 
+          onValueChange={(id) => setSelectedSource(sources.find(s => s.id === id) || null)}
+        >
+          <SelectTrigger className="w-[140px] sm:w-[180px] h-8 text-xs">
+            <SelectValue placeholder="Select source">
+              {selectedSource && (
+                <span className="flex items-center gap-1.5 truncate">
+                  <span>{SOURCE_TYPE_CONFIG[selectedSource.source_type]?.icon || '📌'}</span>
+                  <span className="truncate">{selectedSource.name}</span>
+                </span>
+              )}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent className="z-50 bg-popover">
+            {sources.map((source) => (
+              <SelectItem key={source.id} value={source.id}>
+                <span className="flex items-center gap-2">
+                  <span>{SOURCE_TYPE_CONFIG[source.source_type]?.icon || '📌'}</span>
+                  <span className="truncate">{source.name}</span>
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Count Control */}
+        <div className="flex items-center bg-muted rounded-md">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setCount(Math.max(1, count - 1))}
+            disabled={count <= 1}
+          >
+            <Minus className="w-3.5 h-3.5" />
+          </Button>
+          <Input
+            type="number"
+            min="1"
+            value={count}
+            onChange={(e) => setCount(Math.max(1, parseInt(e.target.value) || 1))}
+            className="w-10 h-8 text-center font-bold text-sm border-0 bg-transparent focus-visible:ring-0 p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setCount(count + 1)}
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+
+        {/* Quick Presets */}
+        <div className="hidden lg:flex gap-1">
+          {[5, 10].map((preset) => (
+            <Button
+              key={preset}
+              variant={count === preset ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-8 w-8 p-0 text-xs font-bold"
+              onClick={() => setCount(preset)}
+            >
+              {preset}
+            </Button>
+          ))}
+        </div>
+
+        {/* Submit */}
+        <Button
+          onClick={handleQuickAdd}
+          disabled={!selectedSource || addDailyPatients.isPending}
+          size="sm"
+          className="h-8 px-3 gap-1.5 ml-auto"
+        >
+          {addDailyPatients.isPending ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <>
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add</span>
+              <Badge variant="secondary" className="h-5 px-1.5 text-xs font-bold">
+                {count}
+              </Badge>
+            </>
+          )}
+        </Button>
       </div>
     </Card>
   );
