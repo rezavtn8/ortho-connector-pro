@@ -296,13 +296,20 @@ export function MailingLabels() {
   const [editableData, setEditableData] = useState<MailingLabelData[]>([]);
   const [isEditMode, setIsEditMode] = useState(false);
   const [hasCustomEdits, setHasCustomEdits] = useState(false);
+  
+  // Track the last filteredData stringified to detect real changes
+  const [lastFilteredDataHash, setLastFilteredDataHash] = useState<string>('');
 
-  // Sync editable data when filtered data changes (only when no custom edits saved)
+  // Only sync editable data when filteredData ACTUALLY changes AND no custom edits
   useEffect(() => {
-    if (!isEditMode && !hasCustomEdits) {
+    const currentHash = JSON.stringify(filteredData);
+    
+    // Only update if: not in edit mode, no custom edits, and data actually changed
+    if (!isEditMode && !hasCustomEdits && currentHash !== lastFilteredDataHash) {
       setEditableData(filteredData);
+      setLastFilteredDataHash(currentHash);
     }
-  }, [filteredData, isEditMode, hasCustomEdits]);
+  }, [filteredData, isEditMode, hasCustomEdits, lastFilteredDataHash]);
 
   // Handle cell edit - memoized for performance
   const handleCellEdit = useCallback((index: number, field: keyof MailingLabelData, value: string) => {
