@@ -1,11 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Download, Search, Filter, FileSpreadsheet, MapPin, CheckCircle2, AlertCircle, Loader2, FileText, FileDown } from 'lucide-react';
+import { Download, Search, Filter, FileSpreadsheet, MapPin, CheckCircle2, AlertCircle, Loader2, FileText, FileDown, RotateCcw, Pencil } from 'lucide-react';
 import { downloadLabelsPDF } from '@/utils/pdfLabelGenerator';
 import { useOffices } from '@/hooks/useOffices';
 import { useQuery } from '@tanstack/react-query';
@@ -291,9 +291,41 @@ export function MailingLabels() {
     return results;
   }, [offices, discoveredOffices, selectedTiers, includeDiscovered, searchTerm, sourceFilter, showParseErrors]);
 
+  // Editable data state - syncs with filtered data but allows edits
+  const [editableData, setEditableData] = useState<MailingLabelData[]>([]);
+  const [hasEdits, setHasEdits] = useState(false);
+
+  // Sync editable data when filtered data changes
+  useEffect(() => {
+    setEditableData(filteredData);
+    setHasEdits(false);
+  }, [filteredData]);
+
+  // Handle cell edit
+  const handleCellEdit = (index: number, field: keyof MailingLabelData, value: string) => {
+    setEditableData(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+    setHasEdits(true);
+  };
+
+  // Reset edits
+  const handleResetEdits = () => {
+    setEditableData(filteredData);
+    setHasEdits(false);
+    toast({
+      title: "Edits reset",
+      description: "All changes have been reverted to original data.",
+    });
+  };
+
+  // Get export data (uses editable data)
+
   // Phase 4: Excel Export
   const handleExportToExcel = () => {
-    if (filteredData.length === 0) {
+    if (editableData.length === 0) {
       toast({
         title: "No data to export",
         description: "Please adjust your filters to include offices.",
@@ -302,9 +334,8 @@ export function MailingLabels() {
       return;
     }
 
-    const exportData = filteredData.map(item => ({
-      'Office Name': item.officeName,
-      'Contact Name': item.contactName,
+    const exportData = editableData.map(item => ({
+      'Name': labelNameFormat === 'office' ? item.officeName : item.contactName,
       'Address 1': item.address1,
       'Address 2': item.address2,
       'City': item.city,
@@ -318,8 +349,7 @@ export function MailingLabels() {
 
     // Set column widths
     worksheet['!cols'] = [
-      { wch: 30 }, // Office Name
-      { wch: 25 }, // Contact Name
+      { wch: 30 }, // Name
       { wch: 30 }, // Address 1
       { wch: 20 }, // Address 2
       { wch: 20 }, // City
@@ -332,7 +362,7 @@ export function MailingLabels() {
 
     toast({
       title: "Export successful",
-      description: `Exported ${filteredData.length} mailing labels to ${fileName}`,
+      description: `Exported ${editableData.length} mailing labels to ${fileName}`,
     });
   };
 
@@ -702,15 +732,33 @@ export function MailingLabels() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Preview</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                Preview
+                {hasEdits && (
+                  <Badge variant="secondary" className="text-xs">
+                    <Pencil className="w-3 h-3 mr-1" />
+                    Edited
+                  </Badge>
+                )}
+              </CardTitle>
               <CardDescription>
-                {isLoading ? 'Loading...' : `${filteredData.length} offices selected`}
+                {isLoading ? 'Loading...' : `${editableData.length} offices selected • Click cells to edit`}
               </CardDescription>
             </div>
             <div className="flex gap-2 flex-wrap">
+              {hasEdits && (
+                <Button 
+                  onClick={handleResetEdits}
+                  variant="ghost"
+                  className="gap-2 text-muted-foreground"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Reset Edits
+                </Button>
+              )}
               <Button 
                 onClick={() => setShowPreview(true)}
-                disabled={isLoading || filteredData.length === 0}
+                disabled={isLoading || editableData.length === 0}
                 variant="outline"
                 className="gap-2"
               >
@@ -719,7 +767,7 @@ export function MailingLabels() {
               </Button>
               <Button 
                 onClick={() => {
-                  const pdfData = filteredData.map(item => ({
+                  const pdfData = editableData.map(item => ({
                     contact: labelNameFormat === 'office' ? item.officeName : item.contactName,
                     address1: item.address1,
                     address2: item.address2,
@@ -731,10 +779,10 @@ export function MailingLabels() {
                   downloadLabelsPDF(pdfData, '5160', { showToLabel: true }, filename);
                   toast({
                     title: "PDF Downloaded",
-                    description: `Exported ${filteredData.length} labels using Avery 5160 template.`,
+                    description: `Exported ${editableData.length} labels using Avery 5160 template.`,
                   });
                 }}
-                disabled={isLoading || filteredData.length === 0}
+                disabled={isLoading || editableData.length === 0}
                 variant="secondary"
                 className="gap-2"
               >
@@ -757,7 +805,7 @@ export function MailingLabels() {
             <div className="text-center py-8 text-muted-foreground">
               Loading offices...
             </div>
-          ) : filteredData.length === 0 ? (
+          ) : editableData.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No offices match your filters. Try adjusting your selection.
             </div>
@@ -767,27 +815,61 @@ export function MailingLabels() {
                 <Table>
                   <TableHeader className="bg-muted/50 sticky top-0 z-10">
                     <TableRow>
-                      <TableHead>
+                      <TableHead className="min-w-[200px]">
                         {labelNameFormat === 'office' ? 'Office Name' : 'Contact Name'}
                       </TableHead>
-                      <TableHead>Address 1</TableHead>
-                      <TableHead>Address 2</TableHead>
-                      <TableHead>City</TableHead>
-                      <TableHead>State</TableHead>
-                      <TableHead>ZIP</TableHead>
+                      <TableHead className="min-w-[180px]">Address 1</TableHead>
+                      <TableHead className="min-w-[120px]">Address 2</TableHead>
+                      <TableHead className="min-w-[120px]">City</TableHead>
+                      <TableHead className="min-w-[60px]">State</TableHead>
+                      <TableHead className="min-w-[80px]">ZIP</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredData.map((item, index) => (
+                    {editableData.map((item, index) => (
                       <TableRow key={index}>
-                        <TableCell className="font-medium">
-                          {labelNameFormat === 'office' ? item.officeName : (item.contactName || '-')}
+                        <TableCell className="p-1">
+                          <Input
+                            value={labelNameFormat === 'office' ? item.officeName : item.contactName}
+                            onChange={(e) => handleCellEdit(index, labelNameFormat === 'office' ? 'officeName' : 'contactName', e.target.value)}
+                            className="h-8 text-sm font-medium border-transparent hover:border-input focus:border-input"
+                          />
                         </TableCell>
-                        <TableCell>{item.address1 || '-'}</TableCell>
-                        <TableCell>{item.address2 || '-'}</TableCell>
-                        <TableCell>{item.city || '-'}</TableCell>
-                        <TableCell>{item.state || '-'}</TableCell>
-                        <TableCell>{item.zip || '-'}</TableCell>
+                        <TableCell className="p-1">
+                          <Input
+                            value={item.address1}
+                            onChange={(e) => handleCellEdit(index, 'address1', e.target.value)}
+                            className="h-8 text-sm border-transparent hover:border-input focus:border-input"
+                          />
+                        </TableCell>
+                        <TableCell className="p-1">
+                          <Input
+                            value={item.address2}
+                            onChange={(e) => handleCellEdit(index, 'address2', e.target.value)}
+                            className="h-8 text-sm border-transparent hover:border-input focus:border-input"
+                          />
+                        </TableCell>
+                        <TableCell className="p-1">
+                          <Input
+                            value={item.city}
+                            onChange={(e) => handleCellEdit(index, 'city', e.target.value)}
+                            className="h-8 text-sm border-transparent hover:border-input focus:border-input"
+                          />
+                        </TableCell>
+                        <TableCell className="p-1">
+                          <Input
+                            value={item.state}
+                            onChange={(e) => handleCellEdit(index, 'state', e.target.value)}
+                            className="h-8 text-sm border-transparent hover:border-input focus:border-input w-16"
+                          />
+                        </TableCell>
+                        <TableCell className="p-1">
+                          <Input
+                            value={item.zip}
+                            onChange={(e) => handleCellEdit(index, 'zip', e.target.value)}
+                            className="h-8 text-sm border-transparent hover:border-input focus:border-input w-20"
+                          />
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -826,7 +908,7 @@ export function MailingLabels() {
       <MailingLabelPreview
         open={showPreview}
         onOpenChange={setShowPreview}
-        data={filteredData.map(item => ({
+        data={editableData.map(item => ({
           contact: labelNameFormat === 'office' ? item.officeName : item.contactName,
           address1: item.address1,
           address2: item.address2,
