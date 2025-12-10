@@ -295,13 +295,14 @@ export function MailingLabels() {
   // Editable data state - syncs with filtered data but allows edits
   const [editableData, setEditableData] = useState<MailingLabelData[]>([]);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [hasCustomEdits, setHasCustomEdits] = useState(false);
 
-  // Sync editable data when filtered data changes (only when not in edit mode)
+  // Sync editable data when filtered data changes (only when no custom edits saved)
   useEffect(() => {
-    if (!isEditMode) {
+    if (!isEditMode && !hasCustomEdits) {
       setEditableData(filteredData);
     }
-  }, [filteredData, isEditMode]);
+  }, [filteredData, isEditMode, hasCustomEdits]);
 
   // Handle cell edit - memoized for performance
   const handleCellEdit = useCallback((index: number, field: keyof MailingLabelData, value: string) => {
@@ -318,8 +319,9 @@ export function MailingLabels() {
     setIsEditMode(true);
   };
 
-  // Save edits (just exits edit mode, data is already in editableData)
+  // Save edits
   const handleSaveEdits = () => {
+    setHasCustomEdits(true);
     setIsEditMode(false);
     toast({
       title: "Changes saved",
@@ -329,11 +331,25 @@ export function MailingLabels() {
 
   // Cancel edits
   const handleCancelEdit = () => {
-    setEditableData(filteredData);
+    if (hasCustomEdits) {
+      // Revert to last saved state - do nothing, editableData already has saved edits
+    } else {
+      setEditableData(filteredData);
+    }
     setIsEditMode(false);
     toast({
       title: "Edits cancelled",
-      description: "All changes have been reverted.",
+      description: "Changes have been reverted.",
+    });
+  };
+
+  // Reset to original data
+  const handleResetToOriginal = () => {
+    setEditableData(filteredData);
+    setHasCustomEdits(false);
+    toast({
+      title: "Reset complete",
+      description: "Data restored to original values.",
     });
   };
 
@@ -739,10 +755,17 @@ export function MailingLabels() {
                       Editing
                     </Badge>
                   )}
+                  {!isEditMode && hasCustomEdits && (
+                    <Badge variant="secondary" className="text-xs">
+                      <Check className="w-3 h-3 mr-1" />
+                      Edited
+                    </Badge>
+                  )}
                 </CardTitle>
                 <CardDescription>
                   {isLoading ? 'Loading...' : `${editableData.length} offices selected`}
                   {isEditMode && ' • Edit cells below, then save'}
+                  {!isEditMode && hasCustomEdits && ' • Custom edits applied'}
                 </CardDescription>
               </div>
               {/* Label Name Format Selector */}
@@ -781,6 +804,16 @@ export function MailingLabels() {
                 </>
               ) : (
                 <>
+                  {hasCustomEdits && (
+                    <Button 
+                      onClick={handleResetToOriginal}
+                      variant="ghost"
+                      className="gap-2 text-muted-foreground"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      Reset
+                    </Button>
+                  )}
                   <Button 
                     onClick={handleStartEdit}
                     disabled={isLoading || editableData.length === 0}
