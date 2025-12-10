@@ -313,9 +313,11 @@ export function MailingLabels() {
     });
   }, []);
 
-  // Enter edit mode
+  // Enter edit mode - preserve existing edits if any
   const handleStartEdit = () => {
-    setEditableData([...filteredData]);
+    if (!hasCustomEdits) {
+      setEditableData([...filteredData]);
+    }
     setIsEditMode(true);
   };
 
