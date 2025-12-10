@@ -596,24 +596,6 @@ export function MailingLabels() {
             </Select>
           </div>
 
-          {/* Label Name Format */}
-          <div className="space-y-2">
-            <Label htmlFor="name-format">Label Name Format</Label>
-            <Select value={labelNameFormat} onValueChange={(value: LabelNameFormat) => setLabelNameFormat(value)}>
-              <SelectTrigger id="name-format">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="office">Office/Clinic Name (as-is)</SelectItem>
-                <SelectItem value="contact">Contact Name (Dr. extracted)</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              {labelNameFormat === 'office' 
-                ? 'Uses the office name exactly as stored (no "Dr." prefix added)'
-                : 'Extracts doctor name from office name with "Dr." prefix'}
-            </p>
-          </div>
 
           {/* Tier Selection (for partner offices) */}
           {(sourceFilter === 'all' || sourceFilter === 'partner') && (
@@ -746,21 +728,36 @@ export function MailingLabels() {
       {/* Phase 3: Preview Table */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                Preview
-                {isEditMode && (
-                  <Badge variant="outline" className="text-xs border-primary text-primary">
-                    <Pencil className="w-3 h-3 mr-1" />
-                    Editing
-                  </Badge>
-                )}
-              </CardTitle>
-              <CardDescription>
-                {isLoading ? 'Loading...' : `${editableData.length} offices selected`}
-                {isEditMode && ' • Edit cells below, then save'}
-              </CardDescription>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  Preview
+                  {isEditMode && (
+                    <Badge variant="outline" className="text-xs border-primary text-primary">
+                      <Pencil className="w-3 h-3 mr-1" />
+                      Editing
+                    </Badge>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  {isLoading ? 'Loading...' : `${editableData.length} offices selected`}
+                  {isEditMode && ' • Edit cells below, then save'}
+                </CardDescription>
+              </div>
+              {/* Label Name Format Selector */}
+              <div className="flex items-center gap-3">
+                <Label htmlFor="name-format" className="text-sm whitespace-nowrap">Export Name:</Label>
+                <Select value={labelNameFormat} onValueChange={(value: LabelNameFormat) => setLabelNameFormat(value)}>
+                  <SelectTrigger id="name-format" className="w-[200px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="office">Office Name</SelectItem>
+                    <SelectItem value="contact">Contact Name (Dr.)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="flex gap-2 flex-wrap">
               {isEditMode ? (
@@ -854,9 +851,8 @@ export function MailingLabels() {
                 <Table>
                   <TableHeader className="bg-muted/50 sticky top-0 z-10">
                     <TableRow>
-                      <TableHead className="min-w-[200px]">
-                        {labelNameFormat === 'office' ? 'Office Name' : 'Contact Name'}
-                      </TableHead>
+                      <TableHead className="min-w-[180px]">Office Name</TableHead>
+                      <TableHead className="min-w-[150px]">Contact Name</TableHead>
                       <TableHead className="min-w-[180px]">Address 1</TableHead>
                       <TableHead className="min-w-[120px]">Address 2</TableHead>
                       <TableHead className="min-w-[120px]">City</TableHead>
@@ -870,12 +866,22 @@ export function MailingLabels() {
                         <TableCell className={isEditMode ? "p-1" : "font-medium"}>
                           {isEditMode ? (
                             <EditableCell
-                              value={labelNameFormat === 'office' ? item.officeName : item.contactName}
-                              onChange={(val) => handleCellEdit(index, labelNameFormat === 'office' ? 'officeName' : 'contactName', val)}
+                              value={item.officeName}
+                              onChange={(val) => handleCellEdit(index, 'officeName', val)}
                               className="font-medium"
                             />
                           ) : (
-                            labelNameFormat === 'office' ? item.officeName : (item.contactName || '-')
+                            item.officeName || '-'
+                          )}
+                        </TableCell>
+                        <TableCell className={isEditMode ? "p-1" : ""}>
+                          {isEditMode ? (
+                            <EditableCell
+                              value={item.contactName}
+                              onChange={(val) => handleCellEdit(index, 'contactName', val)}
+                            />
+                          ) : (
+                            item.contactName || '-'
                           )}
                         </TableCell>
                         <TableCell className={isEditMode ? "p-1" : ""}>
