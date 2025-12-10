@@ -1,7 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { EditableCell } from '@/components/EditableCell';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
@@ -301,15 +302,15 @@ export function MailingLabels() {
     setHasEdits(false);
   }, [filteredData]);
 
-  // Handle cell edit
-  const handleCellEdit = (index: number, field: keyof MailingLabelData, value: string) => {
+  // Handle cell edit - memoized for performance
+  const handleCellEdit = useCallback((index: number, field: keyof MailingLabelData, value: string) => {
     setEditableData(prev => {
       const updated = [...prev];
       updated[index] = { ...updated[index], [field]: value };
       return updated;
     });
     setHasEdits(true);
-  };
+  }, []);
 
   // Reset edits
   const handleResetEdits = () => {
@@ -829,45 +830,42 @@ export function MailingLabels() {
                     {editableData.map((item, index) => (
                       <TableRow key={index}>
                         <TableCell className="p-1">
-                          <Input
+                          <EditableCell
                             value={labelNameFormat === 'office' ? item.officeName : item.contactName}
-                            onChange={(e) => handleCellEdit(index, labelNameFormat === 'office' ? 'officeName' : 'contactName', e.target.value)}
-                            className="h-8 text-sm font-medium border-transparent hover:border-input focus:border-input"
+                            onChange={(val) => handleCellEdit(index, labelNameFormat === 'office' ? 'officeName' : 'contactName', val)}
+                            className="font-medium"
                           />
                         </TableCell>
                         <TableCell className="p-1">
-                          <Input
+                          <EditableCell
                             value={item.address1}
-                            onChange={(e) => handleCellEdit(index, 'address1', e.target.value)}
-                            className="h-8 text-sm border-transparent hover:border-input focus:border-input"
+                            onChange={(val) => handleCellEdit(index, 'address1', val)}
                           />
                         </TableCell>
                         <TableCell className="p-1">
-                          <Input
+                          <EditableCell
                             value={item.address2}
-                            onChange={(e) => handleCellEdit(index, 'address2', e.target.value)}
-                            className="h-8 text-sm border-transparent hover:border-input focus:border-input"
+                            onChange={(val) => handleCellEdit(index, 'address2', val)}
                           />
                         </TableCell>
                         <TableCell className="p-1">
-                          <Input
+                          <EditableCell
                             value={item.city}
-                            onChange={(e) => handleCellEdit(index, 'city', e.target.value)}
-                            className="h-8 text-sm border-transparent hover:border-input focus:border-input"
+                            onChange={(val) => handleCellEdit(index, 'city', val)}
                           />
                         </TableCell>
                         <TableCell className="p-1">
-                          <Input
+                          <EditableCell
                             value={item.state}
-                            onChange={(e) => handleCellEdit(index, 'state', e.target.value)}
-                            className="h-8 text-sm border-transparent hover:border-input focus:border-input w-16"
+                            onChange={(val) => handleCellEdit(index, 'state', val)}
+                            className="w-16"
                           />
                         </TableCell>
                         <TableCell className="p-1">
-                          <Input
+                          <EditableCell
                             value={item.zip}
-                            onChange={(e) => handleCellEdit(index, 'zip', e.target.value)}
-                            className="h-8 text-sm border-transparent hover:border-input focus:border-input w-20"
+                            onChange={(val) => handleCellEdit(index, 'zip', val)}
+                            className="w-20"
                           />
                         </TableCell>
                       </TableRow>
