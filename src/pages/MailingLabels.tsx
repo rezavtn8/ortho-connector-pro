@@ -767,8 +767,9 @@ export function MailingLabels() {
                 <Table>
                   <TableHeader className="bg-muted/50 sticky top-0 z-10">
                     <TableRow>
-                      <TableHead>Office Name</TableHead>
-                      <TableHead>Contact Name</TableHead>
+                      <TableHead>
+                        {labelNameFormat === 'office' ? 'Office Name' : 'Contact Name'}
+                      </TableHead>
                       <TableHead>Address 1</TableHead>
                       <TableHead>Address 2</TableHead>
                       <TableHead>City</TableHead>
@@ -779,8 +780,9 @@ export function MailingLabels() {
                   <TableBody>
                     {filteredData.map((item, index) => (
                       <TableRow key={index}>
-                        <TableCell className="font-medium">{item.officeName}</TableCell>
-                        <TableCell>{item.contactName || '-'}</TableCell>
+                        <TableCell className="font-medium">
+                          {labelNameFormat === 'office' ? item.officeName : (item.contactName || '-')}
+                        </TableCell>
                         <TableCell>{item.address1 || '-'}</TableCell>
                         <TableCell>{item.address2 || '-'}</TableCell>
                         <TableCell>{item.city || '-'}</TableCell>
