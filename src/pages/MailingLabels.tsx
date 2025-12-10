@@ -185,12 +185,15 @@ const extractContactName = (officeName: string): string => {
   return officeName;
 };
 
+export type LabelNameFormat = 'office' | 'contact';
+
 export function MailingLabels() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTiers, setSelectedTiers] = useState<string[]>(['VIP', 'Warm', 'Cold', 'Dormant']);
   const [includeDiscovered, setIncludeDiscovered] = useState(false);
   const [sourceFilter, setSourceFilter] = useState<'all' | 'partner' | 'discovered'>('all');
   const [showParseErrors, setShowParseErrors] = useState(false);
+  const [labelNameFormat, setLabelNameFormat] = useState<LabelNameFormat>('office');
   
   // PHASE 1: Address Correction State
   const [isCorrecting, setIsCorrecting] = useState(false);
@@ -547,6 +550,25 @@ export function MailingLabels() {
             </Select>
           </div>
 
+          {/* Label Name Format */}
+          <div className="space-y-2">
+            <Label htmlFor="name-format">Label Name Format</Label>
+            <Select value={labelNameFormat} onValueChange={(value: LabelNameFormat) => setLabelNameFormat(value)}>
+              <SelectTrigger id="name-format">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="office">Office/Clinic Name (as-is)</SelectItem>
+                <SelectItem value="contact">Contact Name (Dr. extracted)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {labelNameFormat === 'office' 
+                ? 'Uses the office name exactly as stored (no "Dr." prefix added)'
+                : 'Extracts doctor name from office name with "Dr." prefix'}
+            </p>
+          </div>
+
           {/* Tier Selection (for partner offices) */}
           {(sourceFilter === 'all' || sourceFilter === 'partner') && (
             <div className="space-y-2">
@@ -698,7 +720,7 @@ export function MailingLabels() {
               <Button 
                 onClick={() => {
                   const pdfData = filteredData.map(item => ({
-                    contact: item.contactName,
+                    contact: labelNameFormat === 'office' ? item.officeName : item.contactName,
                     address1: item.address1,
                     address2: item.address2,
                     city: item.city,
@@ -803,7 +825,7 @@ export function MailingLabels() {
         open={showPreview}
         onOpenChange={setShowPreview}
         data={filteredData.map(item => ({
-          contact: item.contactName,
+          contact: labelNameFormat === 'office' ? item.officeName : item.contactName,
           address1: item.address1,
           address2: item.address2,
           city: item.city,
