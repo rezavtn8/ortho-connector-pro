@@ -6,7 +6,7 @@ import { EditableCell } from '@/components/EditableCell';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Download, Search, Filter, FileSpreadsheet, MapPin, CheckCircle2, AlertCircle, Loader2, FileText, FileDown, RotateCcw, Pencil } from 'lucide-react';
+import { Download, Search, Filter, FileSpreadsheet, MapPin, CheckCircle2, AlertCircle, Loader2, FileText, FileDown, RotateCcw, Pencil, X, Check } from 'lucide-react';
 import { downloadLabelsPDF } from '@/utils/pdfLabelGenerator';
 import { useOffices } from '@/hooks/useOffices';
 import { useQuery } from '@tanstack/react-query';
@@ -294,13 +294,14 @@ export function MailingLabels() {
 
   // Editable data state - syncs with filtered data but allows edits
   const [editableData, setEditableData] = useState<MailingLabelData[]>([]);
-  const [hasEdits, setHasEdits] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
-  // Sync editable data when filtered data changes
+  // Sync editable data when filtered data changes (only when not in edit mode)
   useEffect(() => {
-    setEditableData(filteredData);
-    setHasEdits(false);
-  }, [filteredData]);
+    if (!isEditMode) {
+      setEditableData(filteredData);
+    }
+  }, [filteredData, isEditMode]);
 
   // Handle cell edit - memoized for performance
   const handleCellEdit = useCallback((index: number, field: keyof MailingLabelData, value: string) => {
@@ -309,16 +310,30 @@ export function MailingLabels() {
       updated[index] = { ...updated[index], [field]: value };
       return updated;
     });
-    setHasEdits(true);
   }, []);
 
-  // Reset edits
-  const handleResetEdits = () => {
-    setEditableData(filteredData);
-    setHasEdits(false);
+  // Enter edit mode
+  const handleStartEdit = () => {
+    setEditableData([...filteredData]);
+    setIsEditMode(true);
+  };
+
+  // Save edits (just exits edit mode, data is already in editableData)
+  const handleSaveEdits = () => {
+    setIsEditMode(false);
     toast({
-      title: "Edits reset",
-      description: "All changes have been reverted to original data.",
+      title: "Changes saved",
+      description: "Your edits have been applied to the export data.",
+    });
+  };
+
+  // Cancel edits
+  const handleCancelEdit = () => {
+    setEditableData(filteredData);
+    setIsEditMode(false);
+    toast({
+      title: "Edits cancelled",
+      description: "All changes have been reverted.",
     });
   };
 
@@ -735,69 +750,92 @@ export function MailingLabels() {
             <div>
               <CardTitle className="flex items-center gap-2">
                 Preview
-                {hasEdits && (
-                  <Badge variant="secondary" className="text-xs">
+                {isEditMode && (
+                  <Badge variant="outline" className="text-xs border-primary text-primary">
                     <Pencil className="w-3 h-3 mr-1" />
-                    Edited
+                    Editing
                   </Badge>
                 )}
               </CardTitle>
               <CardDescription>
-                {isLoading ? 'Loading...' : `${editableData.length} offices selected • Click cells to edit`}
+                {isLoading ? 'Loading...' : `${editableData.length} offices selected`}
+                {isEditMode && ' • Edit cells below, then save'}
               </CardDescription>
             </div>
             <div className="flex gap-2 flex-wrap">
-              {hasEdits && (
-                <Button 
-                  onClick={handleResetEdits}
-                  variant="ghost"
-                  className="gap-2 text-muted-foreground"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  Reset Edits
-                </Button>
+              {isEditMode ? (
+                <>
+                  <Button 
+                    onClick={handleCancelEdit}
+                    variant="ghost"
+                    className="gap-2"
+                  >
+                    <X className="w-4 h-4" />
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleSaveEdits}
+                    variant="default"
+                    className="gap-2"
+                  >
+                    <Check className="w-4 h-4" />
+                    Save Changes
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button 
+                    onClick={handleStartEdit}
+                    disabled={isLoading || editableData.length === 0}
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    <Pencil className="w-4 h-4" />
+                    Edit
+                  </Button>
+                  <Button 
+                    onClick={() => setShowPreview(true)}
+                    disabled={isLoading || editableData.length === 0}
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Preview Labels
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      const pdfData = editableData.map(item => ({
+                        contact: labelNameFormat === 'office' ? item.officeName : item.contactName,
+                        address1: item.address1,
+                        address2: item.address2,
+                        city: item.city,
+                        state: item.state,
+                        zip: item.zip,
+                      }));
+                      const filename = `mailing-labels-${new Date().toISOString().split('T')[0]}.pdf`;
+                      downloadLabelsPDF(pdfData, '5160', { showToLabel: true }, filename);
+                      toast({
+                        title: "PDF Downloaded",
+                        description: `Exported ${editableData.length} labels using Avery 5160 template.`,
+                      });
+                    }}
+                    disabled={isLoading || editableData.length === 0}
+                    variant="secondary"
+                    className="gap-2"
+                  >
+                    <FileDown className="w-4 h-4" />
+                    Quick PDF
+                  </Button>
+                  <Button 
+                    onClick={handleExportToExcel}
+                    disabled={isLoading || filteredData.length === 0}
+                    className="gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    Export Excel
+                  </Button>
+                </>
               )}
-              <Button 
-                onClick={() => setShowPreview(true)}
-                disabled={isLoading || editableData.length === 0}
-                variant="outline"
-                className="gap-2"
-              >
-                <FileText className="w-4 h-4" />
-                Preview Labels
-              </Button>
-              <Button 
-                onClick={() => {
-                  const pdfData = editableData.map(item => ({
-                    contact: labelNameFormat === 'office' ? item.officeName : item.contactName,
-                    address1: item.address1,
-                    address2: item.address2,
-                    city: item.city,
-                    state: item.state,
-                    zip: item.zip,
-                  }));
-                  const filename = `mailing-labels-${new Date().toISOString().split('T')[0]}.pdf`;
-                  downloadLabelsPDF(pdfData, '5160', { showToLabel: true }, filename);
-                  toast({
-                    title: "PDF Downloaded",
-                    description: `Exported ${editableData.length} labels using Avery 5160 template.`,
-                  });
-                }}
-                disabled={isLoading || editableData.length === 0}
-                variant="secondary"
-                className="gap-2"
-              >
-                <FileDown className="w-4 h-4" />
-                Quick PDF
-              </Button>
-              <Button 
-                onClick={handleExportToExcel}
-                disabled={isLoading || filteredData.length === 0}
-                className="gap-2"
-              >
-                <Download className="w-4 h-4" />
-                Export Excel
-              </Button>
             </div>
           </div>
         </CardHeader>
@@ -829,44 +867,68 @@ export function MailingLabels() {
                   <TableBody>
                     {editableData.map((item, index) => (
                       <TableRow key={index}>
-                        <TableCell className="p-1">
-                          <EditableCell
-                            value={labelNameFormat === 'office' ? item.officeName : item.contactName}
-                            onChange={(val) => handleCellEdit(index, labelNameFormat === 'office' ? 'officeName' : 'contactName', val)}
-                            className="font-medium"
-                          />
+                        <TableCell className={isEditMode ? "p-1" : "font-medium"}>
+                          {isEditMode ? (
+                            <EditableCell
+                              value={labelNameFormat === 'office' ? item.officeName : item.contactName}
+                              onChange={(val) => handleCellEdit(index, labelNameFormat === 'office' ? 'officeName' : 'contactName', val)}
+                              className="font-medium"
+                            />
+                          ) : (
+                            labelNameFormat === 'office' ? item.officeName : (item.contactName || '-')
+                          )}
                         </TableCell>
-                        <TableCell className="p-1">
-                          <EditableCell
-                            value={item.address1}
-                            onChange={(val) => handleCellEdit(index, 'address1', val)}
-                          />
+                        <TableCell className={isEditMode ? "p-1" : ""}>
+                          {isEditMode ? (
+                            <EditableCell
+                              value={item.address1}
+                              onChange={(val) => handleCellEdit(index, 'address1', val)}
+                            />
+                          ) : (
+                            item.address1 || '-'
+                          )}
                         </TableCell>
-                        <TableCell className="p-1">
-                          <EditableCell
-                            value={item.address2}
-                            onChange={(val) => handleCellEdit(index, 'address2', val)}
-                          />
+                        <TableCell className={isEditMode ? "p-1" : ""}>
+                          {isEditMode ? (
+                            <EditableCell
+                              value={item.address2}
+                              onChange={(val) => handleCellEdit(index, 'address2', val)}
+                            />
+                          ) : (
+                            item.address2 || '-'
+                          )}
                         </TableCell>
-                        <TableCell className="p-1">
-                          <EditableCell
-                            value={item.city}
-                            onChange={(val) => handleCellEdit(index, 'city', val)}
-                          />
+                        <TableCell className={isEditMode ? "p-1" : ""}>
+                          {isEditMode ? (
+                            <EditableCell
+                              value={item.city}
+                              onChange={(val) => handleCellEdit(index, 'city', val)}
+                            />
+                          ) : (
+                            item.city || '-'
+                          )}
                         </TableCell>
-                        <TableCell className="p-1">
-                          <EditableCell
-                            value={item.state}
-                            onChange={(val) => handleCellEdit(index, 'state', val)}
-                            className="w-16"
-                          />
+                        <TableCell className={isEditMode ? "p-1" : ""}>
+                          {isEditMode ? (
+                            <EditableCell
+                              value={item.state}
+                              onChange={(val) => handleCellEdit(index, 'state', val)}
+                              className="w-16"
+                            />
+                          ) : (
+                            item.state || '-'
+                          )}
                         </TableCell>
-                        <TableCell className="p-1">
-                          <EditableCell
-                            value={item.zip}
-                            onChange={(val) => handleCellEdit(index, 'zip', val)}
-                            className="w-20"
-                          />
+                        <TableCell className={isEditMode ? "p-1" : ""}>
+                          {isEditMode ? (
+                            <EditableCell
+                              value={item.zip}
+                              onChange={(val) => handleCellEdit(index, 'zip', val)}
+                              className="w-20"
+                            />
+                          ) : (
+                            item.zip || '-'
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
