@@ -411,36 +411,44 @@ function OfficesContent() {
     }
   };
 
-  const handleApplyCorrections = async (selectedCorrections: string[]) => {
+  const handleApplyCorrections = async (selectedIds: string[]) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
-      const { data: result, error } = await supabase.functions.invoke('apply-address-corrections', {
-        body: { 
-          corrections: correctionResults.filter(r => selectedCorrections.includes(r.id))
-        },
+      const updates = correctionResults
+        .filter(r => selectedIds.includes(r.id))
+        .map(r => ({ id: r.id, address: r.corrected }));
+
+      const { data: result, error: fnError } = await supabase.functions.invoke('apply-address-corrections', {
+        body: { updates },
         headers: {
           Authorization: `Bearer ${session.access_token}`
         }
       });
 
-      if (error) throw error;
+      if (fnError) {
+        throw new Error(fnError.message || 'Failed to apply corrections');
+      }
 
       toast({
         title: "Addresses updated",
-        description: `Successfully updated ${result.updated} office addresses.`,
+        description: `Successfully updated ${result.updated} of ${result.total} addresses.`,
       });
 
       setShowCorrectionDialog(false);
       setHasBeenCorrected(true);
-      refetch();
+      
+      // Refresh to show updated addresses
+      setTimeout(() => refetch(), 500);
     } catch (error: any) {
+      console.error('Apply corrections error:', error);
       toast({
         title: "Update failed",
-        description: error.message,
+        description: error.message || 'Unknown error occurred',
         variant: "destructive",
       });
+      throw error;
     }
   };
 
