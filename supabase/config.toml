@@ -1,5 +1,11 @@
 project_id = "vqkzqwibbcvmdwgqladn"
 
+[functions.fill-office-details]
+verify_jwt = false
+
+[functions.apply-office-details]
+verify_jwt = false
+
 [functions.get-google-reviews]
 verify_jwt = false
 
