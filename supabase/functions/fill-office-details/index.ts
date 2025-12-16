@@ -52,16 +52,17 @@ serve(async (req) => {
       );
     }
 
-    const supabase = createClient(
+    // Use service role to validate the JWT token
+    const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { global: { headers: { Authorization: authHeader } } },
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
+    const token = authHeader.replace("Bearer ", "");
     const {
       data: { user },
       error: userError,
-    } = await supabase.auth.getUser();
+    } = await supabaseAdmin.auth.getUser(token);
 
     if (userError || !user) {
       console.error(`fill-office-details: auth.getUser failed [${requestId}]`, userError);
@@ -70,6 +71,13 @@ serve(async (req) => {
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+
+    // Create client for RLS-protected queries
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } },
+    );
 
     const { officeIds } = await req.json();
     if (!Array.isArray(officeIds) || officeIds.length === 0) {
