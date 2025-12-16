@@ -13,6 +13,46 @@ type UpdatePayload = {
   website?: string | null;
 };
 
+/**
+ * Normalize phone number to pass database constraints.
+ * Google returns formats like "(949) 555-1234" but our constraint requires
+ * phone to start with a digit or + sign.
+ */
+function normalizePhone(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+  
+  // Remove leading non-digit characters except +
+  let cleaned = phone.trim();
+  
+  // If starts with ( like "(949)", remove it to make "949..."
+  cleaned = cleaned.replace(/^\(/, '');
+  
+  // Remove any other leading non-digit/non-+ characters
+  cleaned = cleaned.replace(/^[^\d\+]+/, '');
+  
+  // If empty after cleaning, return null
+  if (!cleaned || cleaned.length < 7) return null;
+  
+  return cleaned;
+}
+
+/**
+ * Normalize website URL to pass database constraints.
+ * Google sometimes returns "www.example.com" without protocol.
+ */
+function normalizeWebsite(website: string | null | undefined): string | null {
+  if (!website) return null;
+  
+  let cleaned = website.trim();
+  
+  // Add https:// if no protocol present
+  if (!/^https?:\/\//i.test(cleaned)) {
+    cleaned = `https://${cleaned}`;
+  }
+  
+  return cleaned;
+}
+
 serve(async (req) => {
   const requestId = crypto.randomUUID();
   console.log(`apply-office-details: ${req.method} request [${requestId}]`);
