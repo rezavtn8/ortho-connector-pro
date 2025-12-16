@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { useSearchParams, Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,7 +7,7 @@ import { EditableCell } from '@/components/EditableCell';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Download, Search, Filter, FileSpreadsheet, MapPin, CheckCircle2, AlertCircle, Loader2, FileText, FileDown, RotateCcw, Pencil, X, Check } from 'lucide-react';
+import { Download, Search, Filter, FileSpreadsheet, MapPin, CheckCircle2, AlertCircle, Loader2, FileText, FileDown, RotateCcw, Pencil, X, Check, ArrowLeft } from 'lucide-react';
 import { downloadLabelsPDF } from '@/utils/pdfLabelGenerator';
 import { useOffices } from '@/hooks/useOffices';
 import { useQuery } from '@tanstack/react-query';
@@ -189,6 +190,10 @@ const extractContactName = (officeName: string): string => {
 export type LabelNameFormat = 'office' | 'contact';
 
 export function MailingLabels() {
+  const [searchParams] = useSearchParams();
+  const selectedIds = searchParams.get('ids')?.split(',').filter(Boolean) || [];
+  const hasSelectedIds = selectedIds.length > 0;
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTiers, setSelectedTiers] = useState<string[]>(['VIP', 'Warm', 'Cold', 'Dormant']);
   const [includeDiscovered, setIncludeDiscovered] = useState(false);
@@ -229,6 +234,12 @@ export function MailingLabels() {
     if (sourceFilter === 'all' || sourceFilter === 'partner') {
       const partnerOffices = offices
         .filter(office => {
+          // If we have specific IDs from URL, filter by those
+          if (hasSelectedIds) {
+            return selectedIds.includes(office.id);
+          }
+          
+          // Otherwise use tier and search filters
           const matchesTier = selectedTiers.includes(office.tier);
           const matchesSearch = searchTerm === '' || 
             office.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -254,8 +265,8 @@ export function MailingLabels() {
       results = [...results, ...partnerOffices];
     }
 
-    // Filter discovered offices
-    if (sourceFilter === 'all' || sourceFilter === 'discovered') {
+    // Filter discovered offices (only if no specific IDs)
+    if (!hasSelectedIds && (sourceFilter === 'all' || sourceFilter === 'discovered')) {
       if (includeDiscovered || sourceFilter === 'discovered') {
         const discovered = discoveredOffices
           .filter(office => {
@@ -290,7 +301,7 @@ export function MailingLabels() {
     }
 
     return results;
-  }, [offices, discoveredOffices, selectedTiers, includeDiscovered, searchTerm, sourceFilter, showParseErrors]);
+  }, [offices, discoveredOffices, selectedTiers, includeDiscovered, searchTerm, sourceFilter, showParseErrors, hasSelectedIds, selectedIds]);
 
   // Editable data state - syncs with filtered data but allows edits
   const [editableData, setEditableData] = useState<MailingLabelData[]>([]);
@@ -571,80 +582,100 @@ export function MailingLabels() {
 
   return (
     <div className="space-y-6">
+      {/* Context Banner for selected offices */}
+      {hasSelectedIds && (
+        <Alert className="bg-primary/10 border-primary/20">
+          <MapPin className="h-4 w-4" />
+          <AlertTitle>Viewing {selectedIds.length} Selected Offices</AlertTitle>
+          <AlertDescription className="flex items-center justify-between">
+            <span>Creating labels for offices selected from Partner Offices page.</span>
+            <Link to="/offices">
+              <Button variant="outline" size="sm" className="gap-2">
+                <ArrowLeft className="h-4 w-4" />
+                Back to Offices
+              </Button>
+            </Link>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Phase 1: Header */}
       <div>
         <h1 className="text-3xl font-bold mb-2">Mailing Labels</h1>
         <p className="text-muted-foreground">
-          Generate Excel sheets for bulk mailing to offices
+          {hasSelectedIds 
+            ? `Generate labels for ${filteredData.length} selected office${filteredData.length !== 1 ? 's' : ''}`
+            : 'Generate Excel sheets for bulk mailing to offices'}
         </p>
       </div>
 
-      {/* Phase 2 & 3: Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="w-5 h-5" />
-            Filter Options
-          </CardTitle>
-          <CardDescription>
-            Select which offices to include in your mailing list
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Search */}
-          <div className="space-y-2">
-            <Label htmlFor="search">Search</Label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                id="search"
-                placeholder="Search by office name or address..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </div>
-
-          {/* Source Filter */}
-          <div className="space-y-2">
-            <Label htmlFor="source-filter">Office Source</Label>
-            <Select value={sourceFilter} onValueChange={(value: any) => setSourceFilter(value)}>
-              <SelectTrigger id="source-filter">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Offices</SelectItem>
-                <SelectItem value="partner">Partner Offices Only</SelectItem>
-                <SelectItem value="discovered">Discovered Offices Only</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-
-          {/* Tier Selection (for partner offices) */}
-          {(sourceFilter === 'all' || sourceFilter === 'partner') && (
+      {/* Phase 2 & 3: Filters - Hide when specific IDs are selected */}
+      {!hasSelectedIds && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Filter className="w-5 h-5" />
+              Filter Options
+            </CardTitle>
+            <CardDescription>
+              Select which offices to include in your mailing list
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Search */}
             <div className="space-y-2">
-              <Label>Partner Office Tiers</Label>
-              <div className="flex flex-wrap gap-2">
-                {['VIP', 'Warm', 'Cold', 'Dormant'].map(tier => (
-                  <div key={tier} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`tier-${tier}`}
-                      checked={selectedTiers.includes(tier)}
-                      onCheckedChange={() => toggleTier(tier)}
-                    />
-                    <label
-                      htmlFor={`tier-${tier}`}
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                    >
-                      {tier}
-                    </label>
-                  </div>
-                ))}
+              <Label htmlFor="search">Search</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="search"
+                  placeholder="Search by office name or address..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
               </div>
             </div>
-          )}
+
+            {/* Source Filter */}
+            <div className="space-y-2">
+              <Label htmlFor="source-filter">Office Source</Label>
+              <Select value={sourceFilter} onValueChange={(value: any) => setSourceFilter(value)}>
+                <SelectTrigger id="source-filter">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Offices</SelectItem>
+                  <SelectItem value="partner">Partner Offices Only</SelectItem>
+                  <SelectItem value="discovered">Discovered Offices Only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+
+            {/* Tier Selection (for partner offices) */}
+            {(sourceFilter === 'all' || sourceFilter === 'partner') && (
+              <div className="space-y-2">
+                <Label>Partner Office Tiers</Label>
+                <div className="flex flex-wrap gap-2">
+                  {['VIP', 'Warm', 'Cold', 'Dormant'].map(tier => (
+                    <div key={tier} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`tier-${tier}`}
+                        checked={selectedTiers.includes(tier)}
+                        onCheckedChange={() => toggleTier(tier)}
+                      />
+                      <label
+                        htmlFor={`tier-${tier}`}
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                      >
+                        {tier}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
           {/* Include Discovered (when showing all) */}
           {sourceFilter === 'all' && (
@@ -681,6 +712,7 @@ export function MailingLabels() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* PHASE 3: Address Correction Tool */}
       <Card className="border-2 border-primary/20">
