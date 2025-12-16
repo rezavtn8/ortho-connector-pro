@@ -477,15 +477,15 @@ serve(async (req) => {
           }
 
           const office = {
-            place_id: place.place_id,
+            google_place_id: place.place_id,
             name: place.name,
             address: place.vicinity || place.formatted_address || null,
             phone,
             website,
-            rating: place.rating || null,
+            google_rating: place.rating || null,
             user_ratings_total: user_ratings_total,
-            lat: place.geometry.location.lat,
-            lng: place.geometry.location.lng,
+            latitude: place.geometry.location.lat,
+            longitude: place.geometry.location.lng,
             discovered_by: user.id,
             clinic_id: clinic_id,
             source: 'google',
@@ -528,7 +528,7 @@ serve(async (req) => {
         const { data: inserted, error: insertError } = await supabase
           .from('discovered_offices')
           .upsert(officesForInsert, { 
-            onConflict: 'place_id',
+            onConflict: 'google_place_id',
             ignoreDuplicates: false 
           })
           .select();
