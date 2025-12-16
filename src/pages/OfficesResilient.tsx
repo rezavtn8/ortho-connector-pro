@@ -17,7 +17,8 @@ import { TierQuickActions } from '@/components/TierQuickActions';
 import { TagBadge } from '@/components/TagBadge';
 import { TagManager } from '@/components/TagManager';
 import { AddressCorrectionDialog } from '@/components/AddressCorrectionDialog';
-import { Eye, Edit, Users, Trash2, Search, MapPin, Phone, Mail, AlertCircle, TrendingUp, Calendar, Tag, Loader2, CheckCircle2 } from 'lucide-react';
+import { FillDetailsDialog } from '@/components/FillDetailsDialog';
+import { Eye, Edit, Users, Trash2, Search, MapPin, Phone, Mail, AlertCircle, TrendingUp, Calendar, Tag, Loader2, CheckCircle2, Globe } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { PatientLoadHistoryEditor } from '@/components/PatientLoadHistoryEditor';
 import { AddOfficeDialog as AddSourceDialog } from '@/components/AddSourceDialog';
@@ -69,6 +70,13 @@ function OfficesContent() {
   const [showCorrectionDialog, setShowCorrectionDialog] = useState(false);
   const [correctionResults, setCorrectionResults] = useState<any[]>([]);
   const [hasBeenCorrected, setHasBeenCorrected] = useState(false);
+
+  // Fill details state
+  const [isFillingDetails, setIsFillingDetails] = useState(false);
+  const [fillDetailsProgress, setFillDetailsProgress] = useState(0);
+  const [showFillDetailsDialog, setShowFillDetailsDialog] = useState(false);
+  const [fillDetailsResults, setFillDetailsResults] = useState<any[]>([]);
+  const [hasBeenFilled, setHasBeenFilled] = useState(false);
 
   // Fetch offices data with tier calculations
   const { data: offices, isLoading, error, refetch } = useOffices();
@@ -463,6 +471,113 @@ function OfficesContent() {
     }
   };
 
+  // Fill missing details handler
+  const handleFillDetails = async () => {
+    if (!offices || offices.length === 0) {
+      toast({
+        title: "No offices",
+        description: "No partner offices found to fill details for.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const officeIds = offices.map(o => o.id);
+
+    setIsFillingDetails(true);
+    setFillDetailsProgress(0);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      toast({
+        title: "Fetching office details",
+        description: `Looking up ${officeIds.length} offices on Google...`,
+      });
+
+      const { data: result, error: fnError } = await supabase.functions.invoke('fill-office-details', {
+        body: { officeIds },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
+      });
+
+      if (fnError) {
+        throw new Error(fnError.message || 'Fill details failed');
+      }
+      
+      setFillDetailsProgress(100);
+      
+      // Check if any details need updating
+      if (result.needsUpdate === 0) {
+        toast({
+          title: "All details complete ✓",
+          description: `Checked ${result.processed} offices - all phone and website info is already filled!`,
+        });
+        setHasBeenFilled(true);
+        return;
+      }
+
+      setFillDetailsResults(result.results);
+      setShowFillDetailsDialog(true);
+
+    } catch (error: any) {
+      console.error('Fill details error:', error);
+      toast({
+        title: "Fill details failed",
+        description: error.message || "Failed to fetch office details",
+        variant: "destructive",
+      });
+    } finally {
+      setIsFillingDetails(false);
+    }
+  };
+
+  const handleApplyFillDetails = async (selectedIds: string[]) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const updates = fillDetailsResults
+        .filter(r => selectedIds.includes(r.id) && r.changed)
+        .map(r => ({ id: r.id, phone: r.filled.phone, website: r.filled.website }));
+
+      const { data: result, error: fnError } = await supabase.functions.invoke('apply-office-details', {
+        body: { updates },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
+      });
+
+      if (fnError) {
+        throw new Error(fnError.message || 'Failed to apply details');
+      }
+
+      toast({
+        title: "Details updated",
+        description: `Successfully updated ${result.updated} of ${result.total} offices.`,
+      });
+
+      setShowFillDetailsDialog(false);
+      setHasBeenFilled(true);
+      
+      // Refresh to show updated details
+      setTimeout(() => refetch(), 500);
+    } catch (error: any) {
+      console.error('Apply details error:', error);
+      toast({
+        title: "Update failed",
+        description: error.message || 'Unknown error occurred',
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -514,6 +629,30 @@ function OfficesContent() {
               </>
             )}
           </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleFillDetails}
+            disabled={isFillingDetails || hasBeenFilled || !offices?.length}
+          >
+            {isFillingDetails ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Fetching...
+              </>
+            ) : hasBeenFilled ? (
+              <>
+                <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />
+                Details Filled
+              </>
+            ) : (
+              <>
+                <Globe className="h-4 w-4 mr-2" />
+                Fill Missing Details
+              </>
+            )}
+          </Button>
         </div>
         <AddSourceDialog onOfficeAdded={refetch} />
       </div>
@@ -533,12 +672,35 @@ function OfficesContent() {
         </Card>
       )}
 
+      {/* Fill Details Progress */}
+      {isFillingDetails && (
+        <Card>
+          <CardContent className="py-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span>Fetching office details from Google...</span>
+                <span>{fillDetailsProgress}%</span>
+              </div>
+              <Progress value={fillDetailsProgress} className="h-2" />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Address Correction Dialog */}
       <AddressCorrectionDialog
         open={showCorrectionDialog}
         onOpenChange={setShowCorrectionDialog}
         corrections={correctionResults}
         onConfirm={handleApplyCorrections}
+      />
+
+      {/* Fill Details Dialog */}
+      <FillDetailsDialog
+        open={showFillDetailsDialog}
+        onOpenChange={setShowFillDetailsDialog}
+        details={fillDetailsResults}
+        onConfirm={handleApplyFillDetails}
       />
 
       {/* Stats Summary Card */}
