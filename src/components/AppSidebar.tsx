@@ -16,6 +16,7 @@ import {
   Bot,
   Sparkles,
   Mail,
+  HelpCircle,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -57,6 +58,7 @@ const managementItems = [
 ];
 
 const systemItems = [
+  { id: 'help', title: 'Help & Guides', icon: HelpCircle, path: '/help' },
   { id: 'logs', title: 'Activity Logs', icon: Activity, path: '/logs' },
   { id: 'settings', title: 'Settings', icon: Settings, path: '/settings' },
 ];

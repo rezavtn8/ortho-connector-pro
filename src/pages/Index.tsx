@@ -28,6 +28,7 @@ import { MailingLabels } from '@/pages/MailingLabels';
 import DailyPatients from '@/pages/DailyPatients';
 import SubscriptionSuccess from '@/pages/SubscriptionSuccess';
 import SubscriptionCancel from '@/pages/SubscriptionCancel';
+import { HelpCenter } from '@/pages/HelpCenter';
 
 import { useState } from 'react';
 
@@ -185,12 +186,20 @@ const Index = () => {
             } 
           />
           <Route 
+            path="/help/*" 
+            element={
+              <SuspenseWrapper type="page">
+                <HelpCenter />
+              </SuspenseWrapper>
+            } 
+          />
+          <Route 
             path="/settings/*" 
             element={
               <SuspenseWrapper type="page">
                 <Settings />
               </SuspenseWrapper>
-            } 
+            }
           />
           <Route 
             path="/google-business/oauth/callback" 
