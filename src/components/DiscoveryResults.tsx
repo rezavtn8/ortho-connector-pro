@@ -10,15 +10,15 @@ import { ImportDiscoveredOfficeDialog } from '@/components/ImportDiscoveredOffic
 
 interface DiscoveredOffice {
   id: string;
-  place_id: string;
+  google_place_id: string;
   name: string;
   address: string | null;
   phone: string | null;
   website: string | null;
-  rating: number | null;
+  google_rating: number | null;
   user_ratings_total: number | null;
-  lat: number | null;
-  lng: number | null;
+  latitude: number | null;
+  longitude: number | null;
   office_type: string;
   search_distance: number;
   imported: boolean;
@@ -68,7 +68,7 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
       case 'distance':
         return (a.distance || 0) - (b.distance || 0);
       case 'rating':
-        return (b.rating || 0) - (a.rating || 0);
+        return (b.google_rating || 0) - (a.google_rating || 0);
       case 'name':
         return a.name.localeCompare(b.name);
       case 'type':
@@ -143,10 +143,10 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
     const total = offices.length;
     const newCount = newOffices.length;
     const alreadyAddedCount = alreadyInNetwork.length;
-    const highRated = newOffices.filter(o => (o.rating || 0) >= 4.0).length;
+    const highRated = newOffices.filter(o => (o.google_rating || 0) >= 4.0).length;
     const withWebsite = newOffices.filter(o => o.website).length;
     const avgRating = newOffices.length > 0 
-      ? newOffices.reduce((sum, o) => sum + (o.rating || 0), 0) / newOffices.filter(o => o.rating).length 
+      ? newOffices.reduce((sum, o) => sum + (o.google_rating || 0), 0) / newOffices.filter(o => o.google_rating).length 
       : 0;
     
     return { total, newCount, alreadyAddedCount, highRated, withWebsite, avgRating };
@@ -302,7 +302,7 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
                         )}
                       </div>
                     </div>
-                    {(office.rating || 0) >= 4.5 && (
+                    {(office.google_rating || 0) >= 4.5 && (
                       <Badge className="bg-yellow-500 text-white">
                         ⭐ Top Rated
                       </Badge>
@@ -311,7 +311,7 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
                 </CardHeader>
 
                 <CardContent className="space-y-3">
-                  {office.rating && renderStars(office.rating, office.user_ratings_total)}
+                  {office.google_rating && renderStars(office.google_rating, office.user_ratings_total)}
 
                   {office.address && (
                     <div className="flex items-start gap-2 text-sm">
@@ -380,10 +380,10 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
             address: selectedOffice.address || '',
             phone: selectedOffice.phone || '',
             website: selectedOffice.website || '',
-            latitude: selectedOffice.lat,
-            longitude: selectedOffice.lng,
-            google_place_id: selectedOffice.place_id,
-            google_rating: selectedOffice.rating
+            latitude: selectedOffice.latitude,
+            longitude: selectedOffice.longitude,
+            google_place_id: selectedOffice.google_place_id,
+            google_rating: selectedOffice.google_rating
           }}
           onSourceAdded={handleOfficeAdded}
         />

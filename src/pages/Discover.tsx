@@ -11,15 +11,15 @@ import { calculateDistance } from '@/utils/distanceCalculation';
 
 interface DiscoveredOffice {
   id: string;
-  place_id: string;
+  google_place_id: string;
   name: string;
   address: string | null;
   phone: string | null;
   website: string | null;
-  rating: number | null;
+  google_rating: number | null;
   user_ratings_total: number | null;
-  lat: number | null;
-  lng: number | null;
+  latitude: number | null;
+  longitude: number | null;
   office_type: string;
   search_distance: number;
   search_location_lat: number;
@@ -272,8 +272,8 @@ export const Discover = () => {
 
       // Calculate distances for returned offices
       const officesWithDistance = (data.offices || []).map((office: any) => {
-        const distance = office.lat && office.lng ? calculateDistance(
-          clinicLocation.lat, clinicLocation.lng, office.lat, office.lng
+        const distance = office.latitude && office.longitude ? calculateDistance(
+          clinicLocation.lat, clinicLocation.lng, office.latitude, office.longitude
         ) : undefined;
         
         return { ...office, distance };

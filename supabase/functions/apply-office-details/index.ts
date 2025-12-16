@@ -121,11 +121,17 @@ serve(async (req) => {
     for (const update of updates) {
       const { id, phone, website } = update;
 
+      // Normalize data to pass database constraints
+      const normalizedPhone = normalizePhone(phone);
+      const normalizedWebsite = normalizeWebsite(website);
+
       const updateData: { phone?: string | null; website?: string | null } = {};
-      if (phone !== undefined) updateData.phone = phone;
-      if (website !== undefined) updateData.website = website;
+      if (phone !== undefined) updateData.phone = normalizedPhone;
+      if (website !== undefined) updateData.website = normalizedWebsite;
 
       if (Object.keys(updateData).length === 0) continue;
+
+      console.log(`apply-office-details: Updating ${id} with phone="${normalizedPhone}", website="${normalizedWebsite}" [${requestId}]`);
 
       const { data, error } = await supabase
         .from("patient_sources")

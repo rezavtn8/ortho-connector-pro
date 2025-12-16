@@ -628,17 +628,22 @@ export type Database = {
           created_at: string
           discovered_by: string
           discovery_session_id: string | null
+          distance_miles: number | null
+          email: string | null
           fetched_at: string
+          google_place_id: string
+          google_rating: number | null
           id: string
           imported: boolean
+          is_active: boolean | null
           last_verified_at: string | null
-          lat: number | null
-          lng: number | null
+          latitude: number | null
+          longitude: number | null
           name: string
+          notes: string | null
           office_type: string | null
+          opening_hours: string | null
           phone: string | null
-          place_id: string
-          rating: number | null
           search_distance: number | null
           search_location_lat: number | null
           search_location_lng: number | null
@@ -646,6 +651,7 @@ export type Database = {
           updated_at: string
           user_ratings_total: number | null
           website: string | null
+          yelp_rating: number | null
         }
         Insert: {
           address?: string | null
@@ -654,17 +660,22 @@ export type Database = {
           created_at?: string
           discovered_by: string
           discovery_session_id?: string | null
+          distance_miles?: number | null
+          email?: string | null
           fetched_at?: string
+          google_place_id: string
+          google_rating?: number | null
           id?: string
           imported?: boolean
+          is_active?: boolean | null
           last_verified_at?: string | null
-          lat?: number | null
-          lng?: number | null
+          latitude?: number | null
+          longitude?: number | null
           name: string
+          notes?: string | null
           office_type?: string | null
+          opening_hours?: string | null
           phone?: string | null
-          place_id: string
-          rating?: number | null
           search_distance?: number | null
           search_location_lat?: number | null
           search_location_lng?: number | null
@@ -672,6 +683,7 @@ export type Database = {
           updated_at?: string
           user_ratings_total?: number | null
           website?: string | null
+          yelp_rating?: number | null
         }
         Update: {
           address?: string | null
@@ -680,17 +692,22 @@ export type Database = {
           created_at?: string
           discovered_by?: string
           discovery_session_id?: string | null
+          distance_miles?: number | null
+          email?: string | null
           fetched_at?: string
+          google_place_id?: string
+          google_rating?: number | null
           id?: string
           imported?: boolean
+          is_active?: boolean | null
           last_verified_at?: string | null
-          lat?: number | null
-          lng?: number | null
+          latitude?: number | null
+          longitude?: number | null
           name?: string
+          notes?: string | null
           office_type?: string | null
+          opening_hours?: string | null
           phone?: string | null
-          place_id?: string
-          rating?: number | null
           search_distance?: number | null
           search_location_lat?: number | null
           search_location_lng?: number | null
@@ -698,6 +715,7 @@ export type Database = {
           updated_at?: string
           user_ratings_total?: number | null
           website?: string | null
+          yelp_rating?: number | null
         }
         Relationships: [
           {
