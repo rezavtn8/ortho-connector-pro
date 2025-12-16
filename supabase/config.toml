@@ -1,10 +1,10 @@
 project_id = "vqkzqwibbcvmdwgqladn"
 
 [functions.fill-office-details]
-verify_jwt = false
+verify_jwt = true
 
 [functions.apply-office-details]
-verify_jwt = false
+verify_jwt = true
 
 [functions.get-google-reviews]
 verify_jwt = false

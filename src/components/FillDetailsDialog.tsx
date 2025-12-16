@@ -1,9 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { CheckCircle2, XCircle, Phone, Globe, Loader2, Building2 } from 'lucide-react';
 
 interface FilledDetail {
@@ -40,13 +38,14 @@ export function FillDetailsDialog({ open, onOpenChange, details, onConfirm }: Fi
     return { successfulChanges, failures, noChanges };
   }, [details]);
 
-  // Auto-select all successful changes
-  useState(() => {
+  // Auto-select all successful changes when dialog opens / results change
+  useEffect(() => {
+    if (!open) return;
     setSelectedIds(successfulChanges.map(d => d.id));
-  });
+  }, [open, successfulChanges]);
 
   const toggleSelection = (id: string) => {
-    setSelectedIds(prev => 
+    setSelectedIds(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
