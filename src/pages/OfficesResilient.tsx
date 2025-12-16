@@ -10,12 +10,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Progress } from '@/components/ui/progress';
 import { ResilientErrorBoundary } from '@/components/ResilientErrorBoundary';
 import { SelectionActionBar } from '@/components/SelectionActionBar';
 import { TierQuickActions } from '@/components/TierQuickActions';
 import { TagBadge } from '@/components/TagBadge';
 import { TagManager } from '@/components/TagManager';
-import { Eye, Edit, Users, Trash2, Search, MapPin, Phone, Mail, AlertCircle, TrendingUp, Calendar, Tag } from 'lucide-react';
+import { AddressCorrectionDialog } from '@/components/AddressCorrectionDialog';
+import { Eye, Edit, Users, Trash2, Search, MapPin, Phone, Mail, AlertCircle, TrendingUp, Calendar, Tag, Loader2, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { PatientLoadHistoryEditor } from '@/components/PatientLoadHistoryEditor';
 import { AddOfficeDialog as AddSourceDialog } from '@/components/AddSourceDialog';
@@ -60,6 +62,13 @@ function OfficesContent() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isTagManagerOpen, setIsTagManagerOpen] = useState(false);
+  
+  // Address correction state
+  const [isCorrecting, setIsCorrecting] = useState(false);
+  const [correctionProgress, setCorrectionProgress] = useState(0);
+  const [showCorrectionDialog, setShowCorrectionDialog] = useState(false);
+  const [correctionResults, setCorrectionResults] = useState<any[]>([]);
+  const [hasBeenCorrected, setHasBeenCorrected] = useState(false);
 
   // Fetch offices data with tier calculations
   const { data: offices, isLoading, error, refetch } = useOffices();
@@ -329,6 +338,112 @@ function OfficesContent() {
     [filteredOffices, selectedIds]
   );
 
+  // Address correction handler
+  const handleCorrectAddresses = async () => {
+    if (hasBeenCorrected) {
+      toast({
+        title: "Already corrected",
+        description: "Addresses have already been corrected once. Refresh the page to run again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const officesWithAddresses = offices?.filter(o => o.address) || [];
+    const officeIds = officesWithAddresses.map(o => o.id);
+
+    if (officeIds.length === 0) {
+      toast({
+        title: "No addresses to correct",
+        description: "No partner offices with addresses found.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsCorrecting(true);
+    setCorrectionProgress(0);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      toast({
+        title: "Starting address correction",
+        description: `Processing ${officeIds.length} offices with Google Maps API...`,
+      });
+
+      const { data: result, error: fnError } = await supabase.functions.invoke('correct-office-addresses', {
+        body: { officeIds },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
+      });
+
+      if (fnError) {
+        throw new Error(fnError.message || 'Address correction failed');
+      }
+      
+      const resultsWithNames = result.results.map((r: any) => {
+        const office = officesWithAddresses.find(o => o.id === r.id);
+        return {
+          ...r,
+          officeName: office?.name || 'Unknown'
+        };
+      });
+
+      setCorrectionResults(resultsWithNames);
+      setShowCorrectionDialog(true);
+      setCorrectionProgress(100);
+
+    } catch (error: any) {
+      console.error('Address correction error:', error);
+      toast({
+        title: "Correction failed",
+        description: error.message || "Failed to correct addresses",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCorrecting(false);
+    }
+  };
+
+  const handleApplyCorrections = async (selectedCorrections: string[]) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const { data: result, error } = await supabase.functions.invoke('apply-address-corrections', {
+        body: { 
+          corrections: correctionResults.filter(r => selectedCorrections.includes(r.id))
+        },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Addresses updated",
+        description: `Successfully updated ${result.updated} office addresses.`,
+      });
+
+      setShowCorrectionDialog(false);
+      setHasBeenCorrected(true);
+      refetch();
+    } catch (error: any) {
+      toast({
+        title: "Update failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -343,20 +458,69 @@ function OfficesContent() {
       </div>
 
       {/* Actions */}
-      <div className="flex justify-between items-center gap-2">
-        <Popover open={isTagManagerOpen} onOpenChange={setIsTagManagerOpen}>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm">
-              <Tag className="h-4 w-4 mr-2" />
-              Manage Tags
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-80" align="start">
-            <TagManager />
-          </PopoverContent>
-        </Popover>
+      <div className="flex flex-wrap justify-between items-center gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Popover open={isTagManagerOpen} onOpenChange={setIsTagManagerOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Tag className="h-4 w-4 mr-2" />
+                Manage Tags
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80" align="start">
+              <TagManager />
+            </PopoverContent>
+          </Popover>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCorrectAddresses}
+            disabled={isCorrecting || hasBeenCorrected || !offices?.length}
+          >
+            {isCorrecting ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Correcting...
+              </>
+            ) : hasBeenCorrected ? (
+              <>
+                <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />
+                Addresses Corrected
+              </>
+            ) : (
+              <>
+                <MapPin className="h-4 w-4 mr-2" />
+                Fix Addresses
+              </>
+            )}
+          </Button>
+        </div>
         <AddSourceDialog onOfficeAdded={refetch} />
       </div>
+
+      {/* Correction Progress */}
+      {isCorrecting && (
+        <Card>
+          <CardContent className="py-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span>Correcting addresses with Google Maps...</span>
+                <span>{correctionProgress}%</span>
+              </div>
+              <Progress value={correctionProgress} className="h-2" />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Address Correction Dialog */}
+      <AddressCorrectionDialog
+        open={showCorrectionDialog}
+        onOpenChange={setShowCorrectionDialog}
+        corrections={correctionResults}
+        onConfirm={handleApplyCorrections}
+      />
 
       {/* Stats Summary Card */}
       <Card>
