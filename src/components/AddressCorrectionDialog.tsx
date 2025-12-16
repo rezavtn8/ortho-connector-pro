@@ -123,6 +123,17 @@ export function AddressCorrectionDialog({
 
         <div className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
           <div className="space-y-4 pb-2">
+            {/* No Changes Needed - Show success state */}
+            {successfulChanges.length === 0 && failures.length === 0 && noChanges.length > 0 && (
+              <div className="text-center py-12">
+                <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-foreground mb-2">All Addresses Are Correct!</h3>
+                <p className="text-muted-foreground max-w-md mx-auto">
+                  All {noChanges.length} addresses were verified against Google Maps and don't need any changes.
+                </p>
+              </div>
+            )}
+
             {/* Successful Changes */}
             {successfulChanges.length > 0 && (
               <div className="space-y-3">
