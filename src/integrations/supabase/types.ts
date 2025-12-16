@@ -315,8 +315,57 @@ export type Database = {
           },
         ]
       }
+      campaign_templates: {
+        Row: {
+          campaign_type: string
+          created_at: string | null
+          delivery_method: string
+          email_body_template: string | null
+          email_subject_template: string | null
+          gift_bundle: Json | null
+          id: string
+          materials_checklist: string[] | null
+          name: string
+          notes: string | null
+          target_tiers: string[] | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          campaign_type: string
+          created_at?: string | null
+          delivery_method: string
+          email_body_template?: string | null
+          email_subject_template?: string | null
+          gift_bundle?: Json | null
+          id?: string
+          materials_checklist?: string[] | null
+          name: string
+          notes?: string | null
+          target_tiers?: string[] | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          campaign_type?: string
+          created_at?: string | null
+          delivery_method?: string
+          email_body_template?: string | null
+          email_subject_template?: string | null
+          gift_bundle?: Json | null
+          id?: string
+          materials_checklist?: string[] | null
+          name?: string
+          notes?: string | null
+          target_tiers?: string[] | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       campaigns: {
         Row: {
+          actual_referrals: number | null
           assigned_rep_id: string | null
           campaign_mode: string | null
           campaign_type: string
@@ -325,16 +374,19 @@ export type Database = {
           created_by: string
           delivery_method: string
           email_settings: Json | null
+          estimated_cost: number | null
           id: string
           materials_checklist: string[] | null
           name: string
           notes: string | null
           planned_delivery_date: string | null
+          roi_tracking: Json | null
           selected_gift_bundle: Json | null
           status: string
           updated_at: string
         }
         Insert: {
+          actual_referrals?: number | null
           assigned_rep_id?: string | null
           campaign_mode?: string | null
           campaign_type: string
@@ -343,16 +395,19 @@ export type Database = {
           created_by: string
           delivery_method: string
           email_settings?: Json | null
+          estimated_cost?: number | null
           id?: string
           materials_checklist?: string[] | null
           name: string
           notes?: string | null
           planned_delivery_date?: string | null
+          roi_tracking?: Json | null
           selected_gift_bundle?: Json | null
           status?: string
           updated_at?: string
         }
         Update: {
+          actual_referrals?: number | null
           assigned_rep_id?: string | null
           campaign_mode?: string | null
           campaign_type?: string
@@ -361,11 +416,13 @@ export type Database = {
           created_by?: string
           delivery_method?: string
           email_settings?: Json | null
+          estimated_cost?: number | null
           id?: string
           materials_checklist?: string[] | null
           name?: string
           notes?: string | null
           planned_delivery_date?: string | null
+          roi_tracking?: Json | null
           selected_gift_bundle?: Json | null
           status?: string
           updated_at?: string
@@ -949,6 +1006,66 @@ export type Database = {
           },
         ]
       }
+      mailing_label_edits: {
+        Row: {
+          created_at: string | null
+          custom_address1: string | null
+          custom_address2: string | null
+          custom_city: string | null
+          custom_contact_name: string | null
+          custom_name: string | null
+          custom_state: string | null
+          custom_zip: string | null
+          id: string
+          office_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          custom_address1?: string | null
+          custom_address2?: string | null
+          custom_city?: string | null
+          custom_contact_name?: string | null
+          custom_name?: string | null
+          custom_state?: string | null
+          custom_zip?: string | null
+          id?: string
+          office_id: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          custom_address1?: string | null
+          custom_address2?: string | null
+          custom_city?: string | null
+          custom_contact_name?: string | null
+          custom_name?: string | null
+          custom_state?: string | null
+          custom_zip?: string | null
+          id?: string
+          office_id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mailing_label_edits_office_id_fkey"
+            columns: ["office_id"]
+            isOneToOne: false
+            referencedRelation: "office_metrics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mailing_label_edits_office_id_fkey"
+            columns: ["office_id"]
+            isOneToOne: false
+            referencedRelation: "patient_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       marketing_visits: {
         Row: {
           clinic_id: string | null
@@ -1108,6 +1225,117 @@ export type Database = {
           {
             foreignKeyName: "monthly_patients_source_id_fkey"
             columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "patient_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      office_contacts: {
+        Row: {
+          birthday: string | null
+          created_at: string | null
+          email: string | null
+          id: string
+          is_primary: boolean | null
+          name: string
+          notes: string | null
+          office_id: string
+          phone: string | null
+          role: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          birthday?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          is_primary?: boolean | null
+          name: string
+          notes?: string | null
+          office_id: string
+          phone?: string | null
+          role?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          birthday?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          is_primary?: boolean | null
+          name?: string
+          notes?: string | null
+          office_id?: string
+          phone?: string | null
+          role?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "office_contacts_office_id_fkey"
+            columns: ["office_id"]
+            isOneToOne: false
+            referencedRelation: "office_metrics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "office_contacts_office_id_fkey"
+            columns: ["office_id"]
+            isOneToOne: false
+            referencedRelation: "patient_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      office_interactions: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          interaction_type: string
+          metadata: Json | null
+          occurred_at: string | null
+          office_id: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          interaction_type: string
+          metadata?: Json | null
+          occurred_at?: string | null
+          office_id: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          interaction_type?: string
+          metadata?: Json | null
+          occurred_at?: string | null
+          office_id?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "office_interactions_office_id_fkey"
+            columns: ["office_id"]
+            isOneToOne: false
+            referencedRelation: "office_metrics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "office_interactions_office_id_fkey"
+            columns: ["office_id"]
             isOneToOne: false
             referencedRelation: "patient_sources"
             referencedColumns: ["id"]
@@ -1791,6 +2019,8 @@ export type Database = {
           id: string
           job_title: string | null
           last_name: string | null
+          onboarding_completed: boolean | null
+          onboarding_step: number | null
           phone: string | null
           pin_code: string | null
           role: Database["public"]["Enums"]["user_role"]
@@ -1807,6 +2037,8 @@ export type Database = {
           id?: string
           job_title?: string | null
           last_name?: string | null
+          onboarding_completed?: boolean | null
+          onboarding_step?: number | null
           phone?: string | null
           pin_code?: string | null
           role?: Database["public"]["Enums"]["user_role"]
@@ -1823,6 +2055,8 @@ export type Database = {
           id?: string
           job_title?: string | null
           last_name?: string | null
+          onboarding_completed?: boolean | null
+          onboarding_step?: number | null
           phone?: string | null
           pin_code?: string | null
           role?: Database["public"]["Enums"]["user_role"]
