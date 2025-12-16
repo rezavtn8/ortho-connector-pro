@@ -104,6 +104,7 @@ export function HelpCenter() {
   });
   const [activeStep, setActiveStep] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<HelpCategory | null>(null);
+  const [selectedArticle, setSelectedArticle] = useState<typeof helpCategories[0]['articles'][0] | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
 
   // Persist progress
@@ -349,7 +350,93 @@ export function HelpCenter() {
 
         {/* Browse Topics Tab */}
         <TabsContent value="browse" className="space-y-6">
-          {selectedCategory ? (
+          {selectedArticle ? (
+            // Article View
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="space-y-6"
+            >
+              <Button 
+                variant="ghost" 
+                className="gap-2"
+                onClick={() => setSelectedArticle(null)}
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to articles
+              </Button>
+              
+              <Card className="border-2">
+                <CardHeader>
+                  <div className="flex items-center gap-3 mb-2">
+                    <Badge variant="outline" className="text-xs gap-1">
+                      <Clock className="h-3 w-3" />
+                      {selectedArticle.readTime} min read
+                    </Badge>
+                    {selectedArticle.tags.map(tag => (
+                      <Badge key={tag} variant="secondary" className="text-xs">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                  <CardTitle className="text-2xl">{selectedArticle.title}</CardTitle>
+                  <CardDescription className="text-base">{selectedArticle.description}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="prose prose-sm max-w-none dark:prose-invert">
+                    {selectedArticle.content.split('\n\n').map((paragraph, idx) => {
+                      // Handle headers
+                      if (paragraph.startsWith('**') && paragraph.endsWith('**')) {
+                        return <h3 key={idx} className="text-lg font-semibold mt-6 mb-3">{paragraph.replace(/\*\*/g, '')}</h3>;
+                      }
+                      // Handle list items
+                      if (paragraph.includes('\n- ')) {
+                        const [title, ...items] = paragraph.split('\n- ');
+                        return (
+                          <div key={idx} className="my-4">
+                            {title && <p className="font-medium mb-2">{title}</p>}
+                            <ul className="list-disc pl-5 space-y-1">
+                              {items.map((item, i) => (
+                                <li key={i} className="text-muted-foreground">{item}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        );
+                      }
+                      // Handle tables (simple markdown)
+                      if (paragraph.includes('|')) {
+                        const rows = paragraph.split('\n').filter(r => r.trim() && !r.includes('---'));
+                        return (
+                          <div key={idx} className="my-4 overflow-x-auto">
+                            <table className="min-w-full text-sm border rounded-lg overflow-hidden">
+                              <tbody>
+                                {rows.map((row, ri) => (
+                                  <tr key={ri} className={ri === 0 ? 'bg-muted font-medium' : 'border-t'}>
+                                    {row.split('|').filter(c => c.trim()).map((cell, ci) => (
+                                      <td key={ci} className="px-3 py-2">{cell.trim()}</td>
+                                    ))}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        );
+                      }
+                      // Regular paragraph
+                      return (
+                        <p key={idx} className="text-muted-foreground leading-relaxed my-3">
+                          {paragraph.split('**').map((part, i) => 
+                            i % 2 === 1 ? <strong key={i} className="text-foreground">{part}</strong> : part
+                          )}
+                        </p>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ) : selectedCategory ? (
+            // Category Articles List
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -387,6 +474,7 @@ export function HelpCenter() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.05 }}
                       className="p-4 rounded-xl border hover:border-primary/30 hover:bg-muted/30 transition-all cursor-pointer"
+                      onClick={() => setSelectedArticle(article)}
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div>
@@ -412,6 +500,7 @@ export function HelpCenter() {
               </Card>
             </motion.div>
           ) : (
+            // Categories Grid
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {helpCategories.map((category, index) => (
                 <motion.div
