@@ -387,6 +387,18 @@ function OfficesContent() {
         throw new Error(fnError.message || 'Address correction failed');
       }
       
+      setCorrectionProgress(100);
+      
+      // Check if any addresses need updating
+      if (result.needsUpdate === 0) {
+        toast({
+          title: "All addresses verified ✓",
+          description: `Checked ${result.processed} offices - all addresses are already correctly formatted!`,
+        });
+        setHasBeenCorrected(true);
+        return;
+      }
+      
       const resultsWithNames = result.results.map((r: any) => {
         const office = officesWithAddresses.find(o => o.id === r.id);
         return {
@@ -397,7 +409,6 @@ function OfficesContent() {
 
       setCorrectionResults(resultsWithNames);
       setShowCorrectionDialog(true);
-      setCorrectionProgress(100);
 
     } catch (error: any) {
       console.error('Address correction error:', error);
