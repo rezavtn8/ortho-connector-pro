@@ -77,16 +77,6 @@ export function AIAssistant() {
 
   return (
     <div className="space-y-6">
-      {/* Header - Teal Theme matching other pages */}
-      <div className="flex flex-col space-y-3 mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <Brain className="h-8 w-8 title-icon" />
-          <h1 className="text-4xl font-bold page-title">AI Assistant</h1>
-        </div>
-        <p className="text-muted-foreground text-lg">
-          Intelligent insights and data-driven chat powered by AI
-        </p>
-      </div>
 
       {/* Quick Stats Card */}
       {!loading && (

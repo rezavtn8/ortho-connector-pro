@@ -45,15 +45,6 @@ function CampaignsContent() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="flex flex-col space-y-3 mb-8">
-          <div className="flex items-center gap-3">
-            <Megaphone className="h-8 w-8 title-icon" />
-            <h1 className="text-4xl font-bold page-title">Campaigns</h1>
-          </div>
-          <p className="text-muted-foreground text-lg">
-            Loading your campaigns...
-          </p>
-        </div>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin" />
         </div>
@@ -64,12 +55,6 @@ function CampaignsContent() {
   if (error && !campaigns?.length) {
     return (
       <div className="space-y-6">
-        <div className="flex flex-col space-y-3 mb-8">
-          <div className="flex items-center gap-3">
-            <Megaphone className="h-8 w-8 title-icon" />
-            <h1 className="text-4xl font-bold page-title">Campaigns</h1>
-          </div>
-        </div>
         
         <Card className="max-w-md mx-auto">
           <CardHeader className="text-center">
@@ -164,16 +149,6 @@ function CampaignsContent() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col space-y-3 mb-8">
-        <div className="flex items-center gap-3">
-          <Megaphone className="h-8 w-8 title-icon" />
-          <h1 className="text-4xl font-bold page-title">Campaigns</h1>
-        </div>
-        <p className="text-muted-foreground text-lg">
-          Manage your marketing campaigns and outreach efforts
-        </p>
-      </div>
 
       {/* Offline indicator */}
       {isOffline && (

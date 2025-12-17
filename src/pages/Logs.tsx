@@ -286,15 +286,6 @@ export function Logs() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="flex flex-col space-y-3 mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <Activity className="h-8 w-8 title-icon" />
-            <h1 className="text-4xl font-bold page-title">Activity Logs</h1>
-          </div>
-          <p className="text-muted-foreground text-lg">
-            Track all patient count changes and system activities
-          </p>
-        </div>
         <Card>
           <CardContent className="p-8">
             <div className="text-center">
@@ -309,16 +300,6 @@ export function Logs() {
 
   return (
     <div className="space-y-3 animate-fade-in">
-      {/* Header */}
-      <div className="flex flex-col space-y-3 mb-8">
-        <div className="flex items-center gap-3">
-          <Activity className="h-8 w-8 title-icon" />
-          <h1 className="text-4xl font-bold page-title">Activity Logs</h1>
-        </div>
-        <p className="text-muted-foreground text-lg">
-          Track all patient count changes and system activities
-        </p>
-      </div>
       {/* Filters Section */}
       <div className="flex items-center justify-between gap-4 bg-muted/30 p-3 rounded-lg">
         <div>
