@@ -599,15 +599,6 @@ export function MailingLabels() {
         </Alert>
       )}
 
-      {/* Phase 1: Header */}
-      <div>
-        <h1 className="text-3xl font-bold mb-2">Mailing Labels</h1>
-        <p className="text-muted-foreground">
-          {hasSelectedIds 
-            ? `Generate labels for ${filteredData.length} selected office${filteredData.length !== 1 ? 's' : ''}`
-            : 'Generate Excel sheets for bulk mailing to offices'}
-        </p>
-      </div>
 
       {/* Phase 2 & 3: Filters - Hide when specific IDs are selected */}
       {!hasSelectedIds && (

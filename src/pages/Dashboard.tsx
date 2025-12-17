@@ -162,15 +162,6 @@ function DashboardContent() {
   if (isLoading || !stats) {
     return (
       <div className="space-y-6">
-        <div className="flex flex-col space-y-3 mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <Home className="h-8 w-8 title-icon" />
-            <h1 className="text-4xl font-bold page-title">Dashboard</h1>
-          </div>
-          <p className="text-muted-foreground text-lg">
-            Loading your patient referral data...
-          </p>
-        </div>
         
         {/* Overview Stats Skeleton */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -235,16 +226,6 @@ function DashboardContent() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col space-y-3 mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <Home className="h-8 w-8 title-icon" />
-          <h1 className="text-4xl font-bold page-title">Dashboard</h1>
-        </div>
-        <p className="text-muted-foreground text-lg">
-          Your practice overview and key performance indicators
-        </p>
-      </div>
 
       {/* Mobile-optimized Overview Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">

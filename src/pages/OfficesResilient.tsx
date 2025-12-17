@@ -580,16 +580,6 @@ function OfficesContent() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col space-y-3 mb-8">
-        <div className="flex items-center gap-3">
-          <Users className="h-8 w-8 title-icon" />
-          <h1 className="text-4xl font-bold page-title">Partner Offices</h1>
-        </div>
-        <p className="text-muted-foreground text-lg">
-          Manage your referring partner offices and track their referral performance
-        </p>
-      </div>
 
       {/* Actions */}
       <div className="flex flex-wrap justify-between items-center gap-2">
