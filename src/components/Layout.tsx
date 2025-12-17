@@ -1,11 +1,31 @@
 // src/components/Layout.tsx
 import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from '@/components/AppSidebar';
 import { ErrorBoundary } from './ErrorBoundary';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+
+const pageTitles: Record<string, string> = {
+  '/dashboard': 'Dashboard',
+  '/daily-patients': 'Daily Patients',
+  '/sources': 'Patient Sources',
+  '/offices': 'Partner Offices',
+  '/analytics': 'Reports',
+  '/ai-assistant': 'AI Assistant',
+  '/marketing-visits': 'Outreach Visits',
+  '/campaigns': 'Campaigns',
+  '/mailing-labels': 'Mailing Labels',
+  '/discover': 'Find Offices',
+  '/reviews': 'Reviews',
+  '/review-magic': 'Review Magic',
+  '/map-view': 'Map',
+  '/help': 'Help & Guides',
+  '/logs': 'Activity Logs',
+  '/settings': 'Settings',
+};
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -14,7 +34,17 @@ interface LayoutProps {
 export function Layout({ children }: LayoutProps) {
   const isMobile = useIsMobile();
   const { user } = useAuth();
+  const location = useLocation();
   const [clinicInfo, setClinicInfo] = useState<{ name: string; logo_url: string | null }>({ name: '', logo_url: null });
+
+  // Get page title from current path
+  const getPageTitle = () => {
+    const path = location.pathname;
+    if (pageTitles[path]) return pageTitles[path];
+    if (path.startsWith('/sources/')) return 'Source Details';
+    return '';
+  };
+  const pageTitle = getPageTitle();
 
   useEffect(() => {
     const loadClinicInfo = async () => {
@@ -77,17 +107,15 @@ export function Layout({ children }: LayoutProps) {
             <header className="h-14 flex items-center justify-between border-b bg-card/50 backdrop-blur-sm px-3 sm:px-4">
               <div className="flex items-center gap-3">
                 <SidebarTrigger />
-                {isMobile && (
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-lg">{clinicInfo.name || 'Nexora'}</span>
-                  </div>
+                {pageTitle && (
+                  <h1 className="font-semibold text-lg text-foreground">{pageTitle}</h1>
                 )}
               </div>
               <div className="flex items-center gap-3">
                 {clinicInfo.logo_url && (
                   <img src={clinicInfo.logo_url} alt={clinicInfo.name} className="h-8 w-auto object-contain" />
                 )}
-                <span className="font-semibold text-foreground hidden sm:block">{clinicInfo.name || 'Nexora'}</span>
+                <span className="font-medium text-muted-foreground hidden sm:block">{clinicInfo.name || 'Nexora'}</span>
               </div>
             </header>
           </ErrorBoundary>
