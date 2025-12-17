@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { RefreshCw, AlertCircle, Search, Plus, Building2, Loader2 } from 'lucide-react';
+import { RefreshCw, Search, Plus, Building2, Loader2, MapPin, Star, Globe, Compass } from 'lucide-react';
 import { DiscoveryWizard } from '@/components/DiscoveryWizard';
 import { DiscoveryResults } from '@/components/DiscoveryResults';
 import { SelectionActionBar } from '@/components/SelectionActionBar';
 import { BulkAddToNetworkDialog } from '@/components/BulkAddToNetworkDialog';
 import { calculateDistance } from '@/utils/distanceCalculation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface DiscoveredOffice {
   id: string;
@@ -67,7 +69,6 @@ export const Discover = () => {
   const [nextRefreshDate, setNextRefreshDate] = useState<Date | null>(null);
   const [clinicLocation, setClinicLocation] = useState<{ lat: number; lng: number } | null>(null);
   
-  // Selection state
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showBulkAddDialog, setShowBulkAddDialog] = useState(false);
   const [showNewSearchDialog, setShowNewSearchDialog] = useState(false);
@@ -75,7 +76,6 @@ export const Discover = () => {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // Load discovered offices from database on mount (results-first approach)
   useEffect(() => {
     if (user) {
       loadUserProfile();
@@ -89,7 +89,6 @@ export const Discover = () => {
     
     setIsLoadingFromDB(true);
     try {
-      // Load discovered offices from database
       const { data: offices, error } = await supabase
         .from('discovered_offices')
         .select('*')
@@ -99,7 +98,6 @@ export const Discover = () => {
       if (error) throw error;
 
       if (offices && offices.length > 0) {
-        // Get clinic location for distance calculation
         const { data: profile } = await supabase
           .from('user_profiles')
           .select('clinic_id')
@@ -123,7 +121,6 @@ export const Discover = () => {
           }
         }
 
-        // Calculate distances
         const officesWithDistance = offices.map((office: any) => {
           const distance = office.latitude && office.longitude && clinicLat && clinicLng
             ? calculateDistance(clinicLat, clinicLng, office.latitude, office.longitude)
@@ -133,7 +130,6 @@ export const Discover = () => {
 
         setDiscoveredOffices(officesWithDistance);
 
-        // Get the most recent session info for display
         const { data: latestSession } = await supabase
           .from('discovery_sessions')
           .select('*')
@@ -275,7 +271,6 @@ export const Discover = () => {
         return;
       }
 
-      // Success
       const officesCount = data.offices?.length || 0;
       
       if (data.cached && data.cacheAge !== undefined && data.expiresIn !== undefined) {
@@ -366,7 +361,6 @@ export const Discover = () => {
   };
 
   const handleOfficeAdded = async () => {
-    // Refresh from database to update imported status
     await loadDiscoveredOfficesFromDB();
   };
 
@@ -374,7 +368,6 @@ export const Discover = () => {
     if (!user) return;
     
     try {
-      // Clear discovered offices from database
       await supabase
         .from('discovered_offices')
         .delete()
@@ -399,7 +392,6 @@ export const Discover = () => {
     }
   };
 
-  // Selection handlers
   const handleSelectionChange = (ids: string[]) => {
     setSelectedIds(ids);
   };
@@ -450,13 +442,33 @@ export const Discover = () => {
   const selectedOffices = discoveredOffices.filter(o => selectedIds.includes(o.id));
   const selectedNames = selectedOffices.map(o => o.name);
 
-  // Loading state
+  // Calculate stats
+  const newOffices = discoveredOffices.filter(o => !o.imported);
+  const highRatedOffices = newOffices.filter(o => (o.google_rating || 0) >= 4.0);
+  const withWebsite = newOffices.filter(o => o.website);
+  const avgRating = newOffices.length > 0 
+    ? (newOffices.reduce((sum, o) => sum + (o.google_rating || 0), 0) / newOffices.filter(o => o.google_rating).length).toFixed(1)
+    : '0';
+
   if (isLoadingFromDB) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading discovered offices...</p>
+      <div className="space-y-6">
+        {/* Loading Hero */}
+        <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-teal-500/10 via-cyan-500/5 to-blue-500/10 dark:from-teal-500/20 dark:via-cyan-500/10 dark:to-blue-500/20 border border-teal-200/50 dark:border-teal-800/50 p-6">
+          <Skeleton className="h-8 w-48 mb-2" />
+          <Skeleton className="h-4 w-72" />
+        </div>
+        
+        {/* Loading Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i} className="border-border/50">
+              <CardContent className="p-4">
+                <Skeleton className="h-4 w-24 mb-2" />
+                <Skeleton className="h-8 w-16" />
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </div>
     );
@@ -464,110 +476,158 @@ export const Discover = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header with Actions */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Find Offices</h1>
-          <p className="text-muted-foreground">
-            {discoveredOffices.length > 0 
-              ? `${discoveredOffices.filter(o => !o.imported).length} offices available to add`
-              : 'Discover dental offices in your area'}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {discoveredOffices.length > 0 && (
-            <>
-              <Button 
-                onClick={handleForceRefresh}
-                variant="outline"
-                disabled={isLoading}
-                className="flex items-center gap-2"
-              >
-                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-                Refresh
-              </Button>
-              <Dialog open={showNewSearchDialog} onOpenChange={setShowNewSearchDialog}>
-                <DialogTrigger asChild>
-                  <Button variant="default" className="flex items-center gap-2">
-                    <Search className="w-4 h-4" />
-                    New Search
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>New Discovery Search</DialogTitle>
-                  </DialogHeader>
-                  <DiscoveryWizard
-                    onDiscover={handleDiscover}
-                    isLoading={isLoading}
-                    weeklyUsage={weeklyUsage}
-                    canDiscover={canDiscover}
-                    nextRefreshDate={nextRefreshDate}
-                    compact
-                  />
-                </DialogContent>
-              </Dialog>
-            </>
-          )}
+      {/* Hero Section */}
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-teal-500/10 via-cyan-500/5 to-blue-500/10 dark:from-teal-500/20 dark:via-cyan-500/10 dark:to-blue-500/20 border border-teal-200/50 dark:border-teal-800/50 p-6">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-teal-400/20 to-transparent rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+        <div className="relative flex items-start justify-between flex-wrap gap-4">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 shadow-lg shadow-teal-500/25">
+                <Compass className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-foreground">Find Offices</h1>
+                <p className="text-muted-foreground">
+                  {discoveredOffices.length > 0 
+                    ? `${newOffices.length} offices available to add to your network`
+                    : 'Discover dental offices in your area'}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            {discoveredOffices.length > 0 && (
+              <>
+                <Button 
+                  onClick={handleForceRefresh}
+                  variant="outline"
+                  disabled={isLoading}
+                  className="flex items-center gap-2 border-teal-300 dark:border-teal-700 hover:bg-teal-50 dark:hover:bg-teal-950"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+                <Dialog open={showNewSearchDialog} onOpenChange={setShowNewSearchDialog}>
+                  <DialogTrigger asChild>
+                    <Button className="flex items-center gap-2 bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white shadow-lg shadow-teal-500/25">
+                      <Search className="w-4 h-4" />
+                      New Search
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>New Discovery Search</DialogTitle>
+                    </DialogHeader>
+                    <DiscoveryWizard
+                      onDiscover={handleDiscover}
+                      isLoading={isLoading}
+                      weeklyUsage={weeklyUsage}
+                      canDiscover={canDiscover}
+                      nextRefreshDate={nextRefreshDate}
+                      compact
+                    />
+                  </DialogContent>
+                </Dialog>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Rate Limit Notice */}
-      {!canDiscover && nextRefreshDate && (
-        <Card className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-600" />
-              <p className="text-sm text-amber-800 dark:text-amber-200">
-                Weekly discovery limit reached. Next discovery available: {nextRefreshDate.toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric'
-                })}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Stats Grid - Only show when there are results */}
+      {discoveredOffices.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card className="border-border/50 hover:border-teal-300/50 dark:hover:border-teal-700/50 transition-colors group">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-teal-50 dark:bg-teal-950/30 group-hover:scale-105 transition-transform">
+                  <Building2 className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Available</p>
+                  <p className="text-xl font-bold text-foreground">{newOffices.length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="border-border/50 hover:border-amber-300/50 dark:hover:border-amber-700/50 transition-colors group">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 group-hover:scale-105 transition-transform">
+                  <Star className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">High Rated (4+)</p>
+                  <p className="text-xl font-bold text-foreground">{highRatedOffices.length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="border-border/50 hover:border-blue-300/50 dark:hover:border-blue-700/50 transition-colors group">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/30 group-hover:scale-105 transition-transform">
+                  <Globe className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">With Website</p>
+                  <p className="text-xl font-bold text-foreground">{withWebsite.length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="border-border/50 hover:border-emerald-300/50 dark:hover:border-emerald-700/50 transition-colors group">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 group-hover:scale-105 transition-transform">
+                  <MapPin className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Avg Rating</p>
+                  <p className="text-xl font-bold text-foreground">{avgRating}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Main Content */}
-      <div className="animate-fade-in">
-        {discoveredOffices.length === 0 ? (
-          // Show wizard for first-time users
-          <DiscoveryWizard
-            onDiscover={handleDiscover}
-            isLoading={isLoading}
-            weeklyUsage={weeklyUsage}
-            canDiscover={canDiscover}
-            nextRefreshDate={nextRefreshDate}
-          />
-        ) : (
-          // Show results with selection
-          <DiscoveryResults
-            offices={discoveredOffices}
-            session={currentSession}
-            onAddToNetwork={() => {}}
-            onOfficeAdded={handleOfficeAdded}
-            isLoading={isLoading}
-            selectedIds={selectedIds}
-            onSelectionChange={handleSelectionChange}
-            onStartOver={handleStartOver}
-          />
-        )}
-      </div>
+      {discoveredOffices.length === 0 ? (
+        <DiscoveryWizard
+          onDiscover={handleDiscover}
+          isLoading={isLoading}
+          weeklyUsage={weeklyUsage}
+          canDiscover={canDiscover}
+          nextRefreshDate={nextRefreshDate}
+        />
+      ) : (
+        <DiscoveryResults
+          offices={discoveredOffices}
+          session={currentSession}
+          onAddToNetwork={() => {}}
+          onOfficeAdded={handleOfficeAdded}
+          isLoading={isLoading}
+          selectedIds={selectedIds}
+          onSelectionChange={handleSelectionChange}
+          onStartOver={handleStartOver}
+        />
+      )}
 
       {/* Selection Action Bar */}
-      <SelectionActionBar
-        selectedIds={selectedIds}
-        selectedNames={selectedNames}
-        onClear={handleClearSelection}
-        onEmailCampaign={() => {}}
-        onGiftCampaign={() => {}}
-        onScheduleVisits={() => {}}
-        isDiscoveredOffices
-        onBulkAdd={handleBulkAdd}
-        onRemove={handleRemoveSelected}
-      />
+      {selectedIds.length > 0 && (
+        <SelectionActionBar
+          selectedIds={selectedIds}
+          selectedNames={selectedNames}
+          onClear={handleClearSelection}
+          onBulkAdd={handleBulkAdd}
+          onRemove={handleRemoveSelected}
+          isDiscoveredOffices={true}
+        />
+      )}
 
       {/* Bulk Add Dialog */}
       <BulkAddToNetworkDialog
