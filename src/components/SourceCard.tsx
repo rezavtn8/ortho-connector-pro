@@ -22,6 +22,10 @@ interface SourceCardProps {
   onEditFormChange: (updates: Partial<PatientSource>) => void;
   onUpdatePatients: () => void;
   onView: () => void;
+  trackingMode?: {
+    isEditable: boolean;
+    dailyEntryCount: number;
+  };
 }
 
 export function SourceCard({
@@ -39,7 +43,8 @@ export function SourceCard({
   onToggleActive,
   onEditFormChange,
   onUpdatePatients,
-  onView
+  onView,
+  trackingMode
 }: SourceCardProps) {
   const config = SOURCE_TYPE_CONFIG[source.source_type];
 
@@ -138,6 +143,8 @@ export function SourceCard({
               sourceId={source.id}
               currentCount={thisMonth}
               onUpdate={onUpdatePatients}
+              isEditable={trackingMode?.isEditable ?? true}
+              dailyEntryCount={trackingMode?.dailyEntryCount ?? 0}
             />
           </div>
           <div className="text-center">

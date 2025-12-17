@@ -46,13 +46,14 @@ import {
   Building
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-// Navigation is handled internally, no need for React Router
 import { format, subMonths } from 'date-fns';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { AddressSearch } from '@/components/AddressSearch';
-
 import { useNavigate, useParams } from 'react-router-dom';
+import { useSourceTrackingMode } from '@/hooks/useSourceTrackingMode';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { MonthlyPatientRow } from '@/components/MonthlyPatientRow';
 
 export function SourceDetail() {
   const navigate = useNavigate();
@@ -835,7 +836,7 @@ export function SourceDetail() {
             <CardHeader>
               <CardTitle>Monthly Patient History</CardTitle>
               <CardDescription>
-                Click on any count to edit it directly
+                Months with daily entries show auto-calculated totals. Other months can be edited directly.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -850,69 +851,15 @@ export function SourceDetail() {
                 <TableBody>
                   {getLast12Months().map((yearMonth) => {
                     const count = getMonthlyCount(yearMonth);
-                    const isEditing = editingMonth === yearMonth;
-
                     return (
-                      <TableRow key={yearMonth}>
-                        <TableCell>{formatYearMonth(yearMonth)}</TableCell>
-                        <TableCell className="text-center">
-                          {isEditing ? (
-                            <div className="flex items-center justify-center gap-2">
-                              <Input
-                                type="number"
-                                value={editValue}
-                                onChange={(e) => setEditValue(parseInt(e.target.value) || 0)}
-                                className="w-20"
-                                min="0"
-                              />
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => updateMonthlyCount(yearMonth, editValue)}
-                              >
-                                <Save className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setEditingMonth(null)}
-                              >
-                                <X className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <Button
-                              variant="ghost"
-                              onClick={() => {
-                                setEditingMonth(yearMonth);
-                                setEditValue(count);
-                              }}
-                              className="font-semibold"
-                            >
-                              {count}
-                            </Button>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex justify-center gap-1">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => adjustPatientCount(yearMonth, -1)}
-                              disabled={count <= 0}
-                            >
-                              <Minus className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => adjustPatientCount(yearMonth, 1)}
-                            >
-                              <Plus className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
+                      <MonthlyPatientRow
+                        key={yearMonth}
+                        sourceId={sourceId!}
+                        yearMonth={yearMonth}
+                        count={count}
+                        onAdjust={adjustPatientCount}
+                        onUpdate={updateMonthlyCount}
+                      />
                     );
                   })}
                 </TableBody>

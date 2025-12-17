@@ -1,22 +1,30 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Minus, Check, X, Edit3, Loader2 } from 'lucide-react';
+import { Plus, Minus, Check, X, Loader2, Calendar } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getCurrentYearMonth } from '@/lib/dateSync';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface PatientCountEditorProps {
   sourceId: string;
   currentCount: number;
   onUpdate: () => void;
+  isEditable?: boolean;
+  dailyEntryCount?: number;
 }
 
-export function PatientCountEditor({ sourceId, currentCount, onUpdate }: PatientCountEditorProps) {
+export function PatientCountEditor({ 
+  sourceId, 
+  currentCount, 
+  onUpdate,
+  isEditable = true,
+  dailyEntryCount = 0
+}: PatientCountEditorProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(currentCount.toString());
   const [isLoading, setIsLoading] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -44,7 +52,6 @@ export function PatientCountEditor({ sourceId, currentCount, onUpdate }: Patient
     try {
       const currentMonth = getCurrentYearMonth();
       
-      // Use the database function that includes logging
       const { data, error } = await supabase.rpc('set_patient_count', {
         p_source_id: sourceId,
         p_year_month: currentMonth,
@@ -98,6 +105,30 @@ export function PatientCountEditor({ sourceId, currentCount, onUpdate }: Patient
     setValue(currentCount.toString());
     setIsEditing(false);
   };
+
+  // Read-only mode when tracking via daily patients
+  if (!isEditable) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex items-center justify-center gap-1.5 px-2 py-1 bg-muted/50 rounded-md">
+              <Calendar className="w-3 h-3 text-primary" />
+              <span className="font-semibold text-sm">{currentCount}</span>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs">
+            <p className="text-xs">
+              Tracked via Daily Patients ({dailyEntryCount} {dailyEntryCount === 1 ? 'entry' : 'entries'})
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Edit daily entries to change this total
+            </p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
 
   if (isEditing) {
     return (
