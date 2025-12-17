@@ -415,65 +415,6 @@ export function Analytics() {
         </Button>
       </div>
 
-      {/* Controls */}
-      <div className="flex justify-between items-center">
-        <div className="flex gap-4">
-          <Select value={selectedType} onValueChange={(v) => setSelectedType(v as any)}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="All Categories" />
-            </SelectTrigger>
-            <SelectContent className="bg-background border z-50">
-              <SelectItem value="all">All Categories</SelectItem>
-              <SelectItem value="online">
-                <span className="flex items-center gap-2">
-                  <span>🌐</span>
-                  Online Sources
-                </span>
-              </SelectItem>
-              <SelectItem value="offices">
-                <span className="flex items-center gap-2">
-                  <span>🏢</span>
-                  Offices
-                </span>
-              </SelectItem>
-              <SelectItem value="insurance">
-                <span className="flex items-center gap-2">
-                  <span>📋</span>
-                  Insurance
-                </span>
-              </SelectItem>
-              <SelectItem value="word-of-mouth">
-                <span className="flex items-center gap-2">
-                  <span>💬</span>
-                  Word of Mouth
-                </span>
-              </SelectItem>
-              <SelectItem value="other">
-                <span className="flex items-center gap-2">
-                  <span>📌</span>
-                  Other
-                </span>
-              </SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={selectedPeriod} onValueChange={(v) => setSelectedPeriod(v as '3m' | '6m' | '12m' | 'all')}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Time Period" />
-            </SelectTrigger>
-            <SelectContent className="bg-background border z-50">
-              <SelectItem value="3m">Last 3 Months</SelectItem>
-              <SelectItem value="6m">Last 6 Months</SelectItem>
-              <SelectItem value="12m">Last 12 Months</SelectItem>
-              <SelectItem value="all">All Time</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <Button onClick={exportData} variant="outline">
-          <Download className="w-4 h-4 mr-2" />
-          Export Data
-        </Button>
-      </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -548,28 +489,28 @@ export function Analytics() {
 
       {/* Analytics Tabs */}
       <Tabs defaultValue="trends" className="w-full">
-        <TabsList className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 w-full max-w-4xl" variant="pills">
-          <TabsTrigger value="trends" variant="pills" className="flex items-center gap-2">
+        <TabsList className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 w-full max-w-4xl">
+          <TabsTrigger value="trends" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             <span className="hidden sm:inline">Trends</span>
           </TabsTrigger>
-          <TabsTrigger value="distribution" variant="pills" className="flex items-center gap-2">
+          <TabsTrigger value="distribution" className="flex items-center gap-2">
             <PieChart className="h-4 w-4" />
             <span className="hidden sm:inline">Distribution</span>
           </TabsTrigger>
-          <TabsTrigger value="performance" variant="pills" className="flex items-center gap-2">
+          <TabsTrigger value="performance" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
             <span className="hidden sm:inline">Top Performers</span>
           </TabsTrigger>
-          <TabsTrigger value="growing" variant="pills" className="flex items-center gap-2">
+          <TabsTrigger value="growing" className="flex items-center gap-2">
             <ArrowUp className="h-4 w-4" />
             <span className="hidden sm:inline">Growing</span>
           </TabsTrigger>
-          <TabsTrigger value="declining" variant="pills" className="flex items-center gap-2">
+          <TabsTrigger value="declining" className="flex items-center gap-2">
             <ArrowDown className="h-4 w-4" />
             <span className="hidden sm:inline">Declining</span>
           </TabsTrigger>
-          <TabsTrigger value="outreach" variant="pills" className="flex items-center gap-2">
+          <TabsTrigger value="outreach" className="flex items-center gap-2">
             <Target className="h-4 w-4" />
             <span className="hidden sm:inline">Outreach</span>
           </TabsTrigger>

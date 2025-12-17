@@ -345,7 +345,7 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
 
   return (
     <div className="min-h-screen bg-gradient-subtle flex items-center justify-center p-3 sm:p-6 lg:p-8">
-      <Card variant="medical" className="w-full max-w-sm sm:max-w-md mx-auto shadow-lg">
+      <Card className="w-full max-w-sm sm:max-w-md mx-auto shadow-lg border-border">
         <CardHeader className="text-center px-4 pt-6 pb-4 sm:px-8 sm:pt-8 sm:pb-6">
           <div className="mx-auto w-12 h-12 sm:w-16 sm:h-16 bg-gradient-primary rounded-full flex items-center justify-center mb-3 sm:mb-6">
             <Building2 className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
@@ -513,7 +513,6 @@ export function AuthForm({ embedded = false }: AuthFormProps) {
 
             <Button 
               type="submit" 
-              variant="medical" 
               className="w-full h-12 sm:h-10 text-base sm:text-sm font-medium mt-6" 
               disabled={currentForm.formState.isSubmitting || (isLocked && !isSignUp)}
             >

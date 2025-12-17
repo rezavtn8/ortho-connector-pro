@@ -609,16 +609,16 @@ export function Sources() {
 
       {/* Sources Tabs */}
       <Tabs defaultValue="online" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 max-w-md" variant="pills">
-          <TabsTrigger value="online" variant="pills" className="flex items-center gap-2">
+        <TabsList className="grid w-full grid-cols-3 max-w-md">
+          <TabsTrigger value="online" className="flex items-center gap-2">
             <Globe className="h-4 w-4" />
             Online
           </TabsTrigger>
-          <TabsTrigger value="offices" variant="pills" className="flex items-center gap-2">
+          <TabsTrigger value="offices" className="flex items-center gap-2">
             <Building2 className="h-4 w-4" />
             Offices
           </TabsTrigger>
-          <TabsTrigger value="other" variant="pills" className="flex items-center gap-2">
+          <TabsTrigger value="other" className="flex items-center gap-2">
             <MessageSquare className="h-4 w-4" />
             Other
           </TabsTrigger>
@@ -654,7 +654,7 @@ function AddSourceDialog({ onSourceAdded }: AddSourceDialogProps) {
       onSourceAdded={onSourceAdded}
       defaultSourceType="Other"
       triggerButton={
-        <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white">
+        <Button>
           <Plus className="w-4 h-4 mr-2" />
           Add Source
         </Button>
