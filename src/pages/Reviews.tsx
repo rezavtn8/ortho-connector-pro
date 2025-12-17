@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +13,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useOptimizedArray } from '@/hooks/useOptimizedState';
 import { useGoogleReviews } from '@/hooks/useGoogleMapsApi';
 import { supabase } from '@/integrations/supabase/client';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Star,
   Search,
@@ -24,12 +25,12 @@ import {
   RefreshCw,
   MessageSquare,
   TrendingUp,
-  Calendar,
   User,
   Bot,
   Sparkles,
   Copy,
-  X
+  AlertCircle,
+  Info
 } from 'lucide-react';
 
 interface GoogleReview {
@@ -87,10 +88,9 @@ export function Reviews() {
     filterAndSortReviews();
   }, [reviews, searchQuery, filterStatus, sortBy]);
 
-  // Memoized stats calculation for better performance
   const reviewStats = useMemo(() => {
     if (reviews.length === 0) {
-      return { total: 0, needsAttention: 0, averageRating: 0 };
+      return { total: 0, needsAttention: 0, averageRating: 0, handled: 0 };
     }
 
     const needsAttention = reviews.filter(review => 
@@ -98,11 +98,13 @@ export function Reviews() {
       review.status_data?.status === 'unreplied'
     ).length;
 
+    const handled = reviews.filter(review => review.status_data?.status === 'handled').length;
     const averageRating = reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length;
 
     return {
       total: reviews.length,
       needsAttention,
+      handled,
       averageRating: averageRating || 0
     };
   }, [reviews]);
@@ -111,7 +113,6 @@ export function Reviews() {
     if (!user?.id) return;
 
     try {
-      // Get user profile to find their clinic
       const { data: profile } = await supabase
         .from('user_profiles')
         .select('clinic_id')
@@ -127,7 +128,6 @@ export function Reviews() {
         return;
       }
 
-      // Get clinic with Google Place ID
       const { data: clinic } = await supabase
         .from('clinics')
         .select('google_place_id, name')
@@ -155,7 +155,6 @@ export function Reviews() {
     }
   };
 
-
   const fetchReviews = async (targetPlaceId?: string) => {
     const currentPlaceId = targetPlaceId || placeId;
     if (!currentPlaceId) {
@@ -169,38 +168,25 @@ export function Reviews() {
 
     setLoading(true);
     try {
-      console.log('Reviews: Fetching reviews for place:', currentPlaceId);
-      
-      // Use the improved Google Reviews hook
       const reviewData = await fetchGoogleReviews(currentPlaceId);
-      
       const googleReviews: GoogleReview[] = reviewData.reviews || [];
-      console.log(`Reviews: Fetched ${googleReviews.length} reviews from Google`);
 
-      // Fetch existing review statuses
       const { data: reviewStatuses } = await supabase
         .from('review_status')
         .select('*')
         .eq('place_id', currentPlaceId)
         .eq('user_id', user?.id);
 
-      // Merge Google reviews with status data
       const reviewsWithStatus: ReviewWithStatus[] = googleReviews.map(review => {
         const statusData = reviewStatuses?.find(
           status => status.google_review_id === review.google_review_id
         );
-
-        return {
-          ...review,
-          status_data: statusData
-        };
+        return { ...review, status_data: statusData };
       });
 
       setReviews(reviewsWithStatus);
-
     } catch (error: any) {
       console.error('Reviews: Error fetching reviews:', error);
-      // Error handling is already done in the useGoogleReviews hook
     } finally {
       setLoading(false);
     }
@@ -212,13 +198,7 @@ export function Reviews() {
     const review = reviews.find(r => r.google_review_id === reviewId);
     if (!review) return;
 
-    // Open dialog and show loading state
-    setAiResponseDialog({
-      isOpen: true,
-      content: '',
-      reviewId,
-      loading: true
-    });
+    setAiResponseDialog({ isOpen: true, content: '', reviewId, loading: true });
 
     try {
       const { data, error } = await supabase.functions.invoke('ai-assistant', {
@@ -231,9 +211,7 @@ export function Reviews() {
             review_text: review.text,
             review_date: review.relative_time_description,
           },
-          parameters: {
-            tone: 'professional and appreciative',
-          }
+          parameters: { tone: 'professional and appreciative' }
         },
         headers: {
           Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
@@ -242,12 +220,7 @@ export function Reviews() {
 
       if (error) throw error;
 
-      // Show the response in the dialog
-      setAiResponseDialog(prev => ({
-        ...prev,
-        content: data.content,
-        loading: false
-      }));
+      setAiResponseDialog(prev => ({ ...prev, content: data.content, loading: false }));
 
       toast({
         title: 'AI Response Generated',
@@ -257,10 +230,7 @@ export function Reviews() {
       return data.content;
     } catch (error: any) {
       console.error('Error generating AI response:', error);
-      setAiResponseDialog(prev => ({
-        ...prev,
-        loading: false
-      }));
+      setAiResponseDialog(prev => ({ ...prev, loading: false }));
       toast({
         title: 'Error',
         description: 'Failed to generate AI response',
@@ -272,16 +242,9 @@ export function Reviews() {
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      toast({
-        title: 'Copied!',
-        description: 'Response copied to clipboard',
-      });
+      toast({ title: 'Copied!', description: 'Response copied to clipboard' });
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to copy to clipboard',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: 'Failed to copy to clipboard', variant: 'destructive' });
     }
   };
 
@@ -303,37 +266,26 @@ export function Reviews() {
 
       const { error } = await supabase
         .from('review_status')
-        .upsert(updateData, {
-          onConflict: 'google_review_id,user_id'
-        });
+        .upsert(updateData, { onConflict: 'google_review_id,user_id' });
 
       if (error) throw error;
 
-      // Update local state optimally
       setReviews(reviews.map(r => 
         r.google_review_id === reviewId 
           ? { ...r, status_data: { ...updateData, id: r.status_data?.id || '' } as ReviewStatus }
           : r
       ));
 
-      toast({
-        title: 'Success',
-        description: 'Review status updated successfully',
-      });
+      toast({ title: 'Success', description: 'Review status updated successfully' });
     } catch (error) {
       console.error('Error updating review status:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update review status',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: 'Failed to update review status', variant: 'destructive' });
     }
   };
 
   const filterAndSortReviews = useCallback(() => {
     let filtered = [...reviews];
 
-    // Apply search filter
     if (searchQuery) {
       filtered = filtered.filter(review => 
         review.author_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -341,7 +293,6 @@ export function Reviews() {
       );
     }
 
-    // Apply status filter
     if (filterStatus === 'needs-attention') {
       filtered = filtered.filter(review => 
         review.rating <= 3 || review.status_data?.needs_attention || 
@@ -351,159 +302,172 @@ export function Reviews() {
       filtered = filtered.filter(review => review.status_data?.status === filterStatus);
     }
 
-    // Apply sorting
     filtered.sort((a, b) => {
       switch (sortBy) {
-        case 'oldest':
-          return a.time - b.time;
-        case 'rating-high':
-          return b.rating - a.rating;
-        case 'rating-low':
-          return a.rating - b.rating;
-        case 'newest':
-        default:
-          return b.time - a.time;
+        case 'oldest': return a.time - b.time;
+        case 'rating-high': return b.rating - a.rating;
+        case 'rating-low': return a.rating - b.rating;
+        default: return b.time - a.time;
       }
     });
 
     setFilteredReviews(filtered);
   }, [reviews, searchQuery, filterStatus, sortBy]);
 
-  const renderStars = (rating: number) => {
-    return Array.from({ length: 5 }, (_, i) => (
-      <Star
-        key={i}
-        className={`h-4 w-4 ${
-          i < rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
-        }`}
-      />
-    ));
-  };
-
-  const getStatusIcon = (review: ReviewWithStatus) => {
-    const status = review.status_data?.status;
-    const needsAttention = review.rating <= 3 || review.status_data?.needs_attention;
-
-    if (needsAttention) {
-      return <AlertTriangle className="h-4 w-4 text-red-500" />;
-    }
-
-    switch (status) {
-      case 'handled':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'follow-up':
-        return <Clock className="h-4 w-4 text-yellow-500" />;
-      default:
-        return <MessageSquare className="h-4 w-4 text-blue-500" />;
-    }
-  };
+  const renderStars = (rating: number) => (
+    <div className="flex gap-0.5">
+      {Array.from({ length: 5 }, (_, i) => (
+        <Star
+          key={i}
+          className={`h-4 w-4 ${i < rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'}`}
+        />
+      ))}
+    </div>
+  );
 
   const getStatusBadge = (review: ReviewWithStatus) => {
     const status = review.status_data?.status || 'new';
     const needsAttention = review.rating <= 3 || review.status_data?.needs_attention;
 
     if (needsAttention) {
-      return <Badge variant="destructive">Needs Attention</Badge>;
+      return <Badge variant="destructive" className="gap-1"><AlertTriangle className="w-3 h-3" />Needs Attention</Badge>;
     }
 
     switch (status) {
       case 'handled':
-        return <Badge variant="secondary" className="bg-green-100 text-green-800">Handled</Badge>;
+        return <Badge className="gap-1 bg-success/10 text-success border-success/20"><CheckCircle className="w-3 h-3" />Handled</Badge>;
       case 'follow-up':
-        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Follow-up</Badge>;
+        return <Badge className="gap-1 bg-warning/10 text-warning border-warning/20"><Clock className="w-3 h-3" />Follow-up</Badge>;
       case 'unreplied':
-        return <Badge variant="destructive">Unreplied</Badge>;
+        return <Badge variant="destructive" className="gap-1"><AlertCircle className="w-3 h-3" />Unreplied</Badge>;
       default:
-        return <Badge variant="outline">New</Badge>;
+        return <Badge variant="outline" className="gap-1"><MessageSquare className="w-3 h-3" />New</Badge>;
     }
   };
 
-  return (
-    <div className="space-y-6 animate-fade-in">
-
-      {/* Refresh Button */}
-      <div className="flex justify-end">
-        <Button onClick={() => fetchReviews()} disabled={loading || !placeId} className="hover-scale transition-all duration-300">
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Refresh Reviews
-        </Button>
+  if (loading && reviews.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-4">
+                <Skeleton className="h-4 w-24 mb-2" />
+                <Skeleton className="h-8 w-16" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <Skeleton className="h-16 w-full rounded-lg" />
+        <div className="space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-6">
+                <div className="flex gap-4">
+                  <Skeleton className="h-10 w-10 rounded-full" />
+                  <div className="flex-1">
+                    <Skeleton className="h-5 w-32 mb-2" />
+                    <Skeleton className="h-4 w-24 mb-3" />
+                    <Skeleton className="h-16 w-full" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
-      <Card className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-amber-800 dark:text-amber-200 flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5" />
-            Review Data Limitation
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <p className="text-amber-700 dark:text-amber-300 text-sm">
-              <strong>Important:</strong> Google Places API only returns the 5 most helpful reviews. 
-              For comprehensive review management including all reviews, ratings analytics, and response capabilities, we're implementing Google My Business API integration with OAuth2 authentication in the next update.
-            </p>
-            <p className="text-amber-600 dark:text-amber-400 text-xs">
-              Coming soon: Full business API access with proper OAuth2 flow and enhanced review management features.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+    );
+  }
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+  return (
+    <div className="space-y-6">
+      {/* Stats Overview */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <MessageSquare className="h-8 w-8 text-blue-500" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Total Reviews</p>
-                <p className="text-2xl font-bold">{reviewStats.total}</p>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Reviews</p>
+                <p className="text-2xl font-bold mt-1">{reviewStats.total}</p>
+              </div>
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <MessageSquare className="w-5 h-5 text-primary" />
               </div>
             </div>
           </CardContent>
         </Card>
         
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <AlertTriangle className="h-8 w-8 text-red-500" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Needs Attention</p>
-                <p className="text-2xl font-bold">{reviewStats.needsAttention}</p>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Needs Attention</p>
+                <p className="text-2xl font-bold mt-1">{reviewStats.needsAttention}</p>
+              </div>
+              <div className="p-2 bg-destructive/10 rounded-lg">
+                <AlertTriangle className="w-5 h-5 text-destructive" />
               </div>
             </div>
           </CardContent>
         </Card>
-
+        
         <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <TrendingUp className="h-8 w-8 text-green-500" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-muted-foreground">Average Rating</p>
-                <div className="flex items-center">
-                  <p className="text-2xl font-bold mr-2">{reviewStats.averageRating.toFixed(1)}</p>
-                  <div className="flex">{renderStars(Math.round(reviewStats.averageRating))}</div>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Handled</p>
+                <p className="text-2xl font-bold mt-1">{reviewStats.handled}</p>
+              </div>
+              <div className="p-2 bg-success/10 rounded-lg">
+                <CheckCircle className="w-5 h-5 text-success" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Avg Rating</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-2xl font-bold">{reviewStats.averageRating.toFixed(1)}</p>
+                  <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
                 </div>
+              </div>
+              <div className="p-2 bg-amber-500/10 rounded-lg">
+                <TrendingUp className="w-5 h-5 text-amber-600" />
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Search and Filters */}
-      <Card>
-        <CardContent className="p-6">
+      {/* API Notice */}
+      <Card className="border-warning/30 bg-warning/5">
+        <CardContent className="p-4 flex items-start gap-3">
+          <Info className="w-5 h-5 text-warning shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-warning">Limited Review Data</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Google Places API returns only the 5 most helpful reviews. Full review management with Google My Business API integration coming soon.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Filters Section */}
+      <Card className="border-primary/20 bg-gradient-to-r from-primary/5 via-transparent to-transparent">
+        <CardContent className="p-4">
           <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search reviews by reviewer name or content..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search reviews..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
             </div>
             
             <Select value={filterStatus} onValueChange={setFilterStatus}>
@@ -511,7 +475,7 @@ export function Reviews() {
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-popover">
                 <SelectItem value="all">All Reviews</SelectItem>
                 <SelectItem value="needs-attention">Needs Attention</SelectItem>
                 <SelectItem value="new">New</SelectItem>
@@ -525,131 +489,124 @@ export function Reviews() {
               <SelectTrigger className="w-full md:w-40">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-popover">
                 <SelectItem value="newest">Newest First</SelectItem>
                 <SelectItem value="oldest">Oldest First</SelectItem>
                 <SelectItem value="rating-high">Highest Rating</SelectItem>
                 <SelectItem value="rating-low">Lowest Rating</SelectItem>
               </SelectContent>
             </Select>
+
+            <Button onClick={() => fetchReviews()} disabled={loading || !placeId} variant="outline" className="gap-2">
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
           </div>
         </CardContent>
       </Card>
 
       {/* Reviews List */}
-      {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <RefreshCw className="h-8 w-8 animate-spin" />
-        </div>
-      ) : !placeId ? (
-        <Card>
-          <CardContent className="p-12 text-center">
-            <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium mb-2">Clinic Setup Required</h3>
-            <p className="text-muted-foreground mb-4">
-              To view Google reviews, you need to complete your clinic setup first.
+      {!placeId ? (
+        <Card className="border-dashed">
+          <CardContent className="py-12 text-center">
+            <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
+              <MessageSquare className="w-6 h-6 text-muted-foreground" />
+            </div>
+            <h3 className="font-medium mb-1">Clinic Setup Required</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Add your Google Place ID in Settings to view reviews.
             </p>
-            <Button onClick={() => window.location.hash = 'settings'}>
-              Go to Settings
-            </Button>
+            <Button onClick={() => window.location.hash = 'settings'}>Go to Settings</Button>
           </CardContent>
         </Card>
       ) : filteredReviews.length === 0 ? (
-        <Card>
-          <CardContent className="p-12 text-center">
-            <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium mb-2">No Reviews Found</h3>
-            <p className="text-muted-foreground">
+        <Card className="border-dashed">
+          <CardContent className="py-12 text-center">
+            <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
+              <MessageSquare className="w-6 h-6 text-muted-foreground" />
+            </div>
+            <h3 className="font-medium mb-1">No Reviews Found</h3>
+            <p className="text-sm text-muted-foreground">
               {reviews.length === 0 
-                ? "No reviews available. Make sure you have a Google Place ID configured."
-                : "No reviews match your current filters."
-              }
+                ? "No reviews available for this location."
+                : "No reviews match your current filters."}
             </p>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-4">
           {filteredReviews.map((review) => (
-            <Card key={review.google_review_id} className="hover:shadow-md hover-scale transition-all duration-300 animate-fade-in">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start space-x-4">
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={review.profile_photo_url} alt={review.author_name} />
-                      <AvatarFallback>
-                        <User className="h-4 w-4" />
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium">{review.author_name}</p>
-                        {getStatusIcon(review)}
+            <Card key={review.google_review_id} className="group hover:shadow-lg transition-all duration-200 overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <CardContent className="p-4 sm:p-6 relative">
+                <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+                  <Avatar className="h-10 w-10 shrink-0">
+                    <AvatarImage src={review.profile_photo_url} alt={review.author_name} />
+                    <AvatarFallback className="bg-primary/10 text-primary">
+                      <User className="h-4 w-4" />
+                    </AvatarFallback>
+                  </Avatar>
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                      <div>
+                        <p className="font-semibold">{review.author_name}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          {renderStars(review.rating)}
+                          <span className="text-sm text-muted-foreground">•</span>
+                          <span className="text-sm text-muted-foreground">{review.relative_time_description}</span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <div className="flex">{renderStars(review.rating)}</div>
-                        <span className="text-sm text-muted-foreground">•</span>
-                        <span className="text-sm text-muted-foreground">
-                          {review.relative_time_description}
-                        </span>
+                      <div className="flex items-center gap-2">
+                        {getStatusBadge(review)}
                       </div>
                     </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    {getStatusBadge(review)}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => window.open(`https://search.google.com/local/reviews?placeid=${placeId}`, '_blank')}
-                    >
-                      <ExternalLink className="h-3 w-3 mr-1" />
-                      Reply on Google
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              
-              <CardContent className="pt-0">
-                <p className="text-sm mb-4 leading-relaxed">{review.text}</p>
-                
-                <Separator className="my-4" />
-                
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => generateAIResponse(review.google_review_id)}
-                    className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
-                  >
-                    <Sparkles className="h-3 w-3 mr-1" />
-                    AI Response
-                  </Button>
+                    
+                    <p className="text-sm leading-relaxed mb-4">{review.text}</p>
+                    
+                    <Separator className="my-4" />
+                    
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => generateAIResponse(review.google_review_id)}
+                        className="gap-1.5 bg-gradient-to-r from-primary to-primary/80"
+                      >
+                        <Sparkles className="h-3.5 w-3.5" />
+                        AI Response
+                      </Button>
 
-                  <Button
-                    variant={review.status_data?.status === 'handled' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => updateReviewStatus(review.google_review_id, 'handled')}
-                  >
-                    <CheckCircle className="h-3 w-3 mr-1" />
-                    Mark as Handled
-                  </Button>
-                  
-                  <Button
-                    variant={review.status_data?.status === 'follow-up' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => updateReviewStatus(review.google_review_id, 'follow-up')}
-                  >
-                    <Clock className="h-3 w-3 mr-1" />
-                    Follow-up Needed
-                  </Button>
-                  
-                  <Button
-                    variant={review.status_data?.status === 'unreplied' ? 'destructive' : 'outline'}
-                    size="sm"
-                    onClick={() => updateReviewStatus(review.google_review_id, 'unreplied', true)}
-                  >
-                    <AlertTriangle className="h-3 w-3 mr-1" />
-                    Mark as Unreplied
-                  </Button>
+                      <Button
+                        variant={review.status_data?.status === 'handled' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => updateReviewStatus(review.google_review_id, 'handled')}
+                        className="gap-1.5"
+                      >
+                        <CheckCircle className="h-3.5 w-3.5" />
+                        Handled
+                      </Button>
+                      
+                      <Button
+                        variant={review.status_data?.status === 'follow-up' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => updateReviewStatus(review.google_review_id, 'follow-up')}
+                        className="gap-1.5"
+                      >
+                        <Clock className="h-3.5 w-3.5" />
+                        Follow-up
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(`https://search.google.com/local/reviews?placeid=${placeId}`, '_blank')}
+                        className="gap-1.5 ml-auto"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                        Reply on Google
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -658,9 +615,7 @@ export function Reviews() {
       )}
 
       {/* AI Response Dialog */}
-      <Dialog open={aiResponseDialog.isOpen} onOpenChange={(open) => 
-        setAiResponseDialog(prev => ({ ...prev, isOpen: open }))
-      }>
+      <Dialog open={aiResponseDialog.isOpen} onOpenChange={(open) => setAiResponseDialog(prev => ({ ...prev, isOpen: open }))}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -668,7 +623,7 @@ export function Reviews() {
               AI-Generated Review Response
             </DialogTitle>
             <DialogDescription>
-              Here's an AI-generated professional response for this review. You can copy and paste it to Google My Business or use it as inspiration.
+              Copy this response to use on Google My Business or use it as inspiration.
             </DialogDescription>
           </DialogHeader>
           
@@ -691,19 +646,12 @@ export function Reviews() {
                 
                 {aiResponseDialog.content && (
                   <div className="flex gap-2">
-                    <Button
-                      onClick={() => copyToClipboard(aiResponseDialog.content)}
-                      className="flex-1"
-                    >
-                      <Copy className="h-4 w-4 mr-2" />
+                    <Button onClick={() => copyToClipboard(aiResponseDialog.content)} className="flex-1 gap-2">
+                      <Copy className="h-4 w-4" />
                       Copy Response
                     </Button>
-                    
-                    <Button
-                      variant="outline"
-                      onClick={() => generateAIResponse(aiResponseDialog.reviewId)}
-                    >
-                      <RefreshCw className="h-4 w-4 mr-2" />
+                    <Button variant="outline" onClick={() => generateAIResponse(aiResponseDialog.reviewId)} className="gap-2">
+                      <RefreshCw className="h-4 w-4" />
                       Regenerate
                     </Button>
                   </div>
