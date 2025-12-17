@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,6 +29,7 @@ import { SourceCard } from '@/components/SourceCard';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useNavigate } from 'react-router-dom';
 import { UnifiedSourceDialog } from '@/components/UnifiedSourceDialog';
+import { useMultiSourceTrackingMode } from '@/hooks/useSourceTrackingMode';
 
 export function Sources() {
   const navigate = useNavigate();
@@ -46,6 +47,10 @@ export function Sources() {
   const [editingSource, setEditingSource] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<PatientSource>>({});
   const currentMonth = getCurrentYearMonth();
+  
+  // Get tracking mode for all sources
+  const sourceIds = useMemo(() => sources.map(s => s.id), [sources]);
+  const { getModeForSource } = useMultiSourceTrackingMode(sourceIds, currentMonth);
 
   useEffect(() => {
     loadData();
@@ -354,6 +359,7 @@ export function Sources() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             {sources.map((source) => {
               const { thisMonth, total } = getPatientCounts(source.id);
+              const trackingInfo = getModeForSource(source.id);
               return (
                 <SourceCard
                   key={source.id}
@@ -372,6 +378,10 @@ export function Sources() {
                   onEditFormChange={(updates) => setEditForm(prev => ({ ...prev, ...updates }))}
                   onUpdatePatients={loadData}
                   onView={() => handleViewSource(source.id)}
+                  trackingMode={{
+                    isEditable: trackingInfo.isEditable,
+                    dailyEntryCount: trackingInfo.dailyEntryCount
+                  }}
                 />
               );
             })}
@@ -506,11 +516,18 @@ export function Sources() {
                         </div>
                       </TableCell>
                        <TableCell className="text-center">
-                         <PatientCountEditor
-                           sourceId={source.id}
-                           currentCount={thisMonth}
-                           onUpdate={loadData}
-                         />
+                         {(() => {
+                           const trackingInfo = getModeForSource(source.id);
+                           return (
+                             <PatientCountEditor
+                               sourceId={source.id}
+                               currentCount={thisMonth}
+                               onUpdate={loadData}
+                               isEditable={trackingInfo.isEditable}
+                               dailyEntryCount={trackingInfo.dailyEntryCount}
+                             />
+                           );
+                         })()}
                        </TableCell>
                       <TableCell className="text-center font-semibold">
                         {total}
