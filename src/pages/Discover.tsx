@@ -452,13 +452,7 @@ export const Discover = () => {
 
   if (isLoadingFromDB) {
     return (
-      <div className="space-y-6">
-        {/* Loading Hero */}
-        <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-teal-500/10 via-cyan-500/5 to-blue-500/10 dark:from-teal-500/20 dark:via-cyan-500/10 dark:to-blue-500/20 border border-teal-200/50 dark:border-teal-800/50 p-6">
-          <Skeleton className="h-8 w-48 mb-2" />
-          <Skeleton className="h-4 w-72" />
-        </div>
-        
+      <div className="space-y-6 animate-fade-in">
         {/* Loading Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
@@ -475,125 +469,105 @@ export const Discover = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Hero Section */}
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-teal-500/10 via-cyan-500/5 to-blue-500/10 dark:from-teal-500/20 dark:via-cyan-500/10 dark:to-blue-500/20 border border-teal-200/50 dark:border-teal-800/50 p-6">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-teal-400/20 to-transparent rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-        <div className="relative flex items-start justify-between flex-wrap gap-4">
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 shadow-lg shadow-teal-500/25">
-                <Compass className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">Find Offices</h1>
-                <p className="text-muted-foreground">
-                  {discoveredOffices.length > 0 
-                    ? `${newOffices.length} offices available to add to your network`
-                    : 'Discover dental offices in your area'}
-                </p>
-              </div>
+    <div className="space-y-6 animate-fade-in">
+      {/* Stats Grid with Action Buttons */}
+      {discoveredOffices.length > 0 ? (
+        <>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 flex-1">
+              <Card className="border-border/50 hover:border-primary/30 transition-colors group">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-teal-50 dark:bg-teal-950/30 group-hover:scale-105 transition-transform">
+                      <Building2 className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Available</p>
+                      <p className="text-xl font-bold text-foreground">{newOffices.length}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="border-border/50 hover:border-primary/30 transition-colors group">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 group-hover:scale-105 transition-transform">
+                      <Star className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">High Rated (4+)</p>
+                      <p className="text-xl font-bold text-foreground">{highRatedOffices.length}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="border-border/50 hover:border-primary/30 transition-colors group">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/30 group-hover:scale-105 transition-transform">
+                      <Globe className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">With Website</p>
+                      <p className="text-xl font-bold text-foreground">{withWebsite.length}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="border-border/50 hover:border-primary/30 transition-colors group">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 group-hover:scale-105 transition-transform">
+                      <MapPin className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Avg Rating</p>
+                      <p className="text-xl font-bold text-foreground">{avgRating}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+            
+            {/* Action Buttons */}
+            <div className="flex gap-2 shrink-0">
+              <Button 
+                onClick={handleForceRefresh}
+                variant="outline"
+                disabled={isLoading}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+              <Dialog open={showNewSearchDialog} onOpenChange={setShowNewSearchDialog}>
+                <DialogTrigger asChild>
+                  <Button className="flex items-center gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground">
+                    <Search className="w-4 h-4" />
+                    New Search
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>New Discovery Search</DialogTitle>
+                  </DialogHeader>
+                  <DiscoveryWizard
+                    onDiscover={handleDiscover}
+                    isLoading={isLoading}
+                    weeklyUsage={weeklyUsage}
+                    canDiscover={canDiscover}
+                    nextRefreshDate={nextRefreshDate}
+                    compact
+                  />
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
-          <div className="flex gap-2">
-            {discoveredOffices.length > 0 && (
-              <>
-                <Button 
-                  onClick={handleForceRefresh}
-                  variant="outline"
-                  disabled={isLoading}
-                  className="flex items-center gap-2 border-teal-300 dark:border-teal-700 hover:bg-teal-50 dark:hover:bg-teal-950"
-                >
-                  <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-                  Refresh
-                </Button>
-                <Dialog open={showNewSearchDialog} onOpenChange={setShowNewSearchDialog}>
-                  <DialogTrigger asChild>
-                    <Button className="flex items-center gap-2 bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white shadow-lg shadow-teal-500/25">
-                      <Search className="w-4 h-4" />
-                      New Search
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                      <DialogTitle>New Discovery Search</DialogTitle>
-                    </DialogHeader>
-                    <DiscoveryWizard
-                      onDiscover={handleDiscover}
-                      isLoading={isLoading}
-                      weeklyUsage={weeklyUsage}
-                      canDiscover={canDiscover}
-                      nextRefreshDate={nextRefreshDate}
-                      compact
-                    />
-                  </DialogContent>
-                </Dialog>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Stats Grid - Only show when there are results */}
-      {discoveredOffices.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="border-border/50 hover:border-teal-300/50 dark:hover:border-teal-700/50 transition-colors group">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-teal-50 dark:bg-teal-950/30 group-hover:scale-105 transition-transform">
-                  <Building2 className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Available</p>
-                  <p className="text-xl font-bold text-foreground">{newOffices.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="border-border/50 hover:border-amber-300/50 dark:hover:border-amber-700/50 transition-colors group">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 group-hover:scale-105 transition-transform">
-                  <Star className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">High Rated (4+)</p>
-                  <p className="text-xl font-bold text-foreground">{highRatedOffices.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="border-border/50 hover:border-blue-300/50 dark:hover:border-blue-700/50 transition-colors group">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/30 group-hover:scale-105 transition-transform">
-                  <Globe className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">With Website</p>
-                  <p className="text-xl font-bold text-foreground">{withWebsite.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="border-border/50 hover:border-emerald-300/50 dark:hover:border-emerald-700/50 transition-colors group">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 group-hover:scale-105 transition-transform">
-                  <MapPin className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Avg Rating</p>
-                  <p className="text-xl font-bold text-foreground">{avgRating}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+        </>
+      ) : null}
 
       {/* Main Content */}
       {discoveredOffices.length === 0 ? (
