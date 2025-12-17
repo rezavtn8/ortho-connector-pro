@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Brain, MessageSquare, Settings, Users, Activity, TrendingUp, TrendingDown, Sparkles, Zap } from 'lucide-react';
+import { Brain, MessageSquare, Settings, Users, Activity, TrendingUp, TrendingDown } from 'lucide-react';
 import { AIAnalysisTab } from '@/components/ai/AIAnalysisTab';
 import { AIChatTab } from '@/components/ai/AIChatTab';
 import { AISettingsTab } from '@/components/ai/AISettingsTab';
@@ -104,51 +104,21 @@ export function AIAssistant() {
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Hero Section */}
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-teal-500/10 via-cyan-500/5 to-blue-500/10 dark:from-teal-500/20 dark:via-cyan-500/10 dark:to-blue-500/20 border border-teal-200/50 dark:border-teal-800/50 p-6">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-teal-400/20 to-transparent rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-        <div className="relative flex items-start justify-between">
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 shadow-lg shadow-teal-500/25">
-                <Brain className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-                  AI Assistant
-                  <Badge className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-0 text-xs">
-                    <Sparkles className="w-3 h-3 mr-1" />
-                    Powered by AI
-                  </Badge>
-                </h1>
-                <p className="text-muted-foreground">Intelligent insights and recommendations for your practice</p>
-              </div>
-            </div>
-          </div>
-          <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
-            <Zap className="w-4 h-4 text-teal-500" />
-            Real-time analysis
-          </div>
-        </div>
-      </div>
-
+    <div className="space-y-6 animate-fade-in">
       {/* Stats Grid */}
-      {loading ? (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {loading ? (
+          [...Array(4)].map((_, i) => (
             <Card key={i} className="border-border/50">
               <CardContent className="p-4">
                 <Skeleton className="h-4 w-24 mb-2" />
                 <Skeleton className="h-8 w-16" />
               </CardContent>
             </Card>
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {stats.map((stat, index) => (
-            <Card key={index} className="border-border/50 hover:border-teal-300/50 dark:hover:border-teal-700/50 transition-colors group">
+          ))
+        ) : (
+          stats.map((stat, index) => (
+            <Card key={index} className="border-border/50 hover:border-primary/30 transition-colors group">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <div className={`p-2 rounded-lg ${stat.bgColor} group-hover:scale-105 transition-transform`}>
@@ -161,9 +131,9 @@ export function AIAssistant() {
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
 
       {/* Tabs Section */}
       <Card className="border-border/50">
