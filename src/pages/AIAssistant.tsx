@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Brain, MessageSquare, Settings, Users, Activity, TrendingUp, TrendingDown } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Brain, MessageSquare, Settings, Users, Activity, TrendingUp, TrendingDown, Sparkles, Zap } from 'lucide-react';
 import { AIAnalysisTab } from '@/components/ai/AIAnalysisTab';
 import { AIChatTab } from '@/components/ai/AIChatTab';
 import { AISettingsTab } from '@/components/ai/AISettingsTab';
 import { supabase } from '@/integrations/supabase/client';
-import { PatientSource, MonthlyPatients } from '@/lib/database.types';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export function AIAssistant() {
   const [activeTab, setActiveTab] = useState('analysis');
@@ -22,13 +23,11 @@ export function AIAssistant() {
 
   const loadQuickStats = async () => {
     try {
-      // Load sources
       const { data: sourcesData } = await supabase
         .from('patient_sources')
         .select('*')
         .eq('is_active', true);
 
-      // Load monthly data (last 6 months)
       const now = new Date();
       const startDate = new Date(now.getFullYear(), now.getMonth() - 6, 1);
       const startYearMonth = `${startDate.getFullYear()}-${(startDate.getMonth() + 1).toString().padStart(2, '0')}`;
@@ -41,12 +40,10 @@ export function AIAssistant() {
       const sources = sourcesData || [];
       const monthlyData = monthlyDataResult || [];
 
-      // Calculate stats
       const analyticsData = sources.map(source => {
         const sourceMonthlyData = monthlyData.filter(m => m.source_id === source.id);
         const total = sourceMonthlyData.reduce((sum, m) => sum + m.patient_count, 0);
         
-        // Ensure chronological order by year_month before trend calculation
         const sorted = [...sourceMonthlyData].sort((a, b) => (a.year_month || '').localeCompare(b.year_month || ''));
         const recent = sorted.length >= 1 ? (sorted[sorted.length - 1].patient_count || 0) : 0;
         const previous = sorted.length >= 2 ? (sorted[sorted.length - 2].patient_count || 0) : 0;
@@ -75,75 +72,148 @@ export function AIAssistant() {
     }
   };
 
+  const stats = [
+    { 
+      label: 'Total Patients', 
+      value: totalPatients.toLocaleString(), 
+      icon: Users, 
+      color: 'text-teal-600 dark:text-teal-400',
+      bgColor: 'bg-teal-50 dark:bg-teal-950/30'
+    },
+    { 
+      label: 'Avg/Source', 
+      value: averagePerSource, 
+      icon: Activity, 
+      color: 'text-blue-600 dark:text-blue-400',
+      bgColor: 'bg-blue-50 dark:bg-blue-950/30'
+    },
+    { 
+      label: 'Growing', 
+      value: growingSources, 
+      icon: TrendingUp, 
+      color: 'text-emerald-600 dark:text-emerald-400',
+      bgColor: 'bg-emerald-50 dark:bg-emerald-950/30'
+    },
+    { 
+      label: 'Declining', 
+      value: decliningSources, 
+      icon: TrendingDown, 
+      color: 'text-rose-600 dark:text-rose-400',
+      bgColor: 'bg-rose-50 dark:bg-rose-950/30'
+    },
+  ];
+
   return (
     <div className="space-y-6">
-
-      {/* Quick Stats Card */}
-      {!loading && (
-        <Card variant="outline" className="bg-card/50 mb-6">
-          <CardContent className="pt-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5" />
-                  Total Patients
-                </p>
-                <p className="text-2xl font-bold text-foreground">{totalPatients.toLocaleString()}</p>
+      {/* Hero Section */}
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-teal-500/10 via-cyan-500/5 to-blue-500/10 dark:from-teal-500/20 dark:via-cyan-500/10 dark:to-blue-500/20 border border-teal-200/50 dark:border-teal-800/50 p-6">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-teal-400/20 to-transparent rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+        <div className="relative flex items-start justify-between">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 shadow-lg shadow-teal-500/25">
+                <Brain className="w-6 h-6 text-white" />
               </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                  <Activity className="w-3.5 h-3.5" />
-                  Avg/Source
-                </p>
-                <p className="text-2xl font-bold text-foreground">{averagePerSource}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                  <TrendingUp className="w-3.5 h-3.5" />
-                  Growing
-                </p>
-                <p className="text-2xl font-bold text-green-600">{growingSources}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                  <TrendingDown className="w-3.5 h-3.5" />
-                  Declining
-                </p>
-                <p className="text-2xl font-bold text-red-600">{decliningSources}</p>
+              <div>
+                <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+                  AI Assistant
+                  <Badge className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-0 text-xs">
+                    <Sparkles className="w-3 h-3 mr-1" />
+                    Powered by AI
+                  </Badge>
+                </h1>
+                <p className="text-muted-foreground">Intelligent insights and recommendations for your practice</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
+            <Zap className="w-4 h-4 text-teal-500" />
+            Real-time analysis
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Grid */}
+      {loading ? (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i} className="border-border/50">
+              <CardContent className="p-4">
+                <Skeleton className="h-4 w-24 mb-2" />
+                <Skeleton className="h-8 w-16" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {stats.map((stat, index) => (
+            <Card key={index} className="border-border/50 hover:border-teal-300/50 dark:hover:border-teal-700/50 transition-colors group">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${stat.bgColor} group-hover:scale-105 transition-transform`}>
+                    <stat.icon className={`w-4 h-4 ${stat.color}`} />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">{stat.label}</p>
+                    <p className="text-xl font-bold text-foreground">{stat.value}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 max-w-2xl">
-          <TabsTrigger value="analysis" className="flex items-center gap-2">
-            <Brain className="h-4 w-4" />
-            Analysis
-          </TabsTrigger>
-          <TabsTrigger value="chat" className="flex items-center gap-2">
-            <MessageSquare className="h-4 w-4" />
-            Chat
-          </TabsTrigger>
-          <TabsTrigger value="settings" className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            Settings
-          </TabsTrigger>
-        </TabsList>
+      {/* Tabs Section */}
+      <Card className="border-border/50">
+        <CardContent className="p-0">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <div className="border-b border-border/50 bg-muted/30 rounded-t-lg">
+              <TabsList className="h-auto p-1 bg-transparent w-full justify-start gap-1">
+                <TabsTrigger 
+                  value="analysis" 
+                  className="flex items-center gap-2 px-4 py-2.5 data-[state=active]:bg-background data-[state=active]:text-teal-600 dark:data-[state=active]:text-teal-400 data-[state=active]:shadow-sm rounded-lg"
+                >
+                  <Brain className="h-4 w-4" />
+                  <span className="hidden sm:inline">Analysis</span>
+                  <Badge variant="secondary" className="ml-1 text-xs bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300">
+                    AI
+                  </Badge>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="chat" 
+                  className="flex items-center gap-2 px-4 py-2.5 data-[state=active]:bg-background data-[state=active]:text-teal-600 dark:data-[state=active]:text-teal-400 data-[state=active]:shadow-sm rounded-lg"
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  <span className="hidden sm:inline">Chat</span>
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="settings" 
+                  className="flex items-center gap-2 px-4 py-2.5 data-[state=active]:bg-background data-[state=active]:text-teal-600 dark:data-[state=active]:text-teal-400 data-[state=active]:shadow-sm rounded-lg"
+                >
+                  <Settings className="h-4 w-4" />
+                  <span className="hidden sm:inline">Settings</span>
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
-        <TabsContent value="analysis" className="mt-6">
-          <AIAnalysisTab />
-        </TabsContent>
+            <div className="p-6">
+              <TabsContent value="analysis" className="mt-0">
+                <AIAnalysisTab />
+              </TabsContent>
 
-        <TabsContent value="chat" className="mt-6">
-          <AIChatTab />
-        </TabsContent>
+              <TabsContent value="chat" className="mt-0">
+                <AIChatTab />
+              </TabsContent>
 
-        <TabsContent value="settings" className="mt-6">
-          <AISettingsTab />
-        </TabsContent>
-      </Tabs>
+              <TabsContent value="settings" className="mt-0">
+                <AISettingsTab />
+              </TabsContent>
+            </div>
+          </Tabs>
+        </CardContent>
+      </Card>
     </div>
   );
 }
