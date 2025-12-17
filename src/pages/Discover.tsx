@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { RefreshCw, AlertCircle, Search } from 'lucide-react';
+import { RefreshCw, AlertCircle, Search, Plus, Building2, Loader2 } from 'lucide-react';
 import { DiscoveryWizard } from '@/components/DiscoveryWizard';
 import { DiscoveryResults } from '@/components/DiscoveryResults';
+import { SelectionActionBar } from '@/components/SelectionActionBar';
+import { BulkAddToNetworkDialog } from '@/components/BulkAddToNetworkDialog';
 import { calculateDistance } from '@/utils/distanceCalculation';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 interface DiscoveredOffice {
   id: string;
@@ -52,61 +55,111 @@ interface DiscoveryParams {
   requireWebsite?: boolean;
 }
 
-interface UserProfile {
-  clinic_id: string | null;
-  clinic_latitude: number | null;
-  clinic_longitude: number | null;
-}
-
 export const Discover = () => {
   const [currentSession, setCurrentSession] = useState<DiscoverySession | null>(null);
   const [discoveredOffices, setDiscoveredOffices] = useState<DiscoveredOffice[]>([]);
   const [cacheMetadata, setCacheMetadata] = useState<{ cacheAge?: number; expiresIn?: number } | null>(null);
   
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingFromDB, setIsLoadingFromDB] = useState(true);
   const [weeklyUsage, setWeeklyUsage] = useState({ used: 0, limit: 999 });
   const [canDiscover, setCanDiscover] = useState(true);
   const [nextRefreshDate, setNextRefreshDate] = useState<Date | null>(null);
   const [clinicLocation, setClinicLocation] = useState<{ lat: number; lng: number } | null>(null);
   
+  // Selection state
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showBulkAddDialog, setShowBulkAddDialog] = useState(false);
+  const [showNewSearchDialog, setShowNewSearchDialog] = useState(false);
+  
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // Load persisted discovery results on mount
+  // Load discovered offices from database on mount (results-first approach)
   useEffect(() => {
     if (user) {
       loadUserProfile();
       loadWeeklyUsage();
-      loadPersistedResults();
+      loadDiscoveredOfficesFromDB();
     }
   }, [user]);
 
-  // Persist results whenever they change
-  useEffect(() => {
-    if (currentSession && discoveredOffices.length > 0) {
-      localStorage.setItem('discovery_session', JSON.stringify(currentSession));
-      localStorage.setItem('discovered_offices', JSON.stringify(discoveredOffices));
-      if (cacheMetadata) {
-        localStorage.setItem('discovery_cache_metadata', JSON.stringify(cacheMetadata));
-      }
-    }
-  }, [currentSession, discoveredOffices, cacheMetadata]);
-
-  const loadPersistedResults = () => {
+  const loadDiscoveredOfficesFromDB = async () => {
+    if (!user) return;
+    
+    setIsLoadingFromDB(true);
     try {
-      const sessionStr = localStorage.getItem('discovery_session');
-      const officesStr = localStorage.getItem('discovered_offices');
-      const cacheStr = localStorage.getItem('discovery_cache_metadata');
-      
-      if (sessionStr && officesStr) {
-        setCurrentSession(JSON.parse(sessionStr));
-        setDiscoveredOffices(JSON.parse(officesStr));
-        if (cacheStr) {
-          setCacheMetadata(JSON.parse(cacheStr));
+      // Load discovered offices from database
+      const { data: offices, error } = await supabase
+        .from('discovered_offices')
+        .select('*')
+        .eq('discovered_by', user.id)
+        .order('fetched_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (offices && offices.length > 0) {
+        // Get clinic location for distance calculation
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('clinic_id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        let clinicLat: number | null = null;
+        let clinicLng: number | null = null;
+
+        if (profile?.clinic_id) {
+          const { data: clinic } = await supabase
+            .from('clinics')
+            .select('latitude, longitude')
+            .eq('id', profile.clinic_id)
+            .maybeSingle();
+
+          if (clinic) {
+            clinicLat = clinic.latitude;
+            clinicLng = clinic.longitude;
+            setClinicLocation({ lat: clinic.latitude!, lng: clinic.longitude! });
+          }
+        }
+
+        // Calculate distances
+        const officesWithDistance = offices.map((office: any) => {
+          const distance = office.latitude && office.longitude && clinicLat && clinicLng
+            ? calculateDistance(clinicLat, clinicLng, office.latitude, office.longitude)
+            : undefined;
+          return { ...office, distance };
+        });
+
+        setDiscoveredOffices(officesWithDistance);
+
+        // Get the most recent session info for display
+        const { data: latestSession } = await supabase
+          .from('discovery_sessions')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (latestSession) {
+          setCurrentSession({
+            id: latestSession.id,
+            search_distance: latestSession.search_distance,
+            search_lat: latestSession.search_lat,
+            search_lng: latestSession.search_lng,
+            office_type_filter: latestSession.office_type_filter || undefined,
+            zip_code_override: latestSession.zip_code_override || undefined,
+            results_count: latestSession.results_count || 0,
+            api_call_made: latestSession.api_call_made || false,
+            created_at: latestSession.created_at
+          });
         }
       }
     } catch (error) {
-      console.error('Error loading persisted discovery results:', error);
+      console.error('Error loading discovered offices from DB:', error);
+    } finally {
+      setIsLoadingFromDB(false);
     }
   };
 
@@ -143,25 +196,13 @@ export const Discover = () => {
 
   const loadWeeklyUsage = async () => {
     if (!user) return;
-
-    try {
-      // Rate limiting disabled for testing
-      setWeeklyUsage({ used: 0, limit: 999 });
-      setCanDiscover(true);
-      setNextRefreshDate(null);
-    } catch (error) {
-      console.error('Error loading weekly usage:', error);
-    }
+    setWeeklyUsage({ used: 0, limit: 999 });
+    setCanDiscover(true);
+    setNextRefreshDate(null);
   };
 
-
   const callGooglePlacesAPI = async (params: DiscoveryParams): Promise<void> => {
-    console.log('🚀 callGooglePlacesAPI: Starting with params:', params);
-    
-    if (!user || !clinicLocation) {
-      console.log('❌ callGooglePlacesAPI: Missing user or clinic location');
-      return;
-    }
+    if (!user || !clinicLocation) return;
 
     try {
       const { data: profile } = await supabase
@@ -171,7 +212,6 @@ export const Discover = () => {
         .single();
 
       if (!profile?.clinic_id) {
-        console.log('❌ callGooglePlacesAPI: No clinic_id found');
         toast({
           title: "Error",
           description: "Please set up your clinic information in Settings first.",
@@ -193,22 +233,11 @@ export const Discover = () => {
         require_website: params.requireWebsite ?? false
       };
 
-      console.log('📤 callGooglePlacesAPI: Sending request:', requestBody);
-
       const { data, error } = await supabase.functions.invoke('discover-nearby-offices', {
         body: requestBody
       });
 
-      console.log('📥 callGooglePlacesAPI: Response received:', { 
-        success: data?.success, 
-        cached: data?.cached,
-        officesCount: data?.offices?.length, 
-        error 
-      });
-
       if (error) {
-        console.error('❌ callGooglePlacesAPI: Function error:', error);
-        
         const errMsg = String((error as any)?.message || '');
         if (errMsg.includes('429') || /rate\s*limit/i.test(errMsg)) {
           toast({
@@ -229,7 +258,6 @@ export const Discover = () => {
       }
 
       if (!data?.success) {
-        console.log('❌ callGooglePlacesAPI: API call failed:', data?.error);
         if (data?.error?.includes('Weekly discovery limit')) {
           toast({
             title: "Rate Limited",
@@ -247,11 +275,9 @@ export const Discover = () => {
         return;
       }
 
-      // Success - handle both cached and new results
+      // Success
       const officesCount = data.offices?.length || 0;
-      console.log(`✅ callGooglePlacesAPI: Success! ${officesCount} offices found (cached: ${data.cached})`);
       
-      // Store cache metadata for display
       if (data.cached && data.cacheAge !== undefined && data.expiresIn !== undefined) {
         setCacheMetadata({
           cacheAge: data.cacheAge,
@@ -261,7 +287,6 @@ export const Discover = () => {
         setCacheMetadata(null);
       }
       
-      // Single unified success message
       const newCount = data.newOfficesCount || 0;
       toast({
         title: "Offices Found",
@@ -270,18 +295,15 @@ export const Discover = () => {
           : `Found ${officesCount} offices matching your criteria`,
       });
 
-      // Calculate distances for returned offices
       const officesWithDistance = (data.offices || []).map((office: any) => {
         const distance = office.latitude && office.longitude ? calculateDistance(
           clinicLocation.lat, clinicLocation.lng, office.latitude, office.longitude
         ) : undefined;
-        
         return { ...office, distance };
       });
 
       setDiscoveredOffices(officesWithDistance);
 
-      // Create a session object for display
       const session: DiscoverySession = {
         id: data.sessionId || 'temp-' + Date.now(),
         search_distance: params.distance,
@@ -295,13 +317,14 @@ export const Discover = () => {
       };
 
       setCurrentSession(session);
+      setShowNewSearchDialog(false);
       
       if (!data.cached) {
         await loadWeeklyUsage();
       }
 
     } catch (error) {
-      console.error('❌ callGooglePlacesAPI: Exception:', error);
+      console.error('Error in callGooglePlacesAPI:', error);
       toast({
         title: "Error",
         description: "Failed to discover offices. Please try again.",
@@ -311,15 +334,11 @@ export const Discover = () => {
   };
 
   const handleDiscover = async (params: DiscoveryParams, forceRefresh = false) => {
-    console.log('🎯 handleDiscover: Starting discovery with params:', params, 'forceRefresh:', forceRefresh);
     setIsLoading(true);
-    
     try {
-      // Edge function handles all caching - just call it directly
-      console.log('🚀 handleDiscover: Calling edge function (handles caching internally)');
       await callGooglePlacesAPI(params);
     } catch (error) {
-      console.error('❌ handleDiscover: Exception:', error);
+      console.error('Error in handleDiscover:', error);
       toast({
         title: "Error",
         description: "An unexpected error occurred during discovery",
@@ -346,111 +365,127 @@ export const Discover = () => {
     await handleDiscover(params, true);
   };
 
-  const handleAddToNetwork = (office: DiscoveredOffice) => {
-    // This is handled by the DiscoveryResults component
-  };
-
   const handleOfficeAdded = async () => {
-    // Refresh the current results to update imported status
-    if (currentSession && discoveredOffices.length > 0) {
-      const updatedOffices = await Promise.all(
-        discoveredOffices.map(async (office) => {
-          const { data, error } = await supabase
-            .from('discovered_offices')
-            .select('imported')
-            .eq('id', office.id)
-            .single();
-          
-          if (!error && data) {
-            return { ...office, imported: data.imported };
-          }
-          return office;
-        })
-      );
-      
-      setDiscoveredOffices(updatedOffices);
-    }
+    // Refresh from database to update imported status
+    await loadDiscoveredOfficesFromDB();
   };
 
-  const handleStartOver = () => {
-    console.log('🔄 handleStartOver: Clearing all discovery results and starting fresh');
-    setCurrentSession(null);
-    setDiscoveredOffices([]);
-    setCacheMetadata(null);
-    // Clear persisted results
-    localStorage.removeItem('discovery_session');
-    localStorage.removeItem('discovered_offices');
-    localStorage.removeItem('discovery_cache_metadata');
-  };
-
-  const handleClearCache = async () => {
-    if (!user || !currentSession) return;
+  const handleStartOver = async () => {
+    if (!user) return;
     
     try {
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('clinic_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile?.clinic_id) return;
-
-      // Delete cached offices for this search
+      // Clear discovered offices from database
       await supabase
         .from('discovered_offices')
         .delete()
-        .eq('discovered_by', user.id)
-        .eq('clinic_id', profile.clinic_id)
-        .eq('search_distance', currentSession.search_distance);
-
+        .eq('discovered_by', user.id);
+      
+      setCurrentSession(null);
+      setDiscoveredOffices([]);
+      setCacheMetadata(null);
+      setSelectedIds([]);
+      
       toast({
-        title: "Cache Cleared",
-        description: "Cached results removed. Ready for a new search.",
+        title: "Cleared",
+        description: "All discovered offices have been removed.",
       });
-
-      handleStartOver();
     } catch (error) {
-      console.error('Error clearing cache:', error);
+      console.error('Error clearing discoveries:', error);
       toast({
         title: "Error",
-        description: "Failed to clear cache",
+        description: "Failed to clear discoveries",
         variant: "destructive"
       });
     }
   };
 
+  // Selection handlers
+  const handleSelectionChange = (ids: string[]) => {
+    setSelectedIds(ids);
+  };
+
+  const handleClearSelection = () => {
+    setSelectedIds([]);
+  };
+
+  const handleBulkAdd = () => {
+    setShowBulkAddDialog(true);
+  };
+
+  const handleBulkAddComplete = async () => {
+    setShowBulkAddDialog(false);
+    setSelectedIds([]);
+    await loadDiscoveredOfficesFromDB();
+  };
+
+  const selectedOffices = discoveredOffices.filter(o => selectedIds.includes(o.id));
+  const selectedNames = selectedOffices.map(o => o.name);
+
+  // Loading state
+  if (isLoadingFromDB) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading discovered offices...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-
-
-      {/* Action Buttons */}
-      <div className="flex justify-end gap-2 mb-6">
-        {currentSession && (
-          <>
-            <Button 
-              onClick={handleForceRefresh}
-              variant="default"
-              disabled={isLoading}
-              className="flex items-center gap-2"
-            >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-              {isLoading ? 'Searching...' : 'Refresh Results'}
-            </Button>
-            <Button 
-              onClick={handleStartOver}
-              variant="outline"
-              className="flex items-center gap-2"
-            >
-              <Search className="w-4 h-4" />
-              New Search
-            </Button>
-          </>
-        )}
+      {/* Header with Actions */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Find Offices</h1>
+          <p className="text-muted-foreground">
+            {discoveredOffices.length > 0 
+              ? `${discoveredOffices.filter(o => !o.imported).length} offices available to add`
+              : 'Discover dental offices in your area'}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          {discoveredOffices.length > 0 && (
+            <>
+              <Button 
+                onClick={handleForceRefresh}
+                variant="outline"
+                disabled={isLoading}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+              <Dialog open={showNewSearchDialog} onOpenChange={setShowNewSearchDialog}>
+                <DialogTrigger asChild>
+                  <Button variant="default" className="flex items-center gap-2">
+                    <Search className="w-4 h-4" />
+                    New Search
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>New Discovery Search</DialogTitle>
+                  </DialogHeader>
+                  <DiscoveryWizard
+                    onDiscover={handleDiscover}
+                    isLoading={isLoading}
+                    weeklyUsage={weeklyUsage}
+                    canDiscover={canDiscover}
+                    nextRefreshDate={nextRefreshDate}
+                    compact
+                  />
+                </DialogContent>
+              </Dialog>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Rate Limit Notice */}
       {!canDiscover && nextRefreshDate && (
-        <Card className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800 mb-6">
+        <Card className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-amber-600" />
@@ -468,7 +503,8 @@ export const Discover = () => {
 
       {/* Main Content */}
       <div className="animate-fade-in">
-        {!currentSession ? (
+        {discoveredOffices.length === 0 ? (
+          // Show wizard for first-time users
           <DiscoveryWizard
             onDiscover={handleDiscover}
             isLoading={isLoading}
@@ -477,15 +513,39 @@ export const Discover = () => {
             nextRefreshDate={nextRefreshDate}
           />
         ) : (
+          // Show results with selection
           <DiscoveryResults
             offices={discoveredOffices}
             session={currentSession}
-            onAddToNetwork={handleAddToNetwork}
+            onAddToNetwork={() => {}}
             onOfficeAdded={handleOfficeAdded}
             isLoading={isLoading}
+            selectedIds={selectedIds}
+            onSelectionChange={handleSelectionChange}
+            onStartOver={handleStartOver}
           />
         )}
       </div>
+
+      {/* Selection Action Bar */}
+      <SelectionActionBar
+        selectedIds={selectedIds}
+        selectedNames={selectedNames}
+        onClear={handleClearSelection}
+        onEmailCampaign={() => {}}
+        onGiftCampaign={() => {}}
+        onScheduleVisits={() => {}}
+        isDiscoveredOffices
+        onBulkAdd={handleBulkAdd}
+      />
+
+      {/* Bulk Add Dialog */}
+      <BulkAddToNetworkDialog
+        open={showBulkAddDialog}
+        onOpenChange={setShowBulkAddDialog}
+        offices={selectedOffices}
+        onComplete={handleBulkAddComplete}
+      />
     </div>
   );
 };
