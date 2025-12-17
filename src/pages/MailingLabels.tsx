@@ -7,7 +7,7 @@ import { EditableCell } from '@/components/EditableCell';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Download, Search, Filter, FileSpreadsheet, MapPin, CheckCircle2, AlertCircle, Loader2, FileText, FileDown, RotateCcw, Pencil, X, Check, ArrowLeft } from 'lucide-react';
+import { Download, Search, FileSpreadsheet, MapPin, CheckCircle2, Loader2, FileText, FileDown, RotateCcw, Pencil, X, Check, ArrowLeft } from 'lucide-react';
 import { downloadLabelsPDF } from '@/utils/pdfLabelGenerator';
 import { useOffices } from '@/hooks/useOffices';
 import { useQuery } from '@tanstack/react-query';
@@ -600,178 +600,97 @@ export function MailingLabels() {
       )}
 
 
-      {/* Phase 2 & 3: Filters - Hide when specific IDs are selected */}
+      {/* Compact Filters Bar */}
       {!hasSelectedIds && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Filter className="w-5 h-5" />
-              Filter Options
-            </CardTitle>
-            <CardDescription>
-              Select which offices to include in your mailing list
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Search */}
-            <div className="space-y-2">
-              <Label htmlFor="search">Search</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="search"
-                  placeholder="Search by office name or address..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
+        <div className="flex flex-wrap items-center gap-3 p-3 bg-muted/30 rounded-lg border">
+          <div className="relative flex-1 min-w-[200px] max-w-xs">
+            <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search offices..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-8 h-9"
+            />
+          </div>
 
-            {/* Source Filter */}
-            <div className="space-y-2">
-              <Label htmlFor="source-filter">Office Source</Label>
-              <Select value={sourceFilter} onValueChange={(value: any) => setSourceFilter(value)}>
-                <SelectTrigger id="source-filter">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Offices</SelectItem>
-                  <SelectItem value="partner">Partner Offices Only</SelectItem>
-                  <SelectItem value="discovered">Discovered Offices Only</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <Select value={sourceFilter} onValueChange={(value: any) => setSourceFilter(value)}>
+            <SelectTrigger className="w-[160px] h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Offices</SelectItem>
+              <SelectItem value="partner">Partner Only</SelectItem>
+              <SelectItem value="discovered">Discovered Only</SelectItem>
+            </SelectContent>
+          </Select>
 
-
-            {/* Tier Selection (for partner offices) */}
-            {(sourceFilter === 'all' || sourceFilter === 'partner') && (
-              <div className="space-y-2">
-                <Label>Partner Office Tiers</Label>
-                <div className="flex flex-wrap gap-2">
-                  {['VIP', 'Warm', 'Cold', 'Dormant'].map(tier => (
-                    <div key={tier} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`tier-${tier}`}
-                        checked={selectedTiers.includes(tier)}
-                        onCheckedChange={() => toggleTier(tier)}
-                      />
-                      <label
-                        htmlFor={`tier-${tier}`}
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                      >
-                        {tier}
-                      </label>
-                    </div>
-                  ))}
+          {(sourceFilter === 'all' || sourceFilter === 'partner') && (
+            <div className="flex items-center gap-2">
+              {['VIP', 'Warm', 'Cold', 'Dormant'].map(tier => (
+                <div key={tier} className="flex items-center gap-1.5">
+                  <Checkbox
+                    id={`tier-${tier}`}
+                    checked={selectedTiers.includes(tier)}
+                    onCheckedChange={() => toggleTier(tier)}
+                    className="h-4 w-4"
+                  />
+                  <label htmlFor={`tier-${tier}`} className="text-xs cursor-pointer">
+                    {tier}
+                  </label>
                 </div>
-              </div>
-            )}
+              ))}
+            </div>
+          )}
 
-          {/* Include Discovered (when showing all) */}
           {sourceFilter === 'all' && (
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center gap-1.5">
               <Checkbox
                 id="include-discovered"
                 checked={includeDiscovered}
                 onCheckedChange={(checked) => setIncludeDiscovered(checked as boolean)}
+                className="h-4 w-4"
               />
-              <label
-                htmlFor="include-discovered"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-              >
-                Include discovered offices
+              <label htmlFor="include-discovered" className="text-xs cursor-pointer">
+                Include discovered
               </label>
             </div>
           )}
 
-          {/* PHASE 2: Show Parse Errors Toggle */}
-          <div className="pt-2 border-t">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="show-parse-errors"
-                checked={showParseErrors}
-                onCheckedChange={(checked) => setShowParseErrors(checked as boolean)}
-              />
-              <label
-                htmlFor="show-parse-errors"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-              >
-                Log address parsing errors to console
-              </label>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          {/* Address Correction Button */}
+          <Button
+            onClick={handleCorrectAddresses}
+            disabled={isCorrecting || hasBeenCorrected || officesLoading}
+            variant="outline"
+            size="sm"
+            className="gap-1.5 ml-auto"
+          >
+            {isCorrecting ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Correcting...
+              </>
+            ) : hasBeenCorrected ? (
+              <>
+                <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                Corrected
+              </>
+            ) : (
+              <>
+                <MapPin className="w-3.5 h-3.5" />
+                Fix Addresses
+              </>
+            )}
+          </Button>
+        </div>
       )}
 
-      {/* PHASE 3: Address Correction Tool */}
-      <Card className="border-2 border-primary/20">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MapPin className="w-5 h-5 text-primary" />
-            Address Correction Tool
-          </CardTitle>
-          <CardDescription>
-            Use Google Maps API to validate and standardize all partner office addresses (one-time use)
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {hasBeenCorrected ? (
-            <Alert>
-              <CheckCircle2 className="h-4 w-4" />
-              <AlertTitle>Correction Complete</AlertTitle>
-              <AlertDescription>
-                Addresses have been updated successfully. Refresh the page to run correction again.
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <>
-              <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-lg">
-                <AlertCircle className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                <div className="space-y-2 flex-1">
-                  <p className="text-sm font-medium">How it works:</p>
-                  <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                    <li>Sends each partner office address to Google Maps Geocoding API</li>
-                    <li>Receives standardized, validated addresses with proper formatting</li>
-                    <li>Updates your database with corrected addresses automatically</li>
-                    <li>Can only be used once per page load (refresh to run again)</li>
-                  </ul>
-                </div>
-              </div>
-
-              {isCorrecting && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span>Processing addresses...</span>
-                    <span>{Math.round(correctionProgress)}%</span>
-                  </div>
-                  <Progress value={correctionProgress} />
-                </div>
-              )}
-
-              <Button
-                onClick={handleCorrectAddresses}
-                disabled={isCorrecting || hasBeenCorrected || officesLoading}
-                className="w-full gap-2"
-                size="lg"
-              >
-                {isCorrecting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Correcting Addresses...
-                  </>
-                ) : (
-                  <>
-                    <MapPin className="w-4 h-4" />
-                    Correct All Partner Office Addresses
-                  </>
-                )}
-              </Button>
-            </>
-          )}
-        </CardContent>
-      </Card>
+      {isCorrecting && (
+        <div className="flex items-center gap-3 px-3">
+          <span className="text-sm text-muted-foreground">Processing...</span>
+          <Progress value={correctionProgress} className="flex-1 h-2" />
+          <span className="text-sm text-muted-foreground">{Math.round(correctionProgress)}%</span>
+        </div>
+      )}
 
       {/* Phase 3: Preview Table */}
       <Card>
