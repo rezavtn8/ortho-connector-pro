@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Star, Phone, Globe, MapPin, Plus,
-  Building2, Users, ArrowUpDown, Navigation, Check
+  Building2, Users, ArrowUpDown, Navigation, Check, Trash2
 } from 'lucide-react';
 import { ImportDiscoveredOfficeDialog } from '@/components/ImportDiscoveredOfficeDialog';
 
@@ -43,6 +44,9 @@ interface DiscoveryResultsProps {
   onAddToNetwork: (office: DiscoveredOffice) => void;
   onOfficeAdded: () => void;
   isLoading?: boolean;
+  selectedIds?: string[];
+  onSelectionChange?: (ids: string[]) => void;
+  onStartOver?: () => void;
 }
 
 export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
@@ -50,14 +54,17 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
   session,
   onAddToNetwork,
   onOfficeAdded,
-  isLoading = false
+  isLoading = false,
+  selectedIds = [],
+  onSelectionChange,
+  onStartOver
 }) => {
   const [sortBy, setSortBy] = useState<'distance' | 'rating' | 'name' | 'type'>('distance');
   const [selectedOffice, setSelectedOffice] = useState<DiscoveredOffice | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [showAlreadyAdded, setShowAlreadyAdded] = useState(false); // PHASE 3: Toggle for already added
+  const [showAlreadyAdded, setShowAlreadyAdded] = useState(false);
 
-  // PHASE 1: Separate offices into categories
+  // Separate offices into categories
   const newOffices = offices.filter(office => !office.imported && !office.already_in_network);
   const alreadyInNetwork = offices.filter(office => office.already_in_network || office.imported);
   const availableOffices = showAlreadyAdded ? offices : newOffices;
@@ -89,6 +96,32 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
     setShowAddDialog(false);
     onOfficeAdded();
   };
+
+  // Selection handlers
+  const handleSelectAll = () => {
+    if (onSelectionChange) {
+      const allIds = newOffices.map(o => o.id);
+      onSelectionChange(allIds);
+    }
+  };
+
+  const handleDeselectAll = () => {
+    if (onSelectionChange) {
+      onSelectionChange([]);
+    }
+  };
+
+  const handleToggleSelect = (id: string) => {
+    if (onSelectionChange) {
+      if (selectedIds.includes(id)) {
+        onSelectionChange(selectedIds.filter(i => i !== id));
+      } else {
+        onSelectionChange([...selectedIds, id]);
+      }
+    }
+  };
+
+  const isAllSelected = newOffices.length > 0 && newOffices.every(o => selectedIds.includes(o.id));
 
   const renderStars = (rating: number | null, reviewCount: number | null) => {
     if (!rating) return <span className="text-muted-foreground text-sm">No rating</span>;
@@ -154,31 +187,6 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
 
   const stats = getStats();
 
-  // PHASE 3: Intelligent recommendations
-  const getRecommendations = () => {
-    const recommendations = [];
-    
-    if (stats.newCount < 10 && session && session.search_distance < 25) {
-      recommendations.push({
-        icon: '🎯',
-        message: `Try expanding radius to ${session.search_distance + 10} miles`,
-        action: 'expand_radius'
-      });
-    }
-    
-    if (stats.newCount === 0 && stats.alreadyAddedCount > 0) {
-      recommendations.push({
-        icon: '✨',
-        message: 'All discovered offices are already in your network',
-        action: 'show_added'
-      });
-    }
-    
-    return recommendations;
-  };
-
-  const recommendations = getRecommendations();
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -196,9 +204,9 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
         <div className="space-y-4">
           <Building2 className="w-12 h-12 text-muted-foreground mx-auto" />
           <div>
-            <h3 className="text-lg font-semibold">No Discovery Session</h3>
+            <h3 className="text-lg font-semibold">No Discoveries Yet</h3>
             <p className="text-muted-foreground">
-              Use the Discovery Assistant above to find dental offices in your area
+              Use the Discovery Assistant to find dental offices in your area
             </p>
           </div>
         </div>
@@ -208,15 +216,15 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Clean Summary Header */}
+      {/* Summary Header */}
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
-              <h3 className="font-semibold text-lg">{stats.newCount} Offices Found</h3>
+              <h3 className="font-semibold text-lg">{stats.newCount} Offices Available</h3>
               <p className="text-sm text-muted-foreground">{getSearchParametersText()}</p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <div className="text-right">
                 <p className="text-xs text-muted-foreground">High Rated (4.0+)</p>
                 <p className="text-lg font-bold">{stats.highRated}</p>
@@ -232,6 +240,17 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
                   onClick={() => setShowAlreadyAdded(!showAlreadyAdded)}
                 >
                   {showAlreadyAdded ? 'Hide' : 'Show'} In Network ({stats.alreadyAddedCount})
+                </Button>
+              )}
+              {onStartOver && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onStartOver}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Clear All
                 </Button>
               )}
             </div>
@@ -253,9 +272,26 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
         </Card>
       ) : (
         <>
-          {/* Controls */}
-          <div className="flex items-center justify-between">
+          {/* Controls with Selection */}
+          <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
+              {/* Selection controls */}
+              {onSelectionChange && (
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    checked={isAllSelected}
+                    onCheckedChange={(checked) => {
+                      if (checked) handleSelectAll();
+                      else handleDeselectAll();
+                    }}
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    {selectedIds.length > 0 ? `${selectedIds.length} selected` : 'Select all'}
+                  </span>
+                </div>
+              )}
+              
+              {/* Sort control */}
               <div className="flex items-center gap-2">
                 <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
                 <select
@@ -272,100 +308,118 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
             </div>
 
             <div className="text-sm text-muted-foreground">
-              Showing {availableOffices.length} offices • Sorted by {sortBy}
+              Showing {availableOffices.length} offices
             </div>
           </div>
 
           {/* Grid Results Display */}
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-            {sortedOffices.map((office) => (
-              <Card key={office.id} className={`hover:shadow-lg transition-shadow ${
-                office.already_in_network || office.imported ? 'opacity-60 border-blue-300 dark:border-blue-800' : ''
-              }`}>
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="text-lg leading-tight">{office.name}</CardTitle>
-                      <div className="flex items-center gap-2 mt-2 flex-wrap">
-                        <Badge variant="outline" className="text-xs">
-                          {office.office_type}
-                        </Badge>
-                        {office.distance && (
-                          <Badge variant="secondary" className="text-xs">
-                            {office.distance.toFixed(1)} mi
+            {sortedOffices.map((office) => {
+              const isSelected = selectedIds.includes(office.id);
+              const isInNetwork = office.already_in_network || office.imported;
+              
+              return (
+                <Card 
+                  key={office.id} 
+                  className={`hover:shadow-lg transition-all ${
+                    isInNetwork ? 'opacity-60 border-blue-300 dark:border-blue-800' : ''
+                  } ${isSelected ? 'ring-2 ring-primary border-primary' : ''}`}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start gap-3">
+                      {/* Checkbox */}
+                      {onSelectionChange && !isInNetwork && (
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => handleToggleSelect(office.id)}
+                          className="mt-1"
+                        />
+                      )}
+                      
+                      <div className="flex-1">
+                        <CardTitle className="text-lg leading-tight">{office.name}</CardTitle>
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          <Badge variant="outline" className="text-xs">
+                            {office.office_type}
                           </Badge>
-                        )}
-                        {(office.already_in_network || office.imported) && (
-                          <Badge className="bg-blue-500 text-white text-xs">
-                            ✓ In Network
-                          </Badge>
-                        )}
+                          {office.distance && (
+                            <Badge variant="secondary" className="text-xs">
+                              {office.distance.toFixed(1)} mi
+                            </Badge>
+                          )}
+                          {isInNetwork && (
+                            <Badge className="bg-blue-500 text-white text-xs">
+                              ✓ In Network
+                            </Badge>
+                          )}
+                        </div>
                       </div>
+                      
+                      {(office.google_rating || 0) >= 4.5 && (
+                        <Badge className="bg-yellow-500 text-white shrink-0">
+                          ⭐ Top Rated
+                        </Badge>
+                      )}
                     </div>
-                    {(office.google_rating || 0) >= 4.5 && (
-                      <Badge className="bg-yellow-500 text-white">
-                        ⭐ Top Rated
-                      </Badge>
+                  </CardHeader>
+
+                  <CardContent className="space-y-3">
+                    {office.google_rating && renderStars(office.google_rating, office.user_ratings_total)}
+
+                    {office.address && (
+                      <div className="flex items-start gap-2 text-sm">
+                        <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                        <span className="text-muted-foreground">{office.address}</span>
+                      </div>
                     )}
-                  </div>
-                </CardHeader>
 
-                <CardContent className="space-y-3">
-                  {office.google_rating && renderStars(office.google_rating, office.user_ratings_total)}
-
-                  {office.address && (
-                    <div className="flex items-start gap-2 text-sm">
-                      <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                      <span className="text-muted-foreground">{office.address}</span>
+                    <div className="flex items-center gap-2">
+                      {office.phone && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => window.open(`tel:${office.phone}`, '_self')}
+                        >
+                          <Phone className="w-4 h-4 mr-1" />
+                          Call
+                        </Button>
+                      )}
+                      {office.website && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => window.open(office.website!, '_blank')}
+                        >
+                          <Globe className="w-4 h-4 mr-1" />
+                          Visit
+                        </Button>
+                      )}
                     </div>
-                  )}
 
-                  <div className="flex items-center gap-2">
-                    {office.phone && (
+                    {!isInNetwork ? (
                       <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => window.open(`tel:${office.phone}`, '_self')}
+                        onClick={() => handleAddToNetwork(office)}
+                        className="w-full"
                       >
-                        <Phone className="w-4 h-4 mr-1" />
-                        Call
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add to Network
+                      </Button>
+                    ) : (
+                      <Button
+                        disabled
+                        variant="outline"
+                        className="w-full"
+                      >
+                        <Check className="w-4 h-4 mr-2" />
+                        Already Added
                       </Button>
                     )}
-                    {office.website && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => window.open(office.website!, '_blank')}
-                      >
-                        <Globe className="w-4 h-4 mr-1" />
-                        Visit
-                      </Button>
-                    )}
-                  </div>
-
-                  {!(office.already_in_network || office.imported) ? (
-                    <Button
-                      onClick={() => handleAddToNetwork(office)}
-                      className="w-full bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-600/90"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add to Network
-                    </Button>
-                  ) : (
-                    <Button
-                      disabled
-                      variant="outline"
-                      className="w-full"
-                    >
-                      <Check className="w-4 h-4 mr-2" />
-                      Already Added
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </>
       )}

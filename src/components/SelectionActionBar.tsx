@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Mail, Gift, Printer, MapPin, Tag, Calendar, MoreHorizontal } from 'lucide-react';
+import { X, Mail, Gift, Printer, MapPin, Tag, Calendar, MoreHorizontal, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -19,6 +19,8 @@ interface SelectionActionBarProps {
   onEmailCampaign?: () => void;
   onGiftCampaign?: () => void;
   onScheduleVisits?: () => void;
+  isDiscoveredOffices?: boolean;
+  onBulkAdd?: () => void;
 }
 
 export function SelectionActionBar({
@@ -28,18 +30,29 @@ export function SelectionActionBar({
   onEmailCampaign,
   onGiftCampaign,
   onScheduleVisits,
+  isDiscoveredOffices = false,
+  onBulkAdd,
 }: SelectionActionBarProps) {
   const navigate = useNavigate();
   const [isTagDialogOpen, setIsTagDialogOpen] = useState(false);
 
   const handlePrintLabels = () => {
     const idsParam = selectedIds.join(',');
-    navigate(`/mailing-labels?ids=${idsParam}`);
+    // Use discovered=true param for discovered offices
+    if (isDiscoveredOffices) {
+      navigate(`/mailing-labels?discovered=true&ids=${idsParam}`);
+    } else {
+      navigate(`/mailing-labels?ids=${idsParam}`);
+    }
   };
 
   const handleViewOnMap = () => {
     const idsParam = selectedIds.join(',');
-    navigate(`/map-view?ids=${idsParam}`);
+    if (isDiscoveredOffices) {
+      navigate(`/map-view?discovered=true&ids=${idsParam}`);
+    } else {
+      navigate(`/map-view?ids=${idsParam}`);
+    }
   };
 
   if (selectedIds.length === 0) return null;
@@ -60,73 +73,111 @@ export function SelectionActionBar({
             
             <div className="w-px h-6 bg-primary-foreground/30 mx-2" />
 
-            {/* Primary Actions */}
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={onEmailCampaign}
-              className="gap-2"
-            >
-              <Mail className="h-4 w-4" />
-              <span className="hidden sm:inline">Email</span>
-            </Button>
-
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={onGiftCampaign}
-              className="gap-2"
-            >
-              <Gift className="h-4 w-4" />
-              <span className="hidden sm:inline">Gift</span>
-            </Button>
-
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handlePrintLabels}
-              className="gap-2"
-            >
-              <Printer className="h-4 w-4" />
-              <span className="hidden sm:inline">Labels</span>
-            </Button>
-
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setIsTagDialogOpen(true)}
-              className="gap-2"
-            >
-              <Tag className="h-4 w-4" />
-              <span className="hidden sm:inline">Tag</span>
-            </Button>
-
-            {/* More Actions Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="secondary" size="sm" className="px-2">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleViewOnMap}>
-                  <MapPin className="h-4 w-4 mr-2" />
-                  View on Map
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={onScheduleVisits}>
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Schedule Visits
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  onClick={onClear}
-                  className="text-destructive focus:text-destructive"
+            {/* Primary Actions - Different for discovered vs network offices */}
+            {isDiscoveredOffices ? (
+              <>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={onBulkAdd}
+                  className="gap-2"
                 >
-                  <X className="h-4 w-4 mr-2" />
-                  Clear Selection
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline">Add to Network</span>
+                </Button>
+
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handlePrintLabels}
+                  className="gap-2"
+                >
+                  <Printer className="h-4 w-4" />
+                  <span className="hidden sm:inline">Labels</span>
+                </Button>
+
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleViewOnMap}
+                  className="gap-2"
+                >
+                  <MapPin className="h-4 w-4" />
+                  <span className="hidden sm:inline">Map</span>
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={onEmailCampaign}
+                  className="gap-2"
+                >
+                  <Mail className="h-4 w-4" />
+                  <span className="hidden sm:inline">Email</span>
+                </Button>
+
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={onGiftCampaign}
+                  className="gap-2"
+                >
+                  <Gift className="h-4 w-4" />
+                  <span className="hidden sm:inline">Gift</span>
+                </Button>
+
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handlePrintLabels}
+                  className="gap-2"
+                >
+                  <Printer className="h-4 w-4" />
+                  <span className="hidden sm:inline">Labels</span>
+                </Button>
+
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setIsTagDialogOpen(true)}
+                  className="gap-2"
+                >
+                  <Tag className="h-4 w-4" />
+                  <span className="hidden sm:inline">Tag</span>
+                </Button>
+              </>
+            )}
+
+            {/* More Actions Dropdown - Only for network offices */}
+            {!isDiscoveredOffices && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="secondary" size="sm" className="px-2">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleViewOnMap}>
+                    <MapPin className="h-4 w-4 mr-2" />
+                    View on Map
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={onScheduleVisits}>
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Schedule Visits
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={onClear}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Clear Selection
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
 
             {/* Close button */}
             <button

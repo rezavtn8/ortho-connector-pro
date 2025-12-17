@@ -192,12 +192,15 @@ export type LabelNameFormat = 'office' | 'contact';
 export function MailingLabels() {
   const [searchParams] = useSearchParams();
   const selectedIds = searchParams.get('ids')?.split(',').filter(Boolean) || [];
+  const isDiscoveredSource = searchParams.get('discovered') === 'true';
   const hasSelectedIds = selectedIds.length > 0;
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTiers, setSelectedTiers] = useState<string[]>(['VIP', 'Warm', 'Cold', 'Dormant']);
-  const [includeDiscovered, setIncludeDiscovered] = useState(false);
-  const [sourceFilter, setSourceFilter] = useState<'all' | 'partner' | 'discovered'>('all');
+  const [includeDiscovered, setIncludeDiscovered] = useState(isDiscoveredSource);
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'partner' | 'discovered'>(
+    isDiscoveredSource && hasSelectedIds ? 'discovered' : 'all'
+  );
   const [showParseErrors, setShowParseErrors] = useState(false);
   const [labelNameFormat, setLabelNameFormat] = useState<LabelNameFormat>('office');
   
@@ -211,8 +214,12 @@ export function MailingLabels() {
 
   const { data: offices = [], isLoading: officesLoading } = useOffices();
   
+  // Enable discovered offices query when:
+  // 1. User wants to include discovered offices
+  // 2. Source filter is 'discovered'
+  // 3. URL params indicate discovered offices (discovered=true)
   const { data: discoveredOffices = [], isLoading: discoveredLoading } = useQuery({
-    queryKey: ['discovered-offices'],
+    queryKey: ['discovered-offices-for-labels'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('discovered_offices')
@@ -222,7 +229,7 @@ export function MailingLabels() {
       if (error) throw error;
       return data || [];
     },
-    enabled: includeDiscovered || sourceFilter === 'discovered',
+    enabled: includeDiscovered || sourceFilter === 'discovered' || isDiscoveredSource,
   });
 
   // Phase 2: Filtering Logic + Error Detection
@@ -265,34 +272,41 @@ export function MailingLabels() {
       results = [...results, ...partnerOffices];
     }
 
-    // Filter discovered offices (only if no specific IDs)
-    if (!hasSelectedIds && (sourceFilter === 'all' || sourceFilter === 'discovered')) {
-      if (includeDiscovered || sourceFilter === 'discovered') {
-        const discovered = discoveredOffices
-          .filter(office => {
-            const matchesSearch = searchTerm === '' || 
-              office.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-              (office.address?.toLowerCase().includes(searchTerm.toLowerCase()));
-            
-            return matchesSearch;
-          })
-          .map(office => {
-            const parsed = parseAddress(office.address);
-            
-            // Detect potential parsing errors
-            if (!parsed.city || !parsed.state || !parsed.zip) {
-              errors.push(`${office.name}: Missing city/state/zip - "${office.address}"`);
-            }
-            
-            return {
-              officeName: office.name,
-              contactName: extractContactName(office.name),
-              ...parsed,
-            };
-          });
-        
-        results = [...results, ...discovered];
-      }
+    // Filter discovered offices
+    // Include when: URL has discovered=true with IDs, OR user enabled discovered filter
+    const shouldIncludeDiscovered = (isDiscoveredSource && hasSelectedIds) || 
+      (!hasSelectedIds && (sourceFilter === 'all' || sourceFilter === 'discovered') && (includeDiscovered || sourceFilter === 'discovered'));
+    
+    if (shouldIncludeDiscovered) {
+      const discovered = discoveredOffices
+        .filter(office => {
+          // If we have specific IDs from URL with discovered=true, filter by those
+          if (isDiscoveredSource && hasSelectedIds) {
+            return selectedIds.includes(office.id);
+          }
+          
+          const matchesSearch = searchTerm === '' || 
+            office.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (office.address?.toLowerCase().includes(searchTerm.toLowerCase()));
+          
+          return matchesSearch;
+        })
+        .map(office => {
+          const parsed = parseAddress(office.address);
+          
+          // Detect potential parsing errors
+          if (!parsed.city || !parsed.state || !parsed.zip) {
+            errors.push(`${office.name}: Missing city/state/zip - "${office.address}"`);
+          }
+          
+          return {
+            officeName: office.name,
+            contactName: extractContactName(office.name),
+            ...parsed,
+          };
+        });
+      
+      results = [...results, ...discovered];
     }
 
     // Log errors if any
@@ -301,7 +315,7 @@ export function MailingLabels() {
     }
 
     return results;
-  }, [offices, discoveredOffices, selectedTiers, includeDiscovered, searchTerm, sourceFilter, showParseErrors, hasSelectedIds, selectedIds]);
+  }, [offices, discoveredOffices, selectedTiers, includeDiscovered, searchTerm, sourceFilter, showParseErrors, hasSelectedIds, selectedIds, isDiscoveredSource]);
 
   // Editable data state - syncs with filtered data but allows edits
   const [editableData, setEditableData] = useState<MailingLabelData[]>([]);

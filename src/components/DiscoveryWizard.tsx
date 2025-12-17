@@ -21,7 +21,8 @@ interface DiscoveryWizardProps {
   isLoading: boolean;
   weeklyUsage: { used: number; limit: number };
   canDiscover: boolean;
-  nextRefreshDate?: Date;
+  nextRefreshDate?: Date | null;
+  compact?: boolean;
 }
 
 const DISTANCE_OPTIONS = [
@@ -64,7 +65,8 @@ export const DiscoveryWizard: React.FC<DiscoveryWizardProps> = ({
   isLoading,
   weeklyUsage,
   canDiscover,
-  nextRefreshDate
+  nextRefreshDate,
+  compact = false
 }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [params, setParams] = useState<DiscoveryParams>({
