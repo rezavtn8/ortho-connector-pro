@@ -418,6 +418,35 @@ export const Discover = () => {
     await loadDiscoveredOfficesFromDB();
   };
 
+  const handleRemoveSelected = async () => {
+    if (!user || selectedIds.length === 0) return;
+
+    try {
+      const { error } = await supabase
+        .from('discovered_offices')
+        .delete()
+        .in('id', selectedIds)
+        .eq('discovered_by', user.id);
+
+      if (error) throw error;
+
+      setDiscoveredOffices(prev => prev.filter(o => !selectedIds.includes(o.id)));
+      setSelectedIds([]);
+      
+      toast({
+        title: "Removed",
+        description: `${selectedIds.length} office(s) removed from discoveries`,
+      });
+    } catch (error) {
+      console.error('Error removing offices:', error);
+      toast({
+        title: "Error",
+        description: "Failed to remove offices",
+        variant: "destructive"
+      });
+    }
+  };
+
   const selectedOffices = discoveredOffices.filter(o => selectedIds.includes(o.id));
   const selectedNames = selectedOffices.map(o => o.name);
 
@@ -537,6 +566,7 @@ export const Discover = () => {
         onScheduleVisits={() => {}}
         isDiscoveredOffices
         onBulkAdd={handleBulkAdd}
+        onRemove={handleRemoveSelected}
       />
 
       {/* Bulk Add Dialog */}
