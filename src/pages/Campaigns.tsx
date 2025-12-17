@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
@@ -13,7 +13,6 @@ import { EmailExecutionDialog } from '@/components/campaign/EmailExecutionDialog
 import { GiftDeliveryDialog } from '@/components/campaign/GiftDeliveryDialog';
 import { ResilientErrorBoundary } from '@/components/ResilientErrorBoundary';
 import { 
-  Megaphone, 
   Loader2,
   AlertCircle,
   WifiOff,
@@ -21,10 +20,18 @@ import {
   Mail,
   Gift,
   Package,
-  Sparkles
+  Plus,
+  Send,
+  CheckCircle2,
+  Clock,
+  Target,
+  TrendingUp,
+  Users,
+  ArrowRight
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Campaign {
   id: string;
@@ -46,18 +53,12 @@ function CampaignsContent() {
   const { user } = useAuth();
   const { toast } = useToast();
   
-  // State for campaign creators
   const [showEmailCreator, setShowEmailCreator] = useState(false);
   const [showGiftCreator, setShowGiftCreator] = useState(false);
-  
-  // State for detail dialogs
   const [showEmailDetail, setShowEmailDetail] = useState(false);
   const [showGiftDetail, setShowGiftDetail] = useState(false);
-  
-  // State for execution dialogs
   const [showEmailExecution, setShowEmailExecution] = useState(false);
   const [showGiftDelivery, setShowGiftDelivery] = useState(false);
-  
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
 
   const { data: campaigns, isLoading, error, refetch, isOffline } = useResilientQuery({
@@ -70,12 +71,10 @@ function CampaignsContent() {
 
       if (campaignsError) throw campaignsError;
 
-      // Fetch campaign deliveries to get tier information
       const { data: deliveriesData } = await supabase
         .from('campaign_deliveries')
         .select('campaign_id, referral_tier');
 
-      // Group deliveries by campaign
       const deliveriesByCampaign = deliveriesData?.reduce((acc: any, delivery: any) => {
         if (!acc[delivery.campaign_id]) {
           acc[delivery.campaign_id] = { tiers: new Set(), count: 0 };
@@ -87,7 +86,6 @@ function CampaignsContent() {
         return acc;
       }, {});
 
-      // Add tier information to campaigns
       const enrichedCampaigns = campaignsData?.map((campaign: any) => {
         const deliveryInfo = deliveriesByCampaign?.[campaign.id];
         return {
@@ -99,20 +97,21 @@ function CampaignsContent() {
 
       return enrichedCampaigns || [];
     },
-    refetchInterval: 30000, // Auto-refresh every 30 seconds
+    refetchInterval: 30000,
     fallbackData: [],
     retryMessage: 'Refreshing campaigns...'
   });
 
   const emailCampaigns = campaigns?.filter((c: Campaign) => c.delivery_method === 'email') || [];
   const giftCampaigns = campaigns?.filter((c: Campaign) => c.delivery_method === 'physical') || [];
-  const otherCampaigns = campaigns?.filter((c: Campaign) => 
-    c.delivery_method !== 'email' && c.delivery_method !== 'physical'
-  ) || [];
+  
+  // Stats calculations
+  const totalCampaigns = campaigns?.length || 0;
+  const activeCampaigns = campaigns?.filter((c: Campaign) => c.status === 'active' || c.status === 'draft').length || 0;
+  const completedCampaigns = campaigns?.filter((c: Campaign) => c.status === 'completed').length || 0;
+  const totalOfficesReached = campaigns?.reduce((sum: number, c: Campaign) => sum + (c.office_count || 0), 0) || 0;
 
-  const handleCampaignUpdated = () => {
-    refetch();
-  };
+  const handleCampaignUpdated = () => refetch();
 
   const handleViewEmailDetails = (campaign: Campaign) => {
     setSelectedCampaign(campaign);
@@ -144,70 +143,84 @@ function CampaignsContent() {
     setShowGiftDelivery(true);
   };
 
+  const getStatusBadge = (status: string, variant: 'email' | 'gift') => {
+    const baseClasses = variant === 'email' 
+      ? "bg-primary/10 text-primary border-primary/20"
+      : "bg-amber-500/10 text-amber-600 border-amber-500/20";
+    
+    const statusIcon = status === 'completed' ? (
+      <CheckCircle2 className="w-3 h-3" />
+    ) : status === 'active' ? (
+      <Send className="w-3 h-3" />
+    ) : (
+      <Clock className="w-3 h-3" />
+    );
+
+    return (
+      <Badge variant="outline" className={`${baseClasses} gap-1 capitalize`}>
+        {statusIcon}
+        {status}
+      </Badge>
+    );
+  };
+
   const renderEmailCampaignCard = (campaign: Campaign) => (
-    <Card key={campaign.id} className="hover:shadow-md transition-shadow border-primary/20 cursor-pointer" onClick={() => handleExecuteEmail(campaign)}>
-      <CardHeader>
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Mail className="w-5 h-5 text-primary" />
-              {campaign.name}
+    <Card 
+      key={campaign.id} 
+      className="group hover:shadow-lg transition-all duration-200 border-border/50 hover:border-primary/30 cursor-pointer overflow-hidden"
+      onClick={() => handleExecuteEmail(campaign)}
+    >
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+      <CardHeader className="relative pb-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <CardTitle className="text-base font-semibold flex items-center gap-2 truncate">
+              <div className="p-1.5 bg-primary/10 rounded-md shrink-0">
+                <Mail className="w-4 h-4 text-primary" />
+              </div>
+              <span className="truncate">{campaign.name}</span>
             </CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">
-              {campaign.campaign_type}
-            </p>
-            {campaign.office_count !== undefined && campaign.office_count > 0 && (
-              <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <span className="text-xs text-muted-foreground">
-                  {campaign.office_count} {campaign.office_count === 1 ? 'office' : 'offices'}
-                </span>
-                {campaign.office_tiers && campaign.office_tiers.length > 0 && (
-                  <>
-                    <span className="text-xs text-muted-foreground">•</span>
-                    <div className="flex gap-1 flex-wrap">
-                      {campaign.office_tiers.map((tier) => (
-                        <Badge 
-                          key={tier} 
-                          variant="secondary" 
-                          className="text-xs"
-                        >
-                          {tier}
-                        </Badge>
-                      ))}
-                    </div>
-                  </>
+            <p className="text-sm text-muted-foreground mt-1.5">{campaign.campaign_type}</p>
+          </div>
+          {getStatusBadge(campaign.status, 'email')}
+        </div>
+      </CardHeader>
+      <CardContent className="relative pt-0">
+        {campaign.office_count !== undefined && campaign.office_count > 0 && (
+          <div className="flex items-center gap-3 mb-3 text-sm">
+            <div className="flex items-center gap-1.5 text-muted-foreground">
+              <Users className="w-3.5 h-3.5" />
+              <span>{campaign.office_count} offices</span>
+            </div>
+            {campaign.office_tiers && campaign.office_tiers.length > 0 && (
+              <div className="flex gap-1 flex-wrap">
+                {campaign.office_tiers.slice(0, 3).map((tier) => (
+                  <Badge key={tier} variant="secondary" className="text-xs px-1.5 py-0">
+                    {tier}
+                  </Badge>
+                ))}
+                {campaign.office_tiers.length > 3 && (
+                  <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                    +{campaign.office_tiers.length - 3}
+                  </Badge>
                 )}
               </div>
             )}
           </div>
-          <Badge 
-            variant="outline"
-            className="bg-primary/5 text-primary border-primary/20"
-          >
-            {campaign.status}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {campaign.notes && (
-          <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-            {campaign.notes}
-          </p>
         )}
-        <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleViewEmailDetails(campaign)}
-          >
-            View Details
+        {campaign.notes && (
+          <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{campaign.notes}</p>
+        )}
+        <div className="flex gap-2 pt-2 border-t border-border/50" onClick={(e) => e.stopPropagation()}>
+          <Button variant="ghost" size="sm" className="text-xs h-8" onClick={() => handleViewEmailDetails(campaign)}>
+            Details
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleEditEmailCampaign(campaign)}
-          >
+          <Button variant="ghost" size="sm" className="text-xs h-8" onClick={() => handleEditEmailCampaign(campaign)}>
             Edit
+          </Button>
+          <Button variant="default" size="sm" className="text-xs h-8 ml-auto gap-1" onClick={() => handleExecuteEmail(campaign)}>
+            Execute
+            <ArrowRight className="w-3 h-3" />
           </Button>
         </div>
       </CardContent>
@@ -215,80 +228,64 @@ function CampaignsContent() {
   );
 
   const renderGiftCampaignCard = (campaign: Campaign) => (
-    <Card key={campaign.id} className="hover:shadow-md transition-shadow border-amber-200 cursor-pointer" onClick={() => handleManageGiftDelivery(campaign)}>
-      <CardHeader>
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Gift className="w-5 h-5 text-amber-600" />
-              {campaign.name}
-            </CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">
-              {campaign.campaign_type}
-            </p>
-            {campaign.planned_delivery_date && (
-              <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                <Calendar className="w-3 h-3" />
-                {format(new Date(campaign.planned_delivery_date), 'MMM dd, yyyy')}
-              </p>
-            )}
-            {campaign.office_count !== undefined && campaign.office_count > 0 && (
-              <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <span className="text-xs text-muted-foreground">
-                  {campaign.office_count} {campaign.office_count === 1 ? 'office' : 'offices'}
-                </span>
-                {campaign.office_tiers && campaign.office_tiers.length > 0 && (
-                  <>
-                    <span className="text-xs text-muted-foreground">•</span>
-                    <div className="flex gap-1 flex-wrap">
-                      {campaign.office_tiers.map((tier) => (
-                        <Badge 
-                          key={tier} 
-                          variant="secondary" 
-                          className="text-xs"
-                        >
-                          {tier}
-                        </Badge>
-                      ))}
-                    </div>
-                  </>
-                )}
+    <Card 
+      key={campaign.id} 
+      className="group hover:shadow-lg transition-all duration-200 border-border/50 hover:border-amber-500/30 cursor-pointer overflow-hidden"
+      onClick={() => handleManageGiftDelivery(campaign)}
+    >
+      <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+      <CardHeader className="relative pb-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <CardTitle className="text-base font-semibold flex items-center gap-2 truncate">
+              <div className="p-1.5 bg-amber-500/10 rounded-md shrink-0">
+                <Gift className="w-4 h-4 text-amber-600" />
               </div>
-            )}
+              <span className="truncate">{campaign.name}</span>
+            </CardTitle>
+            <p className="text-sm text-muted-foreground mt-1.5">{campaign.campaign_type}</p>
           </div>
-          <Badge 
-            variant="outline"
-            className="bg-amber-50 text-amber-700 border-amber-200"
-          >
-            {campaign.status}
-          </Badge>
+          {getStatusBadge(campaign.status, 'gift')}
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="relative pt-0">
+        <div className="flex flex-wrap items-center gap-3 mb-3 text-sm">
+          {campaign.planned_delivery_date && (
+            <div className="flex items-center gap-1.5 text-muted-foreground">
+              <Calendar className="w-3.5 h-3.5" />
+              <span>{format(new Date(campaign.planned_delivery_date), 'MMM dd, yyyy')}</span>
+            </div>
+          )}
+          {campaign.office_count !== undefined && campaign.office_count > 0 && (
+            <div className="flex items-center gap-1.5 text-muted-foreground">
+              <Users className="w-3.5 h-3.5" />
+              <span>{campaign.office_count} offices</span>
+            </div>
+          )}
+        </div>
         {campaign.selected_gift_bundle && (
-          <p className="text-sm font-medium text-amber-800 mb-2">
-            Gift: {campaign.selected_gift_bundle.name}
-          </p>
+          <div className="flex items-center gap-2 mb-3 p-2 bg-amber-500/5 rounded-md">
+            <Package className="w-4 h-4 text-amber-600" />
+            <span className="text-sm font-medium text-amber-700 dark:text-amber-400">{campaign.selected_gift_bundle.name}</span>
+          </div>
         )}
         {campaign.notes && (
-          <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-            {campaign.notes}
-          </p>
+          <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{campaign.notes}</p>
         )}
-        <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleViewGiftDetails(campaign)}
-          >
-            View Details
+        <div className="flex gap-2 pt-2 border-t border-border/50" onClick={(e) => e.stopPropagation()}>
+          <Button variant="ghost" size="sm" className="text-xs h-8" onClick={() => handleViewGiftDetails(campaign)}>
+            Details
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleEditGiftCampaign(campaign)}
-          >
+          <Button variant="ghost" size="sm" className="text-xs h-8" onClick={() => handleEditGiftCampaign(campaign)}>
             Edit
+          </Button>
+          <Button 
+            size="sm" 
+            className="text-xs h-8 ml-auto gap-1 bg-amber-600 hover:bg-amber-700 text-white"
+            onClick={() => handleManageGiftDelivery(campaign)}
+          >
+            Manage
+            <ArrowRight className="w-3 h-3" />
           </Button>
         </div>
       </CardContent>
@@ -298,17 +295,32 @@ function CampaignsContent() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="flex flex-col space-y-3 mb-8">
-          <div className="flex items-center gap-3">
-            <Megaphone className="h-8 w-8 title-icon" />
-            <h1 className="text-4xl font-bold page-title">Campaigns</h1>
-          </div>
-          <p className="text-muted-foreground text-lg">
-            Loading your campaigns...
-          </p>
+        {/* Stats Skeleton */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-4">
+                <Skeleton className="h-4 w-24 mb-2" />
+                <Skeleton className="h-8 w-16" />
+              </CardContent>
+            </Card>
+          ))}
         </div>
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin" />
+        
+        {/* Section Skeleton */}
+        <div className="space-y-4">
+          <Skeleton className="h-16 w-full rounded-lg" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[...Array(3)].map((_, i) => (
+              <Card key={i}>
+                <CardContent className="p-6">
+                  <Skeleton className="h-5 w-3/4 mb-3" />
+                  <Skeleton className="h-4 w-1/2 mb-4" />
+                  <Skeleton className="h-8 w-full" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -316,31 +328,22 @@ function CampaignsContent() {
 
   if (error && !campaigns?.length) {
     return (
-      <div className="space-y-6">
-        <div className="flex flex-col space-y-3 mb-8">
-          <div className="flex items-center gap-3">
-            <Megaphone className="h-8 w-8 title-icon" />
-            <h1 className="text-4xl font-bold page-title">Campaigns</h1>
-          </div>
-        </div>
-        
-        <Card className="max-w-md mx-auto">
-          <CardHeader className="text-center">
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Card className="max-w-md w-full">
+          <CardContent className="text-center py-8">
             <div className="mx-auto mb-4 w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center">
               {isOffline ? <WifiOff className="w-6 h-6 text-destructive" /> : <AlertCircle className="w-6 h-6 text-destructive" />}
             </div>
-            <CardTitle>
-              {isOffline ? 'You\'re Offline' : 'Failed to Load Campaigns'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-center space-y-4">
-            <p className="text-muted-foreground">
+            <h3 className="font-semibold text-lg mb-2">
+              {isOffline ? "You're Offline" : 'Failed to Load Campaigns'}
+            </h3>
+            <p className="text-muted-foreground text-sm mb-4">
               {isOffline 
-                ? 'Campaigns are not available while offline. Please reconnect to view your campaigns.'
-                : 'Unable to load your campaigns. Please check your connection and try again.'
+                ? 'Campaigns are not available while offline.'
+                : 'Unable to load your campaigns. Please try again.'
               }
             </p>
-            <Button onClick={() => refetch()} disabled={isOffline} className="gap-2">
+            <Button onClick={() => refetch()} disabled={isOffline} variant="outline" className="gap-2">
               <Loader2 className="h-4 w-4" />
               Try Again
             </Button>
@@ -352,119 +355,169 @@ function CampaignsContent() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col space-y-3 mb-8">
-        <div className="flex items-center gap-3">
-          <Megaphone className="h-8 w-8 title-icon" />
-          <h1 className="text-4xl font-bold page-title">Campaigns</h1>
-        </div>
-        <p className="text-muted-foreground text-lg">
-          Create AI-powered campaigns and manage your outreach efforts
-        </p>
-      </div>
-
-      {/* Offline indicator */}
+      {/* Offline Indicator */}
       {isOffline && (
-        <Card className="border-orange-200 bg-orange-50">
+        <Card className="border-warning/50 bg-warning/5">
           <CardContent className="flex items-center gap-3 p-4">
-            <WifiOff className="h-5 w-5 text-orange-600" />
+            <WifiOff className="h-5 w-5 text-warning" />
             <div>
-              <p className="font-medium text-orange-900">You're currently offline</p>
-              <p className="text-sm text-orange-700">Showing cached campaigns. Some features may not be available.</p>
+              <p className="font-medium text-sm">You're currently offline</p>
+              <p className="text-xs text-muted-foreground">Showing cached campaigns. Some features may not be available.</p>
             </div>
           </CardContent>
         </Card>
       )}
 
-      <div className="space-y-8">
-        {/* Email Campaigns Section */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between bg-primary/5 p-4 rounded-lg border border-primary/10">
-            <div>
-              <h2 className="text-xl font-semibold flex items-center gap-2">
-                <Mail className="w-5 h-5 text-primary" />
-                Email Campaigns
-              </h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                AI-powered personalized email campaigns
-              </p>
+      {/* Stats Overview */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Campaigns</p>
+                <p className="text-2xl font-bold mt-1">{totalCampaigns}</p>
+              </div>
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Target className="w-5 h-5 text-primary" />
+              </div>
             </div>
-            <Button onClick={() => setShowEmailCreator(true)} className="gap-2" disabled={isOffline}>
-              <Mail className="w-4 h-4" />
-              Create Email Campaign
-            </Button>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {emailCampaigns.length === 0 ? (
-              <Card className="col-span-full">
-                <CardContent className="text-center py-8">
-                  <Mail className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">No email campaigns yet. Create one to get started!</p>
-                </CardContent>
-              </Card>
-            ) : (
-              emailCampaigns.map(renderEmailCampaignCard)
-            )}
-          </div>
-        </div>
-
-        {/* Gift Campaigns Section */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between bg-amber-50 p-4 rounded-lg border border-amber-200">
-            <div>
-              <h2 className="text-xl font-semibold flex items-center gap-2 text-amber-900">
-                <Gift className="w-5 h-5 text-amber-600" />
-                Gift Campaigns
-              </h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                Physical gift deliveries and tracking
-              </p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Active</p>
+                <p className="text-2xl font-bold mt-1">{activeCampaigns}</p>
+              </div>
+              <div className="p-2 bg-info/10 rounded-lg">
+                <Send className="w-5 h-5 text-info" />
+              </div>
             </div>
-            <Button 
-              onClick={() => setShowGiftCreator(true)} 
-              className="gap-2 bg-amber-600 hover:bg-amber-700"
-              disabled={isOffline}
-            >
-              <Gift className="w-4 h-4" />
-              Create Gift Campaign
-            </Button>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {giftCampaigns.length === 0 ? (
-              <Card className="col-span-full">
-                <CardContent className="text-center py-8">
-                  <Package className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">No gift campaigns yet. Create one to get started!</p>
-                </CardContent>
-              </Card>
-            ) : (
-              giftCampaigns.map(renderGiftCampaignCard)
-            )}
-          </div>
-        </div>
-
-        {/* Other Campaigns Section */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between bg-muted/50 p-4 rounded-lg border">
-            <div>
-              <h2 className="text-xl font-semibold">Other Campaigns</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                Future campaign types (events, ads, etc.)
-              </p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Completed</p>
+                <p className="text-2xl font-bold mt-1">{completedCampaigns}</p>
+              </div>
+              <div className="p-2 bg-success/10 rounded-lg">
+                <CheckCircle2 className="w-5 h-5 text-success" />
+              </div>
             </div>
-          </div>
-          
-          <Card>
-            <CardContent className="text-center py-8">
-              <p className="text-muted-foreground">Coming soon: Additional campaign types</p>
-            </CardContent>
-          </Card>
-        </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Offices Reached</p>
+                <p className="text-2xl font-bold mt-1">{totalOfficesReached}</p>
+              </div>
+              <div className="p-2 bg-amber-500/10 rounded-lg">
+                <TrendingUp className="w-5 h-5 text-amber-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Campaign Creators */}
+      {/* Email Campaigns Section */}
+      <section className="space-y-4">
+        <Card className="border-primary/20 bg-gradient-to-r from-primary/5 via-transparent to-transparent">
+          <CardContent className="p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-primary/10 rounded-xl">
+                  <Mail className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold">Email Campaigns</h2>
+                  <p className="text-sm text-muted-foreground">AI-powered personalized email outreach</p>
+                </div>
+              </div>
+              <Button onClick={() => setShowEmailCreator(true)} disabled={isOffline} className="gap-2">
+                <Plus className="w-4 h-4" />
+                New Email Campaign
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+        
+        {emailCampaigns.length === 0 ? (
+          <Card className="border-dashed">
+            <CardContent className="py-12 text-center">
+              <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                <Mail className="w-6 h-6 text-primary" />
+              </div>
+              <h3 className="font-medium mb-1">No email campaigns yet</h3>
+              <p className="text-sm text-muted-foreground mb-4">Create your first email campaign to start reaching out to offices.</p>
+              <Button variant="outline" onClick={() => setShowEmailCreator(true)} disabled={isOffline} className="gap-2">
+                <Plus className="w-4 h-4" />
+                Create Campaign
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {emailCampaigns.map(renderEmailCampaignCard)}
+          </div>
+        )}
+      </section>
+
+      {/* Gift Campaigns Section */}
+      <section className="space-y-4">
+        <Card className="border-amber-500/20 bg-gradient-to-r from-amber-500/5 via-transparent to-transparent">
+          <CardContent className="p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-amber-500/10 rounded-xl">
+                  <Gift className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold">Gift Campaigns</h2>
+                  <p className="text-sm text-muted-foreground">Physical gift deliveries and tracking</p>
+                </div>
+              </div>
+              <Button 
+                onClick={() => setShowGiftCreator(true)} 
+                disabled={isOffline}
+                className="gap-2 bg-amber-600 hover:bg-amber-700 text-white"
+              >
+                <Plus className="w-4 h-4" />
+                New Gift Campaign
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+        
+        {giftCampaigns.length === 0 ? (
+          <Card className="border-dashed">
+            <CardContent className="py-12 text-center">
+              <div className="mx-auto w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center mb-4">
+                <Package className="w-6 h-6 text-amber-600" />
+              </div>
+              <h3 className="font-medium mb-1">No gift campaigns yet</h3>
+              <p className="text-sm text-muted-foreground mb-4">Create your first gift campaign to strengthen office relationships.</p>
+              <Button variant="outline" onClick={() => setShowGiftCreator(true)} disabled={isOffline} className="gap-2">
+                <Plus className="w-4 h-4" />
+                Create Campaign
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {giftCampaigns.map(renderGiftCampaignCard)}
+          </div>
+        )}
+      </section>
+
+      {/* Dialogs */}
       <EmailCampaignCreator
         open={showEmailCreator}
         onOpenChange={setShowEmailCreator}
@@ -477,7 +530,6 @@ function CampaignsContent() {
         onCampaignCreated={handleCampaignUpdated}
       />
 
-      {/* Detail Dialogs */}
       {selectedCampaign && (
         <>
           <EmailCampaignDetailDialog
@@ -500,7 +552,6 @@ function CampaignsContent() {
             }}
           />
 
-          {/* Execution Dialogs */}
           <EmailExecutionDialog
             campaign={selectedCampaign}
             open={showEmailExecution}
