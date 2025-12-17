@@ -108,7 +108,7 @@ export function Layout({ children }: LayoutProps) {
               <div className="flex items-center gap-3">
                 <SidebarTrigger />
                 {pageTitle && (
-                  <h1 className="font-semibold text-lg text-foreground">{pageTitle}</h1>
+                  <h1 className="font-semibold text-lg text-teal-600 dark:text-teal-400">{pageTitle}</h1>
                 )}
               </div>
               <div className="flex items-center gap-3">
