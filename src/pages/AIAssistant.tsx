@@ -117,16 +117,16 @@ export function AIAssistant() {
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 max-w-2xl" variant="pills">
-          <TabsTrigger value="analysis" variant="pills" className="flex items-center gap-2">
+        <TabsList className="grid w-full grid-cols-3 max-w-2xl">
+          <TabsTrigger value="analysis" className="flex items-center gap-2">
             <Brain className="h-4 w-4" />
             Analysis
           </TabsTrigger>
-          <TabsTrigger value="chat" variant="pills" className="flex items-center gap-2">
+          <TabsTrigger value="chat" className="flex items-center gap-2">
             <MessageSquare className="h-4 w-4" />
             Chat
           </TabsTrigger>
-          <TabsTrigger value="settings" variant="pills" className="flex items-center gap-2">
+          <TabsTrigger value="settings" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
             Settings
           </TabsTrigger>
