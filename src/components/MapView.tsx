@@ -1,12 +1,15 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, RefreshCw, Building2, Users, TrendingUp, Calendar, Star, Globe, Phone } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MapPin, RefreshCw, Building2, Users, TrendingUp, Calendar, Star, Globe, Phone, List, Map, ExternalLink } from "lucide-react";
 import { useMapboxToken } from '@/hooks/useMapboxToken';
 import { useMapData } from '@/hooks/useMapData';
 import { useDiscoveredMapData } from '@/hooks/useDiscoveredMapData';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 interface MapViewProps {
@@ -17,6 +20,7 @@ interface MapViewProps {
 
 export function MapView({ height = "600px", mode = 'network', officeIds = [] }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
+  const [activeTab, setActiveTab] = useState<string>(mode === 'discovered' && officeIds.length > 20 ? 'list' : 'map');
   const map = useRef<mapboxgl.Map | null>(null);
   const isMobile = useIsMobile();
   
@@ -109,9 +113,9 @@ export function MapView({ height = "600px", mode = 'network', officeIds = [] }: 
     }
   };
 
-  // Initialize and update map
+  // Initialize and update map - only when map tab is active
   useEffect(() => {
-    if (!mapContainer.current || !mapboxToken || !clinic) return;
+    if (!mapContainer.current || !mapboxToken || !clinic || activeTab !== 'map') return;
 
     // Clear existing map safely
     if (map.current) {
@@ -241,7 +245,7 @@ export function MapView({ height = "600px", mode = 'network', officeIds = [] }: 
         map.current = null;
       }
     };
-  }, [mapboxToken, clinic, networkOffices, discoveredOffices, isDiscoveredMode]);
+  }, [mapboxToken, clinic, networkOffices, discoveredOffices, isDiscoveredMode, activeTab]);
 
   // Show error states
   if (!mapboxToken) {
@@ -389,73 +393,200 @@ export function MapView({ height = "600px", mode = 'network', officeIds = [] }: 
         )}
       </div>
 
-      {/* Map and Legend Layout */}
-      <div className="flex flex-col lg:grid lg:grid-cols-4 gap-4 lg:gap-6">
-        {/* Map */}
-        <div className="lg:col-span-3 order-1">
-          <Card className="overflow-hidden">
-            <div 
-              ref={mapContainer} 
-              style={{ height: isMobile ? '400px' : height }}
-              className="w-full"
-            />
-          </Card>
-        </div>
+      {/* Tabs for discovered mode */}
+      {isDiscoveredMode ? (
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="mb-4">
+            <TabsTrigger value="list" className="flex items-center gap-2">
+              <List className="h-4 w-4" />
+              List View
+            </TabsTrigger>
+            <TabsTrigger value="map" className="flex items-center gap-2">
+              <Map className="h-4 w-4" />
+              Map View
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Legend */}
-        <div className="space-y-4 order-0 lg:order-2">
-          <Card className="p-3 sm:p-4">
-            <h3 className="font-semibold mb-3 sm:mb-4 flex items-center gap-2">
-              <MapPin className="h-4 w-4" />
-              {isDiscoveredMode ? 'Rating Categories' : 'Office Categories'}
-            </h3>
-            
-            <div className="space-y-2 sm:space-y-3">
-              {legendItems.map((item) => (
-                <div key={item.label} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2 sm:space-x-3">
-                    <div 
-                      className="w-3 h-3 sm:w-4 sm:h-4 rounded-full border-2 border-white shadow-sm"
-                      style={{ backgroundColor: item.color }}
-                    />
-                    <div>
-                      <p className="font-medium text-xs sm:text-sm">{item.label}</p>
-                      <p className="text-xs text-muted-foreground hidden sm:block">{item.description}</p>
+          <TabsContent value="list" className="mt-0">
+            <Card>
+              <ScrollArea className="h-[500px]">
+                <div className="divide-y">
+                  {discoveredOffices.map((office) => (
+                    <div key={office.id} className="p-4 hover:bg-muted/50 transition-colors">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-medium truncate">{office.name}</h4>
+                            <Badge 
+                              variant="secondary" 
+                              className="text-xs shrink-0"
+                              style={{ 
+                                backgroundColor: getDiscoveredOfficeColor(office.ratingCategory) + '20',
+                                color: getDiscoveredOfficeColor(office.ratingCategory)
+                              }}
+                            >
+                              {office.ratingCategory}
+                            </Badge>
+                          </div>
+                          
+                          {office.office_type && (
+                            <p className="text-sm text-muted-foreground mb-1">{office.office_type}</p>
+                          )}
+                          
+                          {office.address && (
+                            <p className="text-sm text-muted-foreground truncate">{office.address}</p>
+                          )}
+                          
+                          <div className="flex items-center gap-4 mt-2 text-sm">
+                            {office.google_rating && (
+                              <span className="flex items-center gap-1">
+                                <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />
+                                {office.google_rating}
+                              </span>
+                            )}
+                            {office.distance_miles && (
+                              <span className="text-muted-foreground">
+                                {office.distance_miles.toFixed(1)} mi
+                              </span>
+                            )}
+                            {office.phone && (
+                              <span className="flex items-center gap-1 text-muted-foreground">
+                                <Phone className="h-3.5 w-3.5" />
+                                {office.phone}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {office.website && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            asChild
+                            className="shrink-0"
+                          >
+                            <a href={office.website} target="_blank" rel="noopener noreferrer">
+                              <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                              Website
+                            </a>
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <Badge variant="secondary" className="ml-2 text-xs">
-                    {item.count}
-                  </Badge>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </Card>
+              </ScrollArea>
+            </Card>
+          </TabsContent>
 
-          <Card className="p-3 sm:p-4">
-            <h3 className="font-semibold mb-2 sm:mb-3 text-sm sm:text-base">Map Legend</h3>
-            <div className="space-y-2 text-xs sm:text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 sm:w-6 sm:h-6 bg-blue-600 rounded-full border-2 border-white shadow-sm flex items-center justify-center">
-                  <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-white rounded-full"></div>
+          <TabsContent value="map" className="mt-0">
+            <div className="flex flex-col lg:grid lg:grid-cols-4 gap-4 lg:gap-6">
+              <div className="lg:col-span-3 order-1">
+                <Card className="overflow-hidden">
+                  <div 
+                    ref={mapContainer} 
+                    style={{ height: isMobile ? '400px' : height }}
+                    className="w-full"
+                  />
+                </Card>
+              </div>
+              
+              <div className="space-y-4 order-0 lg:order-2">
+                <Card className="p-3 sm:p-4">
+                  <h3 className="font-semibold mb-3 sm:mb-4 flex items-center gap-2">
+                    <MapPin className="h-4 w-4" />
+                    Rating Categories
+                  </h3>
+                  
+                  <div className="space-y-2 sm:space-y-3">
+                    {legendItems.map((item) => (
+                      <div key={item.label} className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2 sm:space-x-3">
+                          <div 
+                            className="w-3 h-3 sm:w-4 sm:h-4 rounded-full border-2 border-white shadow-sm"
+                            style={{ backgroundColor: item.color }}
+                          />
+                          <div>
+                            <p className="font-medium text-xs sm:text-sm">{item.label}</p>
+                            <p className="text-xs text-muted-foreground hidden sm:block">{item.description}</p>
+                          </div>
+                        </div>
+                        <Badge variant="secondary" className="ml-2 text-xs">
+                          {item.count}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
+      ) : (
+        /* Network mode - original layout */
+        <div className="flex flex-col lg:grid lg:grid-cols-4 gap-4 lg:gap-6">
+          <div className="lg:col-span-3 order-1">
+            <Card className="overflow-hidden">
+              <div 
+                ref={mapContainer} 
+                style={{ height: isMobile ? '400px' : height }}
+                className="w-full"
+              />
+            </Card>
+          </div>
+
+          <div className="space-y-4 order-0 lg:order-2">
+            <Card className="p-3 sm:p-4">
+              <h3 className="font-semibold mb-3 sm:mb-4 flex items-center gap-2">
+                <MapPin className="h-4 w-4" />
+                Office Categories
+              </h3>
+              
+              <div className="space-y-2 sm:space-y-3">
+                {legendItems.map((item) => (
+                  <div key={item.label} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2 sm:space-x-3">
+                      <div 
+                        className="w-3 h-3 sm:w-4 sm:h-4 rounded-full border-2 border-white shadow-sm"
+                        style={{ backgroundColor: item.color }}
+                      />
+                      <div>
+                        <p className="font-medium text-xs sm:text-sm">{item.label}</p>
+                        <p className="text-xs text-muted-foreground hidden sm:block">{item.description}</p>
+                      </div>
+                    </div>
+                    <Badge variant="secondary" className="ml-2 text-xs">
+                      {item.count}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            <Card className="p-3 sm:p-4">
+              <h3 className="font-semibold mb-2 sm:mb-3 text-sm sm:text-base">Map Legend</h3>
+              <div className="space-y-2 text-xs sm:text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 sm:w-6 sm:h-6 bg-blue-600 rounded-full border-2 border-white shadow-sm flex items-center justify-center">
+                    <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-white rounded-full"></div>
+                  </div>
+                  <span>Your Clinic</span>
                 </div>
-                <span>Your Clinic</span>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 sm:w-4 sm:h-4 bg-gray-400 rounded-full border-2 border-white shadow-sm"></div>
+                  <span>Referring Offices</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 sm:w-4 sm:h-4 bg-gray-400 rounded-full border-2 border-white shadow-sm"></div>
-                <span>{isDiscoveredMode ? 'Discovered Offices' : 'Referring Offices'}</span>
+              
+              <div className="mt-3 sm:mt-4 pt-2 sm:pt-3 border-t">
+                <p className="text-xs text-muted-foreground">
+                  Click on any marker to view details about the office and referral history.
+                </p>
               </div>
-            </div>
-            
-            <div className="mt-3 sm:mt-4 pt-2 sm:pt-3 border-t">
-              <p className="text-xs text-muted-foreground">
-                {isDiscoveredMode 
-                  ? 'Click on any marker to view office details, rating, and contact info.'
-                  : 'Click on any marker to view details about the office and referral history.'}
-              </p>
-            </div>
-          </Card>
+            </Card>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
