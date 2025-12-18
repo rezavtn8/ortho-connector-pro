@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend } from 'date-fns';
-
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isWeekend } from 'date-fns';
+import { formatDateForDB, formatDateDisplay } from '@/utils/dateUtils';
 export interface DailyPatientEntry {
   id: string;
   source_id: string;
@@ -200,7 +200,7 @@ export function useAddDailyPatients() {
       const promises = inputs.map(input => 
         supabase.rpc('add_daily_patients', {
           p_source_id: input.source_id,
-          p_date: format(input.date, 'yyyy-MM-dd'),
+          p_date: formatDateForDB(input.date),
           p_count: input.count,
           p_notes: input.notes || null
         })
@@ -225,7 +225,7 @@ export function useAddDailyPatients() {
       queryClient.invalidateQueries({ queryKey: ['unified-patient-data'] });
       
       const totalPatients = variables.reduce((sum, v) => sum + v.count, 0);
-      const dateStr = format(variables[0].date, 'MMM d');
+      const dateStr = formatDateDisplay(variables[0].date, 'MMM d');
       
       toast({
         title: "Patients Added",
