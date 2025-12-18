@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 
 export interface DiscoveredOffice {
@@ -29,9 +29,15 @@ export function useDiscoveredMapData(officeIds: string[], fetchAll: boolean = fa
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Memoize officeIds to prevent infinite re-renders
+  const stableOfficeIds = useMemo(() => officeIds.join(','), [officeIds]);
+
   const loadData = useCallback(async () => {
+    const idsArray = stableOfficeIds ? stableOfficeIds.split(',').filter(Boolean) : [];
+    
     // If not fetching all and no specific IDs, skip
-    if (!fetchAll && !officeIds.length) {
+    if (!fetchAll && idsArray.length === 0) {
+      setOffices([]);
       setIsLoading(false);
       return;
     }
@@ -83,7 +89,7 @@ export function useDiscoveredMapData(officeIds: string[], fetchAll: boolean = fa
         query = query.eq('discovered_by', user.id);
       } else {
         // Fetch specific offices by ID
-        query = query.in('id', officeIds);
+        query = query.in('id', idsArray);
       }
 
       const { data: discoveredOffices, error: officesError } = await query;
@@ -124,7 +130,7 @@ export function useDiscoveredMapData(officeIds: string[], fetchAll: boolean = fa
     } finally {
       setIsLoading(false);
     }
-  }, [officeIds, fetchAll]);
+  }, [stableOfficeIds, fetchAll]);
 
   useEffect(() => {
     loadData();
