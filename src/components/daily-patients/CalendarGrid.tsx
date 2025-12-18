@@ -11,15 +11,12 @@ import {
   startOfWeek,
   endOfWeek,
   eachDayOfInterval, 
-  isSameMonth, 
-  isToday,
-  addMonths,
-  subMonths,
-  isSameDay
+  isSameMonth
 } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { DailyPatientEntry } from '@/hooks/useDailyPatients';
 import { SOURCE_TYPE_CONFIG, SourceType } from '@/lib/database.types';
+import { isToday, isSameDay, getToday, formatDateForDB } from '@/utils/dateUtils';
 
 interface CalendarGridProps {
   currentDate: Date;
@@ -56,12 +53,12 @@ export function CalendarGrid({
   };
 
   const renderDayCell = (date: Date) => {
-    const dateKey = format(date, 'yyyy-MM-dd');
+    const dateKey = formatDateForDB(date);
     const dayEntries = patientsByDate[dateKey] || [];
     const dayTotal = getDayTotal(dateKey);
     const isCurrentMonth = isSameMonth(date, currentDate);
     const isTodayDate = isToday(date);
-    const isSelected = selectedDate && isSameDay(date, selectedDate);
+    const isSelected = selectedDate ? isSameDay(date, selectedDate) : false;
 
     return (
       <Popover key={dateKey}>

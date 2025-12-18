@@ -27,11 +27,12 @@ import {
   ChevronRight,
   Zap
 } from 'lucide-react';
-import { format, subDays, addDays, isToday, isYesterday, isTomorrow } from 'date-fns';
+import { format, subDays, addDays, isTomorrow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAddDailyPatients } from '@/hooks/useDailyPatients';
 import { SOURCE_TYPE_CONFIG, SourceType } from '@/lib/database.types';
+import { getToday, isToday, isYesterday, normalizeDate } from '@/utils/dateUtils';
 
 interface PatientSource {
   id: string;
@@ -61,7 +62,7 @@ export function AddDailyPatientsDialog({
   initialDate,
   onSuccess
 }: AddDailyPatientsDialogProps) {
-  const [date, setDate] = useState<Date>(initialDate || new Date());
+  const [date, setDate] = useState<Date>(() => initialDate ? normalizeDate(initialDate) : getToday());
   const [sources, setSources] = useState<PatientSource[]>([]);
   const [sourceEntries, setSourceEntries] = useState<Record<string, SourceEntry>>({});
   const [notes, setNotes] = useState('');
@@ -75,7 +76,7 @@ export function AddDailyPatientsDialog({
     if (open) {
       loadSources();
       if (initialDate) {
-        setDate(initialDate);
+        setDate(normalizeDate(initialDate));
       }
     }
   }, [open, initialDate]);
@@ -248,7 +249,7 @@ export function AddDailyPatientsDialog({
                 variant="outline"
                 size="icon"
                 className="shrink-0"
-                onClick={() => setDate(subDays(date, 1))}
+                onClick={() => setDate(normalizeDate(subDays(date, 1)))}
               >
                 <ChevronLeft className="w-4 h-4" />
               </Button>
@@ -277,7 +278,7 @@ export function AddDailyPatientsDialog({
                     selected={date}
                     onSelect={(d) => {
                       if (d) {
-                        setDate(d);
+                        setDate(normalizeDate(d));
                         setCalendarOpen(false);
                       }
                     }}
@@ -291,7 +292,7 @@ export function AddDailyPatientsDialog({
                 variant="outline"
                 size="icon"
                 className="shrink-0"
-                onClick={() => setDate(addDays(date, 1))}
+                onClick={() => setDate(normalizeDate(addDays(date, 1)))}
               >
                 <ChevronRight className="w-4 h-4" />
               </Button>
@@ -300,7 +301,7 @@ export function AddDailyPatientsDialog({
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => setDate(new Date())}
+                  onClick={() => setDate(getToday())}
                 >
                   Today
                 </Button>

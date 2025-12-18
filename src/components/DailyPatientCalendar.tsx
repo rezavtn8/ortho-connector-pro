@@ -17,18 +17,18 @@ import { MonthlyDataNotice } from '@/components/daily-patients/MonthlyDataNotice
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Calendar, List, Plus, AlertCircle } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Calendar, List, Plus } from 'lucide-react';
+import { getToday, normalizeDate } from '@/utils/dateUtils';
 
 interface DailyPatientCalendarProps {
   className?: string;
 }
 
 export function DailyPatientCalendar({ className }: DailyPatientCalendarProps) {
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(() => getToday());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [addDialogDate, setAddDialogDate] = useState<Date>(new Date());
+  const [addDialogDate, setAddDialogDate] = useState<Date>(() => getToday());
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
 
   const yearMonth = format(currentDate, 'yyyy-MM');
@@ -56,16 +56,17 @@ export function DailyPatientCalendar({ className }: DailyPatientCalendarProps) {
     }, {} as Record<string, DailyPatientEntry[]>);
   }, [dailyPatients]);
 
-  const handleDateClick = (date: Date) => setSelectedDate(date);
+  const handleDateClick = (date: Date) => setSelectedDate(normalizeDate(date));
   const handleAddClick = (date: Date) => {
-    setAddDialogDate(date);
+    setAddDialogDate(normalizeDate(date));
     setShowAddDialog(true);
   };
   const handlePrevMonth = () => setCurrentDate(subMonths(currentDate, 1));
   const handleNextMonth = () => setCurrentDate(addMonths(currentDate, 1));
   const handleToday = () => {
-    setCurrentDate(new Date());
-    setSelectedDate(new Date());
+    const today = getToday();
+    setCurrentDate(today);
+    setSelectedDate(today);
   };
   const handleDeleteEntry = async (entryId: string) => {
     await deleteDailyPatient.mutateAsync(entryId);
@@ -109,7 +110,7 @@ export function DailyPatientCalendar({ className }: DailyPatientCalendarProps) {
           <MonthlyDataNotice 
             monthlyTotal={monthlyPatients.reduce((sum, e) => sum + e.patient_count, 0)}
             sourceCount={monthlyPatients.length}
-            onAddClick={() => handleAddClick(new Date())}
+            onAddClick={() => handleAddClick(getToday())}
           />
         )}
 
@@ -143,7 +144,7 @@ export function DailyPatientCalendar({ className }: DailyPatientCalendarProps) {
             variant="outline" 
             size="sm"
             className="gap-1.5 h-8 text-xs"
-            onClick={() => handleAddClick(new Date())}
+            onClick={() => handleAddClick(getToday())}
           >
             <Plus className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Multi-Source</span>
