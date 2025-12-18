@@ -2,8 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MapPin, RefreshCw, Building2, Users, TrendingUp, Calendar, Star, Globe, Phone, List, Map, ExternalLink } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { MapPin, RefreshCw, Building2, Users, TrendingUp, Calendar, Star, Globe, Phone, ExternalLink, Compass } from "lucide-react";
 import { useMapboxToken } from '@/hooks/useMapboxToken';
 import { useMapData } from '@/hooks/useMapData';
 import { useDiscoveredMapData } from '@/hooks/useDiscoveredMapData';
@@ -14,30 +15,28 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 
 interface MapViewProps {
   height?: string;
-  mode?: 'network' | 'discovered';
-  officeIds?: string[];
+  initialShowDiscovered?: boolean;
 }
 
-export function MapView({ height = "600px", mode = 'network', officeIds = [] }: MapViewProps) {
+export function MapView({ height = "600px", initialShowDiscovered = false }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const [activeTab, setActiveTab] = useState<string>(mode === 'discovered' && officeIds.length > 20 ? 'list' : 'map');
+  const [showDiscovered, setShowDiscovered] = useState(initialShowDiscovered);
   const map = useRef<mapboxgl.Map | null>(null);
   const isMobile = useIsMobile();
   
   const { token: mapboxToken, isLoading: tokenLoading } = useMapboxToken();
   
-  // Use the appropriate data hook based on mode
+  // Always load network data
   const networkData = useMapData();
-  const discoveredData = useDiscoveredMapData(mode === 'discovered' ? officeIds : []);
+  // Load all discovered offices when toggle is on
+  const discoveredData = useDiscoveredMapData([], showDiscovered);
   
-  const isDiscoveredMode = mode === 'discovered';
-  const { offices: networkOffices, clinic: networkClinic, isLoading: networkLoading } = networkData;
-  const { offices: discoveredOffices, clinic: discoveredClinic, isLoading: discoveredLoading } = discoveredData;
+  const { offices: networkOffices, clinic, isLoading: networkLoading } = networkData;
+  const { offices: discoveredOffices, isLoading: discoveredLoading } = discoveredData;
   
-  const clinic = isDiscoveredMode ? discoveredClinic : networkClinic;
-  const isLoading = tokenLoading || (isDiscoveredMode ? discoveredLoading : networkLoading);
+  const isLoading = tokenLoading || networkLoading || (showDiscovered && discoveredLoading);
 
-  // Calculate stats based on mode
+  // Calculate stats
   const networkStats = {
     total: networkOffices.length,
     vip: networkOffices.filter(o => o.category === 'VIP').length,
@@ -55,10 +54,6 @@ export function MapView({ height = "600px", mode = 'network', officeIds = [] }: 
     good: discoveredOffices.filter(o => o.ratingCategory === 'Good').length,
     average: discoveredOffices.filter(o => o.ratingCategory === 'Average').length,
     low: discoveredOffices.filter(o => o.ratingCategory === 'Low').length,
-    withWebsite: discoveredOffices.filter(o => o.website).length,
-    avgRating: discoveredOffices.length > 0 
-      ? (discoveredOffices.reduce((sum, o) => sum + (o.google_rating || 0), 0) / discoveredOffices.length).toFixed(1)
-      : '0'
   };
 
   const networkLegend = [
@@ -70,24 +65,50 @@ export function MapView({ height = "600px", mode = 'network', officeIds = [] }: 
   ];
 
   const discoveredLegend = [
-    { color: '#10b981', label: 'Excellent', description: '4.5+ stars', count: discoveredStats.excellent },
-    { color: '#f97316', label: 'Good', description: '4.0 - 4.4 stars', count: discoveredStats.good },
-    { color: '#eab308', label: 'Average', description: '3.5 - 3.9 stars', count: discoveredStats.average },
-    { color: '#9ca3af', label: 'Low', description: 'Below 3.5 stars', count: discoveredStats.low },
+    { color: '#10b981', label: 'Excellent', description: '4.5+ stars', count: discoveredStats.excellent, isDashed: true },
+    { color: '#f97316', label: 'Good', description: '4.0 - 4.4 stars', count: discoveredStats.good, isDashed: true },
+    { color: '#eab308', label: 'Average', description: '3.5 - 3.9 stars', count: discoveredStats.average, isDashed: true },
+    { color: '#9ca3af', label: 'Low', description: 'Below 3.5 stars', count: discoveredStats.low, isDashed: true },
   ];
 
-  const legendItems = isDiscoveredMode ? discoveredLegend : networkLegend;
-
-  // Simple marker creation
-  const createSimpleMarker = (lng: number, lat: number, color: string, isClinic = false) => {
+  // Create marker for network offices (solid)
+  const createNetworkMarker = (lng: number, lat: number, color: string) => {
     const el = document.createElement('div');
-    el.style.width = isClinic ? '30px' : '20px';
-    el.style.height = isClinic ? '30px' : '20px';
+    el.style.width = '20px';
+    el.style.height = '20px';
     el.style.backgroundColor = color;
     el.style.borderRadius = '50%';
     el.style.border = '2px solid white';
     el.style.cursor = 'pointer';
     el.style.boxShadow = '0 2px 6px rgba(0,0,0,0.3)';
+    
+    return new mapboxgl.Marker(el).setLngLat([lng, lat]);
+  };
+
+  // Create marker for discovered offices (dashed border, different shape)
+  const createDiscoveredMarker = (lng: number, lat: number, color: string) => {
+    const el = document.createElement('div');
+    el.style.width = '20px';
+    el.style.height = '20px';
+    el.style.backgroundColor = color + '40'; // Semi-transparent fill
+    el.style.borderRadius = '50%';
+    el.style.border = `3px dashed ${color}`;
+    el.style.cursor = 'pointer';
+    el.style.boxShadow = '0 2px 6px rgba(0,0,0,0.2)';
+    
+    return new mapboxgl.Marker(el).setLngLat([lng, lat]);
+  };
+
+  // Create clinic marker
+  const createClinicMarker = (lng: number, lat: number) => {
+    const el = document.createElement('div');
+    el.style.width = '30px';
+    el.style.height = '30px';
+    el.style.backgroundColor = '#2563eb';
+    el.style.borderRadius = '50%';
+    el.style.border = '3px solid white';
+    el.style.cursor = 'pointer';
+    el.style.boxShadow = '0 2px 8px rgba(0,0,0,0.4)';
     
     return new mapboxgl.Marker(el).setLngLat([lng, lat]);
   };
@@ -113,9 +134,9 @@ export function MapView({ height = "600px", mode = 'network', officeIds = [] }: 
     }
   };
 
-  // Initialize and update map - only when map tab is active
+  // Initialize and update map
   useEffect(() => {
-    if (!mapContainer.current || !mapboxToken || !clinic || activeTab !== 'map') return;
+    if (!mapContainer.current || !mapboxToken || !clinic) return;
 
     // Clear existing map safely
     if (map.current) {
@@ -142,29 +163,43 @@ export function MapView({ height = "600px", mode = 'network', officeIds = [] }: 
     // Add markers when map loads
     map.current.on('load', () => {
       // Add clinic marker
-      const clinicMarker = createSimpleMarker(
-        clinic.longitude,
-        clinic.latitude,
-        '#2563eb',
-        true
-      );
+      const clinicMarker = createClinicMarker(clinic.longitude, clinic.latitude);
       
       clinicMarker
         .setPopup(new mapboxgl.Popup().setHTML(`<div class="p-2"><strong>${clinic.name}</strong><br/>${clinic.address}</div>`))
         .addTo(map.current!);
 
-      if (isDiscoveredMode) {
-        // Add discovered office markers
+      const bounds = new mapboxgl.LngLatBounds();
+      bounds.extend([clinic.longitude, clinic.latitude]);
+
+      // Add network office markers (solid circles)
+      networkOffices.forEach((office) => {
+        if (!office.latitude || !office.longitude) return;
+
+        const color = getNetworkOfficeColor(office.category);
+        const officeMarker = createNetworkMarker(office.longitude, office.latitude, color);
+        
+        officeMarker
+          .setPopup(new mapboxgl.Popup().setHTML(`
+            <div class="p-2">
+              <strong>${office.name}</strong><br/>
+              <span class="text-xs px-1 py-0.5 rounded" style="background: ${color}20; color: ${color}">${office.category}</span><br/>
+              ${office.address || ''}<br/>
+              <small>Referrals: ${office.currentMonthReferrals} this month</small>
+            </div>
+          `))
+          .addTo(map.current!);
+        
+        bounds.extend([office.longitude, office.latitude]);
+      });
+
+      // Add discovered office markers if toggle is on (dashed circles)
+      if (showDiscovered) {
         discoveredOffices.forEach((office) => {
           if (!office.latitude || !office.longitude) return;
 
           const color = getDiscoveredOfficeColor(office.ratingCategory);
-
-          const officeMarker = createSimpleMarker(
-            office.longitude,
-            office.latitude,
-            color
-          );
+          const officeMarker = createDiscoveredMarker(office.longitude, office.latitude, color);
           
           const ratingDisplay = office.google_rating ? `⭐ ${office.google_rating}` : 'No rating';
           const distanceDisplay = office.distance_miles ? `${office.distance_miles.toFixed(1)} mi` : '';
@@ -172,6 +207,9 @@ export function MapView({ height = "600px", mode = 'network', officeIds = [] }: 
           officeMarker
             .setPopup(new mapboxgl.Popup().setHTML(`
               <div class="p-2">
+                <div class="flex items-center gap-1 mb-1">
+                  <span class="text-xs px-1.5 py-0.5 rounded bg-teal-100 text-teal-800">Discovered</span>
+                </div>
                 <strong>${office.name}</strong><br/>
                 ${office.office_type ? `<small class="text-gray-600">${office.office_type}</small><br/>` : ''}
                 ${office.address || ''}<br/>
@@ -184,54 +222,14 @@ export function MapView({ height = "600px", mode = 'network', officeIds = [] }: 
               </div>
             `))
             .addTo(map.current!);
-        });
-
-        // Fit bounds for discovered offices
-        if (discoveredOffices.length > 0) {
-          const bounds = new mapboxgl.LngLatBounds();
-          bounds.extend([clinic.longitude, clinic.latitude]);
-          discoveredOffices.forEach(office => {
-            if (office.latitude && office.longitude) {
-              bounds.extend([office.longitude, office.latitude]);
-            }
-          });
-          map.current!.fitBounds(bounds, { padding: 50 });
-        }
-      } else {
-        // Add network office markers
-        networkOffices.forEach((office) => {
-          if (!office.latitude || !office.longitude) return;
-
-          const color = getNetworkOfficeColor(office.category);
-
-          const officeMarker = createSimpleMarker(
-            office.longitude,
-            office.latitude,
-            color
-          );
           
-          officeMarker
-            .setPopup(new mapboxgl.Popup().setHTML(`
-              <div class="p-2">
-                <strong>${office.name}</strong><br/>
-                ${office.address || ''}<br/>
-                <small>Referrals: ${office.currentMonthReferrals} this month</small>
-              </div>
-            `))
-            .addTo(map.current!);
+          bounds.extend([office.longitude, office.latitude]);
         });
+      }
 
-        // Fit bounds for network offices
-        if (networkOffices.length > 0) {
-          const bounds = new mapboxgl.LngLatBounds();
-          bounds.extend([clinic.longitude, clinic.latitude]);
-          networkOffices.forEach(office => {
-            if (office.latitude && office.longitude) {
-              bounds.extend([office.longitude, office.latitude]);
-            }
-          });
-          map.current!.fitBounds(bounds, { padding: 50 });
-        }
+      // Fit bounds to show all markers
+      if (networkOffices.length > 0 || (showDiscovered && discoveredOffices.length > 0)) {
+        map.current!.fitBounds(bounds, { padding: 50 });
       }
     });
 
@@ -245,7 +243,7 @@ export function MapView({ height = "600px", mode = 'network', officeIds = [] }: 
         map.current = null;
       }
     };
-  }, [mapboxToken, clinic, networkOffices, discoveredOffices, isDiscoveredMode, activeTab]);
+  }, [mapboxToken, clinic, networkOffices, discoveredOffices, showDiscovered]);
 
   // Show error states
   if (!mapboxToken) {
@@ -294,261 +292,144 @@ export function MapView({ height = "600px", mode = 'network', officeIds = [] }: 
 
   return (
     <div className="space-y-6">
-      {/* Mode indicator for discovered offices */}
-      {isDiscoveredMode && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Badge variant="secondary" className="bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200">
-            Discovered Offices
-          </Badge>
-          <span>Viewing {discoveredOffices.length} selected office{discoveredOffices.length !== 1 ? 's' : ''}</span>
+      {/* Toggle for discovered offices */}
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex items-center gap-3">
+          <Switch 
+            id="show-discovered"
+            checked={showDiscovered} 
+            onCheckedChange={setShowDiscovered} 
+          />
+          <Label htmlFor="show-discovered" className="flex items-center gap-2 cursor-pointer">
+            <Compass className="h-4 w-4 text-teal-600" />
+            Show Discovered Offices
+          </Label>
+          {showDiscovered && discoveredOffices.length > 0 && (
+            <Badge variant="secondary" className="bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200">
+              {discoveredOffices.length} discovered
+            </Badge>
+          )}
         </div>
-      )}
+        
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Badge variant="outline">{networkStats.total} network offices</Badge>
+        </div>
+      </div>
 
       {/* Stats Header */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {isDiscoveredMode ? (
-          <>
-            <Card className="p-3 sm:p-4">
-              <div className="flex items-center space-x-2">
-                <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
-                <div>
-                  <p className="text-lg sm:text-2xl font-bold">{discoveredStats.total}</p>
-                  <p className="text-xs sm:text-sm text-muted-foreground">Selected Offices</p>
-                </div>
+        <Card className="p-3 sm:p-4">
+          <div className="flex items-center space-x-2">
+            <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+            <div>
+              <p className="text-lg sm:text-2xl font-bold">{networkStats.total}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Network Offices</p>
+            </div>
+          </div>
+        </Card>
+        
+        <Card className="p-3 sm:p-4">
+          <div className="flex items-center space-x-2">
+            <Users className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
+            <div>
+              <p className="text-lg sm:text-2xl font-bold">{networkStats.totalReferrals}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">This Month</p>
+            </div>
+          </div>
+        </Card>
+        
+        <Card className="p-3 sm:p-4">
+          <div className="flex items-center space-x-2">
+            <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" />
+            <div>
+              <p className="text-lg sm:text-2xl font-bold">{networkStats.activeThisMonth}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Active Offices</p>
+            </div>
+          </div>
+        </Card>
+        
+        {showDiscovered ? (
+          <Card className="p-3 sm:p-4 border-teal-200 dark:border-teal-800">
+            <div className="flex items-center space-x-2">
+              <Compass className="h-4 w-4 sm:h-5 sm:w-5 text-teal-600" />
+              <div>
+                <p className="text-lg sm:text-2xl font-bold">{discoveredStats.total}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Discovered</p>
               </div>
-            </Card>
-            
-            <Card className="p-3 sm:p-4">
-              <div className="flex items-center space-x-2">
-                <Star className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500" />
-                <div>
-                  <p className="text-lg sm:text-2xl font-bold">{discoveredStats.avgRating}</p>
-                  <p className="text-xs sm:text-sm text-muted-foreground">Avg Rating</p>
-                </div>
-              </div>
-            </Card>
-            
-            <Card className="p-3 sm:p-4">
-              <div className="flex items-center space-x-2">
-                <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
-                <div>
-                  <p className="text-lg sm:text-2xl font-bold">{discoveredStats.excellent}</p>
-                  <p className="text-xs sm:text-sm text-muted-foreground">Highly Rated</p>
-                </div>
-              </div>
-            </Card>
-            
-            <Card className="p-3 sm:p-4">
-              <div className="flex items-center space-x-2">
-                <Globe className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
-                <div>
-                  <p className="text-lg sm:text-2xl font-bold">{discoveredStats.withWebsite}</p>
-                  <p className="text-xs sm:text-sm text-muted-foreground">With Website</p>
-                </div>
-              </div>
-            </Card>
-          </>
+            </div>
+          </Card>
         ) : (
-          <>
-            <Card className="p-3 sm:p-4">
-              <div className="flex items-center space-x-2">
-                <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
-                <div>
-                  <p className="text-lg sm:text-2xl font-bold">{networkStats.total}</p>
-                  <p className="text-xs sm:text-sm text-muted-foreground">Total Offices</p>
-                </div>
+          <Card className="p-3 sm:p-4">
+            <div className="flex items-center space-x-2">
+              <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
+              <div>
+                <p className="text-lg sm:text-2xl font-bold">{networkStats.vip + networkStats.strong}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Top Performers</p>
               </div>
-            </Card>
-            
-            <Card className="p-3 sm:p-4">
-              <div className="flex items-center space-x-2">
-                <Users className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
-                <div>
-                  <p className="text-lg sm:text-2xl font-bold">{networkStats.totalReferrals}</p>
-                  <p className="text-xs sm:text-sm text-muted-foreground">This Month</p>
-                </div>
-              </div>
-            </Card>
-            
-            <Card className="p-3 sm:p-4">
-              <div className="flex items-center space-x-2">
-                <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" />
-                <div>
-                  <p className="text-lg sm:text-2xl font-bold">{networkStats.activeThisMonth}</p>
-                  <p className="text-xs sm:text-sm text-muted-foreground">Active Offices</p>
-                </div>
-              </div>
-            </Card>
-            
-            <Card className="p-3 sm:p-4">
-              <div className="flex items-center space-x-2">
-                <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
-                <div>
-                  <p className="text-lg sm:text-2xl font-bold">{networkStats.vip + networkStats.strong}</p>
-                  <p className="text-xs sm:text-sm text-muted-foreground">Top Performers</p>
-                </div>
-              </div>
-            </Card>
-          </>
+            </div>
+          </Card>
         )}
       </div>
 
-      {/* Tabs for discovered mode */}
-      {isDiscoveredMode ? (
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="mb-4">
-            <TabsTrigger value="list" className="flex items-center gap-2">
-              <List className="h-4 w-4" />
-              List View
-            </TabsTrigger>
-            <TabsTrigger value="map" className="flex items-center gap-2">
-              <Map className="h-4 w-4" />
-              Map View
-            </TabsTrigger>
-          </TabsList>
+      {/* Map and Legend */}
+      <div className="flex flex-col lg:grid lg:grid-cols-4 gap-4 lg:gap-6">
+        <div className="lg:col-span-3 order-1">
+          <Card className="overflow-hidden">
+            <div 
+              ref={mapContainer} 
+              style={{ height: isMobile ? '400px' : height }}
+              className="w-full"
+            />
+          </Card>
+        </div>
 
-          <TabsContent value="list" className="mt-0">
-            <Card>
-              <ScrollArea className="h-[500px]">
-                <div className="divide-y">
-                  {discoveredOffices.map((office) => (
-                    <div key={office.id} className="p-4 hover:bg-muted/50 transition-colors">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h4 className="font-medium truncate">{office.name}</h4>
-                            <Badge 
-                              variant="secondary" 
-                              className="text-xs shrink-0"
-                              style={{ 
-                                backgroundColor: getDiscoveredOfficeColor(office.ratingCategory) + '20',
-                                color: getDiscoveredOfficeColor(office.ratingCategory)
-                              }}
-                            >
-                              {office.ratingCategory}
-                            </Badge>
-                          </div>
-                          
-                          {office.office_type && (
-                            <p className="text-sm text-muted-foreground mb-1">{office.office_type}</p>
-                          )}
-                          
-                          {office.address && (
-                            <p className="text-sm text-muted-foreground truncate">{office.address}</p>
-                          )}
-                          
-                          <div className="flex items-center gap-4 mt-2 text-sm">
-                            {office.google_rating && (
-                              <span className="flex items-center gap-1">
-                                <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />
-                                {office.google_rating}
-                              </span>
-                            )}
-                            {office.distance_miles && (
-                              <span className="text-muted-foreground">
-                                {office.distance_miles.toFixed(1)} mi
-                              </span>
-                            )}
-                            {office.phone && (
-                              <span className="flex items-center gap-1 text-muted-foreground">
-                                <Phone className="h-3.5 w-3.5" />
-                                {office.phone}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        
-                        {office.website && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            asChild
-                            className="shrink-0"
-                          >
-                            <a href={office.website} target="_blank" rel="noopener noreferrer">
-                              <ExternalLink className="h-3.5 w-3.5 mr-1" />
-                              Website
-                            </a>
-                          </Button>
-                        )}
-                      </div>
+        <div className="space-y-4 order-0 lg:order-2">
+          {/* Network Offices Legend */}
+          <Card className="p-3 sm:p-4">
+            <h3 className="font-semibold mb-3 sm:mb-4 flex items-center gap-2">
+              <Building2 className="h-4 w-4" />
+              Network Offices
+            </h3>
+            
+            <div className="space-y-2 sm:space-y-3">
+              {networkLegend.map((item) => (
+                <div key={item.label} className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2 sm:space-x-3">
+                    <div 
+                      className="w-3 h-3 sm:w-4 sm:h-4 rounded-full border-2 border-white shadow-sm"
+                      style={{ backgroundColor: item.color }}
+                    />
+                    <div>
+                      <p className="font-medium text-xs sm:text-sm">{item.label}</p>
+                      <p className="text-xs text-muted-foreground hidden sm:block">{item.description}</p>
                     </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="map" className="mt-0">
-            <div className="flex flex-col lg:grid lg:grid-cols-4 gap-4 lg:gap-6">
-              <div className="lg:col-span-3 order-1">
-                <Card className="overflow-hidden">
-                  <div 
-                    ref={mapContainer} 
-                    style={{ height: isMobile ? '400px' : height }}
-                    className="w-full"
-                  />
-                </Card>
-              </div>
-              
-              <div className="space-y-4 order-0 lg:order-2">
-                <Card className="p-3 sm:p-4">
-                  <h3 className="font-semibold mb-3 sm:mb-4 flex items-center gap-2">
-                    <MapPin className="h-4 w-4" />
-                    Rating Categories
-                  </h3>
-                  
-                  <div className="space-y-2 sm:space-y-3">
-                    {legendItems.map((item) => (
-                      <div key={item.label} className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2 sm:space-x-3">
-                          <div 
-                            className="w-3 h-3 sm:w-4 sm:h-4 rounded-full border-2 border-white shadow-sm"
-                            style={{ backgroundColor: item.color }}
-                          />
-                          <div>
-                            <p className="font-medium text-xs sm:text-sm">{item.label}</p>
-                            <p className="text-xs text-muted-foreground hidden sm:block">{item.description}</p>
-                          </div>
-                        </div>
-                        <Badge variant="secondary" className="ml-2 text-xs">
-                          {item.count}
-                        </Badge>
-                      </div>
-                    ))}
                   </div>
-                </Card>
-              </div>
+                  <Badge variant="secondary" className="ml-2 text-xs">
+                    {item.count}
+                  </Badge>
+                </div>
+              ))}
             </div>
-          </TabsContent>
-        </Tabs>
-      ) : (
-        /* Network mode - original layout */
-        <div className="flex flex-col lg:grid lg:grid-cols-4 gap-4 lg:gap-6">
-          <div className="lg:col-span-3 order-1">
-            <Card className="overflow-hidden">
-              <div 
-                ref={mapContainer} 
-                style={{ height: isMobile ? '400px' : height }}
-                className="w-full"
-              />
-            </Card>
-          </div>
+          </Card>
 
-          <div className="space-y-4 order-0 lg:order-2">
-            <Card className="p-3 sm:p-4">
+          {/* Discovered Offices Legend - only show when toggle is on */}
+          {showDiscovered && (
+            <Card className="p-3 sm:p-4 border-teal-200 dark:border-teal-800">
               <h3 className="font-semibold mb-3 sm:mb-4 flex items-center gap-2">
-                <MapPin className="h-4 w-4" />
-                Office Categories
+                <Compass className="h-4 w-4 text-teal-600" />
+                Discovered Offices
               </h3>
               
               <div className="space-y-2 sm:space-y-3">
-                {legendItems.map((item) => (
+                {discoveredLegend.map((item) => (
                   <div key={item.label} className="flex items-center justify-between">
                     <div className="flex items-center space-x-2 sm:space-x-3">
                       <div 
-                        className="w-3 h-3 sm:w-4 sm:h-4 rounded-full border-2 border-white shadow-sm"
-                        style={{ backgroundColor: item.color }}
+                        className="w-3 h-3 sm:w-4 sm:h-4 rounded-full"
+                        style={{ 
+                          backgroundColor: item.color + '40',
+                          border: `2px dashed ${item.color}`
+                        }}
                       />
                       <div>
                         <p className="font-medium text-xs sm:text-sm">{item.label}</p>
@@ -561,32 +442,49 @@ export function MapView({ height = "600px", mode = 'network', officeIds = [] }: 
                   </div>
                 ))}
               </div>
-            </Card>
-
-            <Card className="p-3 sm:p-4">
-              <h3 className="font-semibold mb-2 sm:mb-3 text-sm sm:text-base">Map Legend</h3>
-              <div className="space-y-2 text-xs sm:text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 sm:w-6 sm:h-6 bg-blue-600 rounded-full border-2 border-white shadow-sm flex items-center justify-center">
-                    <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-white rounded-full"></div>
-                  </div>
-                  <span>Your Clinic</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 sm:w-4 sm:h-4 bg-gray-400 rounded-full border-2 border-white shadow-sm"></div>
-                  <span>Referring Offices</span>
-                </div>
-              </div>
               
-              <div className="mt-3 sm:mt-4 pt-2 sm:pt-3 border-t">
-                <p className="text-xs text-muted-foreground">
-                  Click on any marker to view details about the office and referral history.
-                </p>
-              </div>
+              <p className="text-xs text-muted-foreground mt-3 pt-2 border-t">
+                Dashed markers indicate discovered offices not yet in your network.
+              </p>
             </Card>
-          </div>
+          )}
+
+          {/* Map Legend */}
+          <Card className="p-3 sm:p-4">
+            <h3 className="font-semibold mb-2 sm:mb-3 text-sm sm:text-base">Map Legend</h3>
+            <div className="space-y-2 text-xs sm:text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 sm:w-6 sm:h-6 bg-blue-600 rounded-full border-2 border-white shadow-sm flex items-center justify-center">
+                  <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-white rounded-full"></div>
+                </div>
+                <span>Your Clinic</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 sm:w-4 sm:h-4 bg-gray-400 rounded-full border-2 border-white shadow-sm"></div>
+                <span>Network Office (solid)</span>
+              </div>
+              {showDiscovered && (
+                <div className="flex items-center gap-2">
+                  <div 
+                    className="w-3 h-3 sm:w-4 sm:h-4 rounded-full"
+                    style={{ 
+                      backgroundColor: '#9ca3af40',
+                      border: '2px dashed #9ca3af'
+                    }}
+                  ></div>
+                  <span>Discovered Office (dashed)</span>
+                </div>
+              )}
+            </div>
+            
+            <div className="mt-3 sm:mt-4 pt-2 sm:pt-3 border-t">
+              <p className="text-xs text-muted-foreground">
+                Click on any marker to view details.
+              </p>
+            </div>
+          </Card>
         </div>
-      )}
+      </div>
     </div>
   );
 }

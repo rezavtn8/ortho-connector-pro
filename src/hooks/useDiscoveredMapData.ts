@@ -23,14 +23,15 @@ export interface Clinic {
   longitude: number;
 }
 
-export function useDiscoveredMapData(officeIds: string[]) {
+export function useDiscoveredMapData(officeIds: string[], fetchAll: boolean = false) {
   const [offices, setOffices] = useState<DiscoveredOffice[]>([]);
   const [clinic, setClinic] = useState<Clinic | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
-    if (!officeIds.length) {
+    // If not fetching all and no specific IDs, skip
+    if (!fetchAll && !officeIds.length) {
       setIsLoading(false);
       return;
     }
@@ -70,13 +71,22 @@ export function useDiscoveredMapData(officeIds: string[]) {
         }
       }
 
-      // Load discovered offices
-      const { data: discoveredOffices, error: officesError } = await supabase
+      // Load discovered offices - either all for user or specific IDs
+      let query = supabase
         .from('discovered_offices')
         .select('id, name, address, phone, website, latitude, longitude, google_rating, office_type, distance_miles')
-        .in('id', officeIds)
         .not('latitude', 'is', null)
         .not('longitude', 'is', null);
+
+      if (fetchAll) {
+        // Fetch all discovered offices for this user
+        query = query.eq('discovered_by', user.id);
+      } else {
+        // Fetch specific offices by ID
+        query = query.in('id', officeIds);
+      }
+
+      const { data: discoveredOffices, error: officesError } = await query;
 
       if (officesError) {
         console.error('Error loading discovered offices:', officesError);
@@ -114,7 +124,7 @@ export function useDiscoveredMapData(officeIds: string[]) {
     } finally {
       setIsLoading(false);
     }
-  }, [officeIds]);
+  }, [officeIds, fetchAll]);
 
   useEffect(() => {
     loadData();
