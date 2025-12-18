@@ -49,11 +49,11 @@ export function SelectionActionBar({
   };
 
   const handleViewOnMap = () => {
-    const idsParam = selectedIds.join(',');
     if (isDiscoveredOffices) {
-      navigate(`/map-view?discovered=true&ids=${idsParam}`);
+      // Just enable the discovered toggle - shows all discovered offices
+      navigate(`/map-view?showDiscovered=true`);
     } else {
-      navigate(`/map-view?ids=${idsParam}`);
+      navigate(`/map-view`);
     }
   };
 
