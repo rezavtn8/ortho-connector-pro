@@ -113,9 +113,14 @@ export function MapView({ height = "600px", mode = 'network', officeIds = [] }: 
   useEffect(() => {
     if (!mapContainer.current || !mapboxToken || !clinic) return;
 
-    // Clear existing map
+    // Clear existing map safely
     if (map.current) {
-      map.current.remove();
+      try {
+        map.current.remove();
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+      map.current = null;
     }
 
     mapboxgl.accessToken = mapboxToken;
@@ -228,7 +233,12 @@ export function MapView({ height = "600px", mode = 'network', officeIds = [] }: 
 
     return () => {
       if (map.current) {
-        map.current.remove();
+        try {
+          map.current.remove();
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+        map.current = null;
       }
     };
   }, [mapboxToken, clinic, networkOffices, discoveredOffices, isDiscoveredMode]);
