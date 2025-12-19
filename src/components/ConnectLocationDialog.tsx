@@ -20,10 +20,10 @@ export function ConnectLocationDialog({ clinicId, onConnected }: ConnectLocation
     try {
       setConnecting(true);
 
-      // Initiate OAuth flow with site-based redirect to avoid redirect_uri_mismatch
+      // Initiate OAuth flow - uses direct Supabase callback for simplicity
       const { data, error } = await supabase.functions.invoke('google-business-oauth-init', {
         body: {
-          redirect_target: 'site',
+          // Pass site_origin so callback knows where to redirect on success
           site_origin: window.location.origin,
         },
       });

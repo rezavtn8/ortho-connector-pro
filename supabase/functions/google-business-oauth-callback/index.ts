@@ -58,18 +58,17 @@ const handler = async (req: Request): Promise<Response> => {
     // Exchange code for tokens
     const clientId = Deno.env.get('GOOGLE_OAUTH_CLIENT_ID');
     const clientSecret = Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET');
-    // redirect_uri MUST match the one used in the initial auth request
-    const redirectUri = (siteOriginFromState && allowedOrigins.includes(siteOriginFromState))
-      ? `${siteOriginFromState}/google-business/oauth/callback`
-      : `${supabaseUrl}/functions/v1/google-business-oauth-callback`;
 
+    // Always use direct Supabase callback URI for consistency
+    const redirectUri = `${supabaseUrl}/functions/v1/google-business-oauth-callback`;
+    
     // Debug logging (safe)
     console.info('oauth-callback params', {
       client_id_preview: clientId ? `${clientId.slice(0, 6)}...${clientId.slice(-4)}` : null,
       redirect_uri: redirectUri,
       code_present: Boolean(code),
       state_length: state?.length ?? 0,
-      supabase_url_matches_project: supabaseUrl?.includes('vqkzqwibbcvmdwgqladn.supabase.co') ?? false,
+      site_origin_from_state: siteOriginFromState,
     });
 
     if (!clientId || !clientSecret) {
@@ -138,12 +137,15 @@ const handler = async (req: Request): Promise<Response> => {
       body: { clinic_id },
     });
 
-    // Redirect to app with success
-    return Response.redirect(`${Deno.env.get('SUPABASE_URL')?.replace('.supabase.co', '.lovable.app')}/review-magic?connected=true`, 302);
+    // Redirect to site_origin if available and allowed, otherwise fallback to lovable.app
+    const successRedirect = targetBase || `${Deno.env.get('SUPABASE_URL')?.replace('.supabase.co', '.lovable.app')}`;
+    console.info('oauth-callback success, redirecting to:', successRedirect);
+    return Response.redirect(`${successRedirect}/review-magic?connected=true`, 302);
 
   } catch (error: any) {
     console.error('Error in google-business-oauth-callback:', error);
-    return Response.redirect(`${Deno.env.get('SUPABASE_URL')?.replace('.supabase.co', '.lovable.app')}/review-magic?error=${encodeURIComponent(error.message)}`, 302);
+    const errorRedirect = `${Deno.env.get('SUPABASE_URL')?.replace('.supabase.co', '.lovable.app')}`;
+    return Response.redirect(`${errorRedirect}/review-magic?error=${encodeURIComponent(error.message)}`, 302);
   }
 };
 
