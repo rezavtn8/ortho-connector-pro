@@ -68,26 +68,20 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    // We'll finalize the OAuth state after computing redirect strategy
-    let encodedState = '';
-
-    // Get OAuth credentials and determine redirect strategy
+    // Get OAuth credentials
     const clientId = Deno.env.get('GOOGLE_OAUTH_CLIENT_ID');
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
 
-    // Read optional body to decide redirect target
-    let preferredRedirect: 'supabase' | 'site' = 'supabase';
+    // Read optional body to get site_origin for success redirect
     let siteOrigin: string | null = null;
     try {
       if (req.method === 'POST' && (req.headers.get('content-type') || '').includes('application/json')) {
         const body = await req.json().catch(() => null);
-        if (body?.redirect_target === 'site') preferredRedirect = 'site';
         if (typeof body?.site_origin === 'string') siteOrigin = body.site_origin;
       }
     } catch (_) {
       // ignore body parse errors
     }
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
 
     if (!clientId) {
       throw new Error('GOOGLE_OAUTH_CLIENT_ID not configured');
@@ -96,7 +90,7 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('SUPABASE_URL not configured');
     }
 
-    // Allow-listed site origins that can be used for OAuth redirect
+    // Allow-listed site origins for success redirect (not OAuth redirect)
     const allowedOrigins = [
       'https://nexoradental.com',
       supabaseUrl.replace('.supabase.co', '.lovable.app'),
@@ -104,35 +98,28 @@ const handler = async (req: Request): Promise<Response> => {
       'http://localhost:3000',
     ];
 
-    // Decide redirect URI
-    let redirectUri = `${supabaseUrl}/functions/v1/google-business-oauth-callback`;
-    if (preferredRedirect === 'site' && siteOrigin && allowedOrigins.includes(siteOrigin)) {
-      redirectUri = `${siteOrigin}/google-business/oauth/callback`;
-    }
+    // Always use direct Supabase callback for OAuth (simplest, most reliable)
+    const redirectUri = `${supabaseUrl}/functions/v1/google-business-oauth-callback`;
 
-    // Debug logging (safe): verify values used to build the OAuth URL
+    // Debug logging
     console.info('oauth-init env', {
       client_id_preview: clientId ? `${clientId.slice(0, 6)}...${clientId.slice(-4)}` : null,
       redirect_uri: redirectUri,
-      supabase_url_matches_project: supabaseUrl?.includes('vqkzqwibbcvmdwgqladn.supabase.co') ?? false,
-      preferredRedirect,
       siteOrigin,
       siteOriginAllowed: siteOrigin ? allowedOrigins.includes(siteOrigin) : null,
     });
 
-    // Finalize OAuth state now that redirect is decided
+    // Build OAuth state - include site_origin so callback knows where to redirect on success
     const statePayload: Record<string, unknown> = {
       user_id: user.id,
       clinic_id: clinics.id,
       timestamp: Date.now(),
     };
-    if (preferredRedirect === 'site' && siteOrigin && allowedOrigins.includes(siteOrigin)) {
-      // Include origin to let the callback redirect back to the same site domain
-      // (validated again server-side in the callback function)
-      // @ts-ignore - Deno runtime
+    // Store site_origin for success redirect (validated in callback)
+    if (siteOrigin && allowedOrigins.includes(siteOrigin)) {
       statePayload.site_origin = siteOrigin;
     }
-    encodedState = btoa(JSON.stringify(statePayload));
+    const encodedState = btoa(JSON.stringify(statePayload));
 
     // Build OAuth URL
     const scopes = [
