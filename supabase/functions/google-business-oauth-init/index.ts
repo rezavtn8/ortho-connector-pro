@@ -21,17 +21,24 @@ serve(async (req: Request): Promise<Response> => {
       throw new Error('Missing authorization header');
     }
 
-    // Create Supabase client and get user
+    // Extract token
+    const token = authHeader.replace('Bearer ', '');
+
+    // Create Supabase client
     const supabase = createClient(
       SUPABASE_URL,
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Get user with token
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
+      console.error('Auth error:', authError?.message);
       throw new Error('Not authenticated');
     }
+
+    console.log('User authenticated:', user.id);
 
     // Get user's clinic
     const { data: profile, error: profileError } = await supabase
@@ -40,9 +47,16 @@ serve(async (req: Request): Promise<Response> => {
       .eq('user_id', user.id)
       .single();
 
-    if (profileError || !profile?.clinic_id) {
-      throw new Error('No clinic found for user. Please complete onboarding first.');
+    if (profileError) {
+      console.error('Profile error:', profileError.message);
+      throw new Error('Failed to get user profile');
     }
+
+    if (!profile?.clinic_id) {
+      throw new Error('No clinic found. Please complete onboarding first.');
+    }
+
+    console.log('Clinic found:', profile.clinic_id);
 
     // Parse request body for redirect URL
     let successRedirectUrl = 'https://nexoradental.com/review-magic';
@@ -84,11 +98,10 @@ serve(async (req: Request): Promise<Response> => {
     authUrl.searchParams.set('prompt', 'consent');
     authUrl.searchParams.set('state', state);
 
-    console.log('OAuth init:', {
+    console.log('OAuth init success:', {
       user_id: user.id,
       clinic_id: profile.clinic_id,
       redirect_uri: REDIRECT_URI,
-      success_redirect: successRedirectUrl,
     });
 
     return new Response(
