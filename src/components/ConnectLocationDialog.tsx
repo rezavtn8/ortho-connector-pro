@@ -20,19 +20,20 @@ export function ConnectLocationDialog({ clinicId, onConnected }: ConnectLocation
     try {
       setConnecting(true);
 
-      // Initiate OAuth flow - uses direct Supabase callback for simplicity
+      // Initiate OAuth flow
       const { data, error } = await supabase.functions.invoke('google-business-oauth-init', {
         body: {
-          // Pass site_origin so callback knows where to redirect on success
-          site_origin: window.location.origin,
+          redirect_url: `${window.location.origin}/review-magic`,
         },
       });
 
       if (error) throw error;
 
-      if (data?.authorization_url) {
+      if (data?.auth_url) {
         // Redirect to Google OAuth
-        window.location.href = data.authorization_url;
+        window.location.href = data.auth_url;
+      } else {
+        throw new Error('No authorization URL received');
       }
     } catch (error: any) {
       console.error('Error connecting Google Business:', error);
