@@ -54,6 +54,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useSourceTrackingMode } from '@/hooks/useSourceTrackingMode';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { MonthlyPatientRow } from '@/components/MonthlyPatientRow';
+import { OfficeEmailsSection } from '@/components/OfficeEmailsSection';
 
 export function SourceDetail() {
   const navigate = useNavigate();
@@ -593,13 +594,16 @@ export function SourceDetail() {
 
       {/* Details */}
       <Tabs defaultValue="details" className="w-full">
-        <TabsList className={cn("grid w-full", source.source_type === 'Office' ? "grid-cols-5" : "grid-cols-4")} variant="underline">
+        <TabsList className={cn("grid w-full", source.source_type === 'Office' ? "grid-cols-6" : "grid-cols-4")} variant="underline">
           <TabsTrigger value="details" variant="underline">Details</TabsTrigger>
           <TabsTrigger value="monthly" variant="underline">Monthly History</TabsTrigger>
           <TabsTrigger value="changelog" variant="underline">Change Log</TabsTrigger>
           <TabsTrigger value="tags" variant="underline">Tags</TabsTrigger>
           {source.source_type === 'Office' && (
-            <TabsTrigger value="visits" variant="underline">Marketing Visits</TabsTrigger>
+            <>
+              <TabsTrigger value="emails" variant="underline">Emails</TabsTrigger>
+              <TabsTrigger value="visits" variant="underline">Marketing Visits</TabsTrigger>
+            </>
           )}
         </TabsList>
 
@@ -961,6 +965,17 @@ export function SourceDetail() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Emails Tab */}
+        {source.source_type === 'Office' && (
+          <TabsContent value="emails" className="space-y-4">
+            <OfficeEmailsSection 
+              officeId={source.id} 
+              officeName={source.name} 
+              officeEmail={source.email}
+            />
+          </TabsContent>
+        )}
 
         {/* Marketing Visits Tab */}
         {source.source_type === 'Office' && (

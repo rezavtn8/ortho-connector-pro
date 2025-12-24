@@ -18,7 +18,8 @@ import { TagBadge } from '@/components/TagBadge';
 import { TagManager } from '@/components/TagManager';
 import { AddressCorrectionDialog } from '@/components/AddressCorrectionDialog';
 import { FillDetailsDialog } from '@/components/FillDetailsDialog';
-import { Eye, Edit, Users, Trash2, Search, MapPin, Phone, Mail, AlertCircle, TrendingUp, Calendar, Tag, Loader2, CheckCircle2, Globe } from 'lucide-react';
+import { Eye, Edit, Users, Trash2, Search, MapPin, Phone, Mail, AlertCircle, TrendingUp, Calendar, Tag, Loader2, CheckCircle2, Globe, Download } from 'lucide-react';
+import { exportOfficeContactsToCSV } from '@/hooks/useOfficeEmails';
 import { useToast } from '@/hooks/use-toast';
 import { PatientLoadHistoryEditor } from '@/components/PatientLoadHistoryEditor';
 import { AddOfficeDialog as AddSourceDialog } from '@/components/AddSourceDialog';
@@ -77,6 +78,7 @@ function OfficesContent() {
   const [showFillDetailsDialog, setShowFillDetailsDialog] = useState(false);
   const [fillDetailsResults, setFillDetailsResults] = useState<any[]>([]);
   const [hasBeenFilled, setHasBeenFilled] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Fetch offices data with tier calculations
   const { data: offices, isLoading, error, refetch } = useOffices();
@@ -640,6 +642,42 @@ function OfficesContent() {
               <>
                 <Globe className="h-4 w-4 mr-2" />
                 Fill Missing Details
+              </>
+            )}
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              setIsExporting(true);
+              try {
+                const count = await exportOfficeContactsToCSV(selectedIds.length > 0 ? selectedIds : undefined);
+                toast({
+                  title: 'Export complete',
+                  description: `Exported ${count} offices to CSV.`,
+                });
+              } catch (error: any) {
+                toast({
+                  title: 'Export failed',
+                  description: error.message || 'Failed to export contacts',
+                  variant: 'destructive',
+                });
+              } finally {
+                setIsExporting(false);
+              }
+            }}
+            disabled={isExporting || !offices?.length}
+          >
+            {isExporting ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Exporting...
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4 mr-2" />
+                Export Contacts {selectedIds.length > 0 && `(${selectedIds.length})`}
               </>
             )}
           </Button>

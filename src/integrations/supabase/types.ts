@@ -1309,6 +1309,86 @@ export type Database = {
           },
         ]
       }
+      office_emails: {
+        Row: {
+          ai_content_id: string | null
+          body: string
+          contact_id: string | null
+          created_at: string
+          email_type: string
+          id: string
+          is_ai_generated: boolean
+          office_id: string
+          recipient_email: string | null
+          sent_at: string | null
+          status: string
+          subject: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_content_id?: string | null
+          body: string
+          contact_id?: string | null
+          created_at?: string
+          email_type?: string
+          id?: string
+          is_ai_generated?: boolean
+          office_id: string
+          recipient_email?: string | null
+          sent_at?: string | null
+          status?: string
+          subject: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_content_id?: string | null
+          body?: string
+          contact_id?: string | null
+          created_at?: string
+          email_type?: string
+          id?: string
+          is_ai_generated?: boolean
+          office_id?: string
+          recipient_email?: string | null
+          sent_at?: string | null
+          status?: string
+          subject?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "office_emails_ai_content_id_fkey"
+            columns: ["ai_content_id"]
+            isOneToOne: false
+            referencedRelation: "ai_generated_content"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "office_emails_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "office_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "office_emails_office_id_fkey"
+            columns: ["office_id"]
+            isOneToOne: false
+            referencedRelation: "office_metrics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "office_emails_office_id_fkey"
+            columns: ["office_id"]
+            isOneToOne: false
+            referencedRelation: "patient_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       office_interactions: {
         Row: {
           created_at: string | null
