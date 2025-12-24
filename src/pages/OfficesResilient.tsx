@@ -546,7 +546,7 @@ function OfficesContent() {
 
       const updates = fillDetailsResults
         .filter(r => selectedIds.includes(r.id) && r.changed)
-        .map(r => ({ id: r.id, phone: r.filled.phone, website: r.filled.website }));
+        .map(r => ({ id: r.id, phone: r.filled.phone, website: r.filled.website, email: r.filled.email }));
 
       const { data: result, error: fnError } = await supabase.functions.invoke('apply-office-details', {
         body: { updates },

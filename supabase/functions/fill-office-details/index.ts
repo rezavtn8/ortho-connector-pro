@@ -13,14 +13,134 @@ interface FilledDetails {
   original: {
     phone: string | null;
     website: string | null;
+    email: string | null;
   };
   filled: {
     phone: string | null;
     website: string | null;
+    email: string | null;
   };
   success: boolean;
   changed: boolean;
   error?: string;
+}
+
+/**
+ * Extract email addresses from HTML content
+ */
+function extractEmailsFromHtml(html: string): string[] {
+  // Common email pattern
+  const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+  const matches = html.match(emailRegex) || [];
+  
+  // Filter out common false positives and duplicates
+  const filtered = [...new Set(matches)]
+    .filter(email => {
+      const lower = email.toLowerCase();
+      // Exclude common non-contact emails
+      if (lower.includes('example.com')) return false;
+      if (lower.includes('domain.com')) return false;
+      if (lower.includes('email.com')) return false;
+      if (lower.includes('yoursite.com')) return false;
+      if (lower.includes('wixpress.com')) return false;
+      if (lower.includes('sentry.io')) return false;
+      if (lower.endsWith('.png')) return false;
+      if (lower.endsWith('.jpg')) return false;
+      if (lower.endsWith('.gif')) return false;
+      if (lower.endsWith('.svg')) return false;
+      if (lower.endsWith('.webp')) return false;
+      // Prioritize contact/info emails
+      return true;
+    })
+    .sort((a, b) => {
+      // Prioritize contact/info/office emails
+      const aLower = a.toLowerCase();
+      const bLower = b.toLowerCase();
+      const priorityPatterns = ['info@', 'contact@', 'office@', 'hello@', 'appointments@', 'admin@', 'reception@'];
+      const aHasPriority = priorityPatterns.some(p => aLower.startsWith(p));
+      const bHasPriority = priorityPatterns.some(p => bLower.startsWith(p));
+      if (aHasPriority && !bHasPriority) return -1;
+      if (!aHasPriority && bHasPriority) return 1;
+      return 0;
+    });
+
+  return filtered;
+}
+
+/**
+ * Try to fetch website and extract email
+ */
+async function extractEmailFromWebsite(websiteUrl: string): Promise<string | null> {
+  try {
+    // Normalize URL
+    let url = websiteUrl.trim();
+    if (!/^https?:\/\//i.test(url)) {
+      url = `https://${url}`;
+    }
+
+    // Fetch the page with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+        'Accept': 'text/html,application/xhtml+xml',
+      },
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      console.log(`Failed to fetch ${url}: ${response.status}`);
+      return null;
+    }
+
+    const html = await response.text();
+    const emails = extractEmailsFromHtml(html);
+
+    if (emails.length > 0) {
+      console.log(`Found emails on ${url}: ${emails.slice(0, 3).join(', ')}`);
+      return emails[0]; // Return the best candidate
+    }
+
+    // Try the contact page if main page has no email
+    const contactPaths = ['/contact', '/contact-us', '/about', '/about-us'];
+    for (const path of contactPaths) {
+      try {
+        const contactUrl = new URL(path, url).href;
+        const contactController = new AbortController();
+        const contactTimeoutId = setTimeout(() => contactController.abort(), 5000);
+
+        const contactResponse = await fetch(contactUrl, {
+          signal: contactController.signal,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+            'Accept': 'text/html,application/xhtml+xml',
+          },
+        });
+
+        clearTimeout(contactTimeoutId);
+
+        if (contactResponse.ok) {
+          const contactHtml = await contactResponse.text();
+          const contactEmails = extractEmailsFromHtml(contactHtml);
+          if (contactEmails.length > 0) {
+            console.log(`Found email on ${contactUrl}: ${contactEmails[0]}`);
+            return contactEmails[0];
+          }
+        }
+      } catch {
+        // Ignore errors on contact page attempts
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.log(`Error fetching website ${websiteUrl}:`, error);
+    return null;
+  }
 }
 
 serve(async (req) => {
@@ -90,7 +210,7 @@ serve(async (req) => {
 
     const { data: offices, error: fetchError } = await supabase
       .from("patient_sources")
-      .select("id, name, phone, website, google_place_id, address")
+      .select("id, name, phone, website, email, google_place_id, address")
       .in("id", officeIds)
       .eq("source_type", "Office");
 
@@ -107,13 +227,13 @@ serve(async (req) => {
 
     for (const office of offices) {
       try {
-        // Already complete
-        if (office.phone && office.website) {
+        // Check if already complete (has phone, website, AND email)
+        if (office.phone && office.website && office.email) {
           results.push({
             id: office.id,
             officeName: office.name,
-            original: { phone: office.phone, website: office.website },
-            filled: { phone: office.phone, website: office.website },
+            original: { phone: office.phone, website: office.website, email: office.email },
+            filled: { phone: office.phone, website: office.website, email: office.email },
             success: true,
             changed: false,
           });
@@ -121,82 +241,71 @@ serve(async (req) => {
         }
 
         let placeId: string | null = office.google_place_id;
+        let newPhone = office.phone;
+        let newWebsite = office.website;
+        let newEmail = office.email;
 
-        // If no place_id, try search by name + address (best effort)
-        if (!placeId && office.address) {
-          const searchQuery = `${office.name} ${office.address}`;
-          const searchUrl =
-            `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(searchQuery)}&inputtype=textquery&fields=place_id&key=${googleApiKey}`;
+        // If missing phone or website, try Google Places
+        if (!office.phone || !office.website) {
+          // If no place_id, try search by name + address
+          if (!placeId && office.address) {
+            const searchQuery = `${office.name} ${office.address}`;
+            const searchUrl =
+              `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(searchQuery)}&inputtype=textquery&fields=place_id&key=${googleApiKey}`;
 
-          const searchResponse = await fetch(searchUrl);
-          const searchData = await searchResponse.json();
+            const searchResponse = await fetch(searchUrl);
+            const searchData = await searchResponse.json();
 
-          if (searchData.status === "OK" && searchData.candidates?.length > 0) {
-            placeId = searchData.candidates[0].place_id;
+            if (searchData.status === "OK" && searchData.candidates?.length > 0) {
+              placeId = searchData.candidates[0].place_id;
+            }
+          }
+
+          if (placeId) {
+            const detailsUrl =
+              `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=formatted_phone_number,website,international_phone_number&key=${googleApiKey}`;
+
+            const detailsResponse = await fetch(detailsUrl);
+            const detailsData = await detailsResponse.json();
+
+            if (detailsData.status === "OK") {
+              const placeDetails = detailsData.result ?? {};
+              newPhone = office.phone ?? placeDetails.formatted_phone_number ?? placeDetails.international_phone_number ?? null;
+              newWebsite = office.website ?? placeDetails.website ?? null;
+            }
           }
         }
 
-        if (!placeId) {
-          results.push({
-            id: office.id,
-            officeName: office.name,
-            original: { phone: office.phone, website: office.website },
-            filled: { phone: office.phone, website: office.website },
-            success: false,
-            changed: false,
-            error: "Could not find Google Place ID",
-          });
-          continue;
+        // Try to extract email from website if we have one and email is missing
+        if (!newEmail && newWebsite) {
+          console.log(`fill-office-details: Extracting email from ${newWebsite} for ${office.name} [${requestId}]`);
+          newEmail = await extractEmailFromWebsite(newWebsite);
         }
 
-        const detailsUrl =
-          `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=formatted_phone_number,website,international_phone_number&key=${googleApiKey}`;
-
-        const detailsResponse = await fetch(detailsUrl);
-        const detailsData = await detailsResponse.json();
-
-        if (detailsData.status !== "OK") {
-          results.push({
-            id: office.id,
-            officeName: office.name,
-            original: { phone: office.phone, website: office.website },
-            filled: { phone: office.phone, website: office.website },
-            success: false,
-            changed: false,
-            error: `Place details failed: ${detailsData.status}`,
-          });
-          continue;
+        const hasChanges = newPhone !== office.phone || newWebsite !== office.website || newEmail !== office.email;
+        
+        if (hasChanges) {
+          needsUpdateCount++;
         }
-
-        const placeDetails = detailsData.result ?? {};
-        const newPhone =
-          office.phone ??
-          placeDetails.formatted_phone_number ??
-          placeDetails.international_phone_number ??
-          null;
-        const newWebsite = office.website ?? placeDetails.website ?? null;
-
-        const hasChanges = newPhone !== office.phone || newWebsite !== office.website;
-        if (hasChanges) needsUpdateCount++;
 
         results.push({
           id: office.id,
           officeName: office.name,
-          original: { phone: office.phone, website: office.website },
-          filled: { phone: newPhone, website: newWebsite },
+          original: { phone: office.phone, website: office.website, email: office.email },
+          filled: { phone: newPhone, website: newWebsite, email: newEmail },
           success: true,
           changed: hasChanges,
         });
 
-        // light rate limit
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        // Rate limit between requests
+        await new Promise((resolve) => setTimeout(resolve, 200));
       } catch (error) {
         console.error(`fill-office-details: Error processing office ${office.id} [${requestId}]`, error);
         results.push({
           id: office.id,
           officeName: office.name,
-          original: { phone: office.phone, website: office.website },
-          filled: { phone: office.phone, website: office.website },
+          original: { phone: office.phone, website: office.website, email: office.email },
+          filled: { phone: office.phone, website: office.website, email: office.email },
           success: false,
           changed: false,
           error: error instanceof Error ? error.message : "Unknown error",
