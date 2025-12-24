@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { CheckCircle2, XCircle, Phone, Globe, Loader2, Building2 } from 'lucide-react';
+import { CheckCircle2, XCircle, Phone, Globe, Loader2, Building2, Mail } from 'lucide-react';
 
 interface FilledDetail {
   id: string;
@@ -10,10 +10,12 @@ interface FilledDetail {
   original: {
     phone: string | null;
     website: string | null;
+    email: string | null;
   };
   filled: {
     phone: string | null;
     website: string | null;
+    email: string | null;
   };
   success: boolean;
   changed: boolean;
@@ -86,7 +88,7 @@ export function FillDetailsDialog({ open, onOpenChange, details, onConfirm }: Fi
                 <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-foreground mb-2">All Details Already Complete!</h3>
                 <p className="text-muted-foreground max-w-md mx-auto">
-                  All {noChanges.length} offices already have their phone and website information filled in.
+                  All {noChanges.length} offices already have their phone, website, and email information filled in.
                 </p>
               </div>
             )}
@@ -136,6 +138,16 @@ export function FillDetailsDialog({ open, onOpenChange, details, onConfirm }: Fi
                               <span className="text-green-600 dark:text-green-400 truncate max-w-[300px]">
                                 {detail.filled.website}
                               </span>
+                            </div>
+                          )}
+                          {detail.filled.email && detail.filled.email !== detail.original.email && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                              <span className="text-muted-foreground">Email:</span>
+                              <span className="text-green-600 dark:text-green-400">{detail.filled.email}</span>
+                              {detail.original.email && (
+                                <span className="text-xs text-muted-foreground">(was: {detail.original.email})</span>
+                              )}
                             </div>
                           )}
                         </div>

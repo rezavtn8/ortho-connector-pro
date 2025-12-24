@@ -11,6 +11,7 @@ type UpdatePayload = {
   id: string;
   phone?: string | null;
   website?: string | null;
+  email?: string | null;
 };
 
 /**
@@ -49,6 +50,21 @@ function normalizeWebsite(website: string | null | undefined): string | null {
   if (!/^https?:\/\//i.test(cleaned)) {
     cleaned = `https://${cleaned}`;
   }
+  
+  return cleaned;
+}
+
+/**
+ * Normalize email address.
+ */
+function normalizeEmail(email: string | null | undefined): string | null {
+  if (!email) return null;
+  
+  const cleaned = email.trim().toLowerCase();
+  
+  // Basic email validation
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  if (!emailRegex.test(cleaned)) return null;
   
   return cleaned;
 }
@@ -119,19 +135,21 @@ serve(async (req) => {
     const errors: string[] = [];
 
     for (const update of updates) {
-      const { id, phone, website } = update;
+      const { id, phone, website, email } = update;
 
       // Normalize data to pass database constraints
       const normalizedPhone = normalizePhone(phone);
       const normalizedWebsite = normalizeWebsite(website);
+      const normalizedEmail = normalizeEmail(email);
 
-      const updateData: { phone?: string | null; website?: string | null } = {};
+      const updateData: { phone?: string | null; website?: string | null; email?: string | null } = {};
       if (phone !== undefined) updateData.phone = normalizedPhone;
       if (website !== undefined) updateData.website = normalizedWebsite;
+      if (email !== undefined) updateData.email = normalizedEmail;
 
       if (Object.keys(updateData).length === 0) continue;
 
-      console.log(`apply-office-details: Updating ${id} with phone="${normalizedPhone}", website="${normalizedWebsite}" [${requestId}]`);
+      console.log(`apply-office-details: Updating ${id} with phone="${normalizedPhone}", website="${normalizedWebsite}", email="${normalizedEmail}" [${requestId}]`);
 
       const { data, error } = await supabase
         .from("patient_sources")
