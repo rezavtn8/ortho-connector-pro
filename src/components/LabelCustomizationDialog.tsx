@@ -61,11 +61,43 @@ export const LabelCustomizationDialog = ({
   templateDimensions = { width: 2.625, height: 1 }
 }: LabelCustomizationDialogProps) => {
   const [localCustomization, setLocalCustomization] = useState<LabelCustomization>(customization);
+  const [hasAutoLoadedSettings, setHasAutoLoadedSettings] = useState(false);
   const savedSettings = useSavedLabelSettings();
   
   const hasSavedLogo = !savedSettings.isLoading && !!savedSettings.clinicLogoUrl;
   const hasSavedAddress = !savedSettings.isLoading && !!savedSettings.clinicAddress;
+  const hasSavedClinicName = !savedSettings.isLoading && !!savedSettings.clinicName;
   const isLargeLabel = templateDimensions.height >= 2.5;
+  
+  // Auto-load saved settings on first dialog open when settings are available
+  useEffect(() => {
+    if (savedSettings.isLoading || hasAutoLoadedSettings) return;
+    
+    const updates: Partial<LabelCustomization> = {};
+    
+    // Auto-load logo from settings if not already set
+    if (savedSettings.clinicLogoUrl && !localCustomization.logoUrl) {
+      updates.logoUrl = savedSettings.clinicLogoUrl;
+      updates.showLogo = true;
+    }
+    
+    // Auto-load return address from settings if not already set
+    if (savedSettings.clinicAddress && !localCustomization.returnAddress) {
+      updates.returnAddress = savedSettings.clinicAddress;
+      updates.showReturnAddress = true;
+    }
+    
+    // Auto-load branding text from settings if not already set
+    if (savedSettings.clinicName && !localCustomization.brandingText) {
+      updates.brandingText = savedSettings.clinicName;
+    }
+    
+    if (Object.keys(updates).length > 0) {
+      setLocalCustomization(prev => ({ ...prev, ...updates }));
+    }
+    
+    setHasAutoLoadedSettings(true);
+  }, [savedSettings.isLoading, savedSettings.clinicLogoUrl, savedSettings.clinicAddress, savedSettings.clinicName, hasAutoLoadedSettings]);
   
   // Auto-optimize on content changes when enabled
   useEffect(() => {
@@ -401,8 +433,8 @@ export const LabelCustomizationDialog = ({
 
             {localCustomization.showLogo && (
               <div className="space-y-3">
-                {/* Use saved logo from settings button */}
-                {hasSavedLogo && !localCustomization.logoUrl && (
+                {/* Use saved logo from settings button - show when no logo OR when logo differs from settings */}
+                {hasSavedLogo && localCustomization.logoUrl !== savedSettings.clinicLogoUrl && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -413,7 +445,7 @@ export const LabelCustomizationDialog = ({
                     }))}
                   >
                     <Building className="h-4 w-4" />
-                    Use Logo from Settings
+                    {localCustomization.logoUrl ? 'Reset to Logo from Settings' : 'Use Logo from Settings'}
                   </Button>
                 )}
                 
@@ -483,8 +515,8 @@ export const LabelCustomizationDialog = ({
 
             {localCustomization.showReturnAddress && (
               <div className="space-y-3">
-                {/* Use saved address from settings button */}
-                {hasSavedAddress && !localCustomization.returnAddress && (
+                {/* Use saved address from settings button - show when address differs from settings */}
+                {hasSavedAddress && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -495,7 +527,7 @@ export const LabelCustomizationDialog = ({
                     }))}
                   >
                     <Building className="h-4 w-4" />
-                    Use Address from Settings
+                    {localCustomization.returnAddress ? 'Reset to Address from Settings' : 'Use Address from Settings'}
                   </Button>
                 )}
                 
@@ -534,8 +566,8 @@ export const LabelCustomizationDialog = ({
 
             {localCustomization.showBranding && (
               <div className="space-y-3">
-                {/* Use clinic name from settings */}
-                {savedSettings.clinicName && !localCustomization.brandingText && (
+                {/* Use clinic name from settings - show when branding differs from settings */}
+                {hasSavedClinicName && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -546,7 +578,7 @@ export const LabelCustomizationDialog = ({
                     }))}
                   >
                     <Building className="h-4 w-4" />
-                    Use Clinic Name from Settings
+                    {localCustomization.brandingText ? 'Reset to Clinic Name from Settings' : 'Use Clinic Name from Settings'}
                   </Button>
                 )}
                 
