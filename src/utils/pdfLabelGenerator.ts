@@ -1,10 +1,17 @@
 /**
  * Professional Mailing Label PDF Generator
- * Generates pixel-perfect Avery-compatible label sheets for printing
- * Supports logos, custom sizing, and two-zone layouts for large labels
+ * Uses the shared layout engine to ensure PDF matches preview exactly.
+ * Supports logos, custom sizing, and two-zone layouts for large labels.
  */
 
 import jsPDF from 'jspdf';
+import {
+  calculateLabelLayout,
+  getLayoutPixelValues,
+  type LayoutOptions,
+  type LabelDimensions,
+  type CalculatedLayout,
+} from './labelLayoutEngine';
 
 export interface LabelData {
   contact: string;
@@ -105,36 +112,11 @@ export const AVERY_TEMPLATES: Record<string, LabelTemplate> = {
   },
 };
 
-// Convert inches to PDF points (72 points per inch)
-const inchesToPoints = (inches: number): number => inches * 72;
+// PDF uses 72 points per inch
+const POINTS_PER_INCH = 72;
 
-// Calculate optimal font size based on label dimensions
-const calculateFontSize = (template: LabelTemplate, multiplier: number = 1): number => {
-  const heightPx = template.height * 72; // Convert to points
-  
-  let baseSize: number;
-  if (heightPx < 72) {
-    // Small labels (< 1" high)
-    baseSize = 8;
-  } else if (heightPx < 108) {
-    // Medium labels (1-1.5" high)
-    baseSize = 10;
-  } else if (heightPx < 180) {
-    // Large labels (1.5-2.5" high)
-    baseSize = 12;
-  } else if (heightPx < 240) {
-    // Extra large labels (2.5-3.33" high)
-    baseSize = 14;
-  } else {
-    // Huge labels (> 3.33" high)
-    baseSize = 16;
-  }
-  
-  return Math.max(6, Math.min(24, baseSize * multiplier));
-};
-
-// Calculate line height based on font size
-const getLineHeight = (fontSize: number): number => fontSize * 1.3;
+// Convert inches to PDF points
+const inchesToPoints = (inches: number): number => inches * POINTS_PER_INCH;
 
 // Truncate text to fit within width
 const truncateText = (pdf: jsPDF, text: string, maxWidth: number): string => {
@@ -163,18 +145,14 @@ function addLogoToPDF(
   centerX?: number
 ): void {
   try {
-    // logoUrl is expected to be a base64 data URL
     if (!logoUrl.startsWith('data:image')) {
       return;
     }
     
-    // Extract format from data URL
     const formatMatch = logoUrl.match(/data:image\/(\w+);/);
     const format = formatMatch ? formatMatch[1].toUpperCase() : 'PNG';
     
-    // Add image - jsPDF will auto-scale to fit
     if (centerX !== undefined) {
-      // Center the logo horizontally
       pdf.addImage(logoUrl, format, centerX - maxWidth / 2, y, maxWidth, maxHeight);
     } else {
       pdf.addImage(logoUrl, format, x, y, maxWidth, maxHeight);
@@ -185,64 +163,83 @@ function addLogoToPDF(
 }
 
 /**
- * Generate a professional PDF with mailing labels
+ * Convert screen pixels to PDF points
+ * Screen uses 96 DPI, PDF uses 72 points per inch
+ */
+function pixelsToPoints(pixels: number): number {
+  return (pixels / 96) * 72;
+}
+
+/**
+ * Generate a professional PDF with mailing labels using the shared layout engine
  */
 export function generateLabelsPDF(
   labels: LabelData[],
   templateKey: string,
   customization: LabelCustomization = {}
 ): jsPDF {
-  // Defensive check for empty labels array
   if (!labels || labels.length === 0) {
-    const pdf = new jsPDF({
+    return new jsPDF({
       orientation: 'portrait',
       unit: 'pt',
       format: 'letter',
     });
-    return pdf;
   }
 
   const template = AVERY_TEMPLATES[templateKey] || AVERY_TEMPLATES["5160"];
   const labelsPerPage = template.cols * template.rows;
   const totalPages = Math.ceil(labels.length / labelsPerPage);
   
-  // Determine if this is a large label that should use two-zone layout
-  const isLargeLabel = template.height >= 2.5;
-  const useTwoZoneLayout = customization.useTwoZoneLayout ?? (isLargeLabel && customization.showLogo);
+  // Build layout options matching the preview
+  const layoutOptions: LayoutOptions = {
+    showLogo: !!customization.showLogo && !!customization.logoUrl,
+    showFromAddress: !!customization.showReturnAddress && !!customization.returnAddress,
+    showToLabel: customization.showToLabel !== false,
+    showFromLabel: customization.showFromLabel !== false,
+    showBranding: !!customization.showBranding && !!customization.brandingText,
+    logoSizeMultiplier: Math.max(0.25, Math.min(2.5, customization.logoSizeMultiplier || 1)),
+    fontSizeMultiplier: Math.max(0.5, Math.min(2.0, customization.fontSizeMultiplier || 1)),
+    fromFontSizeMultiplier: Math.max(0.5, Math.min(1.5, customization.fromFontSizeMultiplier || 1)),
+    lineSpacing: customization.lineSpacing || 'normal',
+    toAlignment: customization.toAlignment || 'center',
+    fromPosition: customization.fromPosition || 'top-left',
+    layoutMode: customization.layoutMode || 'auto',
+  };
   
-  // Create PDF in Letter size (8.5 x 11 inches)
+  const dimensions: LabelDimensions = {
+    width: template.width,
+    height: template.height,
+  };
+  
+  // Calculate layout using the shared engine
+  const fromLines = customization.returnAddress?.split('\n').length || 0;
+  const layout = calculateLabelLayout(dimensions, layoutOptions, fromLines, 4);
+  const pixelLayout = getLayoutPixelValues(dimensions, layout);
+  
+  // Create PDF in Letter size
   const pdf = new jsPDF({
     orientation: 'portrait',
-    unit: 'pt', // Points for precise positioning
+    unit: 'pt',
     format: 'letter',
   });
 
-  // Page dimensions in points
-  const pageWidth = inchesToPoints(8.5);
-  const pageHeight = inchesToPoints(11);
-  
   // Template dimensions in points
-  const labelWidth = inchesToPoints(template.width);
-  const labelHeight = inchesToPoints(template.height);
-  const marginTop = inchesToPoints(template.marginTop);
-  const marginLeft = inchesToPoints(template.marginLeft);
-  const gapX = inchesToPoints(template.gapX);
-  const gapY = inchesToPoints(template.gapY);
+  const labelWidthPt = inchesToPoints(template.width);
+  const labelHeightPt = inchesToPoints(template.height);
+  const marginTopPt = inchesToPoints(template.marginTop);
+  const marginLeftPt = inchesToPoints(template.marginLeft);
+  const gapXPt = inchesToPoints(template.gapX);
+  const gapYPt = inchesToPoints(template.gapY);
   
-  // Calculate font sizes with extended multiplier range
-  const fontMultiplier = Math.max(0.5, Math.min(2.0, customization.fontSizeMultiplier || 1));
-  const logoMultiplier = Math.max(0.25, Math.min(2.5, customization.logoSizeMultiplier || 1));
-  const mainFontSize = calculateFontSize(template, fontMultiplier);
-  const smallFontSize = mainFontSize * 0.75;
-  const lineHeight = getLineHeight(mainFontSize);
-  const smallLineHeight = getLineHeight(smallFontSize);
+  // Calculate padding in points (matches preview: max(4px, 4% of height))
+  const paddingPt = pixelsToPoints(Math.max(4, pixelLayout.heightPx * 0.04));
+  const contentWidthPt = labelWidthPt - (paddingPt * 2);
   
-  // Padding inside each label
-  const padding = inchesToPoints(isLargeLabel ? 0.1 : 0.05);
-  const contentWidth = labelWidth - (padding * 2);
-
-  // Logo dimensions for two-zone layout
-  const logoZoneHeight = useTwoZoneLayout ? labelHeight * 0.45 : 0;
+  // Get zones from layout
+  const logoZone = pixelLayout.zones.find(z => z.type === 'logo');
+  const fromZone = pixelLayout.zones.find(z => z.type === 'from');
+  const toZone = pixelLayout.zones.find(z => z.type === 'to');
+  const brandingZone = pixelLayout.zones.find(z => z.type === 'branding');
 
   for (let pageIndex = 0; pageIndex < totalPages; pageIndex++) {
     if (pageIndex > 0) {
@@ -257,200 +254,144 @@ export function generateLabelsPDF(
       const row = Math.floor(index / template.cols);
       
       // Calculate label position
-      const x = marginLeft + (col * (labelWidth + gapX));
-      const y = marginTop + (row * (labelHeight + gapY));
+      const labelX = marginLeftPt + (col * (labelWidthPt + gapXPt));
+      const labelY = marginTopPt + (row * (labelHeightPt + gapYPt));
       
-      // Content area
-      const contentX = x + padding;
-      const contentY = y + padding;
-      const contentHeight = labelHeight - (padding * 2);
-      const centerX = x + (labelWidth / 2);
+      // Content area with padding
+      const contentX = labelX + paddingPt;
+      let currentY = labelY + paddingPt;
+      const centerX = labelX + (labelWidthPt / 2);
       
-      // Handle two-zone layout for large labels with logo
-      if (useTwoZoneLayout && customization.showLogo && customization.logoUrl) {
-        // Top zone: Logo (takes up ~45% of label height)
-        const logoMaxWidth = contentWidth * 0.8;
-        const logoMaxHeight = logoZoneHeight - padding * 2;
+      // Zone 1: Logo (if enabled)
+      if (layoutOptions.showLogo && customization.logoUrl && logoZone) {
+        const logoHeightPt = pixelsToPoints(logoZone.heightPx);
+        const logoWidthPt = contentWidthPt * 0.8;
         
         addLogoToPDF(
           pdf,
           customization.logoUrl,
           contentX,
-          contentY,
-          logoMaxWidth * logoMultiplier,
-          logoMaxHeight * logoMultiplier,
+          currentY,
+          logoWidthPt,
+          logoHeightPt,
           centerX
         );
         
-        // Bottom zone: Address (starts below logo zone)
-        const addressZoneY = y + logoZoneHeight;
-        const addressZoneHeight = labelHeight - logoZoneHeight - padding;
+        currentY += logoHeightPt + paddingPt * 0.5;
+      }
+      
+      // Zone 2: From Address (if enabled)
+      if (layoutOptions.showFromAddress && customization.returnAddress && fromZone) {
+        const fromFontSizePt = pixelsToPoints(fromZone.fontSize);
+        const fromLineHeightPt = pixelsToPoints(fromZone.lineHeight);
         
-        // Calculate vertical centering for main address in bottom zone
-        const addressLines = [
-          label.contact,
-          label.address1,
-          label.address2,
-          `${label.city}${label.city && label.state ? ', ' : ''}${label.state} ${label.zip}`.trim(),
-        ].filter(line => line && line.trim());
+        pdf.setFontSize(fromFontSizePt);
         
-        const showToLabel = customization.showToLabel !== false;
-        const totalLines = addressLines.length + (showToLabel ? 1 : 0);
-        const totalTextHeight = totalLines * lineHeight;
+        const fromX = customization.fromPosition === 'top-left' 
+          ? contentX 
+          : labelX + labelWidthPt - paddingPt;
+        const fromAlign = customization.fromPosition === 'top-left' ? 'left' : 'right';
         
-        let textY = addressZoneY + (addressZoneHeight - totalTextHeight) / 2 + mainFontSize;
-        
-        // Draw main address - centered
-        pdf.setFontSize(mainFontSize);
-        
-        if (showToLabel) {
+        if (layoutOptions.showFromLabel) {
           pdf.setFont('helvetica', 'bold');
-          pdf.text('To:', centerX, textY, { align: 'center' });
-          textY += lineHeight;
-        }
-        
-        if (label.contact) {
-          pdf.setFont('helvetica', 'bold');
-          const truncatedContact = truncateText(pdf, label.contact, contentWidth);
-          pdf.text(truncatedContact, centerX, textY, { align: 'center' });
-          textY += lineHeight;
+          pdf.text('From:', fromX, currentY + fromFontSizePt, { align: fromAlign });
+          currentY += fromLineHeightPt;
         }
         
         pdf.setFont('helvetica', 'normal');
+        const returnLines = customization.returnAddress.split('\n').slice(0, 3);
+        returnLines.forEach(line => {
+          const truncated = truncateText(pdf, line, contentWidthPt * 0.45);
+          pdf.text(truncated, fromX, currentY + fromFontSizePt, { align: fromAlign });
+          currentY += fromLineHeightPt;
+        });
         
-        if (label.address1) {
-          const truncatedAddr1 = truncateText(pdf, label.address1, contentWidth);
-          pdf.text(truncatedAddr1, centerX, textY, { align: 'center' });
-          textY += lineHeight;
-        }
+        currentY += paddingPt * 0.5;
+      }
+      
+      // Zone 3: To Address (centered in remaining space)
+      if (toZone) {
+        const toFontSizePt = pixelsToPoints(toZone.fontSize);
+        const toLineHeightPt = pixelsToPoints(toZone.lineHeight);
         
-        if (label.address2) {
-          const truncatedAddr2 = truncateText(pdf, label.address2, contentWidth);
-          pdf.text(truncatedAddr2, centerX, textY, { align: 'center' });
-          textY += lineHeight;
-        }
-        
+        // Build address lines
+        const addressLines: string[] = [];
+        if (label.contact) addressLines.push(label.contact);
+        if (label.address1) addressLines.push(label.address1);
+        if (label.address2) addressLines.push(label.address2);
         const cityStateZip = `${label.city}${label.city && label.state ? ', ' : ''}${label.state} ${label.zip}`.trim();
-        if (cityStateZip) {
-          const truncatedCSZ = truncateText(pdf, cityStateZip, contentWidth);
-          pdf.text(truncatedCSZ, centerX, textY, { align: 'center' });
+        if (cityStateZip) addressLines.push(cityStateZip);
+        
+        const toTotalLines = (layoutOptions.showToLabel ? 1 : 0) + addressLines.length;
+        const toContentHeightPt = toTotalLines * toLineHeightPt;
+        
+        // Calculate remaining space for centering
+        const brandingReservePt = brandingZone 
+          ? pixelsToPoints(brandingZone.heightPx) + paddingPt * 0.25
+          : 0;
+        const bottomY = labelY + labelHeightPt - paddingPt - brandingReservePt;
+        const availableHeightPt = bottomY - currentY;
+        
+        // Vertically center the "to" content
+        let toStartY = currentY + (availableHeightPt - toContentHeightPt) / 2 + toFontSizePt;
+        
+        // Horizontal alignment
+        const toAlign = customization.toAlignment || 'center';
+        let toX: number;
+        if (toAlign === 'center') {
+          toX = centerX;
+        } else if (toAlign === 'right') {
+          toX = labelX + labelWidthPt - paddingPt;
+        } else {
+          toX = contentX;
         }
         
-        // Return address in bottom-left of address zone
-        if (customization.showReturnAddress && customization.returnAddress) {
-          pdf.setFontSize(smallFontSize);
-          pdf.setFont('helvetica', 'normal');
-          
-          const returnLines = customization.returnAddress.split('\n').slice(0, 3);
-          let returnY = addressZoneY + smallFontSize + 4;
-          
-          if (customization.showFromLabel) {
-            pdf.setFont('helvetica', 'bold');
-            pdf.text('From:', contentX, returnY);
-            returnY += smallLineHeight;
-            pdf.setFont('helvetica', 'normal');
-          }
-          
-          returnLines.forEach(line => {
-            const truncated = truncateText(pdf, line, contentWidth * 0.4);
-            pdf.text(truncated, contentX, returnY);
-            returnY += smallLineHeight;
-          });
-        }
-      } else {
-        // Standard layout (non-two-zone)
-        
-        // Add logo if enabled (standard positioning)
-        if (customization.showLogo && customization.logoUrl) {
-          const logoMaxWidth = contentWidth * 0.3 * logoMultiplier;
-          const logoMaxHeight = contentHeight * 0.3 * logoMultiplier;
-          addLogoToPDF(pdf, customization.logoUrl, contentX, contentY, logoMaxWidth, logoMaxHeight);
-        }
-        
-        // Calculate vertical centering for main address
-        const addressLines = [
-          label.contact,
-          label.address1,
-          label.address2,
-          `${label.city}${label.city && label.state ? ', ' : ''}${label.state} ${label.zip}`.trim(),
-        ].filter(line => line && line.trim());
-        
-        const showToLabel = customization.showToLabel !== false;
-        const totalLines = addressLines.length + (showToLabel ? 1 : 0);
-        const totalTextHeight = totalLines * lineHeight;
-        
-        // Start Y position for centered text
-        let textY = contentY + (contentHeight - totalTextHeight) / 2 + mainFontSize;
-        
-        // Handle return address if enabled
-        if (customization.showReturnAddress && customization.returnAddress) {
-          pdf.setFontSize(smallFontSize);
-          pdf.setFont('helvetica', 'normal');
-          
-          const returnLines = customization.returnAddress.split('\n').slice(0, 3);
-          let returnY = contentY + smallFontSize;
-          
-          if (customization.showFromLabel) {
-            pdf.setFont('helvetica', 'bold');
-            pdf.text('From:', contentX, returnY);
-            returnY += smallLineHeight;
-            pdf.setFont('helvetica', 'normal');
-          }
-          
-          returnLines.forEach(line => {
-            const truncated = truncateText(pdf, line, contentWidth * 0.45);
-            pdf.text(truncated, contentX, returnY);
-            returnY += smallLineHeight;
-          });
-        }
-        
-        // Draw main address - centered
-        pdf.setFontSize(mainFontSize);
+        pdf.setFontSize(toFontSizePt);
         
         // "To:" label
-        if (showToLabel) {
+        if (layoutOptions.showToLabel) {
           pdf.setFont('helvetica', 'bold');
-          pdf.text('To:', centerX, textY, { align: 'center' });
-          textY += lineHeight;
+          pdf.text('To:', toX, toStartY, { align: toAlign });
+          toStartY += toLineHeightPt;
         }
         
         // Contact name (bold)
         if (label.contact) {
           pdf.setFont('helvetica', 'bold');
-          const truncatedContact = truncateText(pdf, label.contact, contentWidth);
-          pdf.text(truncatedContact, centerX, textY, { align: 'center' });
-          textY += lineHeight;
+          const truncatedContact = truncateText(pdf, label.contact, contentWidthPt);
+          pdf.text(truncatedContact, toX, toStartY, { align: toAlign });
+          toStartY += toLineHeightPt;
         }
         
         // Address lines (normal)
         pdf.setFont('helvetica', 'normal');
         
         if (label.address1) {
-          const truncatedAddr1 = truncateText(pdf, label.address1, contentWidth);
-          pdf.text(truncatedAddr1, centerX, textY, { align: 'center' });
-          textY += lineHeight;
+          const truncatedAddr1 = truncateText(pdf, label.address1, contentWidthPt);
+          pdf.text(truncatedAddr1, toX, toStartY, { align: toAlign });
+          toStartY += toLineHeightPt;
         }
         
         if (label.address2) {
-          const truncatedAddr2 = truncateText(pdf, label.address2, contentWidth);
-          pdf.text(truncatedAddr2, centerX, textY, { align: 'center' });
-          textY += lineHeight;
+          const truncatedAddr2 = truncateText(pdf, label.address2, contentWidthPt);
+          pdf.text(truncatedAddr2, toX, toStartY, { align: toAlign });
+          toStartY += toLineHeightPt;
         }
         
-        // City, State ZIP
-        const cityStateZip = `${label.city}${label.city && label.state ? ', ' : ''}${label.state} ${label.zip}`.trim();
         if (cityStateZip) {
-          const truncatedCSZ = truncateText(pdf, cityStateZip, contentWidth);
-          pdf.text(truncatedCSZ, centerX, textY, { align: 'center' });
+          const truncatedCSZ = truncateText(pdf, cityStateZip, contentWidthPt);
+          pdf.text(truncatedCSZ, toX, toStartY, { align: toAlign });
         }
       }
       
-      // Branding footer (for both layouts)
-      if (customization.showBranding && customization.brandingText) {
-        pdf.setFontSize(smallFontSize * 0.9);
+      // Zone 4: Branding Footer (if enabled)
+      if (layoutOptions.showBranding && customization.brandingText && brandingZone) {
+        const brandingFontSizePt = pixelsToPoints(brandingZone.fontSize);
+        const brandY = labelY + labelHeightPt - paddingPt;
+        
+        pdf.setFontSize(brandingFontSizePt);
         pdf.setFont('helvetica', 'bold');
-        const brandY = y + labelHeight - padding - 2;
-        const truncatedBrand = truncateText(pdf, customization.brandingText, contentWidth);
+        const truncatedBrand = truncateText(pdf, customization.brandingText, contentWidthPt);
         pdf.text(truncatedBrand, centerX, brandY, { align: 'center' });
       }
     });
