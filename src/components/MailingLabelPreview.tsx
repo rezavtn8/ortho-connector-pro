@@ -1,11 +1,11 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Printer, Settings, FileDown, Eye, AlertTriangle } from "lucide-react";
-import { useState, useMemo } from "react";
+import { Printer, Settings, FileDown, Eye, AlertTriangle, X, Download } from "lucide-react";
+import { useState, useMemo, useCallback } from "react";
 import { LabelCustomizationDialog, LabelCustomization } from "./LabelCustomizationDialog";
 import { toast } from "@/hooks/use-toast";
-import { downloadLabelsPDF, previewLabelsPDF } from "@/utils/pdfLabelGenerator";
+import { downloadLabelsPDF, generatePdfBlob } from "@/utils/pdfLabelGenerator";
 import {
   calculateLabelLayout,
   getLayoutPixelValues,
@@ -89,6 +89,8 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
   const [selectedTemplate, setSelectedTemplate] = useState<keyof typeof AVERY_TEMPLATES>("5160");
   const [showCustomization, setShowCustomization] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [customization, setCustomization] = useState<LabelCustomization>({
     showLogo: false,
     showReturnAddress: false,
@@ -104,6 +106,15 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
     layoutMode: 'auto',
     useAutoOptimization: true,
   });
+  
+  // Cleanup blob URL when dialog closes
+  const closePdfPreview = useCallback(() => {
+    if (pdfBlobUrl) {
+      URL.revokeObjectURL(pdfBlobUrl);
+      setPdfBlobUrl(null);
+    }
+    setShowPdfPreview(false);
+  }, [pdfBlobUrl]);
   
   const template = AVERY_TEMPLATES[selectedTemplate];
   const labelsPerPage = template.cols * template.rows;
@@ -215,9 +226,7 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
     setIsGenerating(true);
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      previewLabelsPDF(
+      const blob = await generatePdfBlob(
         data,
         selectedTemplate,
         {
@@ -240,10 +249,14 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
         }
       );
       
-      toast({
-        title: "PDF Preview Opened",
-        description: "The PDF has been opened in a new tab for preview.",
-      });
+      // Clean up previous blob URL if exists
+      if (pdfBlobUrl) {
+        URL.revokeObjectURL(pdfBlobUrl);
+      }
+      
+      const url = URL.createObjectURL(blob);
+      setPdfBlobUrl(url);
+      setShowPdfPreview(true);
     } catch (error) {
       console.error('PDF preview error:', error);
       toast({
@@ -253,6 +266,15 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
       });
     } finally {
       setIsGenerating(false);
+    }
+  };
+  
+  const handleDownloadFromPreview = () => {
+    if (pdfBlobUrl) {
+      const link = document.createElement('a');
+      link.href = pdfBlobUrl;
+      link.download = `mailing-labels-${selectedTemplate}-${new Date().toISOString().split('T')[0]}.pdf`;
+      link.click();
     }
   };
 
@@ -502,6 +524,44 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
         onSave={setCustomization}
         templateDimensions={{ width: template.width, height: template.height }}
       />
+
+      {/* In-App PDF Preview Dialog */}
+      <Dialog open={showPdfPreview} onOpenChange={(open) => !open && closePdfPreview()}>
+        <DialogContent className="max-w-5xl h-[90vh] flex flex-col p-0" aria-describedby={undefined}>
+          <DialogHeader className="px-6 py-4 border-b border-border flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <DialogTitle>PDF Preview</DialogTitle>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="default" 
+                  size="sm"
+                  onClick={handleDownloadFromPreview}
+                  className="gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  Download PDF
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={closePdfPreview}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="flex-1 min-h-0">
+            {pdfBlobUrl && (
+              <iframe
+                src={pdfBlobUrl}
+                className="w-full h-full border-0"
+                title="PDF Preview"
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Professional Print Styles */}
       <style>{`
