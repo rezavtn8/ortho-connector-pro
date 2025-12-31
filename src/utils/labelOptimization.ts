@@ -1,6 +1,6 @@
 import { LabelDimensions, calculateOptimalSizes } from './labelSizing';
 
-export type LogoPosition = "top-left" | "top-center" | "top-right" | "center";
+export type LogoPosition = "top-left" | "top-center" | "top-right" | "center" | "top-half";
 export type ReturnAddressPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
 export interface OptimizedLayout {
@@ -11,6 +11,7 @@ export interface OptimizedLayout {
   showFromLabel: boolean;
   showToLabel: boolean;
   reasoning: string;
+  useTwoZoneLayout: boolean; // For large labels with logo in top half
 }
 
 /**
@@ -23,8 +24,34 @@ function selectOptimalLayout(dimensions: LabelDimensions, hasLogo: boolean, hasR
   
   let layout: OptimizedLayout;
   
+  // Extra large shipping labels (>= 2.5" tall, like 3-1/3" x 4")
+  if (heightPx >= 240 && hasLogo) {
+    layout = {
+      logoPosition: "top-half",
+      returnAddressPosition: "bottom-left",
+      logoSizeMultiplier: 1.5,
+      fontSizeMultiplier: 1.2,
+      showFromLabel: true,
+      showToLabel: true,
+      reasoning: "Two-zone layout - prominent logo in top half, address below",
+      useTwoZoneLayout: true
+    };
+  }
+  // Large labels (2" to 2.5" tall)
+  else if (heightPx >= 180 && heightPx < 240) {
+    layout = {
+      logoPosition: "top-center",
+      returnAddressPosition: "bottom-left",
+      logoSizeMultiplier: 1.3,
+      fontSizeMultiplier: 1.15,
+      showFromLabel: true,
+      showToLabel: true,
+      reasoning: "Spacious layout - prominent centered logo, separated return address",
+      useTwoZoneLayout: false
+    };
+  }
   // Small vertical labels (< 1.2" tall, narrow)
-  if (heightPx < 115 && aspectRatio < 2.5) {
+  else if (heightPx < 115 && aspectRatio < 2.5) {
     layout = {
       logoPosition: "top-center",
       returnAddressPosition: "top-left",
@@ -32,7 +59,8 @@ function selectOptimalLayout(dimensions: LabelDimensions, hasLogo: boolean, hasR
       fontSizeMultiplier: 0.9,
       showFromLabel: false,
       showToLabel: false,
-      reasoning: "Compact layout - centered logo, minimal labels"
+      reasoning: "Compact layout - centered logo, minimal labels",
+      useTwoZoneLayout: false
     };
   }
   // Medium square-ish labels (1.5" to 2" tall, balanced width)
@@ -44,19 +72,8 @@ function selectOptimalLayout(dimensions: LabelDimensions, hasLogo: boolean, hasR
       fontSizeMultiplier: 1.0,
       showFromLabel: true,
       showToLabel: true,
-      reasoning: "Balanced layout - logo right, return address left, with labels"
-    };
-  }
-  // Large labels (2" or taller)
-  else if (heightPx >= 180) {
-    layout = {
-      logoPosition: "top-center",
-      returnAddressPosition: "bottom-left",
-      logoSizeMultiplier: 1.2,
-      fontSizeMultiplier: 1.1,
-      showFromLabel: true,
-      showToLabel: true,
-      reasoning: "Spacious layout - prominent centered logo, separated return address"
+      reasoning: "Balanced layout - logo right, return address left, with labels",
+      useTwoZoneLayout: false
     };
   }
   // Wide horizontal labels
@@ -68,7 +85,8 @@ function selectOptimalLayout(dimensions: LabelDimensions, hasLogo: boolean, hasR
       fontSizeMultiplier: 0.95,
       showFromLabel: false,
       showToLabel: true,
-      reasoning: "Wide layout - logo left, return address opposite corner"
+      reasoning: "Wide layout - logo left, return address opposite corner",
+      useTwoZoneLayout: false
     };
   }
   // Default fallback
@@ -80,18 +98,20 @@ function selectOptimalLayout(dimensions: LabelDimensions, hasLogo: boolean, hasR
       fontSizeMultiplier: 1.0,
       showFromLabel: true,
       showToLabel: true,
-      reasoning: "Standard layout - classic opposing corners"
+      reasoning: "Standard layout - classic opposing corners",
+      useTwoZoneLayout: false
     };
   }
   
   // Adjust if no logo
   if (!hasLogo) {
     layout.returnAddressPosition = "top-left";
+    layout.useTwoZoneLayout = false;
   }
   
   // Adjust if no return address
   if (!hasReturnAddress) {
-    layout.logoPosition = "top-center";
+    layout.logoPosition = hasLogo && heightPx >= 240 ? "top-half" : "top-center";
   }
   
   return layout;
@@ -121,7 +141,12 @@ function optimizeSizing(
   }
   
   // Increase sizes if lots of space available
-  if (totalArea > 30000 && !hasLogo) {
+  if (totalArea > 50000 && !hasLogo) {
+    // Extra large labels without logo
+    sizeAdjustment += 0.25;
+  } else if (totalArea > 35000 && !hasLogo) {
+    sizeAdjustment += 0.2;
+  } else if (totalArea > 30000 && !hasLogo) {
     sizeAdjustment += 0.15;
   } else if (totalArea > 25000) {
     sizeAdjustment += 0.1;
@@ -132,10 +157,19 @@ function optimizeSizing(
     sizeAdjustment -= 0.2;
   }
   
+  // For two-zone layout, boost logo size further
+  if (layout.useTwoZoneLayout) {
+    return {
+      ...layout,
+      logoSizeMultiplier: Math.max(0.8, Math.min(2.0, layout.logoSizeMultiplier + sizeAdjustment)),
+      fontSizeMultiplier: Math.max(0.6, Math.min(1.8, layout.fontSizeMultiplier + sizeAdjustment * 0.5)),
+    };
+  }
+  
   return {
     ...layout,
-    logoSizeMultiplier: Math.max(0.6, Math.min(1.4, layout.logoSizeMultiplier + sizeAdjustment)),
-    fontSizeMultiplier: Math.max(0.8, Math.min(1.2, layout.fontSizeMultiplier + sizeAdjustment * 0.5)),
+    logoSizeMultiplier: Math.max(0.6, Math.min(1.5, layout.logoSizeMultiplier + sizeAdjustment)),
+    fontSizeMultiplier: Math.max(0.8, Math.min(1.4, layout.fontSizeMultiplier + sizeAdjustment * 0.5)),
   };
 }
 
@@ -150,6 +184,11 @@ function resolveLayoutConflicts(
   hasReturnAddress: boolean
 ): OptimizedLayout {
   const heightPx = dimensions.height * 96;
+  
+  // Two-zone layout doesn't have overlap issues
+  if (layout.useTwoZoneLayout) {
+    return layout;
+  }
   
   // Check for potential overlaps with top-positioned elements
   if (layout.logoPosition === "top-center" && layout.returnAddressPosition === "top-left") {
@@ -208,9 +247,24 @@ export function optimizeLabelLayout(
  * Get human-readable explanation of the optimization
  */
 export function explainOptimization(dimensions: LabelDimensions, layout: OptimizedLayout): string {
-  const size = dimensions.height < 1.2 ? "small" : dimensions.height < 2 ? "medium" : "large";
+  const heightPx = dimensions.height * 96;
+  let size: string;
+  if (heightPx < 115) {
+    size = "small";
+  } else if (heightPx < 180) {
+    size = "medium";
+  } else if (heightPx < 240) {
+    size = "large";
+  } else {
+    size = "extra large shipping";
+  }
+  
   const aspectRatio = dimensions.width / dimensions.height;
   const shape = aspectRatio < 1.5 ? "square" : aspectRatio < 2.5 ? "rectangular" : "wide";
+  
+  if (layout.useTwoZoneLayout) {
+    return `Auto-optimized for ${size} ${shape} labels (${dimensions.width}" × ${dimensions.height}"): Logo zone in top half, address zone below`;
+  }
   
   return `Auto-optimized for ${size} ${shape} labels (${dimensions.width}" × ${dimensions.height}"): ${layout.reasoning}`;
 }
