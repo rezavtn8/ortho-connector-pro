@@ -551,13 +551,23 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
               </div>
             </div>
           </DialogHeader>
-          <div className="flex-1 min-h-0">
+          <div className="flex-1 min-h-0 bg-muted">
             {pdfBlobUrl && (
-              <iframe
-                src={pdfBlobUrl}
-                className="w-full h-full border-0"
-                title="PDF Preview"
-              />
+              <object
+                data={pdfBlobUrl}
+                type="application/pdf"
+                className="w-full h-full"
+              >
+                <div className="flex flex-col items-center justify-center h-full gap-4 p-8">
+                  <p className="text-muted-foreground text-center">
+                    Unable to display PDF preview in browser.
+                  </p>
+                  <Button onClick={handleDownloadFromPreview} className="gap-2">
+                    <Download className="h-4 w-4" />
+                    Download PDF Instead
+                  </Button>
+                </div>
+              </object>
             )}
           </div>
         </DialogContent>

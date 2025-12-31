@@ -165,7 +165,19 @@ async function loadImageAsBase64(url: string): Promise<string | null> {
 }
 
 /**
- * Add logo to PDF at specified position
+ * Get natural dimensions of an image from base64 data
+ */
+async function getImageDimensions(base64: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onerror = () => resolve({ width: 100, height: 50 }); // Fallback aspect ratio
+    img.src = base64;
+  });
+}
+
+/**
+ * Add logo to PDF at specified position, preserving aspect ratio
  */
 function addLogoToPDF(
   pdf: jsPDF,
@@ -174,7 +186,9 @@ function addLogoToPDF(
   y: number,
   maxWidth: number,
   maxHeight: number,
-  centerX?: number
+  centerX: number | undefined,
+  naturalWidth: number,
+  naturalHeight: number
 ): void {
   try {
     if (!logoBase64 || !logoBase64.startsWith('data:image')) {
@@ -184,11 +198,21 @@ function addLogoToPDF(
     const formatMatch = logoBase64.match(/data:image\/(\w+);/);
     const format = formatMatch ? formatMatch[1].toUpperCase() : 'PNG';
     
-    if (centerX !== undefined) {
-      pdf.addImage(logoBase64, format, centerX - maxWidth / 2, y, maxWidth, maxHeight);
-    } else {
-      pdf.addImage(logoBase64, format, x, y, maxWidth, maxHeight);
+    // Calculate scaled dimensions preserving aspect ratio
+    const aspectRatio = naturalWidth / naturalHeight;
+    let finalWidth = maxWidth;
+    let finalHeight = maxWidth / aspectRatio;
+    
+    // If height exceeds max, scale down based on height instead
+    if (finalHeight > maxHeight) {
+      finalHeight = maxHeight;
+      finalWidth = maxHeight * aspectRatio;
     }
+    
+    // Center horizontally if centerX is provided
+    const logoX = centerX !== undefined ? centerX - finalWidth / 2 : x;
+    
+    pdf.addImage(logoBase64, format, logoX, y, finalWidth, finalHeight);
   } catch (error) {
     console.warn('Failed to add logo to PDF:', error);
   }
@@ -268,10 +292,14 @@ export async function generateLabelsPDF(
   const paddingPt = pixelsToPoints(paddingPx);
   const contentWidthPt = labelWidthPt - (paddingPt * 2);
   
-  // Pre-load logo as base64 if needed
+  // Pre-load logo as base64 and get natural dimensions if needed
   let logoBase64: string | null = null;
+  let logoDimensions = { width: 100, height: 50 }; // Default aspect ratio
   if (customization.showLogo && customization.logoUrl) {
     logoBase64 = await loadImageAsBase64(customization.logoUrl);
+    if (logoBase64) {
+      logoDimensions = await getImageDimensions(logoBase64);
+    }
   }
   
   // Get zones from pixelLayout which has heightPx values
@@ -314,7 +342,9 @@ export async function generateLabelsPDF(
           currentY,
           logoWidthPt,
           logoHeightPt,
-          centerX
+          centerX,
+          logoDimensions.width,
+          logoDimensions.height
         );
         
         currentY += logoHeightPt + paddingPt * 0.5;
@@ -471,5 +501,6 @@ export async function generatePdfBlob(
   customization: LabelCustomization = {}
 ): Promise<Blob> {
   const pdf = await generateLabelsPDF(labels, templateKey, customization);
-  return pdf.output('blob');
+  const arrayBuffer = pdf.output('arraybuffer');
+  return new Blob([arrayBuffer], { type: 'application/pdf' });
 }
