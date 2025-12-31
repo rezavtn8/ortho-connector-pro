@@ -107,18 +107,23 @@ export default function ReviewMagic() {
 
   const handleSync = async () => {
     if (!clinicData?.id) return;
-    
+
     try {
       setSyncing(true);
-      const { error } = await supabase.functions.invoke('sync-google-business-reviews', {
+      const { data, error } = await supabase.functions.invoke('sync-google-business-reviews', {
         body: { clinic_id: clinicData.id },
       });
 
       if (error) throw error;
 
+      const result = (data as any)?.results?.[0];
+      if (!result?.success) {
+        throw new Error(result?.error || 'Failed to sync reviews');
+      }
+
       toast({
         title: "Success",
-        description: "Reviews synced successfully",
+        description: `Reviews synced successfully (${result.reviews_fetched ?? 0} fetched)`,
       });
 
       await loadReviews(clinicData.id);

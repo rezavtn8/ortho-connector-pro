@@ -380,10 +380,17 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
+    const anyFailed = results.some((r: any) => !r?.success);
+
+    // If a single clinic sync was requested, surface failures as non-2xx
+    // so the frontend can reliably show an error.
+    const status = clinic_id && !sync_all && anyFailed ? 502 : 200;
+
     return new Response(JSON.stringify({
-      success: true,
+      success: !anyFailed,
       results,
     }), {
+      status,
       headers: { 'Content-Type': 'application/json', ...corsHeaders },
     });
 
