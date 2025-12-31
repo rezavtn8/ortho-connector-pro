@@ -294,8 +294,17 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
               </div>
             )}
             
-            {/* Main recipient address - centered */}
-            <div className="text-center w-full">
+            {/* Main recipient address - positioned to avoid overlap with From */}
+            <div 
+              style={{
+                position: "absolute",
+                top: "50%",
+                left: customization.showReturnAddress ? "55%" : "50%",
+                transform: "translate(-50%, -50%)",
+                textAlign: "center",
+                width: customization.showReturnAddress ? "50%" : "90%",
+              }}
+            >
               {customization.showToLabel && (
                 <div className="font-semibold mb-1">To:</div>
               )}
