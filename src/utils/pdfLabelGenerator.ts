@@ -133,11 +133,43 @@ const truncateText = (pdf: jsPDF, text: string, maxWidth: number): string => {
 };
 
 /**
+ * Convert an external image URL to base64 data URL
+ */
+async function loadImageAsBase64(url: string): Promise<string | null> {
+  // Already base64
+  if (url.startsWith('data:image')) {
+    return url;
+  }
+  
+  try {
+    const response = await fetch(url, { mode: 'cors' });
+    if (!response.ok) {
+      console.warn('Failed to fetch image:', response.status);
+      return null;
+    }
+    
+    const blob = await response.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => {
+        console.warn('Failed to read image as base64');
+        resolve(null);
+      };
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.warn('Failed to load image as base64:', error);
+    return null;
+  }
+}
+
+/**
  * Add logo to PDF at specified position
  */
 function addLogoToPDF(
   pdf: jsPDF,
-  logoUrl: string,
+  logoBase64: string,
   x: number,
   y: number,
   maxWidth: number,
@@ -145,17 +177,17 @@ function addLogoToPDF(
   centerX?: number
 ): void {
   try {
-    if (!logoUrl.startsWith('data:image')) {
+    if (!logoBase64 || !logoBase64.startsWith('data:image')) {
       return;
     }
     
-    const formatMatch = logoUrl.match(/data:image\/(\w+);/);
+    const formatMatch = logoBase64.match(/data:image\/(\w+);/);
     const format = formatMatch ? formatMatch[1].toUpperCase() : 'PNG';
     
     if (centerX !== undefined) {
-      pdf.addImage(logoUrl, format, centerX - maxWidth / 2, y, maxWidth, maxHeight);
+      pdf.addImage(logoBase64, format, centerX - maxWidth / 2, y, maxWidth, maxHeight);
     } else {
-      pdf.addImage(logoUrl, format, x, y, maxWidth, maxHeight);
+      pdf.addImage(logoBase64, format, x, y, maxWidth, maxHeight);
     }
   } catch (error) {
     console.warn('Failed to add logo to PDF:', error);
@@ -173,11 +205,11 @@ function pixelsToPoints(pixels: number): number {
 /**
  * Generate a professional PDF with mailing labels using the shared layout engine
  */
-export function generateLabelsPDF(
+export async function generateLabelsPDF(
   labels: LabelData[],
   templateKey: string,
   customization: LabelCustomization = {}
-): jsPDF {
+): Promise<jsPDF> {
   if (!labels || labels.length === 0) {
     return new jsPDF({
       orientation: 'portrait',
@@ -236,6 +268,12 @@ export function generateLabelsPDF(
   const paddingPt = pixelsToPoints(paddingPx);
   const contentWidthPt = labelWidthPt - (paddingPt * 2);
   
+  // Pre-load logo as base64 if needed
+  let logoBase64: string | null = null;
+  if (customization.showLogo && customization.logoUrl) {
+    logoBase64 = await loadImageAsBase64(customization.logoUrl);
+  }
+  
   // Get zones from pixelLayout which has heightPx values
   const logoZone = pixelLayout.zones.find(z => z.type === 'logo');
   const fromZone = pixelLayout.zones.find(z => z.type === 'from');
@@ -264,14 +302,14 @@ export function generateLabelsPDF(
       const centerX = labelX + (labelWidthPt / 2);
       
       // Zone 1: Logo (if enabled)
-      if (layoutOptions.showLogo && customization.logoUrl && logoZone) {
+      if (layoutOptions.showLogo && logoBase64 && logoZone) {
         // logoZone.heightPx is in screen pixels (96 DPI), convert to PDF points
         const logoHeightPt = pixelsToPoints(logoZone.heightPx);
         const logoWidthPt = contentWidthPt * 0.8;
         
         addLogoToPDF(
           pdf,
-          customization.logoUrl,
+          logoBase64,
           contentX,
           currentY,
           logoWidthPt,
@@ -409,14 +447,14 @@ export function generateLabelsPDF(
 /**
  * Generate and download PDF
  */
-export function downloadLabelsPDF(
+export async function downloadLabelsPDF(
   labels: LabelData[],
   templateKey: string,
   customization: LabelCustomization = {},
   filename: string = 'mailing-labels.pdf'
-): void {
+): Promise<void> {
   try {
-    const pdf = generateLabelsPDF(labels, templateKey, customization);
+    const pdf = await generateLabelsPDF(labels, templateKey, customization);
     pdf.save(filename);
   } catch (error) {
     console.error('Error generating PDF for download:', error);
@@ -425,28 +463,13 @@ export function downloadLabelsPDF(
 }
 
 /**
- * Generate PDF and open in new tab for preview
+ * Generate PDF blob for in-app preview
  */
-export function previewLabelsPDF(
+export async function generatePdfBlob(
   labels: LabelData[],
   templateKey: string,
   customization: LabelCustomization = {}
-): void {
-  try {
-    const pdf = generateLabelsPDF(labels, templateKey, customization);
-    const blob = pdf.output('blob');
-    const url = URL.createObjectURL(blob);
-    const newWindow = window.open(url, '_blank');
-    
-    if (!newWindow) {
-      // Popup blocked - try alternative download approach
-      const link = document.createElement('a');
-      link.href = url;
-      link.target = '_blank';
-      link.click();
-    }
-  } catch (error) {
-    console.error('Error generating PDF preview:', error);
-    throw error;
-  }
+): Promise<Blob> {
+  const pdf = await generateLabelsPDF(labels, templateKey, customization);
+  return pdf.output('blob');
 }
