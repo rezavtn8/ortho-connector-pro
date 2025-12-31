@@ -118,12 +118,14 @@ function shouldUseTwoZoneLayout(
 /**
  * Calculate the layout for a label based on dimensions and options
  * This is the main function that both preview and PDF generator should use
+ * Auto-adjusts logo size if content overflows
  */
 export function calculateLabelLayout(
   dimensions: LabelDimensions,
   options: LayoutOptions,
   fromAddressLines: number = 0,
-  toAddressLines: number = 4
+  toAddressLines: number = 4,
+  _autoAdjustAttempt: number = 0 // Internal: tracks auto-adjustment iterations
 ): CalculatedLayout {
   const widthPx = dimensions.width * DPI;
   const heightPx = dimensions.height * DPI;
@@ -142,9 +144,10 @@ export function calculateLabelLayout(
   const fromLineHeight = fromFontSize * lineHeightMult;
   const brandingLineHeight = brandingFontSize * lineHeightMult;
   
-  // Calculate logo height
+  // Calculate logo height (may be reduced in auto-adjustment)
+  const effectiveLogoMultiplier = options.logoSizeMultiplier * Math.pow(0.75, _autoAdjustAttempt);
   const logoHeight = options.showLogo 
-    ? calculateLogoHeight(heightPx, options.showFromAddress, useTwoZone, options.logoSizeMultiplier)
+    ? calculateLogoHeight(heightPx, options.showFromAddress, useTwoZone, effectiveLogoMultiplier)
     : 0;
   
   const zones: LayoutZone[] = [];
@@ -244,6 +247,17 @@ export function calculateLabelLayout(
   
   const hasOverflow = totalContentHeightPx > heightPx - padding * 2;
   
+  // Auto-adjust: if overflow and we have a logo, try reducing logo size (max 4 attempts)
+  if (hasOverflow && options.showLogo && _autoAdjustAttempt < 4) {
+    return calculateLabelLayout(
+      dimensions,
+      options,
+      fromAddressLines,
+      toAddressLines,
+      _autoAdjustAttempt + 1
+    );
+  }
+  
   // Generate description
   let description = '';
   if (useTwoZone) {
@@ -257,6 +271,11 @@ export function calculateLabelLayout(
     if (options.showLogo) description += 'Logo → ';
     if (options.showFromAddress) description += 'From → ';
     description += 'To';
+  }
+  
+  // Note if we auto-adjusted
+  if (_autoAdjustAttempt > 0) {
+    description += ` (logo auto-reduced ${Math.round((1 - Math.pow(0.75, _autoAdjustAttempt)) * 100)}%)`;
   }
   
   if (hasOverflow) {
