@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Upload, X, Sparkles, Type, ImageIcon, AlignLeft, AlignCenter, AlignRight, LayoutGrid } from "lucide-react";
+import { Upload, X, Sparkles, Type, ImageIcon, AlignLeft, AlignCenter, AlignRight, LayoutGrid, Building, Check } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import {
@@ -18,6 +18,7 @@ import {
   type FromPosition,
   type LineSpacing,
 } from "@/utils/labelLayoutEngine";
+import { useSavedLabelSettings } from "@/hooks/useSavedLabelSettings";
 
 // Export types for external use
 export type { LayoutMode, ToAlignment, FromPosition, LineSpacing };
@@ -60,7 +61,10 @@ export const LabelCustomizationDialog = ({
   templateDimensions = { width: 2.625, height: 1 }
 }: LabelCustomizationDialogProps) => {
   const [localCustomization, setLocalCustomization] = useState<LabelCustomization>(customization);
+  const savedSettings = useSavedLabelSettings();
   
+  const hasSavedLogo = !savedSettings.isLoading && !!savedSettings.clinicLogoUrl;
+  const hasSavedAddress = !savedSettings.isLoading && !!savedSettings.clinicAddress;
   const isLargeLabel = templateDimensions.height >= 2.5;
   
   // Auto-optimize on content changes when enabled
@@ -397,21 +401,45 @@ export const LabelCustomizationDialog = ({
 
             {localCustomization.showLogo && (
               <div className="space-y-3">
+                {/* Use saved logo from settings button */}
+                {hasSavedLogo && !localCustomization.logoUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full gap-2 border-primary/50 text-primary hover:bg-primary/10"
+                    onClick={() => setLocalCustomization(prev => ({ 
+                      ...prev, 
+                      logoUrl: savedSettings.clinicLogoUrl 
+                    }))}
+                  >
+                    <Building className="h-4 w-4" />
+                    Use Logo from Settings
+                  </Button>
+                )}
+                
                 {localCustomization.logoUrl ? (
-                  <div className="relative w-32 h-32 border border-border rounded-lg overflow-hidden bg-muted/30">
-                    <img 
-                      src={localCustomization.logoUrl} 
-                      alt="Logo" 
-                      className="w-full h-full object-contain p-2"
-                    />
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      className="absolute top-1 right-1 h-6 w-6"
-                      onClick={() => setLocalCustomization(prev => ({ ...prev, logoUrl: undefined }))}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
+                  <div className="relative">
+                    <div className="relative w-32 h-32 border border-border rounded-lg overflow-hidden bg-muted/30">
+                      <img 
+                        src={localCustomization.logoUrl} 
+                        alt="Logo" 
+                        className="w-full h-full object-contain p-2"
+                      />
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-1 right-1 h-6 w-6"
+                        onClick={() => setLocalCustomization(prev => ({ ...prev, logoUrl: undefined }))}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    {hasSavedLogo && localCustomization.logoUrl === savedSettings.clinicLogoUrl && (
+                      <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                        <Check className="h-3 w-3 text-green-500" />
+                        Using logo from Settings
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <div className="relative">
@@ -454,16 +482,41 @@ export const LabelCustomizationDialog = ({
             </div>
 
             {localCustomization.showReturnAddress && (
-              <Textarea
-                placeholder="Your Name&#10;Your Address Line 1&#10;City, State ZIP"
-                value={localCustomization.returnAddress || ""}
-                onChange={(e) => setLocalCustomization(prev => ({ 
-                  ...prev, 
-                  returnAddress: e.target.value 
-                }))}
-                rows={3}
-                className="resize-none"
-              />
+              <div className="space-y-3">
+                {/* Use saved address from settings button */}
+                {hasSavedAddress && !localCustomization.returnAddress && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full gap-2 border-primary/50 text-primary hover:bg-primary/10"
+                    onClick={() => setLocalCustomization(prev => ({ 
+                      ...prev, 
+                      returnAddress: `${savedSettings.clinicName || ''}\n${savedSettings.clinicAddress || ''}`.trim()
+                    }))}
+                  >
+                    <Building className="h-4 w-4" />
+                    Use Address from Settings
+                  </Button>
+                )}
+                
+                <Textarea
+                  placeholder="Your Name&#10;Your Address Line 1&#10;City, State ZIP"
+                  value={localCustomization.returnAddress || ""}
+                  onChange={(e) => setLocalCustomization(prev => ({ 
+                    ...prev, 
+                    returnAddress: e.target.value 
+                  }))}
+                  rows={3}
+                  className="resize-none"
+                />
+                
+                {hasSavedAddress && localCustomization.returnAddress?.includes(savedSettings.clinicAddress || '') && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Check className="h-3 w-3 text-green-500" />
+                    Using address from Settings
+                  </p>
+                )}
+              </div>
             )}
           </div>
 
@@ -480,14 +533,32 @@ export const LabelCustomizationDialog = ({
             </div>
 
             {localCustomization.showBranding && (
-              <Input
-                placeholder="e.g., Your Company Name"
-                value={localCustomization.brandingText || ""}
-                onChange={(e) => setLocalCustomization(prev => ({ 
-                  ...prev, 
-                  brandingText: e.target.value 
-                }))}
-              />
+              <div className="space-y-3">
+                {/* Use clinic name from settings */}
+                {savedSettings.clinicName && !localCustomization.brandingText && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full gap-2 border-primary/50 text-primary hover:bg-primary/10"
+                    onClick={() => setLocalCustomization(prev => ({ 
+                      ...prev, 
+                      brandingText: savedSettings.clinicName 
+                    }))}
+                  >
+                    <Building className="h-4 w-4" />
+                    Use Clinic Name from Settings
+                  </Button>
+                )}
+                
+                <Input
+                  placeholder="e.g., Your Company Name"
+                  value={localCustomization.brandingText || ""}
+                  onChange={(e) => setLocalCustomization(prev => ({ 
+                    ...prev, 
+                    brandingText: e.target.value 
+                  }))}
+                />
+              </div>
             )}
           </div>
 
