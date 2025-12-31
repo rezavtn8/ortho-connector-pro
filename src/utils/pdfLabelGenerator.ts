@@ -232,10 +232,11 @@ export function generateLabelsPDF(
   const gapYPt = inchesToPoints(template.gapY);
   
   // Calculate padding in points (matches preview: max(4px, 4% of height))
-  const paddingPt = pixelsToPoints(Math.max(4, pixelLayout.heightPx * 0.04));
+  const paddingPx = Math.max(4, pixelLayout.heightPx * 0.04);
+  const paddingPt = pixelsToPoints(paddingPx);
   const contentWidthPt = labelWidthPt - (paddingPt * 2);
   
-  // Get zones from layout
+  // Get zones from pixelLayout which has heightPx values
   const logoZone = pixelLayout.zones.find(z => z.type === 'logo');
   const fromZone = pixelLayout.zones.find(z => z.type === 'from');
   const toZone = pixelLayout.zones.find(z => z.type === 'to');
@@ -264,6 +265,7 @@ export function generateLabelsPDF(
       
       // Zone 1: Logo (if enabled)
       if (layoutOptions.showLogo && customization.logoUrl && logoZone) {
+        // logoZone.heightPx is in screen pixels (96 DPI), convert to PDF points
         const logoHeightPt = pixelsToPoints(logoZone.heightPx);
         const logoWidthPt = contentWidthPt * 0.8;
         
@@ -282,6 +284,7 @@ export function generateLabelsPDF(
       
       // Zone 2: From Address (if enabled)
       if (layoutOptions.showFromAddress && customization.returnAddress && fromZone) {
+        // fromZone.fontSize and lineHeight are in pixels, convert to points
         const fromFontSizePt = pixelsToPoints(fromZone.fontSize);
         const fromLineHeightPt = pixelsToPoints(fromZone.lineHeight);
         
@@ -311,6 +314,7 @@ export function generateLabelsPDF(
       
       // Zone 3: To Address (centered in remaining space)
       if (toZone) {
+        // toZone.fontSize and lineHeight are in pixels, convert to points
         const toFontSizePt = pixelsToPoints(toZone.fontSize);
         const toLineHeightPt = pixelsToPoints(toZone.lineHeight);
         
@@ -326,14 +330,15 @@ export function generateLabelsPDF(
         const toContentHeightPt = toTotalLines * toLineHeightPt;
         
         // Calculate remaining space for centering
+        // brandingZone.heightPx is in pixels, convert to points
         const brandingReservePt = brandingZone 
           ? pixelsToPoints(brandingZone.heightPx) + paddingPt * 0.25
           : 0;
         const bottomY = labelY + labelHeightPt - paddingPt - brandingReservePt;
         const availableHeightPt = bottomY - currentY;
         
-        // Vertically center the "to" content
-        let toStartY = currentY + (availableHeightPt - toContentHeightPt) / 2 + toFontSizePt;
+        // Vertically center the "to" content, ensure it doesn't go above currentY
+        let toStartY = currentY + Math.max(0, (availableHeightPt - toContentHeightPt) / 2) + toFontSizePt;
         
         // Horizontal alignment
         const toAlign = customization.toAlignment || 'center';
@@ -386,6 +391,7 @@ export function generateLabelsPDF(
       
       // Zone 4: Branding Footer (if enabled)
       if (layoutOptions.showBranding && customization.brandingText && brandingZone) {
+        // brandingZone.fontSize is in pixels, convert to points
         const brandingFontSizePt = pixelsToPoints(brandingZone.fontSize);
         const brandY = labelY + labelHeightPt - paddingPt;
         
@@ -409,8 +415,13 @@ export function downloadLabelsPDF(
   customization: LabelCustomization = {},
   filename: string = 'mailing-labels.pdf'
 ): void {
-  const pdf = generateLabelsPDF(labels, templateKey, customization);
-  pdf.save(filename);
+  try {
+    const pdf = generateLabelsPDF(labels, templateKey, customization);
+    pdf.save(filename);
+  } catch (error) {
+    console.error('Error generating PDF for download:', error);
+    throw error;
+  }
 }
 
 /**
@@ -421,8 +432,21 @@ export function previewLabelsPDF(
   templateKey: string,
   customization: LabelCustomization = {}
 ): void {
-  const pdf = generateLabelsPDF(labels, templateKey, customization);
-  const blob = pdf.output('blob');
-  const url = URL.createObjectURL(blob);
-  window.open(url, '_blank');
+  try {
+    const pdf = generateLabelsPDF(labels, templateKey, customization);
+    const blob = pdf.output('blob');
+    const url = URL.createObjectURL(blob);
+    const newWindow = window.open(url, '_blank');
+    
+    if (!newWindow) {
+      // Popup blocked - try alternative download approach
+      const link = document.createElement('a');
+      link.href = url;
+      link.target = '_blank';
+      link.click();
+    }
+  } catch (error) {
+    console.error('Error generating PDF preview:', error);
+    throw error;
+  }
 }

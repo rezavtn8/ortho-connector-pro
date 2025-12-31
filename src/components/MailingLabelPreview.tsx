@@ -256,7 +256,7 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
     }
   };
 
-  // Get zone by type from layout
+  // Get zone by type from pixelLayout (includes heightPx, widthPx, etc.)
   const getZone = (type: 'logo' | 'from' | 'to' | 'branding') => 
     pixelLayout.zones.find(z => z.type === type);
 
