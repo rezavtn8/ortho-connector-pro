@@ -8,11 +8,22 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { AlertTriangle, Star, RefreshCw, Search, Filter, Link as LinkIcon, TrendingUp, MessageSquare } from "lucide-react";
+import { AlertTriangle, Star, RefreshCw, Search, Filter, Link as LinkIcon, TrendingUp, MessageSquare, Unlink, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ReviewMagicCard } from "@/components/ReviewMagicCard";
 import { ConnectLocationDialog } from "@/components/ConnectLocationDialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function ReviewMagic() {
   const { user } = useAuth();
@@ -26,6 +37,7 @@ export default function ReviewMagic() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
+  const [disconnecting, setDisconnecting] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -119,6 +131,40 @@ export default function ReviewMagic() {
       });
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    if (!clinicData?.id) return;
+    
+    try {
+      setDisconnecting(true);
+      
+      // Delete the Google Business token for this clinic
+      const { error } = await supabase
+        .from('google_business_tokens' as any)
+        .delete()
+        .eq('clinic_id', clinicData.id);
+
+      if (error) throw error;
+
+      // Clear local state
+      setConnectionStatus(null);
+      setReviews([]);
+      
+      toast({
+        title: "Disconnected",
+        description: "Google Business Profile has been disconnected. You can now connect a different account.",
+      });
+    } catch (error: any) {
+      console.error('Error disconnecting:', error);
+      toast({
+        title: "Disconnect Failed",
+        description: error.message || "Failed to disconnect Google account",
+        variant: "destructive",
+      });
+    } finally {
+      setDisconnecting(false);
     }
   };
 
@@ -223,6 +269,50 @@ export default function ReviewMagic() {
         </Card>
       ) : (
         <>
+          {/* Connection Info Card */}
+          <Card className="border-green-200 bg-green-50/50 dark:bg-green-950/20 dark:border-green-800">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <div>
+                    <p className="font-medium text-green-800 dark:text-green-200">Google Business Profile Connected</p>
+                    <p className="text-sm text-green-600 dark:text-green-400">
+                      Syncing reviews for {clinicData?.name}
+                    </p>
+                  </div>
+                </div>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-2 text-destructive hover:text-destructive">
+                      <Unlink className="h-4 w-4" />
+                      Disconnect
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Disconnect Google Account?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will disconnect the current Google Business Profile. You can then connect a different Google account.
+                        Your existing review data will be preserved.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction 
+                        onClick={handleDisconnect}
+                        disabled={disconnecting}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        {disconnecting ? 'Disconnecting...' : 'Disconnect'}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card>
