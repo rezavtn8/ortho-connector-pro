@@ -1,12 +1,16 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Printer, Settings, FileDown, Eye } from "lucide-react";
-import { useState } from "react";
-import { LabelCustomizationDialog, LabelCustomization, LogoPosition, ReturnAddressPosition } from "./LabelCustomizationDialog";
-import { calculateOptimalSizes } from "@/utils/labelSizing";
+import { Printer, Settings, FileDown, Eye, AlertTriangle } from "lucide-react";
+import { useState, useMemo } from "react";
+import { LabelCustomizationDialog, LabelCustomization } from "./LabelCustomizationDialog";
 import { toast } from "@/hooks/use-toast";
-import { downloadLabelsPDF, previewLabelsPDF, AVERY_TEMPLATES as PDF_TEMPLATES } from "@/utils/pdfLabelGenerator";
+import { downloadLabelsPDF, previewLabelsPDF } from "@/utils/pdfLabelGenerator";
+import {
+  calculateLabelLayout,
+  getLayoutPixelValues,
+  type LayoutOptions,
+} from "@/utils/labelLayoutEngine";
 
 interface MailingLabelData {
   contact: string;
@@ -93,10 +97,12 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
     showToLabel: true,
     logoSizeMultiplier: 1.0,
     fontSizeMultiplier: 1.0,
-    logoPosition: "top-left" as LogoPosition,
-    returnAddressPosition: "top-left" as ReturnAddressPosition,
+    fromFontSizeMultiplier: 1.0,
+    lineSpacing: 'normal',
+    toAlignment: 'center',
+    fromPosition: 'top-left',
+    layoutMode: 'auto',
     useAutoOptimization: true,
-    useTwoZoneLayout: false,
   });
   
   const template = AVERY_TEMPLATES[selectedTemplate];
@@ -104,15 +110,36 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
   const totalPages = Math.ceil(data.length / labelsPerPage);
   const isLargeLabel = template.height >= 2.5;
   
-  // Calculate dynamic sizes for current template
-  const calculatedSizes = calculateOptimalSizes(
-    { width: template.width, height: template.height },
-    customization.logoSizeMultiplier,
-    customization.fontSizeMultiplier
+  // Calculate layout using the unified engine
+  const layoutOptions: LayoutOptions = useMemo(() => ({
+    showLogo: customization.showLogo && !!customization.logoUrl,
+    showFromAddress: customization.showReturnAddress && !!customization.returnAddress,
+    showToLabel: customization.showToLabel,
+    showFromLabel: customization.showFromLabel,
+    showBranding: customization.showBranding && !!customization.brandingText,
+    logoSizeMultiplier: customization.logoSizeMultiplier,
+    fontSizeMultiplier: customization.fontSizeMultiplier,
+    fromFontSizeMultiplier: customization.fromFontSizeMultiplier,
+    lineSpacing: customization.lineSpacing,
+    toAlignment: customization.toAlignment,
+    fromPosition: customization.fromPosition,
+    layoutMode: customization.layoutMode,
+  }), [customization]);
+  
+  const layout = useMemo(() => {
+    const fromLines = customization.returnAddress?.split('\n').length || 0;
+    return calculateLabelLayout(
+      { width: template.width, height: template.height },
+      layoutOptions,
+      fromLines,
+      4 // Typical address lines
+    );
+  }, [template.width, template.height, layoutOptions, customization.returnAddress]);
+  
+  const pixelLayout = useMemo(() => 
+    getLayoutPixelValues({ width: template.width, height: template.height }, layout),
+    [template.width, template.height, layout]
   );
-
-  // Determine if two-zone layout should be used
-  const useTwoZoneLayout = customization.useTwoZoneLayout && isLargeLabel && customization.showLogo;
 
   const handlePrint = () => {
     window.print();
@@ -131,7 +158,6 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
     setIsGenerating(true);
     
     try {
-      // Small delay for UI feedback
       await new Promise(resolve => setTimeout(resolve, 100));
       
       const filename = `mailing-labels-${selectedTemplate}-${new Date().toISOString().split('T')[0]}.pdf`;
@@ -150,7 +176,12 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
           showBranding: customization.showBranding,
           brandingText: customization.brandingText,
           fontSizeMultiplier: customization.fontSizeMultiplier,
-          useTwoZoneLayout: useTwoZoneLayout,
+          fromFontSizeMultiplier: customization.fromFontSizeMultiplier,
+          lineSpacing: customization.lineSpacing,
+          toAlignment: customization.toAlignment,
+          fromPosition: customization.fromPosition,
+          layoutMode: customization.layoutMode,
+          useTwoZoneLayout: layout.useTwoZoneLayout,
         },
         filename
       );
@@ -200,7 +231,12 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
           showBranding: customization.showBranding,
           brandingText: customization.brandingText,
           fontSizeMultiplier: customization.fontSizeMultiplier,
-          useTwoZoneLayout: useTwoZoneLayout,
+          fromFontSizeMultiplier: customization.fromFontSizeMultiplier,
+          lineSpacing: customization.lineSpacing,
+          toAlignment: customization.toAlignment,
+          fromPosition: customization.fromPosition,
+          layoutMode: customization.layoutMode,
+          useTwoZoneLayout: layout.useTwoZoneLayout,
         }
       );
       
@@ -220,220 +256,127 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
     }
   };
 
-  // Render a single label with appropriate layout
+  // Get zone by type from layout
+  const getZone = (type: 'logo' | 'from' | 'to' | 'branding') => 
+    pixelLayout.zones.find(z => z.type === type);
+
+  // Render a single label with flexbox stacking layout
   const renderLabel = (label: MailingLabelData | undefined, labelIndex: number) => {
+    const logoZone = getZone('logo');
+    const fromZone = getZone('from');
+    const toZone = getZone('to');
+    const brandingZone = getZone('branding');
+    
     if (!label) {
       return (
         <div
           key={labelIndex}
-          className="border border-dashed border-muted print:border-transparent relative overflow-hidden flex items-center justify-center"
-          style={{
-            fontSize: `${calculatedSizes.mainFontSize}px`,
-            lineHeight: "1.3",
-            padding: `${calculatedSizes.padding}px`,
-          }}
+          className="border border-dashed border-muted print:border-transparent flex items-center justify-center"
+          style={{ overflow: 'hidden' }}
         >
           <span className="text-muted-foreground print:hidden text-xs">Empty</span>
         </div>
       );
     }
 
-    // Two-zone layout for large labels with logo
-    if (useTwoZoneLayout && customization.logoUrl) {
-      return (
-        <div
-          key={labelIndex}
-          className="border border-dashed border-muted print:border-transparent relative overflow-hidden flex flex-col"
-          style={{
-            fontSize: `${calculatedSizes.mainFontSize}px`,
-            lineHeight: "1.3",
-          }}
-        >
-          {/* Top Zone: Logo */}
+    const padding = Math.max(4, pixelLayout.heightPx * 0.04);
+    
+    // Build address display
+    const cityStateZip = `${label.city}${label.city && label.state ? ', ' : ''}${label.state} ${label.zip}`.trim();
+
+    return (
+      <div
+        key={labelIndex}
+        className={`border border-dashed print:border-transparent flex flex-col overflow-hidden ${
+          layout.hasOverflow ? 'border-destructive' : 'border-muted'
+        }`}
+        style={{ padding: `${padding}px` }}
+      >
+        {/* Zone 1: Logo (if enabled) - ALWAYS FIRST */}
+        {layoutOptions.showLogo && customization.logoUrl && logoZone && (
           <div 
-            className="flex items-center justify-center border-b border-dashed border-muted/50 print:border-transparent"
+            className="flex-shrink-0 flex items-center justify-center"
             style={{ 
-              height: `${calculatedSizes.logoZoneHeight}px`,
-              padding: `${calculatedSizes.padding}px`,
+              height: `${logoZone.heightPx}px`,
+              marginBottom: `${padding * 0.5}px`,
             }}
           >
             <img 
               src={customization.logoUrl} 
               alt="Logo" 
               style={{ 
-                maxHeight: `${calculatedSizes.logoHeight}px`,
-                maxWidth: `${calculatedSizes.maxLogoWidth}px`,
-                objectFit: "contain",
+                maxHeight: '100%',
+                maxWidth: '80%',
+                objectFit: 'contain',
               }}
             />
           </div>
-          
-          {/* Bottom Zone: Address */}
+        )}
+        
+        {/* Zone 2: From Address (if enabled) - ALWAYS BEFORE TO */}
+        {layoutOptions.showFromAddress && customization.returnAddress && fromZone && (
           <div 
-            className="flex-1 flex flex-col justify-center relative"
-            style={{ padding: `${calculatedSizes.padding}px` }}
+            className="flex-shrink-0"
+            style={{ 
+              fontSize: `${fromZone.fontSize}px`,
+              lineHeight: `${fromZone.lineHeight}px`,
+              textAlign: fromZone.align,
+              marginBottom: `${padding * 0.5}px`,
+              paddingLeft: customization.fromPosition === 'top-left' ? '2px' : undefined,
+              paddingRight: customization.fromPosition === 'top-right' ? '2px' : undefined,
+            }}
           >
-            {/* Return Address - top left of address zone */}
-            {customization.showReturnAddress && customization.returnAddress && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: `${calculatedSizes.padding}px`,
-                  left: `${calculatedSizes.padding}px`,
-                  fontSize: `${calculatedSizes.returnFontSize}px`,
-                  lineHeight: "1.2",
-                  maxWidth: "40%",
-                }}
-              >
-                {customization.showFromLabel && (
-                  <div className="font-semibold">From:</div>
-                )}
-                {customization.returnAddress.split('\n').slice(0, 3).map((line, i) => (
-                  <div key={i} className="truncate">{line}</div>
-                ))}
-              </div>
+            {customization.showFromLabel && (
+              <div className="font-semibold">From:</div>
             )}
-            
-            {/* Main recipient address - positioned to avoid overlap with From */}
+            {customization.returnAddress.split('\n').slice(0, 3).map((line, i) => (
+              <div key={i} className="truncate">{line}</div>
+            ))}
+          </div>
+        )}
+        
+        {/* Zone 3: To Address - CENTERED IN REMAINING SPACE */}
+        {toZone && (
+          <div 
+            className="flex-1 flex flex-col items-center justify-center min-h-0"
+            style={{ 
+              fontSize: `${toZone.fontSize}px`,
+              lineHeight: `${toZone.lineHeight}px`,
+              textAlign: customization.toAlignment,
+            }}
+          >
             <div 
-              style={{
-                position: "absolute",
-                top: "50%",
-                left: customization.showReturnAddress ? "55%" : "50%",
-                transform: "translate(-50%, -50%)",
-                textAlign: "center",
-                width: customization.showReturnAddress ? "50%" : "90%",
+              className="w-full"
+              style={{ 
+                textAlign: customization.toAlignment,
+                paddingLeft: customization.toAlignment === 'left' ? '4px' : undefined,
+                paddingRight: customization.toAlignment === 'right' ? '4px' : undefined,
               }}
             >
               {customization.showToLabel && (
-                <div className="font-semibold mb-1">To:</div>
+                <div className="font-semibold">To:</div>
               )}
               <div className="font-medium truncate">{label.contact}</div>
               <div className="truncate">{label.address1}</div>
               {label.address2 && <div className="truncate">{label.address2}</div>}
-              <div className="truncate">
-                {label.city}{label.city && label.state ? ", " : ""}{label.state} {label.zip}
-              </div>
+              <div className="truncate">{cityStateZip}</div>
             </div>
-            
-            {/* Branding footer */}
-            {customization.showBranding && customization.brandingText && (
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: `${calculatedSizes.padding}px`,
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  fontSize: `${calculatedSizes.brandingFontSize}px`,
-                  fontWeight: 600,
-                }}
-              >
-                <div className="truncate">{customization.brandingText}</div>
-              </div>
-            )}
           </div>
-        </div>
-      );
-    }
-
-    // Standard layout
-    return (
-      <div
-        key={labelIndex}
-        className="border border-dashed border-muted print:border-transparent relative overflow-hidden"
-        style={{
-          fontSize: `${calculatedSizes.mainFontSize}px`,
-          lineHeight: "1.3",
-          padding: `${calculatedSizes.padding}px`,
-        }}
-      >
-        <div className="h-full relative">
-          {/* Logo positioning with dynamic sizing */}
-          {customization.showLogo && customization.logoUrl && (
-            <div
-              style={{
-                position: "absolute",
-                ...(customization.logoPosition === "top-left" && { top: "2px", left: "2px" }),
-                ...(customization.logoPosition === "top-center" && { top: "2px", left: "50%", transform: "translateX(-50%)" }),
-                ...(customization.logoPosition === "top-right" && { top: "2px", right: "2px" }),
-                ...(customization.logoPosition === "center" && { top: "50%", left: "50%", transform: "translate(-50%, -50%)" }),
-                zIndex: 1,
-              }}
-            >
-              <img 
-                src={customization.logoUrl} 
-                alt="Logo" 
-                style={{ 
-                  height: `${calculatedSizes.logoHeight}px`,
-                  width: "auto",
-                  maxWidth: `${calculatedSizes.maxLogoWidth}px`,
-                }}
-              />
-            </div>
-          )}
-
-          {/* Return Address with positioning */}
-          {customization.showReturnAddress && customization.returnAddress && (
-            <div
-              style={{
-                position: "absolute",
-                fontSize: `${calculatedSizes.returnFontSize}px`,
-                lineHeight: "1.2",
-                maxWidth: "45%",
-                ...(customization.returnAddressPosition === "top-left" && { top: "2px", left: "2px" }),
-                ...(customization.returnAddressPosition === "top-right" && { top: "2px", right: "2px", textAlign: "right" }),
-                ...(customization.returnAddressPosition === "bottom-left" && { bottom: "2px", left: "2px" }),
-                ...(customization.returnAddressPosition === "bottom-right" && { bottom: "2px", right: "2px", textAlign: "right" }),
-                zIndex: 1,
-              }}
-            >
-              {customization.showFromLabel && (
-                <div className="font-semibold">From:</div>
-              )}
-              {customization.returnAddress.split('\n').slice(0, 3).map((line, i) => (
-                <div key={i} className="truncate">{line}</div>
-              ))}
-            </div>
-          )}
-          
-          {/* Main recipient address - centered */}
-          <div
-            style={{
-              position: "absolute",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-              textAlign: "center",
-              width: "90%",
+        )}
+        
+        {/* Zone 4: Branding Footer (if enabled) - ALWAYS LAST */}
+        {layoutOptions.showBranding && customization.brandingText && brandingZone && (
+          <div 
+            className="flex-shrink-0 text-center truncate font-semibold"
+            style={{ 
+              fontSize: `${brandingZone.fontSize}px`,
+              lineHeight: `${brandingZone.lineHeight}px`,
+              marginTop: `${padding * 0.25}px`,
             }}
           >
-            {customization.showToLabel && (
-              <div className="font-semibold mb-1">To:</div>
-            )}
-            <div className="font-medium truncate">{label.contact}</div>
-            <div className="truncate">{label.address1}</div>
-            {label.address2 && <div className="truncate">{label.address2}</div>}
-            <div className="truncate">
-              {label.city}{label.city && label.state ? ", " : ""}{label.state} {label.zip}
-            </div>
+            {customization.brandingText}
           </div>
-          
-          {/* Branding footer */}
-          {customization.showBranding && customization.brandingText && (
-            <div
-              style={{
-                position: "absolute",
-                bottom: "2px",
-                left: "50%",
-                transform: "translateX(-50%)",
-                fontSize: "0.7em",
-                fontWeight: 600,
-              }}
-            >
-              <div className="truncate">{customization.brandingText}</div>
-            </div>
-          )}
-        </div>
+        )}
       </div>
     );
   };
@@ -448,9 +391,13 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
               <p className="text-sm text-muted-foreground mt-1">
                 {data.length} labels • {totalPages} page{totalPages !== 1 ? "s" : ""} • {template.name}
               </p>
-              {isLargeLabel && (
-                <p className="text-xs text-primary mt-1">
-                  Large format: {template.height}" × {template.width}" • {calculatedSizes.mainFontSize}px font
+              <p className="text-xs text-muted-foreground mt-1">
+                {layout.description}
+              </p>
+              {layout.hasOverflow && (
+                <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  Content may overflow - consider reducing font size
                 </p>
               )}
             </div>
@@ -559,13 +506,11 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
       {/* Professional Print Styles */}
       <style>{`
         @media print {
-          /* Reset all page elements */
           * {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
           
-          /* Hide browser UI and non-print elements */
           html, body {
             margin: 0 !important;
             padding: 0 !important;
@@ -606,7 +551,6 @@ export const MailingLabelPreview = ({ open, onOpenChange, data }: MailingLabelPr
             page-break-after: auto !important;
           }
           
-          /* Ensure proper sizing */
           @page {
             size: letter;
             margin: 0;

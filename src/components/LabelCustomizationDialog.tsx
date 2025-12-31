@@ -5,30 +5,43 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
-import { Upload, X, Sparkles, Type, ImageIcon } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Upload, X, Sparkles, Type, ImageIcon, AlignLeft, AlignCenter, AlignRight, LayoutGrid } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { calculateOptimalSizes, getCustomizationRanges } from "@/utils/labelSizing";
-import { optimizeLabelLayout, explainOptimization } from "@/utils/labelOptimization";
-import type { LogoPosition, ReturnAddressPosition } from "@/utils/labelOptimization";
+import {
+  calculateLabelLayout,
+  suggestOptimalSettings,
+  type LayoutMode,
+  type ToAlignment,
+  type FromPosition,
+  type LineSpacing,
+} from "@/utils/labelLayoutEngine";
 
-export type { LogoPosition, ReturnAddressPosition };
+// Export types for external use
+export type { LayoutMode, ToAlignment, FromPosition, LineSpacing };
+export type LogoPosition = "top-left" | "top-center" | "top-right" | "center" | "top-half";
+export type ReturnAddressPosition = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
 export interface LabelCustomization {
   logoUrl?: string;
   logoSizeMultiplier: number;
   fontSizeMultiplier: number;
-  logoPosition: LogoPosition;
-  returnAddress?: string;
-  returnAddressPosition: ReturnAddressPosition;
-  brandingText?: string;
+  fromFontSizeMultiplier: number;
   showLogo: boolean;
   showReturnAddress: boolean;
   showBranding: boolean;
   showFromLabel: boolean;
   showToLabel: boolean;
+  returnAddress?: string;
+  brandingText?: string;
   useAutoOptimization: boolean;
-  useTwoZoneLayout: boolean;
+  // New layout controls
+  layoutMode: LayoutMode;
+  toAlignment: ToAlignment;
+  fromPosition: FromPosition;
+  lineSpacing: LineSpacing;
 }
 
 interface LabelCustomizationDialogProps {
@@ -48,30 +61,28 @@ export const LabelCustomizationDialog = ({
 }: LabelCustomizationDialogProps) => {
   const [localCustomization, setLocalCustomization] = useState<LabelCustomization>(customization);
   
-  // Get customization ranges based on label size
-  const ranges = getCustomizationRanges(templateDimensions);
   const isLargeLabel = templateDimensions.height >= 2.5;
   
-  // Auto-optimize on content changes (only when auto-optimization is enabled)
+  // Auto-optimize on content changes when enabled
   useEffect(() => {
     if (!localCustomization.useAutoOptimization) return;
     
-    const optimized = optimizeLabelLayout(
+    const suggestions = suggestOptimalSettings(
       templateDimensions,
       !!localCustomization.logoUrl,
-      !!localCustomization.returnAddress,
-      localCustomization.returnAddress
+      !!localCustomization.returnAddress
     );
     
     setLocalCustomization(prev => ({
       ...prev,
-      logoPosition: optimized.logoPosition,
-      returnAddressPosition: optimized.returnAddressPosition,
-      logoSizeMultiplier: optimized.logoSizeMultiplier,
-      fontSizeMultiplier: optimized.fontSizeMultiplier,
-      showFromLabel: optimized.showFromLabel,
-      showToLabel: optimized.showToLabel,
-      useTwoZoneLayout: optimized.useTwoZoneLayout,
+      layoutMode: suggestions.layoutMode || 'auto',
+      fontSizeMultiplier: suggestions.fontSizeMultiplier || 1.0,
+      logoSizeMultiplier: suggestions.logoSizeMultiplier || 1.0,
+      lineSpacing: suggestions.lineSpacing || 'normal',
+      toAlignment: suggestions.toAlignment || 'center',
+      fromPosition: suggestions.fromPosition || 'top-left',
+      showFromLabel: suggestions.showFromLabel ?? true,
+      showToLabel: suggestions.showToLabel ?? true,
     }));
   }, [
     templateDimensions.width,
@@ -81,23 +92,25 @@ export const LabelCustomizationDialog = ({
     localCustomization.useAutoOptimization,
   ]);
   
-  const optimizationExplanation = localCustomization.useAutoOptimization 
-    ? explainOptimization(
-        templateDimensions,
-        optimizeLabelLayout(
-          templateDimensions,
-          !!localCustomization.logoUrl,
-          !!localCustomization.returnAddress,
-          localCustomization.returnAddress
-        )
-      )
-    : `Manual mode: ${ranges.description}`;
-
-  // Calculate current sizes for display
-  const calculatedSizes = calculateOptimalSizes(
+  // Calculate layout for preview description
+  const layout = calculateLabelLayout(
     templateDimensions,
-    localCustomization.logoSizeMultiplier,
-    localCustomization.fontSizeMultiplier
+    {
+      showLogo: localCustomization.showLogo && !!localCustomization.logoUrl,
+      showFromAddress: localCustomization.showReturnAddress && !!localCustomization.returnAddress,
+      showToLabel: localCustomization.showToLabel,
+      showFromLabel: localCustomization.showFromLabel,
+      showBranding: localCustomization.showBranding && !!localCustomization.brandingText,
+      logoSizeMultiplier: localCustomization.logoSizeMultiplier,
+      fontSizeMultiplier: localCustomization.fontSizeMultiplier,
+      fromFontSizeMultiplier: localCustomization.fromFontSizeMultiplier,
+      lineSpacing: localCustomization.lineSpacing,
+      toAlignment: localCustomization.toAlignment,
+      fromPosition: localCustomization.fromPosition,
+      layoutMode: localCustomization.layoutMode,
+    },
+    localCustomization.returnAddress?.split('\n').length || 0,
+    4
   );
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -126,6 +139,7 @@ export const LabelCustomizationDialog = ({
   };
 
   const fontSizePercent = Math.round(localCustomization.fontSizeMultiplier * 100);
+  const fromFontSizePercent = Math.round(localCustomization.fromFontSizeMultiplier * 100);
   const logoSizePercent = Math.round(localCustomization.logoSizeMultiplier * 100);
 
   return (
@@ -136,7 +150,9 @@ export const LabelCustomizationDialog = ({
             <Sparkles className="h-5 w-5 text-primary" />
             Customize Mailing Labels
           </DialogTitle>
-          <p className="text-sm text-muted-foreground mt-2">{optimizationExplanation}</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            {layout.description} • {templateDimensions.width}" × {templateDimensions.height}"
+          </p>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto py-4 space-y-6">
@@ -148,7 +164,7 @@ export const LabelCustomizationDialog = ({
                 <div>
                   <div className="font-medium text-sm">Auto-Optimization</div>
                   <div className="text-xs text-muted-foreground">
-                    Automatically determines optimal layout and sizing for {templateDimensions.height}" × {templateDimensions.width}" labels
+                    Automatically determines optimal layout and sizing
                   </div>
                 </div>
               </div>
@@ -161,78 +177,209 @@ export const LabelCustomizationDialog = ({
             </div>
           </div>
 
-          {/* Manual Size Controls - shown when auto-optimization is off */}
+          {/* Manual Controls - shown when auto-optimization is off */}
           {!localCustomization.useAutoOptimization && (
-            <div className="space-y-5 p-4 border border-border rounded-lg bg-muted/30">
-              <div className="text-sm font-medium flex items-center gap-2">
-                <Type className="h-4 w-4" />
-                Manual Size Adjustments
-              </div>
-              
-              {/* Font Size Slider */}
+            <div className="space-y-6 p-4 border border-border rounded-lg bg-muted/30">
+              {/* Layout Mode */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm">Font Size</Label>
-                  <span className="text-sm font-medium text-primary">{fontSizePercent}%</span>
+                <div className="flex items-center gap-2">
+                  <LayoutGrid className="h-4 w-4" />
+                  <Label className="text-sm font-medium">Layout Mode</Label>
                 </div>
-                <Slider
-                  value={[localCustomization.fontSizeMultiplier]}
-                  onValueChange={([value]) => 
-                    setLocalCustomization(prev => ({ ...prev, fontSizeMultiplier: value }))
+                <Select 
+                  value={localCustomization.layoutMode} 
+                  onValueChange={(value: LayoutMode) => 
+                    setLocalCustomization(prev => ({ ...prev, layoutMode: value }))
                   }
-                  min={0.5}
-                  max={2.0}
-                  step={0.05}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>50%</span>
-                  <span className="text-foreground">{calculatedSizes.mainFontSize}px main text</span>
-                  <span>200%</span>
-                </div>
-              </div>
-              
-              {/* Logo Size Slider */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm flex items-center gap-2">
-                    <ImageIcon className="h-3 w-3" />
-                    Logo Size
-                  </Label>
-                  <span className="text-sm font-medium text-primary">{logoSizePercent}%</span>
-                </div>
-                <Slider
-                  value={[localCustomization.logoSizeMultiplier]}
-                  onValueChange={([value]) => 
-                    setLocalCustomization(prev => ({ ...prev, logoSizeMultiplier: value }))
-                  }
-                  min={0.25}
-                  max={2.5}
-                  step={0.05}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>25%</span>
-                  <span className="text-foreground">{calculatedSizes.logoHeight}px height</span>
-                  <span>250%</span>
-                </div>
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">Auto (intelligent based on label size)</SelectItem>
+                    <SelectItem value="stacked">Stacked (Logo → From → To vertically)</SelectItem>
+                    <SelectItem value="split">Split (From left, To right - for wide labels)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
-              {/* Two-zone layout toggle for large labels */}
-              {isLargeLabel && localCustomization.showLogo && (
-                <div className="flex items-center justify-between pt-2 border-t border-border">
-                  <div>
-                    <Label className="text-sm">Two-Zone Layout</Label>
-                    <p className="text-xs text-muted-foreground">Logo in top half, address in bottom half</p>
+              {/* To: Address Alignment */}
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">To Address Alignment</Label>
+                <RadioGroup 
+                  value={localCustomization.toAlignment}
+                  onValueChange={(value: ToAlignment) => 
+                    setLocalCustomization(prev => ({ ...prev, toAlignment: value }))
+                  }
+                  className="flex gap-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="left" id="align-left" />
+                    <Label htmlFor="align-left" className="flex items-center gap-1 cursor-pointer">
+                      <AlignLeft className="h-4 w-4" /> Left
+                    </Label>
                   </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="center" id="align-center" />
+                    <Label htmlFor="align-center" className="flex items-center gap-1 cursor-pointer">
+                      <AlignCenter className="h-4 w-4" /> Center
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="right" id="align-right" />
+                    <Label htmlFor="align-right" className="flex items-center gap-1 cursor-pointer">
+                      <AlignRight className="h-4 w-4" /> Right
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              {/* From Address Position */}
+              {localCustomization.showReturnAddress && (
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">From Address Position</Label>
+                  <RadioGroup 
+                    value={localCustomization.fromPosition}
+                    onValueChange={(value: FromPosition) => 
+                      setLocalCustomization(prev => ({ ...prev, fromPosition: value }))
+                    }
+                    className="flex gap-4"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="top-left" id="from-left" />
+                      <Label htmlFor="from-left" className="cursor-pointer">Top-Left</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="top-right" id="from-right" />
+                      <Label htmlFor="from-right" className="cursor-pointer">Top-Right</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+              )}
+
+              {/* Line Spacing */}
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Line Spacing</Label>
+                <Select 
+                  value={localCustomization.lineSpacing} 
+                  onValueChange={(value: LineSpacing) => 
+                    setLocalCustomization(prev => ({ ...prev, lineSpacing: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="compact">Compact (tight spacing)</SelectItem>
+                    <SelectItem value="normal">Normal (balanced)</SelectItem>
+                    <SelectItem value="relaxed">Relaxed (spacious)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Font Size Sliders */}
+              <div className="space-y-5 pt-4 border-t border-border">
+                <div className="text-sm font-medium flex items-center gap-2">
+                  <Type className="h-4 w-4" />
+                  Size Adjustments
+                </div>
+                
+                {/* Main Font Size */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm">Main Font Size (To address)</Label>
+                    <span className="text-sm font-medium text-primary">{fontSizePercent}%</span>
+                  </div>
+                  <Slider
+                    value={[localCustomization.fontSizeMultiplier]}
+                    onValueChange={([value]) => 
+                      setLocalCustomization(prev => ({ ...prev, fontSizeMultiplier: value }))
+                    }
+                    min={0.5}
+                    max={2.0}
+                    step={0.05}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>50%</span>
+                    <span>200%</span>
+                  </div>
+                </div>
+                
+                {/* From Address Font Size */}
+                {localCustomization.showReturnAddress && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">From Address Size</Label>
+                      <span className="text-sm font-medium text-primary">{fromFontSizePercent}%</span>
+                    </div>
+                    <Slider
+                      value={[localCustomization.fromFontSizeMultiplier]}
+                      onValueChange={([value]) => 
+                        setLocalCustomization(prev => ({ ...prev, fromFontSizeMultiplier: value }))
+                      }
+                      min={0.5}
+                      max={1.5}
+                      step={0.05}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>50%</span>
+                      <span>150%</span>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Logo Size */}
+                {localCustomization.showLogo && localCustomization.logoUrl && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm flex items-center gap-2">
+                        <ImageIcon className="h-3 w-3" />
+                        Logo Size
+                      </Label>
+                      <span className="text-sm font-medium text-primary">{logoSizePercent}%</span>
+                    </div>
+                    <Slider
+                      value={[localCustomization.logoSizeMultiplier]}
+                      onValueChange={([value]) => 
+                        setLocalCustomization(prev => ({ ...prev, logoSizeMultiplier: value }))
+                      }
+                      min={0.25}
+                      max={2.5}
+                      step={0.05}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>25%</span>
+                      <span>250%</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Label Toggles */}
+              <div className="space-y-3 pt-4 border-t border-border">
+                <div className="text-sm font-medium">Visual Labels</div>
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm">Show "From:" label</Label>
                   <Switch
-                    checked={localCustomization.useTwoZoneLayout}
+                    checked={localCustomization.showFromLabel}
                     onCheckedChange={(checked) => 
-                      setLocalCustomization(prev => ({ ...prev, useTwoZoneLayout: checked }))
+                      setLocalCustomization(prev => ({ ...prev, showFromLabel: checked }))
                     }
                   />
                 </div>
-              )}
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm">Show "To:" label</Label>
+                  <Switch
+                    checked={localCustomization.showToLabel}
+                    onCheckedChange={(checked) => 
+                      setLocalCustomization(prev => ({ ...prev, showToLabel: checked }))
+                    }
+                  />
+                </div>
+              </div>
             </div>
           )}
 
@@ -285,10 +432,9 @@ export const LabelCustomizationDialog = ({
                   </div>
                 )}
                 
-                {/* Large label notice */}
                 {isLargeLabel && localCustomization.logoUrl && (
                   <p className="text-xs text-primary bg-primary/10 p-2 rounded">
-                    Large label detected! Logo will appear prominently in the top half when two-zone layout is enabled.
+                    Large label: Logo will appear prominently at the top in stacked layout.
                   </p>
                 )}
               </div>
@@ -298,7 +444,7 @@ export const LabelCustomizationDialog = ({
           {/* Return Address Section */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <Label className="text-base font-medium">Return Address</Label>
+              <Label className="text-base font-medium">Return Address (From)</Label>
               <Switch
                 checked={localCustomization.showReturnAddress}
                 onCheckedChange={(checked) => 
@@ -309,13 +455,13 @@ export const LabelCustomizationDialog = ({
 
             {localCustomization.showReturnAddress && (
               <Textarea
-                placeholder="Your Name&#10;Your Address Line 1&#10;Your Address Line 2&#10;City, State ZIP"
+                placeholder="Your Name&#10;Your Address Line 1&#10;City, State ZIP"
                 value={localCustomization.returnAddress || ""}
                 onChange={(e) => setLocalCustomization(prev => ({ 
                   ...prev, 
                   returnAddress: e.target.value 
                 }))}
-                rows={4}
+                rows={3}
                 className="resize-none"
               />
             )}
@@ -324,7 +470,7 @@ export const LabelCustomizationDialog = ({
           {/* Branding Section */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <Label className="text-base font-medium">Branding Text</Label>
+              <Label className="text-base font-medium">Branding Text (Footer)</Label>
               <Switch
                 checked={localCustomization.showBranding}
                 onCheckedChange={(checked) => 
@@ -344,6 +490,15 @@ export const LabelCustomizationDialog = ({
               />
             )}
           </div>
+
+          {/* Layout Preview Description */}
+          {layout.hasOverflow && (
+            <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
+              <p className="text-sm text-destructive font-medium">
+                ⚠️ Content may overflow the label. Try reducing font sizes or disabling some elements.
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end gap-3 pt-4 border-t border-border">
