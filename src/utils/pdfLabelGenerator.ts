@@ -38,6 +38,11 @@ export interface LabelCustomization {
   showBranding?: boolean;
   brandingText?: string;
   fontSizeMultiplier?: number;
+  fromFontSizeMultiplier?: number;
+  lineSpacing?: 'compact' | 'normal' | 'relaxed';
+  toAlignment?: 'left' | 'center' | 'right';
+  fromPosition?: 'top-left' | 'top-right';
+  layoutMode?: 'auto' | 'stacked' | 'split';
   useTwoZoneLayout?: boolean;
 }
 
