@@ -8,6 +8,7 @@ import { MarketingVisitDialog } from '@/components/MarketingVisitDialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { parseDateFromDB } from '@/utils/dateUtils';
 import { 
   Car, 
   Plus, 
@@ -179,7 +180,7 @@ function MarketingVisitsContent() {
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Calendar className="h-3 w-3" />
-                        {new Date(visit.visit_date).toLocaleDateString()}
+                        {parseDateFromDB(visit.visit_date).toLocaleDateString()}
                       </span>
                       <span className="flex items-center gap-1">
                         <User className="h-3 w-3" />
