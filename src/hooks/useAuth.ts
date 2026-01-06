@@ -160,13 +160,25 @@ export function useAuth() {
     clearSessionTimeouts();
     
     if (session) {
-      // Set warning timeout (25 minutes)
+      // Set warning timeout (SESSION_TIMEOUT - WARNING_TIMEOUT = 115 minutes)
       warningTimeoutRef.current = window.setTimeout(showWarningModal, SESSION_TIMEOUT - WARNING_TIMEOUT);
+      // Also set session timeout on login
+      sessionTimeoutRef.current = window.setTimeout(handleSessionTimeout, SESSION_TIMEOUT);
     }
-  }, [session, showWarningModal, clearSessionTimeouts]);
+  }, [session, showWarningModal, clearSessionTimeouts, handleSessionTimeout]);
 
+  // Track activity with protection against premature logouts
   const trackUserActivity = useCallback(() => {
     if (!session) return;
+    
+    // Check actual elapsed time before refreshing to prevent premature resets
+    const activity = getSessionActivity();
+    const now = timestamp();
+    const elapsed = now - activity.lastActivity;
+    
+    // Only refresh if at least 30 seconds have passed (debounce)
+    if (elapsed < 30000) return;
+    
     refreshSession();
   }, [session, refreshSession]);
 
@@ -220,18 +232,30 @@ export function useAuth() {
   useEffect(() => {
     if (!session) return;
 
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    // Include form-related events to ensure typing keeps session alive
+    const events = ['mousedown', 'keypress', 'scroll', 'touchstart', 'click', 'input', 'change', 'focus'];
     
-    // Throttle activity tracking to avoid excessive calls
+    // Throttle activity tracking - increased to 30 seconds to reduce overhead
     let activityTimeout: number;
+    let lastTracked = 0;
     const throttledTrackActivity = () => {
+      const now = Date.now();
+      // Only schedule tracking if 30 seconds have passed
+      if (now - lastTracked < 30000) return;
+      
       clearTimeout(activityTimeout);
-      activityTimeout = window.setTimeout(trackUserActivity, 1000);
+      activityTimeout = window.setTimeout(() => {
+        lastTracked = Date.now();
+        trackUserActivity();
+      }, 100); // Small delay to batch rapid events
     };
 
     events.forEach(event => {
       document.addEventListener(event, throttledTrackActivity, { passive: true });
     });
+
+    // Initialize session timeout when session starts
+    refreshSession();
 
     return () => {
       events.forEach(event => {
@@ -239,7 +263,7 @@ export function useAuth() {
       });
       clearTimeout(activityTimeout);
     };
-  }, [session, trackUserActivity]);
+  }, [session, trackUserActivity, refreshSession]);
 
   // Update lockout timer every second
   useEffect(() => {

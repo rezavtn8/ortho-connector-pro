@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { useOffices } from '@/hooks/useOffices';
 import { cn } from '@/lib/utils';
+import { parseDateFromDB } from '@/utils/dateUtils';
 
 interface MarketingVisit {
   id?: string;
@@ -54,9 +55,13 @@ export function MarketingVisitDialog({ open, onOpenChange, visit, onSuccess }: M
 
   useEffect(() => {
     if (visit) {
+      // Parse the date correctly to avoid timezone issues
+      const parsedDate = parseDateFromDB(visit.visit_date);
+      const formattedDate = `${parsedDate.getFullYear()}-${String(parsedDate.getMonth() + 1).padStart(2, '0')}-${String(parsedDate.getDate()).padStart(2, '0')}`;
+      
       setFormData({
         office_id: visit.office_id,
-        visit_date: visit.visit_date,
+        visit_date: formattedDate,
         visit_type: visit.visit_type,
         rep_name: visit.rep_name,
         visited: visit.visited,
