@@ -126,11 +126,17 @@ export function useAuth() {
     setTimeoutRemaining(0);
   }, []);
 
+  // Use refs for callbacks to avoid stale closure issues and prevent dependency loops
+  const handleSessionTimeoutRef = useRef<() => Promise<void>>();
+  const showWarningModalRef = useRef<() => void>();
+
   const handleSessionTimeout = useCallback(async () => {
     clearSessionTimeouts();
     await supabase.auth.signOut();
     localStorage.removeItem(SESSION_ACTIVITY_KEY);
   }, [clearSessionTimeouts]);
+
+  handleSessionTimeoutRef.current = handleSessionTimeout;
 
   const showWarningModal = useCallback(() => {
     setShowTimeoutWarning(true);
@@ -150,37 +156,52 @@ export function useAuth() {
     // Auto-logout after warning period
     sessionTimeoutRef.current = window.setTimeout(() => {
       clearInterval(countdownInterval);
-      handleSessionTimeout();
+      handleSessionTimeoutRef.current?.();
     }, WARNING_TIMEOUT);
-  }, [handleSessionTimeout]);
+  }, []);
+
+  showWarningModalRef.current = showWarningModal;
+
+  // scheduleTimeouts is stable — uses refs so no dependency on session state
+  const scheduleTimeouts = useCallback(() => {
+    // Clear existing timers first
+    if (sessionTimeoutRef.current) clearTimeout(sessionTimeoutRef.current);
+    if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
+    sessionTimeoutRef.current = null;
+    warningTimeoutRef.current = null;
+
+    // Schedule warning and logout
+    warningTimeoutRef.current = window.setTimeout(() => {
+      showWarningModalRef.current?.();
+    }, SESSION_TIMEOUT - WARNING_TIMEOUT);
+
+    sessionTimeoutRef.current = window.setTimeout(() => {
+      handleSessionTimeoutRef.current?.();
+    }, SESSION_TIMEOUT);
+  }, []);
 
   const refreshSession = useCallback(() => {
     const now = timestamp();
     setSessionActivity({ lastActivity: now, warningShown: false });
-    clearSessionTimeouts();
-    
-    if (session) {
-      // Set warning timeout (SESSION_TIMEOUT - WARNING_TIMEOUT = 115 minutes)
-      warningTimeoutRef.current = window.setTimeout(showWarningModal, SESSION_TIMEOUT - WARNING_TIMEOUT);
-      // Also set session timeout on login
-      sessionTimeoutRef.current = window.setTimeout(handleSessionTimeout, SESSION_TIMEOUT);
-    }
-  }, [session, showWarningModal, clearSessionTimeouts, handleSessionTimeout]);
+    setShowTimeoutWarning(false);
+    scheduleTimeouts();
+  }, [scheduleTimeouts]);
 
-  // Track activity with protection against premature logouts
+  // Track activity — only resets timer if truly idle for 60+ seconds
   const trackUserActivity = useCallback(() => {
-    if (!session) return;
-    
-    // Check actual elapsed time before refreshing to prevent premature resets
     const activity = getSessionActivity();
     const now = timestamp();
     const elapsed = now - activity.lastActivity;
     
-    // Only refresh if at least 30 seconds have passed (debounce)
-    if (elapsed < 30000) return;
+    // Only reset if at least 60 seconds of apparent inactivity
+    if (elapsed < 60000) {
+      // Just update lastActivity timestamp without rescheduling timers
+      setSessionActivity({ lastActivity: now, warningShown: false });
+      return;
+    }
     
     refreshSession();
-  }, [session, refreshSession]);
+  }, [refreshSession]);
 
   const extendSession = useCallback(() => {
     refreshSession();
@@ -228,34 +249,32 @@ export function useAuth() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Set up user activity listeners
+  // Set up user activity listeners — only re-runs when session appears/disappears
   useEffect(() => {
     if (!session) return;
+
+    // Start session timers once when session becomes available
+    scheduleTimeouts();
 
     // Include form-related events to ensure typing keeps session alive
     const events = ['mousedown', 'keypress', 'scroll', 'touchstart', 'click', 'input', 'change', 'focus'];
     
-    // Throttle activity tracking - increased to 30 seconds to reduce overhead
-    let activityTimeout: number;
+    // Throttle: only call trackUserActivity at most once every 60 seconds
     let lastTracked = 0;
+    let activityTimeout: number;
     const throttledTrackActivity = () => {
       const now = Date.now();
-      // Only schedule tracking if 30 seconds have passed
-      if (now - lastTracked < 30000) return;
-      
+      if (now - lastTracked < 60000) return;
       clearTimeout(activityTimeout);
       activityTimeout = window.setTimeout(() => {
         lastTracked = Date.now();
         trackUserActivity();
-      }, 100); // Small delay to batch rapid events
+      }, 200);
     };
 
     events.forEach(event => {
       document.addEventListener(event, throttledTrackActivity, { passive: true });
     });
-
-    // Initialize session timeout when session starts
-    refreshSession();
 
     return () => {
       events.forEach(event => {
@@ -263,7 +282,9 @@ export function useAuth() {
       });
       clearTimeout(activityTimeout);
     };
-  }, [session, trackUserActivity, refreshSession]);
+    // Only depend on session identity (not callbacks) to avoid infinite re-runs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.access_token]);
 
   // Update lockout timer every second
   useEffect(() => {
