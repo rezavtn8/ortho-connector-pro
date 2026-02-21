@@ -1,127 +1,119 @@
 
 
-# Make Discovered Office Groups a First-Class Entity
+# Codebase Cleanup: Dead Code, Unused Files, and Performance Issues
 
-## Goal
+## Overview
 
-Right now, discovered office groups only live on the Discover page. The user wants them to be selectable as a source everywhere -- when creating email campaigns, gift campaigns, printing mailing labels, and viewing on the map. A group should feel like a saved list that the user can reach from any tool in the app.
-
----
-
-## Integration Points
-
-### 1. Email Campaign Creator -- Add "Discovered Group" Source
-
-**File:** `src/components/campaign/EmailCampaignCreator.tsx`
-
-Currently the office list only comes from `useOffices()` (network/partner offices). Changes:
-
-- Add a **source toggle** at the top of the office selection step (Step 2): "Network Offices" | "Discovered Groups"
-- When "Discovered Groups" is selected, show a dropdown of the user's saved groups (from `useDiscoveredGroups`)
-- Selecting a group loads its member offices from `discovered_offices` table
-- The discovered offices get displayed in the same checkbox list format, with office type badge instead of tier badge
-- When creating the campaign, the `office_id` in `campaign_deliveries` will reference discovered office IDs (they're all UUIDs from the same pattern, so this works)
-
-### 2. Gift/Physical Campaign Creator -- Same Treatment
-
-**File:** `src/components/campaign/PhysicalCampaignCreator.tsx`
-
-Same pattern as email -- add a source toggle between network offices and discovered groups in the office selection step.
-
-### 3. Mailing Labels -- Add Group Filter
-
-**File:** `src/pages/MailingLabels.tsx`
-
-Currently has a basic `sourceFilter` (all/partner/discovered) and a `discovered=true&ids=...` URL param pattern. Changes:
-
-- Add a **"Discovered Group"** option to the source filter dropdown
-- When selected, show a group picker dropdown
-- Selecting a group auto-filters to only offices in that group
-- Support a new URL param: `group=<groupId>` so groups can link directly to labels from the Discover page
-
-### 4. Map View -- Filter by Group
-
-**File:** `src/components/MapView.tsx` and `src/pages/MapView.tsx`
-
-Currently shows all discovered offices when the toggle is on. Changes:
-
-- Add a group filter dropdown (visible when "Show Discovered" toggle is on)
-- When a group is selected, only show that group's offices on the map instead of all discovered offices
-- Support URL param: `group=<groupId>` for direct linking
-
-### 5. Discovered Office Groups Component -- Add Campaign Actions
-
-**File:** `src/components/DiscoveredOfficeGroups.tsx`
-
-Add to the group dropdown menu:
-- "Email Campaign" -- opens EmailCampaignCreator with group pre-selected
-- "Gift Campaign" -- opens PhysicalCampaignCreator with group pre-selected
-- "Print Labels" already exists but will use the new `group=<groupId>` URL param
-- "View on Map" will use the new `group=<groupId>` URL param
-
-### 6. Selection Action Bar -- Add Campaign Actions for Discovered Offices
-
-**File:** `src/components/SelectionActionBar.tsx`
-
-Currently discovered offices only show "Add to Network", "Labels", "Map", "Group", "Remove". Add:
-- **"Email"** button -- same as network offices, opens email campaign creator with selected discovered office IDs
-- **"Gift"** button -- same pattern
+A systematic audit of the codebase has identified **22 dead/unused files and exports**, **3 duplicate systems** doing the same job, and several performance concerns. All removals are safe -- nothing currently imported or routed.
 
 ---
 
-## Technical Details
+## Category 1: Dead Files (Never Imported Anywhere)
 
-### Hook Changes
+These files exist on disk but are not imported by any other file in the project:
 
-**`src/hooks/useDiscoveredGroups.ts`** -- Add a new function:
-- `getGroupOffices(groupId)` -- fetches full office data (name, address, etc.) for all members of a group by joining `discovered_office_group_members` with `discovered_offices`
+| File | Why It's Dead |
+|------|--------------|
+| `src/components/AIRecommendations.tsx` | Zero imports found |
+| `src/components/SimplifiedBusinessAnalysis.tsx` | Zero imports found |
+| `src/components/SmartEmptyState.tsx` | Zero imports found |
+| `src/components/OfficeHealthScore.tsx` | Zero imports found |
+| `src/components/OfficeActivityTimeline.tsx` | Zero imports found |
+| `src/components/VirtualizedOfficeList.tsx` | Zero imports found |
+| `src/components/PatientSourceGraph.tsx` | Zero imports found |
+| `src/components/ImportantDateCampaignDialog.tsx` | Zero imports found |
+| `src/components/ImportantDatesCalendar.tsx` | Zero imports found |
+| `src/components/ContextBanner.tsx` | Zero imports found |
+| `src/components/SetupChecklist.tsx` | Zero imports found |
+| `src/components/SubscriptionRequired.tsx` | Zero imports found |
+| `src/components/SecurityAuditLog.tsx` | Zero imports found |
+| `src/components/SecuritySettings.tsx` | Zero imports found |
+| `src/components/CalendarView.tsx` | Zero imports found |
+| `src/components/DateRangePicker.tsx` | Only imports `dateSync` but is never imported itself |
+| `src/pages/NotFound.tsx` | Never routed or imported |
+| `src/hooks/useOptimisticUpdate.ts` | Zero imports found |
+| `src/hooks/useErrorToast.ts` | Zero imports found |
+| `src/hooks/useSubscriptionCheck.ts` | Zero imports found |
+| `src/hooks/usePagination.ts` | Zero imports found |
+| `src/hooks/useDebounce.ts` | Zero imports found |
+| `src/utils/errorHandler.ts` | Zero imports found (GlobalErrorHandler class, never used) |
+| `src/lib/supabaseClient.ts` | `resilientSupabase` is never imported anywhere |
 
-### Campaign Creator Changes
+**Action:** Delete all 24 files.
 
-Both `EmailCampaignCreator.tsx` and `PhysicalCampaignCreator.tsx` need:
-- New prop: `preSelectedDiscoveredIds?: string[]` -- to pre-select discovered offices when coming from groups
-- New state: `officeSource: 'network' | 'discovered'` -- toggles which list is shown
-- New state: `selectedGroupId: string | null` -- which discovered group to load
-- Import and use `useDiscoveredGroups` hook
-- Query `discovered_offices` filtered by group member IDs when a group is selected
+---
 
-### Mailing Labels Changes
+## Category 2: Dead Exports in Used Files
 
-- New URL param support: `group=<groupId>`
-- When `group` param is present, fetch group members and filter discovered offices to only those IDs
-- Add group dropdown to the source filter area
+These are exported functions/hooks that exist inside files that ARE used, but these specific exports are never imported:
 
-### Map View Changes
+| File | Dead Export |
+|------|-----------|
+| `src/hooks/useResilientQuery.ts` | `useCampaignsResilient()` -- never imported |
+| `src/hooks/useResilientQuery.ts` | `useMarketingVisitsResilient()` -- never imported |
+| `src/hooks/useResilientQuery.ts` | `usePatientSourcesResilient()` -- never imported |
 
-- New URL param support: `group=<groupId>`
-- `useDiscoveredMapData` hook: accept optional `groupMemberIds` to filter which discovered offices to show
-- Add group selector dropdown when discovered toggle is on
+**Action:** Remove these 3 dead exports from `useResilientQuery.ts` (keep `useResilientQuery` and `useProfileDataResilient` which ARE used).
 
-### Files to Modify
+---
 
-| File | Change |
-|------|--------|
-| `src/hooks/useDiscoveredGroups.ts` | Add `getGroupOffices()` method |
-| `src/components/campaign/EmailCampaignCreator.tsx` | Add source toggle, group picker, discovered office support |
-| `src/components/campaign/PhysicalCampaignCreator.tsx` | Same as email creator |
-| `src/pages/MailingLabels.tsx` | Add group filter option and `group=` URL param |
-| `src/components/MapView.tsx` | Add group filter dropdown when showing discovered |
-| `src/pages/MapView.tsx` | Pass group param from URL |
-| `src/components/DiscoveredOfficeGroups.tsx` | Add Email/Gift campaign actions to group menu |
-| `src/components/SelectionActionBar.tsx` | Add Email/Gift buttons for discovered offices |
+## Category 3: Duplicate Systems
 
-### No Database Changes Required
+### 3a. Duplicate Network Monitoring
+Two independent systems both monitor network status and poll Supabase:
+- `ConnectionMonitor.tsx` (rendered in `App.tsx`) -- polls `user_profiles` every 30 seconds when offline
+- `useResilientQuery.ts` -- independently listens to online/offline events and checks Supabase connectivity
 
-All the data relationships already exist -- `discovered_office_groups`, `discovered_office_group_members`, and `discovered_offices` tables with proper RLS. We just need to query them from more places in the frontend.
+**Problem:** Both make redundant health-check queries to the database.
 
-### Implementation Order
+**Action:** Keep `ConnectionMonitor` for the UI banner. Remove the duplicate network monitoring from `useResilientQuery` -- it already has `enabled: !!user?.id` which handles the offline case via React Query's built-in `refetchOnReconnect`.
 
-1. Enhance `useDiscoveredGroups` hook with `getGroupOffices()`
-2. Update `EmailCampaignCreator` with source toggle + group picker
-3. Update `PhysicalCampaignCreator` with same pattern
-4. Update `SelectionActionBar` to add Email/Gift for discovered offices
-5. Update `DiscoveredOfficeGroups` menu with campaign actions
-6. Update `MailingLabels` with group filter
-7. Update `MapView` with group filter
-8. Test end-to-end
+### 3b. Global refetchInterval in App.tsx
+`App.tsx` sets `refetchInterval: 1000 * 60 * 10` (every 10 minutes) for ALL queries globally. This means every single query in the app auto-refetches every 10 minutes, even pages the user isn't viewing.
+
+**Problem:** Wastes bandwidth and Supabase quota. Combined with `refetchOnWindowFocus: true` and `refetchOnReconnect: true`, the global interval is unnecessary.
+
+**Action:** Remove the global `refetchInterval` from `App.tsx`. Keep it only on the Campaigns page where it's explicitly set to 30s (that one is intentional).
+
+---
+
+## Category 4: Performance Concerns
+
+### 4a. ConnectionMonitor fires unauthenticated queries
+`ConnectionMonitor` calls `supabase.from('user_profiles').select('id').limit(1)` on mount even for unauthenticated users on the landing page. This will always fail due to RLS.
+
+**Action:** Add a guard to only run the health check when a user session exists.
+
+### 4b. useResilientQuery appends user.id to ALL query keys
+Line 55: `queryKey: [...queryKey, user?.id]` -- this means every time the user object reference changes (e.g., token refresh), all queries get new keys and refetch from scratch instead of using cache.
+
+**Action:** Use `user?.id` as a string dependency, not appended to queryKey. The auth is already enforced by RLS; the queryKey pollution causes unnecessary refetches.
+
+---
+
+## Category 5: Minor Issues
+
+### 5a. Campaigns page refetchInterval: 30s is aggressive
+The campaigns page sets `refetchInterval: 30000` (every 30 seconds). Campaign data rarely changes that fast.
+
+**Action:** Increase to 5 minutes (300000) or remove entirely since `refetchOnWindowFocus` already handles staleness.
+
+### 5b. `performance/ErrorBoundary.tsx` is a re-export shim
+`src/components/performance/ErrorBoundary.tsx` just re-exports from `../ErrorBoundary`. Nothing imports from this path.
+
+**Action:** Delete the file and the `performance/` directory.
+
+---
+
+## Implementation Order
+
+1. Delete all 24 dead files listed in Category 1
+2. Delete `src/components/performance/ErrorBoundary.tsx` and the `performance/` directory
+3. Clean dead exports from `useResilientQuery.ts`
+4. Remove duplicate network monitoring from `useResilientQuery.ts`
+5. Remove global `refetchInterval` from `App.tsx`
+6. Guard `ConnectionMonitor` against unauthenticated state
+7. Fix queryKey pollution in `useResilientQuery.ts`
+8. Reduce campaigns `refetchInterval` from 30s to 5 minutes
+9. Verify clean build
 
