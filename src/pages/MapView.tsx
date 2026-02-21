@@ -8,12 +8,14 @@ export function MapView() {
   // Check if we should show discovered offices toggle enabled by default
   const showDiscoveredParam = searchParams.get('showDiscovered') === 'true' || 
                                searchParams.get('discovered') === 'true';
+  const groupParam = searchParams.get('group') || undefined;
 
   return (
     <div className="space-y-6">
       <MapComponent 
         height="600px" 
         initialShowDiscovered={showDiscoveredParam}
+        initialGroupId={groupParam}
       />
     </div>
   );

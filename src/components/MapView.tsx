@@ -4,10 +4,12 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { MapPin, RefreshCw, Building2, Users, TrendingUp, Calendar, Star, Globe, Phone, ExternalLink, Compass } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MapPin, RefreshCw, Building2, Users, TrendingUp, Calendar, Star, Globe, Phone, ExternalLink, Compass, FolderOpen } from "lucide-react";
 import { useMapboxToken } from '@/hooks/useMapboxToken';
 import { useMapData } from '@/hooks/useMapData';
 import { useDiscoveredMapData } from '@/hooks/useDiscoveredMapData';
+import { useDiscoveredGroups } from '@/hooks/useDiscoveredGroups';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -16,25 +18,41 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 interface MapViewProps {
   height?: string;
   initialShowDiscovered?: boolean;
+  initialGroupId?: string;
 }
 
-export function MapView({ height = "600px", initialShowDiscovered = false }: MapViewProps) {
+export function MapView({ height = "600px", initialShowDiscovered = false, initialGroupId }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const [showDiscovered, setShowDiscovered] = useState(initialShowDiscovered);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(initialGroupId || null);
+  const [groupMemberIds, setGroupMemberIds] = useState<string[]>([]);
   const map = useRef<mapboxgl.Map | null>(null);
   const isMobile = useIsMobile();
   
   const { token: mapboxToken, isLoading: tokenLoading } = useMapboxToken();
+  const { groups, getGroupMemberIds } = useDiscoveredGroups();
   
   // Always load network data
   const networkData = useMapData();
-  // Load all discovered offices when toggle is on
-  const discoveredData = useDiscoveredMapData([], showDiscovered);
+  // Load discovered offices - filter by group if selected
+  const discoveredData = useDiscoveredMapData(
+    selectedGroupId ? groupMemberIds : [],
+    showDiscovered && !selectedGroupId
+  );
   
   const { offices: networkOffices, clinic, isLoading: networkLoading } = networkData;
   const { offices: discoveredOffices, isLoading: discoveredLoading } = discoveredData;
   
   const isLoading = tokenLoading || networkLoading || (showDiscovered && discoveredLoading);
+
+  // Load group member IDs when group is selected
+  useEffect(() => {
+    if (selectedGroupId) {
+      getGroupMemberIds(selectedGroupId).then(ids => setGroupMemberIds(ids));
+    } else {
+      setGroupMemberIds([]);
+    }
+  }, [selectedGroupId]);
 
   // Calculate stats
   const networkStats = {
@@ -298,12 +316,30 @@ export function MapView({ height = "600px", initialShowDiscovered = false }: Map
           <Switch 
             id="show-discovered"
             checked={showDiscovered} 
-            onCheckedChange={setShowDiscovered} 
+            onCheckedChange={(val) => { setShowDiscovered(val); if (!val) setSelectedGroupId(null); }} 
           />
           <Label htmlFor="show-discovered" className="flex items-center gap-2 cursor-pointer">
             <Compass className="h-4 w-4 text-teal-600" />
             Show Discovered Offices
           </Label>
+          {showDiscovered && (
+            <Select value={selectedGroupId || 'all'} onValueChange={(val) => setSelectedGroupId(val === 'all' ? null : val)}>
+              <SelectTrigger className="w-[180px] h-8">
+                <SelectValue placeholder="All discovered" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Discovered</SelectItem>
+                {groups.map(g => (
+                  <SelectItem key={g.id} value={g.id}>
+                    <span className="flex items-center gap-1.5">
+                      <FolderOpen className="h-3 w-3" />
+                      {g.name} ({g.member_count || 0})
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           {showDiscovered && discoveredOffices.length > 0 && (
             <Badge variant="secondary" className="bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200">
               {discoveredOffices.length} discovered

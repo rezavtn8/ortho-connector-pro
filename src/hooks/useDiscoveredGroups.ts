@@ -165,6 +165,30 @@ export function useDiscoveredGroups() {
     }
   };
 
+  const getGroupOffices = async (groupId: string) => {
+    try {
+      const { data: members, error: membersError } = await supabase
+        .from('discovered_office_group_members')
+        .select('office_id')
+        .eq('group_id', groupId);
+
+      if (membersError) throw membersError;
+      if (!members || members.length === 0) return [];
+
+      const officeIds = members.map(m => m.office_id);
+      const { data: offices, error: officesError } = await supabase
+        .from('discovered_offices')
+        .select('id, name, address, phone, email, website, google_rating, office_type, distance_miles, latitude, longitude')
+        .in('id', officeIds);
+
+      if (officesError) throw officesError;
+      return offices || [];
+    } catch (error) {
+      console.error('Error getting group offices:', error);
+      return [];
+    }
+  };
+
   return {
     groups,
     isLoading,
@@ -175,5 +199,6 @@ export function useDiscoveredGroups() {
     renameGroup,
     deleteGroup,
     getGroupMemberIds,
+    getGroupOffices,
   };
 }
