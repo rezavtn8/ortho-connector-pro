@@ -1,114 +1,133 @@
 
 
-# Discovered Offices: Groups Feature and UI/UX Cleanup
+# Systematically Rebuild the Campaigns Tab
 
-## Overview
+## Current State Assessment
 
-Two improvements to the Discovered Offices page:
-1. A **Groups** system so users can organize discovered offices into named collections for future use (print labels, campaigns, etc.)
-2. **UI/UX cleanup** to fix layout inconsistencies, glitchy category badges, and improve overall organization
+The Campaigns tab has two separate pages (`Campaigns.tsx` at 580 lines and `CampaignsResilient.tsx` at 260 lines -- only the default export `Campaigns.tsx` is used), multiple creator dialogs, detail dialogs, and execution dialogs. The code is fragmented across 7+ component files with duplicated logic, inconsistent patterns, and several functional gaps:
 
----
+**Functional Issues:**
+- Email campaigns auto-trigger AI generation on dialog open (can waste API calls)
+- No ability to delete campaigns
+- No ability to change campaign status (Draft/Active/Completed)
+- Gift campaign delivery tracking is basic -- no progress bar or batch actions
+- No search/filter on the main campaigns list
+- The `CampaignsResilient.tsx` file is dead code (not used)
 
-## Part 1: Groups Feature
-
-### How It Works
-
-- Users select discovered offices and click **"Save as Group"** (new button in the selection action bar)
-- A dialog appears where they name the group (e.g., "East Side Dentists", "Spring 2026 Outreach")
-- Groups appear as **tabs or a dropdown** at the top of the Discover page, letting users quickly switch between "All Offices" and their saved groups
-- Each group has actions: rename, add/remove offices, print labels, view on map, delete group
-- Groups persist in the database and survive page refreshes
-
-### Database Changes
-
-**New table: `discovered_office_groups`**
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid (PK) | Auto-generated |
-| name | text | Group name |
-| user_id | uuid | Owner |
-| created_at | timestamptz | Default now() |
-| updated_at | timestamptz | Default now() |
-
-**New table: `discovered_office_group_members`**
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid (PK) | Auto-generated |
-| group_id | uuid (FK) | References discovered_office_groups |
-| office_id | uuid (FK) | References discovered_offices |
-| added_at | timestamptz | Default now() |
-| Unique constraint | | (group_id, office_id) |
-
-Both tables get RLS policies restricting access to the owning user.
-
-### UI Components
-
-**1. Group Selector (top of Discover page)**
-- A horizontal bar with pill/chip buttons: "All Offices" | "Group A" | "Group B" | "+ New Group"
-- Clicking a group filters the list to only show offices in that group
-- Active group is highlighted
-
-**2. "Save as Group" button in SelectionActionBar**
-- When offices are selected, a new "Save as Group" button appears alongside existing actions (Add to Network, Labels, Map, Remove)
-- Opens a dialog to name the group or add to an existing group
-
-**3. Group Management Dialog**
-- Rename group
-- Remove offices from group
-- Delete entire group
-- Quick actions: Print Labels for group, View on Map
-
-### Files to Create
-- `src/components/DiscoveredOfficeGroups.tsx` -- Group selector bar + management UI
-- `src/components/SaveToGroupDialog.tsx` -- Dialog for creating/adding to groups
-- `src/hooks/useDiscoveredGroups.ts` -- Hook for CRUD operations on groups
-
-### Files to Modify
-- `src/pages/Discover.tsx` -- Add group selector, filter by active group
-- `src/components/SelectionActionBar.tsx` -- Add "Save as Group" button for discovered offices
-- `src/components/DiscoveryResults.tsx` -- Support group-filtered display
+**UI/UX Issues:**
+- Stats cards take up too much vertical space
+- Campaign cards lack clear progress indicators
+- No visual distinction between campaign statuses at a glance
+- Empty states are generic
+- No confirmation before destructive actions
 
 ---
 
-## Part 2: UI/UX Cleanup
+## Rebuild Plan
 
-### Issues to Fix
+### Step 1: Clean Up Dead Code
+- Delete `src/pages/CampaignsResilient.tsx` (unused)
+- Delete `src/components/CreateCampaignDialog.tsx` (superseded by EmailCampaignCreator and PhysicalCampaignCreator)
+- Delete `src/components/UnifiedCampaignCreator.tsx` and `src/components/UnifiedCampaignDialog.tsx` if unused
+- Delete `src/components/CampaignDetailDialog.tsx` and `src/components/CampaignExecutionDialog.tsx` if unused
 
-**1. Stats cards duplicated**
-- The Discover page renders its own stats grid (lines 477-533) AND the DiscoveryResults component renders another summary card (lines 220-259). This creates redundant/conflicting information.
-- **Fix:** Remove the stats from the parent Discover page and let DiscoveryResults handle all display, OR consolidate into one clean stats bar.
+### Step 2: Rebuild Main Campaigns Page (`src/pages/Campaigns.tsx`)
 
-**2. Office type badges inconsistency**
-- The `office_type` field can have values like "Unknown", empty strings, or inconsistent casing from Google API
-- **Fix:** Normalize office types on display -- map "Unknown" to a generic label, standardize casing, and use consistent badge colors per type (e.g., "General Dentist" = blue, "Orthodontist" = purple, "Pediatric" = green)
+**New Layout:**
+```
++--------------------------------------------------+
+| Stats Bar (compact, single row)                   |
+| [Total: 12] [Active: 3] [Completed: 8] [Draft:1] |
++--------------------------------------------------+
+| Toolbar: [Search...] [Filter: Status] [+ Email] [+ Gift] |
++--------------------------------------------------+
+| Tab: All | Email | Gift                           |
++--------------------------------------------------+
+| Campaign Cards Grid (2-3 columns)                 |
+| Each card shows:                                  |
+|   - Icon + Name + Status badge                    |
+|   - Type + Office count + Progress bar            |
+|   - Date created + Planned date                   |
+|   - Quick actions: View | Execute | Delete        |
++--------------------------------------------------+
+```
 
-**3. Average rating shows "NaN" when no offices have ratings**
-- Line 450-451: Division by zero when `newOffices.filter(o => o.google_rating).length` is 0
-- **Fix:** Add a zero-length guard
+**Key Changes:**
+- Compact inline stats (horizontal chips, not 4 full cards)
+- Add a search input to filter campaigns by name
+- Add status filter dropdown (All, Draft, Active, Completed)
+- Add tabs: All / Email / Gift to switch between views
+- Unified campaign card component with progress indicator
+- Add delete campaign functionality with confirmation dialog
+- Add status change (Draft -> Active -> Completed) via dropdown on each card
 
-**4. Layout improvements**
-- Sort control uses a raw `<select>` element instead of the Shadcn Select component -- looks inconsistent
-- The "Clear All" destructive action is too close to useful actions
-- Selection checkbox alignment needs tightening
-- **Fix:** Replace with Shadcn Select, add confirmation to "Clear All", improve spacing
+### Step 3: Improve Email Campaign Creator (`EmailCampaignCreator.tsx`)
+- Keep the 2-step wizard but improve step indicators (numbered circles with connecting line)
+- Add campaign name auto-suggestion based on type + date
+- Improve office selection with a search/filter input within the list
+- Add a "Preview" summary before final creation
+- Better validation messages inline (not just toast)
 
-**5. Empty state when group is empty**
-- Show a friendly message with an action to add offices when viewing an empty group
+### Step 4: Improve Physical/Gift Campaign Creator (`PhysicalCampaignCreator.tsx`)
+- Streamline from 4 steps to 3 (merge campaign details + gift bundle into one step)
+- Add visual gift bundle cards with icons
+- Show running cost estimate prominently as offices are selected
+- Better step navigation with clear progress
 
-### Files to Modify
-- `src/pages/Discover.tsx` -- Remove duplicate stats, fix NaN rating, consolidate layout
-- `src/components/DiscoveryResults.tsx` -- Normalize office types, replace raw select with Shadcn Select, improve card layout consistency, add confirmation to Clear All
+### Step 5: Improve Email Execution Dialog (`EmailExecutionDialog.tsx`)
+- Remove auto-generate on open (add explicit "Generate All Emails" button instead)
+- Add batch actions: "Copy All", "Mark All as Sent"
+- Add a progress bar showing generation/sent status
+- Collapsible email preview cards (show subject only, expand for body)
+- Add "Send via Email" button that pre-fills the recipient if office has an email
+
+### Step 6: Improve Gift Delivery Dialog (`GiftDeliveryDialog.tsx`)
+- Add a progress bar at the top (delivered/total)
+- Add batch "Mark All as Delivered" button
+- Add sorting: by status (pending first), by office name
+- Better visual hierarchy for delivery cards
+
+### Step 7: Add Campaign Actions
+- **Delete Campaign**: With confirmation dialog, cascading delete of deliveries
+- **Status Toggle**: Dropdown or button to change Draft -> Active -> Completed
+- **Duplicate Campaign**: Copy an existing campaign with new name
+- **Export**: Export campaign summary as CSV
 
 ---
 
-## Implementation Order
+## Technical Details
 
-1. Database migration (create 2 new tables with RLS)
-2. Create `useDiscoveredGroups` hook
-3. Create `SaveToGroupDialog` component
-4. Create `DiscoveredOfficeGroups` selector component
-5. Update `SelectionActionBar` with "Save as Group" button
-6. Update `Discover.tsx` to integrate groups and fix UI issues
-7. Update `DiscoveryResults.tsx` for UI cleanup (badges, sort, layout)
+### Files to Delete
+| File | Reason |
+|------|--------|
+| `src/pages/CampaignsResilient.tsx` | Dead code, not routed |
+| `src/components/CreateCampaignDialog.tsx` | Superseded |
+| `src/components/CampaignDetailDialog.tsx` | Check if used, likely superseded |
+| `src/components/CampaignExecutionDialog.tsx` | Check if used, likely superseded |
+| `src/components/UnifiedCampaignCreator.tsx` | Check if used |
+| `src/components/UnifiedCampaignDialog.tsx` | Check if used |
+
+### Files to Rewrite/Heavily Modify
+| File | Changes |
+|------|---------|
+| `src/pages/Campaigns.tsx` | Full rewrite: compact stats, search, filters, tabs, delete/status actions |
+| `src/components/campaign/EmailCampaignCreator.tsx` | Add search in office list, auto-name, preview step |
+| `src/components/campaign/PhysicalCampaignCreator.tsx` | Consolidate steps, better gift bundle UI |
+| `src/components/campaign/EmailExecutionDialog.tsx` | Remove auto-generate, add batch actions, collapsible cards |
+| `src/components/campaign/GiftDeliveryDialog.tsx` | Add progress bar, batch actions, sorting |
+| `src/components/campaign/EmailCampaignDetailDialog.tsx` | Minor cleanup, consistency |
+| `src/components/campaign/GiftCampaignDetailDialog.tsx` | Minor cleanup, consistency |
+
+### No Database Changes Required
+All the campaign infrastructure (campaigns, campaign_deliveries tables) already exists with proper RLS policies. The changes are purely frontend.
+
+### Implementation Order
+1. Delete dead code files
+2. Rewrite `Campaigns.tsx` main page with new layout
+3. Improve `EmailCampaignCreator.tsx`
+4. Improve `PhysicalCampaignCreator.tsx`
+5. Improve `EmailExecutionDialog.tsx` (remove auto-generate, add batch actions)
+6. Improve `GiftDeliveryDialog.tsx` (progress bar, batch actions)
+7. Clean up detail dialogs
+8. Test end-to-end
 
