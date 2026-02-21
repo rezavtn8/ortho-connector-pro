@@ -3,12 +3,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
-
-interface RefreshTokenRequest {
-  clinic_id?: string;
-}
 
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
@@ -16,17 +12,42 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { clinic_id }: RefreshTokenRequest = await req.json();
+    // Authenticate user
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
 
+    const userClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
+
+    const userId = claimsData.claims.sub;
+    const { clinic_id } = await req.json();
+
+    // Use service role for token operations
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Get existing token
+    // Build query scoped to the authenticated user
     let query = supabase
       .from('google_business_tokens')
       .select('*')
+      .eq('user_id', userId)
       .single();
 
     if (clinic_id) {
@@ -37,12 +58,10 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (tokenError || !tokenData) {
       return new Response(JSON.stringify({ error: 'No token found' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
     }
 
-    // Refresh token
     const clientId = Deno.env.get('GOOGLE_OAUTH_CLIENT_ID');
     const clientSecret = Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET');
 
@@ -62,8 +81,7 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     if (!tokenResponse.ok) {
-      const errorData = await tokenResponse.text();
-      console.error('Token refresh failed:', errorData);
+      console.error('Token refresh failed:', await tokenResponse.text());
       throw new Error('Failed to refresh token');
     }
 
@@ -71,7 +89,6 @@ const handler = async (req: Request): Promise<Response> => {
     const { access_token, expires_in } = tokens;
     const expiresAt = new Date(Date.now() + expires_in * 1000);
 
-    // Update token in database
     const { error: updateError } = await supabase
       .from('google_business_tokens')
       .update({
@@ -96,8 +113,7 @@ const handler = async (req: Request): Promise<Response> => {
   } catch (error: any) {
     console.error('Error in refresh-google-business-token:', error);
     return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders },
     });
   }
 };
