@@ -1,5 +1,4 @@
-import { useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
-import { useState, useEffect } from 'react';
+import { useQuery, UseQueryOptions } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
@@ -20,50 +19,17 @@ export function useResilientQuery<T>({
   ...options
 }: ResilientQueryOptions<T>) {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
-  const [connectionStatus, setConnectionStatus] = useState<'online' | 'offline' | 'checking'>('online');
-
-  // Monitor network status
-  useEffect(() => {
-    const handleOnline = async () => {
-      setConnectionStatus('checking');
-      try {
-        // Check if Supabase is actually reachable
-        await supabase.from('user_profiles').select('id').limit(1);
-        setConnectionStatus('online');
-        // Refetch all queries when connection is restored
-        queryClient.invalidateQueries();
-      } catch {
-        setConnectionStatus('offline');
-      }
-    };
-
-    const handleOffline = () => setConnectionStatus('offline');
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, [queryClient]);
 
   const query = useQuery({
-    queryKey: [...queryKey, user?.id], // Include user ID in query key for proper invalidation
+    queryKey,
     queryFn: async () => {
       if (!user?.id) {
         throw new Error('Authentication required');
       }
 
-      if (connectionStatus === 'offline') {
-        throw new Error('Currently offline. Please check your connection.');
-      }
-
       try {
         return await queryFn();
       } catch (error: any) {
-        // Log error for debugging
         console.error(`Query failed for ${queryKey.join('/')}:`, error);
         
         if (showErrorToast && error?.message !== 'Authentication required') {
@@ -78,36 +44,26 @@ export function useResilientQuery<T>({
       }
     },
     retry: (failureCount, error: any) => {
-      // Don't retry authentication errors
       if (error?.message?.includes('Authentication') || error?.message?.includes('JWT')) {
         return false;
       }
-      
-      // Don't retry if offline
-      if (connectionStatus === 'offline') {
-        return false;
-      }
-      
-      // Retry up to 3 times for network errors
       return failureCount < 3;
     },
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 15 * 60 * 1000, // 15 minutes
-    enabled: !!user?.id && connectionStatus !== 'offline',
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+    enabled: !!user?.id,
     ...options
   });
 
-  // Return fallback data if query fails and fallback is provided
   const data = query.error && fallbackData ? fallbackData : query.data;
 
   return {
     ...query,
     data,
-    isOnline: connectionStatus === 'online',
-    isOffline: connectionStatus === 'offline',
-    connectionStatus,
-    // Helper method to manually retry
+    isOnline: navigator.onLine,
+    isOffline: !navigator.onLine,
+    connectionStatus: navigator.onLine ? 'online' as const : 'offline' as const,
     retry: () => {
       if (showErrorToast) {
         toast({
@@ -140,62 +96,5 @@ export function useProfileDataResilient() {
     },
     fallbackData: null,
     retryMessage: 'Refreshing profile data...'
-  });
-}
-
-// Specialized hook for campaigns
-export function useCampaignsResilient() {
-  return useResilientQuery({
-    queryKey: ['campaigns'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('campaigns')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      return data || [];
-    },
-    fallbackData: [],
-    retryMessage: 'Refreshing campaigns...'
-  });
-}
-
-// Specialized hook for marketing visits
-export function useMarketingVisitsResilient() {
-  return useResilientQuery({
-    queryKey: ['marketing-visits'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('marketing_visits')
-        .select(`
-          *,
-          patient_sources(name, address)
-        `)
-        .order('visit_date', { ascending: false });
-
-      if (error) throw error;
-      return data || [];
-    },
-    fallbackData: [],
-    retryMessage: 'Refreshing visits...'
-  });
-}
-
-// Specialized hook for patient sources (offices)
-export function usePatientSourcesResilient() {
-  return useResilientQuery({
-    queryKey: ['patient-sources'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('patient_sources')
-        .select('*')
-        .order('name');
-
-      if (error) throw error;
-      return data || [];
-    },
-    fallbackData: [],
-    retryMessage: 'Refreshing offices...'
   });
 }

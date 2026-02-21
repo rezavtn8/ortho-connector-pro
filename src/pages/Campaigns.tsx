@@ -117,7 +117,7 @@ function CampaignsContent() {
         };
       }) || [];
     },
-    refetchInterval: 30000,
+    refetchInterval: 300000,
     fallbackData: [],
     retryMessage: 'Refreshing campaigns...'
   });
