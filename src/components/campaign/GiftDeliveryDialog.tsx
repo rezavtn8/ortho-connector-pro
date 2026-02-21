@@ -1,12 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,15 +10,12 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Progress } from '@/components/ui/progress';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { 
-  Package, 
-  CheckCircle, 
-  Clock, 
-  XCircle,
-  Camera,
-  MapPin,
-  Save,
-  Edit2
+  Package, CheckCircle, Clock, XCircle, MapPin, Save, Edit2, CheckCheck
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { nowISO } from '@/lib/dateSync';
@@ -41,11 +34,7 @@ interface CampaignDelivery {
   delivered_at?: string;
   delivery_notes?: string;
   photo_url?: string;
-  office: {
-    name: string;
-    address?: string;
-    source_type: string;
-  };
+  office: { name: string; address?: string; source_type: string };
 }
 
 interface GiftDeliveryDialogProps {
@@ -55,12 +44,7 @@ interface GiftDeliveryDialogProps {
   onCampaignUpdated: () => void;
 }
 
-export function GiftDeliveryDialog({ 
-  campaign, 
-  open, 
-  onOpenChange, 
-  onCampaignUpdated 
-}: GiftDeliveryDialogProps) {
+export function GiftDeliveryDialog({ campaign, open, onOpenChange, onCampaignUpdated }: GiftDeliveryDialogProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   
@@ -69,202 +53,141 @@ export function GiftDeliveryDialog({
   const [editingNotes, setEditingNotes] = useState<string | null>(null);
   const [noteText, setNoteText] = useState('');
   const [materialsChecked, setMaterialsChecked] = useState<Record<string, boolean>>({});
+  const [sortBy, setSortBy] = useState<'status' | 'name'>('status');
 
   useEffect(() => {
     if (open && campaign) {
       fetchDeliveries();
-      initializeMaterialsChecklist();
+      if (campaign.materials_checklist) {
+        const checked: Record<string, boolean> = {};
+        campaign.materials_checklist.forEach(item => { checked[item] = false; });
+        setMaterialsChecked(checked);
+      }
     }
   }, [open, campaign]);
 
-  const initializeMaterialsChecklist = () => {
-    if (campaign.materials_checklist) {
-      const checked: Record<string, boolean> = {};
-      campaign.materials_checklist.forEach(item => {
-        checked[item] = false;
-      });
-      setMaterialsChecked(checked);
-    }
-  };
-
   const fetchDeliveries = async () => {
     if (!user) return;
-
     try {
       setLoading(true);
       const { data, error } = await supabase
         .from('campaign_deliveries')
-        .select(`
-          *,
-          office:patient_sources (
-            name,
-            address,
-            source_type
-          )
-        `)
+        .select(`*, office:patient_sources (name, address, source_type)`)
         .eq('campaign_id', campaign.id)
         .eq('created_by', user.id)
         .order('created_at');
-
       if (error) throw error;
       setDeliveries(data || []);
-    } catch (error) {
-      console.error('Error fetching deliveries:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load deliveries.",
-        variant: "destructive",
-      });
+    } catch {
+      toast({ title: "Error", description: "Failed to load deliveries.", variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
 
-  const updateDeliveryStatus = async (deliveryId: string, status: 'pending' | 'delivered' | 'failed') => {
-    try {
-      const updateData: any = { gift_status: status };
-      if (status === 'delivered') {
-        updateData.delivered_at = nowISO();
-      }
-
-      await supabase
-        .from('campaign_deliveries')
-        .update(updateData)
-        .eq('id', deliveryId);
-
-      toast({
-        title: "Success",
-        description: `Delivery marked as ${status}`,
-      });
-
-      fetchDeliveries();
-      onCampaignUpdated();
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update status",
-        variant: "destructive",
-      });
+  const sortedDeliveries = useMemo(() => {
+    const sorted = [...deliveries];
+    if (sortBy === 'status') {
+      const order: Record<string, number> = { pending: 0, failed: 1, delivered: 2 };
+      sorted.sort((a, b) => (order[a.gift_status] ?? 0) - (order[b.gift_status] ?? 0));
+    } else {
+      sorted.sort((a, b) => a.office.name.localeCompare(b.office.name));
     }
+    return sorted;
+  }, [deliveries, sortBy]);
+
+  const updateStatus = async (deliveryId: string, status: 'pending' | 'delivered' | 'failed') => {
+    const updateData: any = { gift_status: status };
+    if (status === 'delivered') updateData.delivered_at = nowISO();
+    await supabase.from('campaign_deliveries').update(updateData).eq('id', deliveryId);
+    toast({ title: `Marked as ${status}` });
+    fetchDeliveries();
+    onCampaignUpdated();
   };
 
-  const updateDeliveryNotes = async (deliveryId: string, notes: string) => {
-    try {
-      await supabase
-        .from('campaign_deliveries')
-        .update({ delivery_notes: notes })
-        .eq('id', deliveryId);
-
-      setEditingNotes(null);
-      setNoteText('');
-      fetchDeliveries();
-
-      toast({
-        title: "Success",
-        description: "Notes updated",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update notes",
-        variant: "destructive",
-      });
+  const markAllDelivered = async () => {
+    const pending = deliveries.filter(d => d.gift_status === 'pending');
+    for (const d of pending) {
+      await supabase.from('campaign_deliveries').update({ gift_status: 'delivered', delivered_at: nowISO() }).eq('id', d.id);
     }
+    toast({ title: "All Marked Delivered", description: `${pending.length} deliveries updated` });
+    fetchDeliveries();
+    onCampaignUpdated();
   };
 
-  const startEditingNotes = (delivery: CampaignDelivery) => {
-    setEditingNotes(delivery.id);
-    setNoteText(delivery.delivery_notes || '');
+  const saveNotes = async (deliveryId: string) => {
+    await supabase.from('campaign_deliveries').update({ delivery_notes: noteText }).eq('id', deliveryId);
+    setEditingNotes(null);
+    setNoteText('');
+    fetchDeliveries();
+    toast({ title: "Notes updated" });
   };
 
   const deliveredCount = deliveries.filter(d => d.gift_status === 'delivered').length;
   const pendingCount = deliveries.filter(d => d.gift_status === 'pending').length;
   const failedCount = deliveries.filter(d => d.gift_status === 'failed').length;
+  const progress = deliveries.length ? Math.round((deliveredCount / deliveries.length) * 100) : 0;
 
   const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'delivered':
-        return <CheckCircle className="w-5 h-5 text-green-600" />;
-      case 'failed':
-        return <XCircle className="w-5 h-5 text-red-600" />;
-      default:
-        return <Clock className="w-5 h-5 text-amber-600" />;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'delivered':
-        return 'bg-green-100 text-green-700';
-      case 'failed':
-        return 'bg-red-100 text-red-700';
-      default:
-        return 'bg-amber-100 text-amber-700';
-    }
+    if (status === 'delivered') return <CheckCircle className="w-4 h-4 text-green-600" />;
+    if (status === 'failed') return <XCircle className="w-4 h-4 text-destructive" />;
+    return <Clock className="w-4 h-4 text-amber-600" />;
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Package className="w-5 h-5 text-amber-600" />
-              {campaign.name} - Gift Delivery Management
-            </div>
-            <Badge variant="outline" className="bg-amber-50 text-amber-700">
-              {deliveredCount}/{deliveries.length} Delivered
-            </Badge>
+          <DialogTitle className="flex items-center gap-2">
+            <Package className="w-5 h-5 text-amber-600" />
+            {campaign.name} - Gift Deliveries
           </DialogTitle>
           <DialogDescription>
-            Track and manage gift deliveries to {deliveries.length} offices
+            Track deliveries to {deliveries.length} offices
           </DialogDescription>
         </DialogHeader>
 
-        {/* Summary */}
-        <div className="grid grid-cols-3 gap-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-green-600">Delivered</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold text-green-600">{deliveredCount}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-amber-600">Pending</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold text-amber-600">{pendingCount}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-red-600">Failed</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold text-red-600">{failedCount}</p>
-            </CardContent>
-          </Card>
+        {/* Progress Bar + Stats */}
+        <div className="space-y-3 p-3 bg-muted/30 rounded-lg">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">{deliveredCount}/{deliveries.length} delivered</span>
+            <span className="font-medium">{progress}%</span>
+          </div>
+          <Progress value={progress} className="h-2" />
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-4 text-sm">
+              <span className="flex items-center gap-1 text-green-600"><CheckCircle className="w-3.5 h-3.5" /> {deliveredCount}</span>
+              <span className="flex items-center gap-1 text-amber-600"><Clock className="w-3.5 h-3.5" /> {pendingCount}</span>
+              {failedCount > 0 && <span className="flex items-center gap-1 text-destructive"><XCircle className="w-3.5 h-3.5" /> {failedCount}</span>}
+            </div>
+            <div className="flex gap-2 ml-auto">
+              <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+                <SelectTrigger className="h-8 w-[130px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="status">By Status</SelectItem>
+                  <SelectItem value="name">By Name</SelectItem>
+                </SelectContent>
+              </Select>
+              {pendingCount > 0 && (
+                <Button variant="outline" size="sm" onClick={markAllDelivered} className="gap-1.5 h-8 text-xs">
+                  <CheckCheck className="w-3.5 h-3.5" /> Mark All Delivered
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Materials Checklist */}
         {campaign.materials_checklist && campaign.materials_checklist.length > 0 && (
-          <Card className="bg-amber-50 border-amber-200">
-            <CardHeader>
-              <CardTitle className="text-amber-900">Materials Checklist</CardTitle>
-            </CardHeader>
+          <Card className="bg-amber-500/5 border-amber-500/20">
+            <CardHeader className="pb-2"><CardTitle className="text-sm">Materials Checklist</CardTitle></CardHeader>
             <CardContent>
-              <div className="space-y-2">
+              <div className="flex flex-wrap gap-3">
                 {campaign.materials_checklist.map((item, idx) => (
                   <div key={idx} className="flex items-center gap-2">
-                    <Checkbox
-                      checked={materialsChecked[item]}
-                      onCheckedChange={(checked) => 
-                        setMaterialsChecked(prev => ({ ...prev, [item]: checked as boolean }))
-                      }
-                    />
+                    <Checkbox checked={materialsChecked[item]} onCheckedChange={(c) => setMaterialsChecked(prev => ({ ...prev, [item]: c as boolean }))} />
                     <label className="text-sm">{item}</label>
                   </div>
                 ))}
@@ -276,94 +199,60 @@ export function GiftDeliveryDialog({
         {/* Delivery Cards */}
         {loading ? (
           <div className="text-center py-8">
-            <div className="w-8 h-8 border-4 border-amber-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+            <div className="w-8 h-8 border-4 border-amber-600 border-t-transparent rounded-full animate-spin mx-auto" />
           </div>
         ) : (
-          <div className="space-y-4">
-            {deliveries.map((delivery) => (
+          <div className="space-y-2">
+            {sortedDeliveries.map((delivery) => (
               <Card key={delivery.id}>
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-3 flex-1">
-                      {getStatusIcon(delivery.gift_status)}
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="text-base">{delivery.office.name}</CardTitle>
-                        {delivery.office.address && (
-                          <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                            <MapPin className="w-3 h-3" />
-                            {delivery.office.address}
-                          </p>
-                        )}
-                        <Badge variant="secondary" className="mt-2 text-xs">
-                          {delivery.office.source_type}
-                        </Badge>
+                <CardContent className="p-3">
+                  <div className="flex items-start gap-3">
+                    {getStatusIcon(delivery.gift_status)}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <h4 className="font-medium text-sm truncate">{delivery.office.name}</h4>
+                        <Badge variant="outline" className="text-xs capitalize shrink-0">{delivery.gift_status}</Badge>
                       </div>
-                    </div>
-                    <Badge className={getStatusColor(delivery.gift_status)}>
-                      {delivery.gift_status}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                
-                <CardContent className="space-y-3">
-                  {/* Status Action Buttons */}
-                  {delivery.gift_status === 'pending' && (
-                    <div className="flex gap-2">
-                      <Button 
-                        size="sm" 
-                        onClick={() => updateDeliveryStatus(delivery.id, 'delivered')}
-                        className="bg-green-600 hover:bg-green-700"
-                      >
-                        <CheckCircle className="w-4 h-4 mr-1" />
-                        Mark Delivered
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => updateDeliveryStatus(delivery.id, 'failed')}
-                      >
-                        <XCircle className="w-4 h-4 mr-1" />
-                        Mark Failed
-                      </Button>
-                    </div>
-                  )}
+                      {delivery.office.address && (
+                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                          <MapPin className="w-3 h-3 shrink-0" /><span className="truncate">{delivery.office.address}</span>
+                        </p>
+                      )}
 
-                  {/* Notes Section */}
-                  <div className="border-t pt-3">
-                    {editingNotes === delivery.id ? (
-                      <div className="space-y-2">
-                        <Label>Delivery Notes</Label>
-                        <Textarea
-                          value={noteText}
-                          onChange={(e) => setNoteText(e.target.value)}
-                          placeholder="Add notes about this delivery..."
-                          rows={3}
-                        />
-                        <div className="flex gap-2">
-                          <Button size="sm" onClick={() => updateDeliveryNotes(delivery.id, noteText)}>
-                            <Save className="w-4 h-4 mr-1" />
-                            Save
+                      {/* Actions */}
+                      {delivery.gift_status === 'pending' && (
+                        <div className="flex gap-2 mt-2">
+                          <Button size="sm" variant="default" className="h-7 text-xs gap-1" onClick={() => updateStatus(delivery.id, 'delivered')}>
+                            <CheckCircle className="w-3.5 h-3.5" /> Delivered
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => setEditingNotes(null)}>
-                            Cancel
+                          <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => updateStatus(delivery.id, 'failed')}>
+                            <XCircle className="w-3.5 h-3.5" /> Failed
                           </Button>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <Label className="text-xs text-muted-foreground">Delivery Notes</Label>
+                      )}
+
+                      {/* Notes */}
+                      {editingNotes === delivery.id ? (
+                        <div className="mt-2 space-y-2">
+                          <Textarea value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder="Delivery notes..." rows={2} />
+                          <div className="flex gap-2">
+                            <Button size="sm" className="h-7 text-xs gap-1" onClick={() => saveNotes(delivery.id)}><Save className="w-3.5 h-3.5" /> Save</Button>
+                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setEditingNotes(null)}>Cancel</Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 mt-1">
                           {delivery.delivery_notes ? (
-                            <p className="text-sm mt-1">{delivery.delivery_notes}</p>
+                            <p className="text-xs text-muted-foreground italic flex-1">{delivery.delivery_notes}</p>
                           ) : (
-                            <p className="text-sm text-muted-foreground italic mt-1">No notes added</p>
+                            <p className="text-xs text-muted-foreground italic flex-1">No notes</p>
                           )}
+                          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => { setEditingNotes(delivery.id); setNoteText(delivery.delivery_notes || ''); }}>
+                            <Edit2 className="w-3 h-3" />
+                          </Button>
                         </div>
-                        <Button size="sm" variant="ghost" onClick={() => startEditingNotes(delivery)}>
-                          <Edit2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>

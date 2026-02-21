@@ -2,26 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Progress } from '@/components/ui/progress';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { 
-  Mail, 
-  Copy, 
-  ExternalLink, 
-  CheckCircle, 
-  Clock, 
-  Wand2,
-  RefreshCw,
-  Sparkles
+  Mail, Copy, ExternalLink, CheckCircle, Clock, RefreshCw, Sparkles,
+  ChevronDown, ChevronUp, Wand2, CheckCheck
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { nowISO } from '@/lib/dateSync';
@@ -46,6 +38,7 @@ interface CampaignDelivery {
     name: string;
     address?: string;
     source_type: string;
+    email?: string;
   };
 }
 
@@ -56,12 +49,7 @@ interface EmailExecutionDialogProps {
   onCampaignUpdated: () => void;
 }
 
-export function EmailExecutionDialog({ 
-  campaign, 
-  open, 
-  onOpenChange, 
-  onCampaignUpdated 
-}: EmailExecutionDialogProps) {
+export function EmailExecutionDialog({ campaign, open, onOpenChange, onCampaignUpdated }: EmailExecutionDialogProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   
@@ -71,118 +59,57 @@ export function EmailExecutionDialog({
   const [editingEmail, setEditingEmail] = useState<string | null>(null);
   const [editedSubject, setEditedSubject] = useState('');
   const [editedBody, setEditedBody] = useState('');
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    if (open && campaign) {
-      fetchDeliveries();
-    }
+    if (open && campaign) fetchDeliveries();
   }, [open, campaign]);
 
   const fetchDeliveries = async () => {
     if (!campaign || !user) return;
-
     try {
       setLoading(true);
       const { data, error } = await supabase
         .from('campaign_deliveries')
-        .select(`
-          *,
-          office:patient_sources (
-            name,
-            address,
-            source_type
-          )
-        `)
+        .select(`*, office:patient_sources (name, address, source_type, email)`)
         .eq('campaign_id', campaign.id)
         .eq('created_by', user.id)
         .order('created_at');
-
       if (error) throw error;
       setDeliveries(data || []);
     } catch (error) {
-      console.error('Error fetching deliveries:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load campaign deliveries.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to load deliveries.", variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
 
   const generateEmails = async () => {
-    if (!campaign || !user) return;
-
+    if (!campaign || !user || !deliveries.length) return;
     try {
       setGeneratingEmails(true);
-
-      if (!deliveries || deliveries.length === 0) {
-        toast({
-          title: "No Offices Selected",
-          description: "Please select at least one office for the campaign.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('first_name, last_name')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      const officesData = deliveries.map(delivery => ({
-        id: delivery.office_id,
-        name: delivery.office.name,
-        address: delivery.office.address || '',
-        source_type: delivery.office.source_type || 'Office',
-        referral_tier: delivery.referral_tier || 'New Contact'
+      const { data: profile } = await supabase.from('user_profiles').select('first_name, last_name').eq('user_id', user.id).maybeSingle();
+      const officesData = deliveries.map(d => ({
+        id: d.office_id, name: d.office.name, address: d.office.address || '',
+        source_type: d.office.source_type || 'Office', referral_tier: d.referral_tier || 'New Contact'
       }));
 
       const { data, error } = await supabase.functions.invoke('generate-campaign-emails', {
-        body: {
-          offices: officesData,
-          campaign_name: campaign.name,
-          user_name: profile ? `${profile.first_name} ${profile.last_name}` : undefined,
-        }
+        body: { offices: officesData, campaign_name: campaign.name, user_name: profile ? `${profile.first_name} ${profile.last_name}` : undefined }
       });
-
       if (error) throw error;
-      if (!data.success) throw new Error(data.error || 'Failed to generate emails');
+      if (!data.success) throw new Error(data.error || 'Failed');
 
-      const emailUpdates = data.emails.map((email: any) => ({
-        id: deliveries.find(d => d.office_id === email.office_id)?.id,
-        email_subject: email.subject,
-        email_body: email.body,
-        email_status: 'ready'
-      })).filter((update: any) => update.id);
-
-      for (const update of emailUpdates) {
-        await supabase
-          .from('campaign_deliveries')
-          .update({
-            email_subject: update.email_subject,
-            email_body: update.email_body,
-            email_status: update.email_status
-          })
-          .eq('id', update.id);
+      for (const email of data.emails) {
+        const delivery = deliveries.find(d => d.office_id === email.office_id);
+        if (delivery) {
+          await supabase.from('campaign_deliveries').update({ email_subject: email.subject, email_body: email.body, email_status: 'ready' }).eq('id', delivery.id);
+        }
       }
-
       await fetchDeliveries();
-
-      toast({
-        title: "Success",
-        description: `Generated ${data.emails.length} personalized emails`,
-      });
-
+      toast({ title: "Success", description: `Generated ${data.emails.length} emails` });
     } catch (error) {
-      console.error('Error generating emails:', error);
-      toast({
-        title: "Email Generation Failed",
-        description: error instanceof Error ? error.message : "Failed to generate emails",
-        variant: "destructive",
-      });
+      toast({ title: "Generation Failed", description: error instanceof Error ? error.message : "Failed", variant: "destructive" });
     } finally {
       setGeneratingEmails(false);
     }
@@ -190,250 +117,180 @@ export function EmailExecutionDialog({
 
   const copyEmailContent = async (delivery: CampaignDelivery) => {
     if (!delivery.email_body) return;
-
     try {
-      await navigator.clipboard.writeText(delivery.email_body);
-      
-      await supabase
-        .from('campaign_deliveries')
-        .update({ email_copied_at: nowISO() })
-        .eq('id', delivery.id);
-
-      toast({
-        title: "Copied",
-        description: "Email content copied to clipboard",
-      });
-
+      await navigator.clipboard.writeText(`Subject: ${delivery.email_subject}\n\n${delivery.email_body}`);
+      await supabase.from('campaign_deliveries').update({ email_copied_at: nowISO() }).eq('id', delivery.id);
+      toast({ title: "Copied", description: "Email copied to clipboard" });
       fetchDeliveries();
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to copy email content",
-        variant: "destructive",
-      });
+    } catch {
+      toast({ title: "Error", description: "Failed to copy", variant: "destructive" });
     }
   };
 
   const openInEmail = (delivery: CampaignDelivery) => {
     if (!delivery.email_subject || !delivery.email_body) return;
-
+    const to = delivery.office.email ? encodeURIComponent(delivery.office.email) : '';
     const subject = encodeURIComponent(delivery.email_subject);
     const body = encodeURIComponent(delivery.email_body);
-    window.open(`mailto:?subject=${subject}&body=${body}`);
+    window.open(`mailto:${to}?subject=${subject}&body=${body}`);
   };
 
   const markAsSent = async (deliveryId: string) => {
-    try {
-      await supabase
-        .from('campaign_deliveries')
-        .update({ 
-          email_status: 'sent',
-          email_sent_at: nowISO()
-        })
-        .eq('id', deliveryId);
-
-      toast({
-        title: "Success",
-        description: "Email marked as sent",
-      });
-
-      fetchDeliveries();
-      onCampaignUpdated();
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update status",
-        variant: "destructive",
-      });
-    }
+    await supabase.from('campaign_deliveries').update({ email_status: 'sent', email_sent_at: nowISO() }).eq('id', deliveryId);
+    toast({ title: "Marked as Sent" });
+    fetchDeliveries();
+    onCampaignUpdated();
   };
 
-  const startEditing = (delivery: CampaignDelivery) => {
-    setEditingEmail(delivery.id);
-    setEditedSubject(delivery.email_subject || '');
-    setEditedBody(delivery.email_body || '');
+  const markAllAsSent = async () => {
+    const unsent = deliveries.filter(d => d.email_body && d.email_status !== 'sent');
+    for (const d of unsent) {
+      await supabase.from('campaign_deliveries').update({ email_status: 'sent', email_sent_at: nowISO() }).eq('id', d.id);
+    }
+    toast({ title: "All Marked as Sent", description: `${unsent.length} emails marked` });
+    fetchDeliveries();
+    onCampaignUpdated();
   };
 
   const saveEdit = async (deliveryId: string) => {
-    try {
-      await supabase
-        .from('campaign_deliveries')
-        .update({
-          email_subject: editedSubject,
-          email_body: editedBody
-        })
-        .eq('id', deliveryId);
+    await supabase.from('campaign_deliveries').update({ email_subject: editedSubject, email_body: editedBody }).eq('id', deliveryId);
+    setEditingEmail(null);
+    fetchDeliveries();
+    toast({ title: "Email Updated" });
+  };
 
-      setEditingEmail(null);
-      fetchDeliveries();
-
-      toast({
-        title: "Success",
-        description: "Email updated",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update email",
-        variant: "destructive",
-      });
-    }
+  const toggleCard = (id: string) => {
+    setExpandedCards(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
   };
 
   const emailsGenerated = deliveries.some(d => d.email_body);
   const sentCount = deliveries.filter(d => d.email_status === 'sent').length;
-
-  // Auto-generate emails on first open if not already generated
-  useEffect(() => {
-    if (open && deliveries.length > 0 && !loading && !emailsGenerated && !generatingEmails) {
-      console.log('Auto-generating emails on dialog open...');
-      generateEmails();
-    }
-  }, [open, deliveries, loading, emailsGenerated]);
+  const readyCount = deliveries.filter(d => d.email_body && d.email_status !== 'sent').length;
+  const progress = deliveries.length ? Math.round((sentCount / deliveries.length) * 100) : 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Mail className="w-5 h-5 text-primary" />
-              {campaign.name} - Email Generation
-            </div>
-            <Badge variant="outline" className="bg-primary/5 text-primary">
-              {sentCount}/{deliveries.length} Sent
-            </Badge>
+          <DialogTitle className="flex items-center gap-2">
+            <Mail className="w-5 h-5 text-primary" />
+            {campaign.name} - Email Execution
           </DialogTitle>
           <DialogDescription>
             Generate AI-powered emails and manage sending to {deliveries.length} offices
           </DialogDescription>
         </DialogHeader>
 
-        {/* Simple Action Bar */}
-        {emailsGenerated && (
-          <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-            <p className="text-sm text-muted-foreground">
-              {sentCount}/{deliveries.length} emails sent
-            </p>
-            <Button 
-              onClick={generateEmails}
-              variant="ghost"
-              size="sm"
-              className="gap-2 h-8"
-            >
-              <RefreshCw className="w-3 h-3" />
-              Regenerate
-            </Button>
+        {/* Progress + Actions Bar */}
+        <div className="space-y-3 p-3 bg-muted/30 rounded-lg">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">{sentCount}/{deliveries.length} sent</span>
+            <span className="font-medium">{progress}%</span>
           </div>
-        )}
+          <Progress value={progress} className="h-2" />
+          <div className="flex flex-wrap gap-2">
+            {!emailsGenerated ? (
+              <Button onClick={generateEmails} disabled={generatingEmails || !deliveries.length} className="gap-2">
+                <Wand2 className="w-4 h-4" /> {generatingEmails ? 'Generating...' : 'Generate All Emails'}
+              </Button>
+            ) : (
+              <>
+                <Button variant="outline" size="sm" onClick={generateEmails} disabled={generatingEmails} className="gap-1.5">
+                  <RefreshCw className={`w-3.5 h-3.5 ${generatingEmails ? 'animate-spin' : ''}`} /> Regenerate
+                </Button>
+                {readyCount > 0 && (
+                  <Button variant="outline" size="sm" onClick={markAllAsSent} className="gap-1.5">
+                    <CheckCheck className="w-3.5 h-3.5" /> Mark All as Sent ({readyCount})
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+        </div>
 
-        {/* Office Email Cards */}
+        {/* Email Cards */}
         {(loading || generatingEmails) ? (
           <div className="text-center py-12">
             <RefreshCw className="w-8 h-8 animate-spin text-primary mx-auto mb-3" />
-            <p className="text-sm text-muted-foreground">
-              {generatingEmails ? 'Generating personalized emails...' : 'Loading...'}
-            </p>
+            <p className="text-sm text-muted-foreground">{generatingEmails ? 'Generating personalized emails...' : 'Loading...'}</p>
           </div>
         ) : deliveries.length === 0 ? (
-          <Card>
-            <CardContent className="text-center py-12">
-              <Mail className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Offices Selected</h3>
-              <p className="text-muted-foreground">This campaign doesn't have any offices selected yet.</p>
-            </CardContent>
-          </Card>
+          <Card><CardContent className="text-center py-12">
+            <Mail className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+            <h3 className="font-semibold mb-1">No offices selected</h3>
+            <p className="text-sm text-muted-foreground">This campaign has no offices.</p>
+          </CardContent></Card>
         ) : (
-          <div className="grid grid-cols-1 gap-4">
+          <div className="space-y-2">
             {deliveries.map((delivery) => (
-              <Card key={delivery.id} className="overflow-hidden">
-                <CardHeader className="pb-3 bg-muted/30">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="text-base">{delivery.office.name}</CardTitle>
-                      <p className="text-sm text-muted-foreground">{delivery.office.address}</p>
-                      <div className="flex gap-2 mt-2">
-                        <Badge variant="secondary" className="text-xs">{delivery.office.source_type}</Badge>
-                        {delivery.email_status === 'sent' && (
-                          <Badge className="bg-green-100 text-green-700">
-                            <CheckCircle className="w-3 h-3 mr-1" />
-                            Sent
-                          </Badge>
-                        )}
-                        {delivery.email_body && delivery.email_status !== 'sent' && (
-                          <Badge className="bg-blue-100 text-blue-700">
-                            <Sparkles className="w-3 h-3 mr-1" />
-                            Ready to Send
-                          </Badge>
-                        )}
+              <Collapsible key={delivery.id} open={expandedCards.has(delivery.id)} onOpenChange={() => toggleCard(delivery.id)}>
+                <Card className="overflow-hidden">
+                  <CollapsibleTrigger asChild>
+                    <CardHeader className="pb-2 cursor-pointer hover:bg-muted/30 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <div className="min-w-0">
+                            <CardTitle className="text-sm truncate">{delivery.office.name}</CardTitle>
+                            {delivery.email_subject && <p className="text-xs text-muted-foreground truncate mt-0.5">{delivery.email_subject}</p>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {delivery.email_status === 'sent' ? (
+                            <Badge variant="default" className="bg-green-600 text-xs gap-1"><CheckCircle className="w-3 h-3" /> Sent</Badge>
+                          ) : delivery.email_body ? (
+                            <Badge variant="secondary" className="text-xs gap-1"><Sparkles className="w-3 h-3" /> Ready</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs gap-1"><Clock className="w-3 h-3" /> Pending</Badge>
+                          )}
+                          {expandedCards.has(delivery.id) ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                </CardHeader>
-                
-                <CardContent className="pt-4">
-                  {editingEmail === delivery.id ? (
-                    <div className="space-y-3">
-                      <div>
-                        <Label>Subject</Label>
-                        <Textarea
-                          value={editedSubject}
-                          onChange={(e) => setEditedSubject(e.target.value)}
-                          rows={1}
-                          className="resize-none"
-                        />
-                      </div>
-                      <div>
-                        <Label>Body</Label>
-                        <Textarea
-                          value={editedBody}
-                          onChange={(e) => setEditedBody(e.target.value)}
-                          rows={8}
-                        />
-                      </div>
-                      <div className="flex gap-2">
-                        <Button size="sm" onClick={() => saveEdit(delivery.id)}>Save</Button>
-                        <Button size="sm" variant="outline" onClick={() => setEditingEmail(null)}>Cancel</Button>
-                      </div>
-                    </div>
-                  ) : delivery.email_body ? (
-                    <div className="space-y-3">
-                       <div className="bg-muted/50 p-3 rounded-md">
-                         <Label className="text-xs text-muted-foreground">Subject</Label>
-                         <p className="text-sm font-medium mt-1">{delivery.email_subject}</p>
-                       </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Body Preview</Label>
-                        <p className="text-sm whitespace-pre-wrap line-clamp-3">{delivery.email_body}</p>
-                      </div>
-                      <div className="flex gap-2 pt-2">
-                        <Button size="sm" variant="outline" onClick={() => startEditing(delivery)}>
-                          Edit
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => copyEmailContent(delivery)}>
-                          <Copy className="w-4 h-4 mr-1" />
-                          Copy
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => openInEmail(delivery)}>
-                          <ExternalLink className="w-4 h-4 mr-1" />
-                          Open in Email
-                        </Button>
-                        {delivery.email_status !== 'sent' && (
-                          <Button size="sm" onClick={() => markAsSent(delivery.id)}>
-                            <CheckCircle className="w-4 h-4 mr-1" />
-                            Mark as Sent
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-6 text-muted-foreground">
-                      <Clock className="w-8 h-8 mx-auto mb-2" />
-                      <p className="text-sm">Email not generated yet</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                    </CardHeader>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <CardContent className="pt-0 pb-3">
+                      {editingEmail === delivery.id ? (
+                        <div className="space-y-3">
+                          <div><Label>Subject</Label><Textarea value={editedSubject} onChange={(e) => setEditedSubject(e.target.value)} rows={1} className="resize-none" /></div>
+                          <div><Label>Body</Label><Textarea value={editedBody} onChange={(e) => setEditedBody(e.target.value)} rows={6} /></div>
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={() => saveEdit(delivery.id)}>Save</Button>
+                            <Button size="sm" variant="outline" onClick={() => setEditingEmail(null)}>Cancel</Button>
+                          </div>
+                        </div>
+                      ) : delivery.email_body ? (
+                        <div className="space-y-3">
+                          <div className="bg-muted/50 p-3 rounded-md">
+                            <Label className="text-xs text-muted-foreground">Subject</Label>
+                            <p className="text-sm font-medium mt-0.5">{delivery.email_subject}</p>
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Body</Label>
+                            <p className="text-sm whitespace-pre-wrap mt-0.5">{delivery.email_body}</p>
+                          </div>
+                          <div className="flex flex-wrap gap-2 pt-2 border-t">
+                            <Button size="sm" variant="outline" onClick={() => { setEditingEmail(delivery.id); setEditedSubject(delivery.email_subject || ''); setEditedBody(delivery.email_body || ''); }}>Edit</Button>
+                            <Button size="sm" variant="outline" onClick={() => copyEmailContent(delivery)} className="gap-1"><Copy className="w-3.5 h-3.5" /> Copy</Button>
+                            <Button size="sm" variant="outline" onClick={() => openInEmail(delivery)} className="gap-1"><ExternalLink className="w-3.5 h-3.5" /> {delivery.office.email ? 'Send Email' : 'Open in Email'}</Button>
+                            {delivery.email_status !== 'sent' && (
+                              <Button size="sm" onClick={() => markAsSent(delivery.id)} className="gap-1 ml-auto"><CheckCircle className="w-3.5 h-3.5" /> Mark Sent</Button>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center py-4 text-muted-foreground">
+                          <Clock className="w-6 h-6 mx-auto mb-1" />
+                          <p className="text-sm">Click "Generate All Emails" above</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </CollapsibleContent>
+                </Card>
+              </Collapsible>
             ))}
           </div>
         )}
