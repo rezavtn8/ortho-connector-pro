@@ -1,133 +1,127 @@
 
 
-# Systematically Rebuild the Campaigns Tab
+# Make Discovered Office Groups a First-Class Entity
 
-## Current State Assessment
+## Goal
 
-The Campaigns tab has two separate pages (`Campaigns.tsx` at 580 lines and `CampaignsResilient.tsx` at 260 lines -- only the default export `Campaigns.tsx` is used), multiple creator dialogs, detail dialogs, and execution dialogs. The code is fragmented across 7+ component files with duplicated logic, inconsistent patterns, and several functional gaps:
-
-**Functional Issues:**
-- Email campaigns auto-trigger AI generation on dialog open (can waste API calls)
-- No ability to delete campaigns
-- No ability to change campaign status (Draft/Active/Completed)
-- Gift campaign delivery tracking is basic -- no progress bar or batch actions
-- No search/filter on the main campaigns list
-- The `CampaignsResilient.tsx` file is dead code (not used)
-
-**UI/UX Issues:**
-- Stats cards take up too much vertical space
-- Campaign cards lack clear progress indicators
-- No visual distinction between campaign statuses at a glance
-- Empty states are generic
-- No confirmation before destructive actions
+Right now, discovered office groups only live on the Discover page. The user wants them to be selectable as a source everywhere -- when creating email campaigns, gift campaigns, printing mailing labels, and viewing on the map. A group should feel like a saved list that the user can reach from any tool in the app.
 
 ---
 
-## Rebuild Plan
+## Integration Points
 
-### Step 1: Clean Up Dead Code
-- Delete `src/pages/CampaignsResilient.tsx` (unused)
-- Delete `src/components/CreateCampaignDialog.tsx` (superseded by EmailCampaignCreator and PhysicalCampaignCreator)
-- Delete `src/components/UnifiedCampaignCreator.tsx` and `src/components/UnifiedCampaignDialog.tsx` if unused
-- Delete `src/components/CampaignDetailDialog.tsx` and `src/components/CampaignExecutionDialog.tsx` if unused
+### 1. Email Campaign Creator -- Add "Discovered Group" Source
 
-### Step 2: Rebuild Main Campaigns Page (`src/pages/Campaigns.tsx`)
+**File:** `src/components/campaign/EmailCampaignCreator.tsx`
 
-**New Layout:**
-```
-+--------------------------------------------------+
-| Stats Bar (compact, single row)                   |
-| [Total: 12] [Active: 3] [Completed: 8] [Draft:1] |
-+--------------------------------------------------+
-| Toolbar: [Search...] [Filter: Status] [+ Email] [+ Gift] |
-+--------------------------------------------------+
-| Tab: All | Email | Gift                           |
-+--------------------------------------------------+
-| Campaign Cards Grid (2-3 columns)                 |
-| Each card shows:                                  |
-|   - Icon + Name + Status badge                    |
-|   - Type + Office count + Progress bar            |
-|   - Date created + Planned date                   |
-|   - Quick actions: View | Execute | Delete        |
-+--------------------------------------------------+
-```
+Currently the office list only comes from `useOffices()` (network/partner offices). Changes:
 
-**Key Changes:**
-- Compact inline stats (horizontal chips, not 4 full cards)
-- Add a search input to filter campaigns by name
-- Add status filter dropdown (All, Draft, Active, Completed)
-- Add tabs: All / Email / Gift to switch between views
-- Unified campaign card component with progress indicator
-- Add delete campaign functionality with confirmation dialog
-- Add status change (Draft -> Active -> Completed) via dropdown on each card
+- Add a **source toggle** at the top of the office selection step (Step 2): "Network Offices" | "Discovered Groups"
+- When "Discovered Groups" is selected, show a dropdown of the user's saved groups (from `useDiscoveredGroups`)
+- Selecting a group loads its member offices from `discovered_offices` table
+- The discovered offices get displayed in the same checkbox list format, with office type badge instead of tier badge
+- When creating the campaign, the `office_id` in `campaign_deliveries` will reference discovered office IDs (they're all UUIDs from the same pattern, so this works)
 
-### Step 3: Improve Email Campaign Creator (`EmailCampaignCreator.tsx`)
-- Keep the 2-step wizard but improve step indicators (numbered circles with connecting line)
-- Add campaign name auto-suggestion based on type + date
-- Improve office selection with a search/filter input within the list
-- Add a "Preview" summary before final creation
-- Better validation messages inline (not just toast)
+### 2. Gift/Physical Campaign Creator -- Same Treatment
 
-### Step 4: Improve Physical/Gift Campaign Creator (`PhysicalCampaignCreator.tsx`)
-- Streamline from 4 steps to 3 (merge campaign details + gift bundle into one step)
-- Add visual gift bundle cards with icons
-- Show running cost estimate prominently as offices are selected
-- Better step navigation with clear progress
+**File:** `src/components/campaign/PhysicalCampaignCreator.tsx`
 
-### Step 5: Improve Email Execution Dialog (`EmailExecutionDialog.tsx`)
-- Remove auto-generate on open (add explicit "Generate All Emails" button instead)
-- Add batch actions: "Copy All", "Mark All as Sent"
-- Add a progress bar showing generation/sent status
-- Collapsible email preview cards (show subject only, expand for body)
-- Add "Send via Email" button that pre-fills the recipient if office has an email
+Same pattern as email -- add a source toggle between network offices and discovered groups in the office selection step.
 
-### Step 6: Improve Gift Delivery Dialog (`GiftDeliveryDialog.tsx`)
-- Add a progress bar at the top (delivered/total)
-- Add batch "Mark All as Delivered" button
-- Add sorting: by status (pending first), by office name
-- Better visual hierarchy for delivery cards
+### 3. Mailing Labels -- Add Group Filter
 
-### Step 7: Add Campaign Actions
-- **Delete Campaign**: With confirmation dialog, cascading delete of deliveries
-- **Status Toggle**: Dropdown or button to change Draft -> Active -> Completed
-- **Duplicate Campaign**: Copy an existing campaign with new name
-- **Export**: Export campaign summary as CSV
+**File:** `src/pages/MailingLabels.tsx`
+
+Currently has a basic `sourceFilter` (all/partner/discovered) and a `discovered=true&ids=...` URL param pattern. Changes:
+
+- Add a **"Discovered Group"** option to the source filter dropdown
+- When selected, show a group picker dropdown
+- Selecting a group auto-filters to only offices in that group
+- Support a new URL param: `group=<groupId>` so groups can link directly to labels from the Discover page
+
+### 4. Map View -- Filter by Group
+
+**File:** `src/components/MapView.tsx` and `src/pages/MapView.tsx`
+
+Currently shows all discovered offices when the toggle is on. Changes:
+
+- Add a group filter dropdown (visible when "Show Discovered" toggle is on)
+- When a group is selected, only show that group's offices on the map instead of all discovered offices
+- Support URL param: `group=<groupId>` for direct linking
+
+### 5. Discovered Office Groups Component -- Add Campaign Actions
+
+**File:** `src/components/DiscoveredOfficeGroups.tsx`
+
+Add to the group dropdown menu:
+- "Email Campaign" -- opens EmailCampaignCreator with group pre-selected
+- "Gift Campaign" -- opens PhysicalCampaignCreator with group pre-selected
+- "Print Labels" already exists but will use the new `group=<groupId>` URL param
+- "View on Map" will use the new `group=<groupId>` URL param
+
+### 6. Selection Action Bar -- Add Campaign Actions for Discovered Offices
+
+**File:** `src/components/SelectionActionBar.tsx`
+
+Currently discovered offices only show "Add to Network", "Labels", "Map", "Group", "Remove". Add:
+- **"Email"** button -- same as network offices, opens email campaign creator with selected discovered office IDs
+- **"Gift"** button -- same pattern
 
 ---
 
 ## Technical Details
 
-### Files to Delete
-| File | Reason |
-|------|--------|
-| `src/pages/CampaignsResilient.tsx` | Dead code, not routed |
-| `src/components/CreateCampaignDialog.tsx` | Superseded |
-| `src/components/CampaignDetailDialog.tsx` | Check if used, likely superseded |
-| `src/components/CampaignExecutionDialog.tsx` | Check if used, likely superseded |
-| `src/components/UnifiedCampaignCreator.tsx` | Check if used |
-| `src/components/UnifiedCampaignDialog.tsx` | Check if used |
+### Hook Changes
 
-### Files to Rewrite/Heavily Modify
-| File | Changes |
-|------|---------|
-| `src/pages/Campaigns.tsx` | Full rewrite: compact stats, search, filters, tabs, delete/status actions |
-| `src/components/campaign/EmailCampaignCreator.tsx` | Add search in office list, auto-name, preview step |
-| `src/components/campaign/PhysicalCampaignCreator.tsx` | Consolidate steps, better gift bundle UI |
-| `src/components/campaign/EmailExecutionDialog.tsx` | Remove auto-generate, add batch actions, collapsible cards |
-| `src/components/campaign/GiftDeliveryDialog.tsx` | Add progress bar, batch actions, sorting |
-| `src/components/campaign/EmailCampaignDetailDialog.tsx` | Minor cleanup, consistency |
-| `src/components/campaign/GiftCampaignDetailDialog.tsx` | Minor cleanup, consistency |
+**`src/hooks/useDiscoveredGroups.ts`** -- Add a new function:
+- `getGroupOffices(groupId)` -- fetches full office data (name, address, etc.) for all members of a group by joining `discovered_office_group_members` with `discovered_offices`
+
+### Campaign Creator Changes
+
+Both `EmailCampaignCreator.tsx` and `PhysicalCampaignCreator.tsx` need:
+- New prop: `preSelectedDiscoveredIds?: string[]` -- to pre-select discovered offices when coming from groups
+- New state: `officeSource: 'network' | 'discovered'` -- toggles which list is shown
+- New state: `selectedGroupId: string | null` -- which discovered group to load
+- Import and use `useDiscoveredGroups` hook
+- Query `discovered_offices` filtered by group member IDs when a group is selected
+
+### Mailing Labels Changes
+
+- New URL param support: `group=<groupId>`
+- When `group` param is present, fetch group members and filter discovered offices to only those IDs
+- Add group dropdown to the source filter area
+
+### Map View Changes
+
+- New URL param support: `group=<groupId>`
+- `useDiscoveredMapData` hook: accept optional `groupMemberIds` to filter which discovered offices to show
+- Add group selector dropdown when discovered toggle is on
+
+### Files to Modify
+
+| File | Change |
+|------|--------|
+| `src/hooks/useDiscoveredGroups.ts` | Add `getGroupOffices()` method |
+| `src/components/campaign/EmailCampaignCreator.tsx` | Add source toggle, group picker, discovered office support |
+| `src/components/campaign/PhysicalCampaignCreator.tsx` | Same as email creator |
+| `src/pages/MailingLabels.tsx` | Add group filter option and `group=` URL param |
+| `src/components/MapView.tsx` | Add group filter dropdown when showing discovered |
+| `src/pages/MapView.tsx` | Pass group param from URL |
+| `src/components/DiscoveredOfficeGroups.tsx` | Add Email/Gift campaign actions to group menu |
+| `src/components/SelectionActionBar.tsx` | Add Email/Gift buttons for discovered offices |
 
 ### No Database Changes Required
-All the campaign infrastructure (campaigns, campaign_deliveries tables) already exists with proper RLS policies. The changes are purely frontend.
+
+All the data relationships already exist -- `discovered_office_groups`, `discovered_office_group_members`, and `discovered_offices` tables with proper RLS. We just need to query them from more places in the frontend.
 
 ### Implementation Order
-1. Delete dead code files
-2. Rewrite `Campaigns.tsx` main page with new layout
-3. Improve `EmailCampaignCreator.tsx`
-4. Improve `PhysicalCampaignCreator.tsx`
-5. Improve `EmailExecutionDialog.tsx` (remove auto-generate, add batch actions)
-6. Improve `GiftDeliveryDialog.tsx` (progress bar, batch actions)
-7. Clean up detail dialogs
+
+1. Enhance `useDiscoveredGroups` hook with `getGroupOffices()`
+2. Update `EmailCampaignCreator` with source toggle + group picker
+3. Update `PhysicalCampaignCreator` with same pattern
+4. Update `SelectionActionBar` to add Email/Gift for discovered offices
+5. Update `DiscoveredOfficeGroups` menu with campaign actions
+6. Update `MailingLabels` with group filter
+7. Update `MapView` with group filter
 8. Test end-to-end
 
