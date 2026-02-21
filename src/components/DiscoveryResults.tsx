@@ -3,11 +3,22 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Star, Phone, Globe, MapPin, Plus,
-  Building2, Users, ArrowUpDown, Navigation, Check, Trash2
+  Building2, Users, ArrowUpDown, Navigation, Check, Trash2, FolderOpen
 } from 'lucide-react';
 import { ImportDiscoveredOfficeDialog } from '@/components/ImportDiscoveredOfficeDialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface DiscoveredOffice {
   id: string;
@@ -47,6 +58,7 @@ interface DiscoveryResultsProps {
   selectedIds?: string[];
   onSelectionChange?: (ids: string[]) => void;
   onStartOver?: () => void;
+  activeGroupName?: string;
 }
 
 export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
@@ -57,12 +69,30 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
   isLoading = false,
   selectedIds = [],
   onSelectionChange,
-  onStartOver
+  onStartOver,
+  activeGroupName
 }) => {
   const [sortBy, setSortBy] = useState<'distance' | 'rating' | 'name' | 'type'>('distance');
   const [selectedOffice, setSelectedOffice] = useState<DiscoveredOffice | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showAlreadyAdded, setShowAlreadyAdded] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+
+  // Normalize office type for display
+  const normalizeOfficeType = (type: string | null | undefined): string => {
+    if (!type || type === 'Unknown' || type.trim() === '') return 'Dental Office';
+    return type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  };
+
+  const getOfficeTypeBadgeClass = (type: string): string => {
+    const normalized = type.toLowerCase();
+    if (normalized.includes('orthodon')) return 'bg-purple-100 text-purple-700 dark:bg-purple-950/30 dark:text-purple-300 border-purple-200 dark:border-purple-800';
+    if (normalized.includes('pediatric') || normalized.includes('children')) return 'bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-300 border-green-200 dark:border-green-800';
+    if (normalized.includes('oral') || normalized.includes('surgeon')) return 'bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-300 border-red-200 dark:border-red-800';
+    if (normalized.includes('periodon')) return 'bg-orange-100 text-orange-700 dark:bg-orange-950/30 dark:text-orange-300 border-orange-200 dark:border-orange-800';
+    if (normalized.includes('endodon')) return 'bg-cyan-100 text-cyan-700 dark:bg-cyan-950/30 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800';
+    return 'bg-muted text-muted-foreground border-border';
+  };
 
   // Separate offices into categories
   const newOffices = offices.filter(office => !office.imported && !office.already_in_network);
@@ -246,7 +276,7 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={onStartOver}
+                  onClick={() => setShowClearConfirm(true)}
                   className="text-destructive hover:text-destructive"
                 >
                   <Trash2 className="w-4 h-4 mr-1" />
@@ -258,7 +288,19 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
         </CardContent>
       </Card>
 
-      {newOffices.length === 0 && !showAlreadyAdded ? (
+      {activeGroupName && offices.length === 0 ? (
+        <Card className="text-center p-8">
+          <div className="space-y-4">
+            <FolderOpen className="w-12 h-12 text-muted-foreground mx-auto" />
+            <div>
+              <h3 className="text-lg font-semibold">"{activeGroupName}" is Empty</h3>
+              <p className="text-muted-foreground">
+                Select offices from "All Offices" and use the "Group" button to add them here.
+              </p>
+            </div>
+          </div>
+        </Card>
+      ) : newOffices.length === 0 && !showAlreadyAdded ? (
         <Card className="text-center p-8">
           <div className="space-y-4">
             <Check className="w-12 h-12 text-green-500 mx-auto" />
@@ -294,16 +336,17 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
               {/* Sort control */}
               <div className="flex items-center gap-2">
                 <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as 'name' | 'rating' | 'distance')}
-                  className="text-sm border rounded px-2 py-1 bg-background"
-                >
-                  <option value="distance">Distance</option>
-                  <option value="rating">Rating</option>
-                  <option value="name">Name</option>
-                  <option value="type">Type</option>
-                </select>
+                <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+                  <SelectTrigger className="h-8 w-[120px] text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="distance">Distance</SelectItem>
+                    <SelectItem value="rating">Rating</SelectItem>
+                    <SelectItem value="name">Name</SelectItem>
+                    <SelectItem value="type">Type</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -339,8 +382,8 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
                       <div className="flex-1">
                         <CardTitle className="text-lg leading-tight">{office.name}</CardTitle>
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
-                          <Badge variant="outline" className="text-xs">
-                            {office.office_type}
+                          <Badge variant="outline" className={`text-xs border ${getOfficeTypeBadgeClass(office.office_type)}`}>
+                            {normalizeOfficeType(office.office_type)}
                           </Badge>
                           {office.distance && (
                             <Badge variant="secondary" className="text-xs">
@@ -442,6 +485,30 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
           onSourceAdded={handleOfficeAdded}
         />
       )}
+
+      {/* Clear All Confirmation */}
+      <AlertDialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear All Discovered Offices?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove all discovered offices from your list. Groups will also be emptied. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                onStartOver?.();
+                setShowClearConfirm(false);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Clear All
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

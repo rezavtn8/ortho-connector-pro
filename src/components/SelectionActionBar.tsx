@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Mail, Gift, Printer, MapPin, Tag, Calendar, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
+import { X, Mail, Gift, Printer, MapPin, Tag, Calendar, MoreHorizontal, Plus, Trash2, FolderPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -22,6 +22,7 @@ interface SelectionActionBarProps {
   isDiscoveredOffices?: boolean;
   onBulkAdd?: () => void;
   onRemove?: () => void;
+  onSaveToGroup?: () => void;
 }
 
 export function SelectionActionBar({
@@ -34,6 +35,7 @@ export function SelectionActionBar({
   isDiscoveredOffices = false,
   onBulkAdd,
   onRemove,
+  onSaveToGroup,
 }: SelectionActionBarProps) {
   const navigate = useNavigate();
   const [isTagDialogOpen, setIsTagDialogOpen] = useState(false);
@@ -107,6 +109,18 @@ export function SelectionActionBar({
                   <MapPin className="h-4 w-4" />
                   <span className="hidden sm:inline">Map</span>
                 </Button>
+
+                {onSaveToGroup && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={onSaveToGroup}
+                    className="gap-2"
+                  >
+                    <FolderPlus className="h-4 w-4" />
+                    <span className="hidden sm:inline">Group</span>
+                  </Button>
+                )}
 
                 <Button
                   variant="secondary"
