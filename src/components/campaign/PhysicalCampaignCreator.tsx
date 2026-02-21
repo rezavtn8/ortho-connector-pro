@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,11 +7,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Package, ArrowRight, ArrowLeft, Gift } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Loader2, Package, ArrowRight, ArrowLeft, Gift, Search, Users, Calendar, DollarSign, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { EnhancedDatePicker } from '../EnhancedDatePicker';
 import { useOffices } from '@/hooks/useOffices';
+import { format } from 'date-fns';
 
 interface PhysicalCampaignCreatorProps {
   open: boolean;
@@ -23,8 +25,6 @@ interface Office {
   id: string;
   name: string;
   address: string;
-  phone?: string;
-  email?: string;
   l12: number;
   r3: number;
   mslr: number;
@@ -37,126 +37,78 @@ interface GiftBundle {
   description: string;
   items: string[];
   estimatedCost: number;
-  occasion: string[];
+  icon: string;
 }
 
 const GIFT_BUNDLES: GiftBundle[] = [
-  {
-    id: 'appreciation-basket',
-    name: 'Appreciation Basket',
-    description: 'Premium gift basket with gourmet treats',
-    items: ['Gourmet coffee', 'Artisan chocolates', 'Branded mug', 'Thank you card'],
-    estimatedCost: 75,
-    occasion: ['general', 'appreciation'],
-  },
-  {
-    id: 'holiday-deluxe',
-    name: 'Holiday Deluxe Package',
-    description: 'Festive seasonal gift package',
-    items: ['Seasonal treats', 'Holiday decorations', 'Branded calendar', 'Gift card'],
-    estimatedCost: 100,
-    occasion: ['holiday', 'special'],
-  },
-  {
-    id: 'wellness-bundle',
-    name: 'Wellness Bundle',
-    description: 'Health-focused gift set',
-    items: ['Wellness journal', 'Herbal tea set', 'Stress relief items', 'Educational materials'],
-    estimatedCost: 60,
-    occasion: ['general', 'wellness'],
-  },
-  {
-    id: 'office-essentials',
-    name: 'Office Essentials',
-    description: 'Practical office supplies with branding',
-    items: ['Branded pens', 'Notepads', 'Desk organizer', 'Business card holder'],
-    estimatedCost: 45,
-    occasion: ['general', 'new-office'],
-  },
+  { id: 'appreciation-basket', name: 'Appreciation Basket', description: 'Premium gift basket with gourmet treats', items: ['Gourmet coffee', 'Artisan chocolates', 'Branded mug', 'Thank you card'], estimatedCost: 75, icon: '🎁' },
+  { id: 'holiday-deluxe', name: 'Holiday Deluxe', description: 'Festive seasonal gift package', items: ['Seasonal treats', 'Holiday decorations', 'Branded calendar', 'Gift card'], estimatedCost: 100, icon: '🎄' },
+  { id: 'wellness-bundle', name: 'Wellness Bundle', description: 'Health-focused gift set', items: ['Wellness journal', 'Herbal tea set', 'Stress relief items', 'Educational materials'], estimatedCost: 60, icon: '🧘' },
+  { id: 'office-essentials', name: 'Office Essentials', description: 'Practical supplies with branding', items: ['Branded pens', 'Notepads', 'Desk organizer', 'Business card holder'], estimatedCost: 45, icon: '✏️' },
 ];
 
 const CAMPAIGN_TYPES = [
-  { value: 'referral_appreciation', label: 'Referral Appreciation', description: 'Thank existing referral sources' },
-  { value: 'new_office_intro', label: 'New Office Introduction', description: 'Introduce your practice with gifts' },
-  { value: 'holiday_campaign', label: 'Holiday Campaign', description: 'Seasonal gift distribution' },
-  { value: 'milestone_celebration', label: 'Milestone Celebration', description: 'Celebrate achievements together' },
+  { value: 'referral_appreciation', label: 'Referral Appreciation' },
+  { value: 'new_office_intro', label: 'New Office Introduction' },
+  { value: 'holiday_campaign', label: 'Holiday Campaign' },
+  { value: 'milestone_celebration', label: 'Milestone Celebration' },
 ];
 
-const OFFICE_TIER_FILTERS = [
-  { value: 'all', label: 'All Offices', color: 'bg-gray-500' },
-  { value: 'VIP', label: 'VIP', color: 'bg-purple-500' },
-  { value: 'Warm', label: 'Warm', color: 'bg-orange-500' },
-  { value: 'Cold', label: 'Cold', color: 'bg-blue-500' },
-  { value: 'Dormant', label: 'Dormant', color: 'bg-gray-500' },
-];
+const TIER_FILTERS = ['all', 'VIP', 'Warm', 'Cold', 'Dormant'] as const;
 
 export function PhysicalCampaignCreator({ open, onOpenChange, onCampaignCreated }: PhysicalCampaignCreatorProps) {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [selectedOffices, setSelectedOffices] = useState<string[]>([]);
   const [tierFilter, setTierFilter] = useState('all');
-  const [materialsChecklist, setMaterialsChecklist] = useState<string[]>([]);
+  const [officeSearch, setOfficeSearch] = useState('');
   
-  // Form state
   const [campaignType, setCampaignType] = useState('referral_appreciation');
   const [campaignName, setCampaignName] = useState('');
   const [plannedDate, setPlannedDate] = useState<Date>();
   const [notes, setNotes] = useState('');
   const [selectedGiftBundle, setSelectedGiftBundle] = useState<string>('');
 
-  // Use the offices hook for consistent data
   const { data: officesData, isLoading: loadingOffices } = useOffices();
   
-  const offices: Office[] = (officesData || []).map(office => ({
+  const offices: Office[] = useMemo(() => (officesData || []).map(office => ({
     id: office.id,
     name: office.name || '',
     address: office.address || '',
-    phone: office.phone || undefined,
-    email: office.email || undefined,
     l12: office.l12 || 0,
     r3: office.r3 || 0,
     mslr: office.mslr || 0,
     tier: office.tier || 'Cold',
-  }));
+  })), [officesData]);
 
-  const filteredOffices = tierFilter === 'all' 
-    ? offices 
-    : offices.filter(o => o.tier === tierFilter);
-
-  const handleOfficeSelection = (officeId: string) => {
-    setSelectedOffices(prev => 
-      prev.includes(officeId) 
-        ? prev.filter(id => id !== officeId)
-        : [...prev, officeId]
-    );
-  };
-
-  const handleSelectAllInCategory = () => {
-    const currentFilteredIds = filteredOffices.map(o => o.id);
-    const allSelected = currentFilteredIds.every(id => selectedOffices.includes(id));
-    
-    if (allSelected) {
-      // Deselect all in current filter
-      setSelectedOffices(prev => prev.filter(id => !currentFilteredIds.includes(id)));
-    } else {
-      // Select all in current filter
-      setSelectedOffices(prev => {
-        const newSelection = [...prev];
-        currentFilteredIds.forEach(id => {
-          if (!newSelection.includes(id)) {
-            newSelection.push(id);
-          }
-        });
-        return newSelection;
-      });
+  const filteredOffices = useMemo(() => {
+    let result = tierFilter === 'all' ? offices : offices.filter(o => o.tier === tierFilter);
+    if (officeSearch) {
+      const q = officeSearch.toLowerCase();
+      result = result.filter(o => o.name.toLowerCase().includes(q) || o.address.toLowerCase().includes(q));
     }
-  };
-
-  const allInCategorySelected = filteredOffices.length > 0 && 
-    filteredOffices.every(o => selectedOffices.includes(o.id));
+    return result;
+  }, [offices, tierFilter, officeSearch]);
 
   const selectedBundle = GIFT_BUNDLES.find(b => b.id === selectedGiftBundle);
-  const totalEstimatedCost = selectedBundle ? selectedBundle.estimatedCost * selectedOffices.length : 0;
+  const totalCost = selectedBundle ? selectedBundle.estimatedCost * selectedOffices.length : 0;
+
+  useEffect(() => {
+    if (!campaignName && campaignType) {
+      const typeLabel = CAMPAIGN_TYPES.find(t => t.value === campaignType)?.label || '';
+      setCampaignName(`${typeLabel} - ${format(new Date(), 'MMM yyyy')}`);
+    }
+  }, [campaignType]);
+
+  const handleOfficeToggle = (officeId: string) => {
+    setSelectedOffices(prev => prev.includes(officeId) ? prev.filter(id => id !== officeId) : [...prev, officeId]);
+  };
+
+  const handleSelectAll = () => {
+    const ids = filteredOffices.map(o => o.id);
+    const allSelected = ids.every(id => selectedOffices.includes(id));
+    setSelectedOffices(prev => allSelected ? prev.filter(id => !ids.includes(id)) : [...new Set([...prev, ...ids])]);
+  };
 
   const handleSubmit = async () => {
     if (!campaignName || !selectedGiftBundle || selectedOffices.length === 0) {
@@ -172,42 +124,26 @@ export function PhysicalCampaignCreator({ open, onOpenChange, onCampaignCreated 
       const { data: campaign, error: campaignError } = await supabase
         .from('campaigns')
         .insert({
-          name: campaignName,
-          campaign_type: campaignType,
-          delivery_method: 'physical',
+          name: campaignName, campaign_type: campaignType, delivery_method: 'physical',
           planned_delivery_date: plannedDate?.toISOString().split('T')[0],
-          notes,
-          status: 'Draft',
-          campaign_mode: 'traditional',
-          selected_gift_bundle: selectedBundle,
-          materials_checklist: materialsChecklist.length > 0 ? materialsChecklist : null,
+          notes, status: 'Draft', campaign_mode: 'traditional',
+          selected_gift_bundle: selectedBundle, estimated_cost: totalCost,
           created_by: user.id,
         } as any)
-        .select()
-        .single();
+        .select().single();
 
       if (campaignError) throw campaignError;
 
-      const deliveries = selectedOffices.map(officeId => {
-        const office = offices.find(o => o.id === officeId);
-        return {
-          campaign_id: campaign.id,
-          office_id: officeId,
-          referral_tier: office?.tier || 'Cold',
-          action_mode: 'gift_only',
-          gift_status: 'pending',
-          delivery_status: 'Not Started',
-          created_by: user.id,
-        };
-      });
+      const deliveries = selectedOffices.map(officeId => ({
+        campaign_id: campaign.id, office_id: officeId,
+        referral_tier: offices.find(o => o.id === officeId)?.tier || 'Cold',
+        action_mode: 'gift_only', gift_status: 'pending', delivery_status: 'Not Started', created_by: user.id,
+      }));
 
-      const { error: deliveriesError } = await supabase
-        .from('campaign_deliveries')
-        .insert(deliveries);
-
+      const { error: deliveriesError } = await supabase.from('campaign_deliveries').insert(deliveries);
       if (deliveriesError) throw deliveriesError;
 
-      toast.success('Physical campaign created successfully!');
+      toast.success('Gift campaign created!');
       onCampaignCreated();
       onOpenChange(false);
       resetForm();
@@ -219,260 +155,189 @@ export function PhysicalCampaignCreator({ open, onOpenChange, onCampaignCreated 
   };
 
   const resetForm = () => {
-    setStep(1);
-    setCampaignType('referral_appreciation');
-    setCampaignName('');
-    setPlannedDate(undefined);
-    setNotes('');
-    setSelectedGiftBundle('');
-    setSelectedOffices([]);
-    setTierFilter('all');
-    setMaterialsChecklist([]);
+    setStep(1); setCampaignType('referral_appreciation'); setCampaignName('');
+    setPlannedDate(undefined); setNotes(''); setSelectedGiftBundle('');
+    setSelectedOffices([]); setTierFilter('all'); setOfficeSearch('');
   };
 
-  useEffect(() => {
-    if (!open) resetForm();
-  }, [open]);
+  useEffect(() => { if (!open) resetForm(); }, [open]);
+
+  const StepIndicator = () => (
+    <div className="flex items-center gap-2 mb-4">
+      {[1, 2, 3].map((s) => (
+        <React.Fragment key={s}>
+          <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-medium transition-colors ${
+            step === s ? 'bg-primary text-primary-foreground' : step > s ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'
+          }`}>
+            {step > s ? <CheckCircle2 className="w-4 h-4" /> : s}
+          </div>
+          {s < 3 && <div className={`flex-1 h-0.5 ${step > s ? 'bg-primary/40' : 'bg-muted'}`} />}
+        </React.Fragment>
+      ))}
+    </div>
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh]" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5" />
-            Create Physical Campaign - Step {step} of 4
+            <Package className="h-5 w-5" /> Create Gift Campaign
           </DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="max-h-[calc(90vh-200px)] pr-4">
+        <StepIndicator />
+
+        {/* Running cost estimate */}
+        {selectedGiftBundle && selectedOffices.length > 0 && (
+          <div className="flex items-center gap-2 p-2.5 bg-amber-500/10 rounded-lg text-sm">
+            <DollarSign className="w-4 h-4 text-amber-600" />
+            <span className="font-medium text-amber-700 dark:text-amber-400">
+              Estimated total: ${totalCost} ({selectedOffices.length} × ${selectedBundle?.estimatedCost})
+            </span>
+          </div>
+        )}
+
+        <ScrollArea className="max-h-[calc(90vh-260px)] pr-4">
+          {/* Step 1: Details + Gift Bundle */}
           {step === 1 && (
-            <div className="space-y-4">
-              <div>
-                <Label className="text-lg font-semibold mb-3 block">Select Campaign Type</Label>
+            <div className="space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Campaign Name *</Label>
+                  <Input value={campaignName} onChange={(e) => setCampaignName(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Type</Label>
+                  <div className="flex gap-1.5 flex-wrap mt-1.5">
+                    {CAMPAIGN_TYPES.map(t => (
+                      <Badge key={t.value} variant={campaignType === t.value ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setCampaignType(t.value)}>
+                        {t.label}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Planned Delivery Date</Label>
+                  <EnhancedDatePicker value={plannedDate} onChange={setPlannedDate} placeholder="Select date" />
+                </div>
+                <div>
+                  <Label>Notes</Label>
+                  <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Internal notes..." />
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <Label className="text-base font-semibold mb-3 block">Select Gift Bundle *</Label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {CAMPAIGN_TYPES.map(type => (
-                    <div
-                      key={type.value}
-                      onClick={() => setCampaignType(type.value)}
-                      className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                        campaignType === type.value 
-                          ? 'border-primary bg-primary/5' 
-                          : 'border-border hover:border-primary/50'
-                      }`}
-                    >
-                      <div className="font-semibold">{type.label}</div>
-                      <div className="text-sm text-muted-foreground mt-1">{type.description}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {step === 2 && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="campaignName">Campaign Name *</Label>
-                <Input
-                  id="campaignName"
-                  value={campaignName}
-                  onChange={(e) => setCampaignName(e.target.value)}
-                  placeholder="e.g., Holiday Gift Distribution 2024"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="plannedDate">Planned Delivery Date</Label>
-                <EnhancedDatePicker
-                  value={plannedDate}
-                  onChange={setPlannedDate}
-                  placeholder="Select date"
-                />
-              </div>
-
-              <div>
-                <Label className="text-lg font-semibold mb-3 block">Select Gift Bundle *</Label>
-                <div className="grid gap-3">
                   {GIFT_BUNDLES.map(bundle => (
-                    <div
-                      key={bundle.id}
+                    <Card 
+                      key={bundle.id} 
+                      className={`cursor-pointer transition-all ${selectedGiftBundle === bundle.id ? 'ring-2 ring-primary' : 'hover:shadow-md'}`}
                       onClick={() => setSelectedGiftBundle(bundle.id)}
-                      className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                        selectedGiftBundle === bundle.id 
-                          ? 'border-primary bg-primary/5' 
-                          : 'border-border hover:border-primary/50'
-                      }`}
                     >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="font-semibold flex items-center gap-2">
-                            <Gift className="h-4 w-4" />
-                            {bundle.name}
-                          </div>
-                          <div className="text-sm text-muted-foreground mt-1">{bundle.description}</div>
-                          <div className="text-xs text-muted-foreground mt-2">
-                            Includes: {bundle.items.join(', ')}
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-3">
+                          <span className="text-2xl">{bundle.icon}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <h4 className="font-semibold text-sm">{bundle.name}</h4>
+                              <span className="font-bold text-primary">${bundle.estimatedCost}</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">{bundle.description}</p>
+                            <p className="text-xs text-muted-foreground mt-1.5">{bundle.items.join(' · ')}</p>
                           </div>
                         </div>
-                        <div className="text-lg font-bold text-primary ml-4">
-                          ${bundle.estimatedCost}
-                        </div>
-                      </div>
-                    </div>
+                      </CardContent>
+                    </Card>
                   ))}
                 </div>
-              </div>
-
-              <div>
-                <Label htmlFor="notes">Campaign Notes</Label>
-                <Textarea
-                  id="notes"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Internal notes about this campaign..."
-                  rows={3}
-                />
               </div>
             </div>
           )}
 
-          {step === 3 && (
-            <div className="space-y-4">
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <Label className="text-lg font-semibold">Select Target Offices</Label>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleSelectAllInCategory}
-                    disabled={filteredOffices.length === 0}
-                  >
-                    {allInCategorySelected ? 'Deselect' : 'Select'} All in {OFFICE_TIER_FILTERS.find(f => f.value === tierFilter)?.label}
-                  </Button>
+          {/* Step 2: Office Selection */}
+          {step === 2 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-base font-semibold">Select Target Offices *</Label>
+                <Button variant="outline" size="sm" onClick={handleSelectAll}>
+                  {filteredOffices.length > 0 && filteredOffices.every(o => selectedOffices.includes(o.id)) ? 'Deselect All' : 'Select All'}
+                </Button>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input placeholder="Search offices..." value={officeSearch} onChange={(e) => setOfficeSearch(e.target.value)} className="pl-9" />
                 </div>
-                <div className="flex gap-2 mb-4 flex-wrap">
-                  {OFFICE_TIER_FILTERS.map(filter => (
-                    <Badge
-                      key={filter.value}
-                      variant={tierFilter === filter.value ? 'default' : 'outline'}
-                      className="cursor-pointer"
-                      onClick={() => setTierFilter(filter.value)}
-                    >
-                      {filter.label} ({filter.value === 'all' ? offices.length : offices.filter(o => o.tier === filter.value).length})
+                <div className="flex gap-1.5 flex-wrap">
+                  {TIER_FILTERS.map(t => (
+                    <Badge key={t} variant={tierFilter === t ? 'default' : 'outline'} className="cursor-pointer capitalize" onClick={() => setTierFilter(t)}>
+                      {t === 'all' ? `All (${offices.length})` : `${t} (${offices.filter(o => o.tier === t).length})`}
                     </Badge>
                   ))}
                 </div>
-
-                {loadingOffices ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin" />
-                  </div>
-                ) : (
-                  <div className="space-y-2 max-h-[400px] overflow-y-auto border rounded-lg p-4">
-                    {filteredOffices.map(office => (
-                      <div key={office.id} className="flex items-start gap-3 p-3 border rounded hover:bg-muted/50">
-                        <Checkbox
-                          checked={selectedOffices.includes(office.id)}
-                          onCheckedChange={() => handleOfficeSelection(office.id)}
-                        />
-                        <div className="flex-1">
-                          <div className="font-medium">{office.name}</div>
-                          <div className="text-sm text-muted-foreground">{office.address}</div>
-                          <div className="flex gap-3 mt-1 text-xs">
-                            <span>L12: {office.l12}</span>
-                            <span>R3: {office.r3}</span>
-                            <span>MSLR: {office.mslr.toFixed(1)}</span>
-                            <Badge variant="outline" className="text-xs">{office.tier}</Badge>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="text-sm text-muted-foreground mt-2">
-                  {selectedOffices.length} office(s) selected
-                </div>
               </div>
+
+              {loadingOffices ? (
+                <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
+              ) : (
+                <div className="space-y-1.5 max-h-[400px] overflow-y-auto border rounded-lg p-3">
+                  {filteredOffices.map(office => (
+                    <div key={office.id} className={`flex items-center gap-3 p-2.5 rounded-md cursor-pointer hover:bg-muted/50 transition-colors ${selectedOffices.includes(office.id) ? 'bg-primary/5' : ''}`} onClick={() => handleOfficeToggle(office.id)}>
+                      <Checkbox checked={selectedOffices.includes(office.id)} onCheckedChange={() => handleOfficeToggle(office.id)} />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate">{office.name}</div>
+                        <div className="text-xs text-muted-foreground truncate">{office.address}</div>
+                      </div>
+                      <Badge variant="outline" className="text-xs shrink-0">{office.tier}</Badge>
+                    </div>
+                  ))}
+                  {filteredOffices.length === 0 && <p className="text-center text-sm text-muted-foreground py-6">No offices match</p>}
+                </div>
+              )}
+              <p className="text-sm text-muted-foreground">{selectedOffices.length} office(s) selected</p>
             </div>
           )}
 
-          {step === 4 && (
+          {/* Step 3: Summary */}
+          {step === 3 && (
             <div className="space-y-4">
-              <div className="bg-muted p-4 rounded-lg">
-                <h3 className="font-semibold mb-3">Campaign Summary</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Campaign Name:</span>
-                    <span className="font-medium">{campaignName}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Gift Bundle:</span>
-                    <span className="font-medium">{selectedBundle?.name}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Target Offices:</span>
-                    <span className="font-medium">{selectedOffices.length}</span>
-                  </div>
-                  <div className="flex justify-between pt-2 border-t">
-                    <span className="text-muted-foreground">Estimated Total Cost:</span>
-                    <span className="font-bold text-lg text-primary">${totalEstimatedCost}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <Label className="text-lg font-semibold mb-3 block">Materials Checklist (Optional)</Label>
-                <div className="space-y-2">
-                  {selectedBundle?.items.map((item, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <Checkbox
-                        checked={materialsChecklist.includes(item)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setMaterialsChecklist([...materialsChecklist, item]);
-                          } else {
-                            setMaterialsChecklist(materialsChecklist.filter(i => i !== item));
-                          }
-                        }}
-                      />
-                      <Label className="cursor-pointer">{item}</Label>
+              <Card className="bg-muted/30">
+                <CardContent className="p-4 space-y-3">
+                  <h3 className="font-semibold">Campaign Summary</h3>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div><span className="text-muted-foreground">Name</span><p className="font-medium">{campaignName}</p></div>
+                    <div><span className="text-muted-foreground">Type</span><p className="font-medium capitalize">{campaignType.replace(/_/g, ' ')}</p></div>
+                    <div><span className="text-muted-foreground">Gift</span><p className="font-medium">{selectedBundle?.icon} {selectedBundle?.name}</p></div>
+                    <div><span className="text-muted-foreground">Offices</span><p className="font-medium">{selectedOffices.length}</p></div>
+                    {plannedDate && <div><span className="text-muted-foreground">Delivery Date</span><p className="font-medium">{format(plannedDate, 'MMM dd, yyyy')}</p></div>}
+                    <div className="col-span-2 pt-2 border-t">
+                      <span className="text-muted-foreground">Estimated Total Cost</span>
+                      <p className="text-xl font-bold text-primary">${totalCost}</p>
                     </div>
-                  ))}
-                </div>
-              </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           )}
         </ScrollArea>
 
         <DialogFooter className="flex justify-between">
-          <div>
-            {step > 1 && (
-              <Button variant="outline" onClick={() => setStep(step - 1)}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
-            )}
-          </div>
+          <div>{step > 1 && <Button variant="outline" onClick={() => setStep(step - 1)}><ArrowLeft className="h-4 w-4 mr-2" /> Back</Button>}</div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            {step < 4 ? (
-              <Button onClick={() => setStep(step + 1)} disabled={step === 2 && !selectedGiftBundle}>
-                Next
-                <ArrowRight className="h-4 w-4 ml-2" />
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            {step < 3 ? (
+              <Button onClick={() => setStep(step + 1)} disabled={step === 1 ? !selectedGiftBundle : selectedOffices.length === 0}>
+                Next <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             ) : (
               <Button onClick={handleSubmit} disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  'Create Campaign'
-                )}
+                {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Creating...</> : 'Create Campaign'}
               </Button>
             )}
           </div>
