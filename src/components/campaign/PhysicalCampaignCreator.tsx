@@ -8,17 +8,20 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent } from '@/components/ui/card';
-import { Loader2, Package, ArrowRight, ArrowLeft, Gift, Search, Users, Calendar, DollarSign, CheckCircle2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader2, Package, ArrowRight, ArrowLeft, Gift, Search, Users, Calendar, DollarSign, CheckCircle2, FolderOpen } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { EnhancedDatePicker } from '../EnhancedDatePicker';
 import { useOffices } from '@/hooks/useOffices';
+import { useDiscoveredGroups } from '@/hooks/useDiscoveredGroups';
 import { format } from 'date-fns';
 
 interface PhysicalCampaignCreatorProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCampaignCreated: () => void;
+  preSelectedDiscoveredGroupId?: string | null;
 }
 
 interface Office {
@@ -29,6 +32,13 @@ interface Office {
   r3: number;
   mslr: number;
   tier: string;
+}
+
+interface DiscoveredOfficeItem {
+  id: string;
+  name: string;
+  address: string;
+  office_type?: string;
 }
 
 interface GiftBundle {
@@ -56,7 +66,7 @@ const CAMPAIGN_TYPES = [
 
 const TIER_FILTERS = ['all', 'VIP', 'Warm', 'Cold', 'Dormant'] as const;
 
-export function PhysicalCampaignCreator({ open, onOpenChange, onCampaignCreated }: PhysicalCampaignCreatorProps) {
+export function PhysicalCampaignCreator({ open, onOpenChange, onCampaignCreated, preSelectedDiscoveredGroupId }: PhysicalCampaignCreatorProps) {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [selectedOffices, setSelectedOffices] = useState<string[]>([]);
@@ -69,7 +79,16 @@ export function PhysicalCampaignCreator({ open, onOpenChange, onCampaignCreated 
   const [notes, setNotes] = useState('');
   const [selectedGiftBundle, setSelectedGiftBundle] = useState<string>('');
 
+  // Source toggle
+  const [officeSource, setOfficeSource] = useState<'network' | 'discovered'>(
+    preSelectedDiscoveredGroupId ? 'discovered' : 'network'
+  );
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(preSelectedDiscoveredGroupId || null);
+  const [discoveredOfficesList, setDiscoveredOfficesList] = useState<DiscoveredOfficeItem[]>([]);
+  const [loadingDiscovered, setLoadingDiscovered] = useState(false);
+
   const { data: officesData, isLoading: loadingOffices } = useOffices();
+  const { groups, getGroupOffices } = useDiscoveredGroups();
   
   const offices: Office[] = useMemo(() => (officesData || []).map(office => ({
     id: office.id,
@@ -81,14 +100,48 @@ export function PhysicalCampaignCreator({ open, onOpenChange, onCampaignCreated 
     tier: office.tier || 'Cold',
   })), [officesData]);
 
-  const filteredOffices = useMemo(() => {
-    let result = tierFilter === 'all' ? offices : offices.filter(o => o.tier === tierFilter);
-    if (officeSearch) {
-      const q = officeSearch.toLowerCase();
-      result = result.filter(o => o.name.toLowerCase().includes(q) || o.address.toLowerCase().includes(q));
+  // Load discovered offices when group is selected
+  useEffect(() => {
+    if (officeSource === 'discovered' && selectedGroupId) {
+      setLoadingDiscovered(true);
+      getGroupOffices(selectedGroupId).then(offices => {
+        setDiscoveredOfficesList(offices.map(o => ({
+          id: o.id,
+          name: o.name,
+          address: o.address || '',
+          office_type: o.office_type || undefined,
+        })));
+        setLoadingDiscovered(false);
+      });
+    } else if (officeSource === 'discovered' && !selectedGroupId) {
+      setDiscoveredOfficesList([]);
     }
-    return result;
-  }, [offices, tierFilter, officeSearch]);
+  }, [officeSource, selectedGroupId]);
+
+  useEffect(() => {
+    if (open && preSelectedDiscoveredGroupId) {
+      setOfficeSource('discovered');
+      setSelectedGroupId(preSelectedDiscoveredGroupId);
+    }
+  }, [open, preSelectedDiscoveredGroupId]);
+
+  const currentOfficeList = useMemo(() => {
+    if (officeSource === 'network') {
+      let result = tierFilter === 'all' ? offices : offices.filter(o => o.tier === tierFilter);
+      if (officeSearch) {
+        const q = officeSearch.toLowerCase();
+        result = result.filter(o => o.name.toLowerCase().includes(q) || o.address.toLowerCase().includes(q));
+      }
+      return result.map(o => ({ id: o.id, name: o.name, address: o.address, badge: o.tier }));
+    } else {
+      let result = discoveredOfficesList;
+      if (officeSearch) {
+        const q = officeSearch.toLowerCase();
+        result = result.filter(o => o.name.toLowerCase().includes(q) || o.address.toLowerCase().includes(q));
+      }
+      return result.map(o => ({ id: o.id, name: o.name, address: o.address, badge: o.office_type || 'Discovered' }));
+    }
+  }, [officeSource, offices, discoveredOfficesList, tierFilter, officeSearch]);
 
   const selectedBundle = GIFT_BUNDLES.find(b => b.id === selectedGiftBundle);
   const totalCost = selectedBundle ? selectedBundle.estimatedCost * selectedOffices.length : 0;
@@ -105,7 +158,7 @@ export function PhysicalCampaignCreator({ open, onOpenChange, onCampaignCreated 
   };
 
   const handleSelectAll = () => {
-    const ids = filteredOffices.map(o => o.id);
+    const ids = currentOfficeList.map(o => o.id);
     const allSelected = ids.every(id => selectedOffices.includes(id));
     setSelectedOffices(prev => allSelected ? prev.filter(id => !ids.includes(id)) : [...new Set([...prev, ...ids])]);
   };
@@ -136,7 +189,7 @@ export function PhysicalCampaignCreator({ open, onOpenChange, onCampaignCreated 
 
       const deliveries = selectedOffices.map(officeId => ({
         campaign_id: campaign.id, office_id: officeId,
-        referral_tier: offices.find(o => o.id === officeId)?.tier || 'Cold',
+        referral_tier: currentOfficeList.find(o => o.id === officeId)?.badge || 'Cold',
         action_mode: 'gift_only', gift_status: 'pending', delivery_status: 'Not Started', created_by: user.id,
       }));
 
@@ -158,9 +211,14 @@ export function PhysicalCampaignCreator({ open, onOpenChange, onCampaignCreated 
     setStep(1); setCampaignType('referral_appreciation'); setCampaignName('');
     setPlannedDate(undefined); setNotes(''); setSelectedGiftBundle('');
     setSelectedOffices([]); setTierFilter('all'); setOfficeSearch('');
+    setOfficeSource(preSelectedDiscoveredGroupId ? 'discovered' : 'network');
+    setSelectedGroupId(preSelectedDiscoveredGroupId || null);
+    setDiscoveredOfficesList([]);
   };
 
   useEffect(() => { if (!open) resetForm(); }, [open]);
+
+  const isLoadingList = officeSource === 'network' ? loadingOffices : loadingDiscovered;
 
   const StepIndicator = () => (
     <div className="flex items-center gap-2 mb-4">
@@ -188,7 +246,6 @@ export function PhysicalCampaignCreator({ open, onOpenChange, onCampaignCreated 
 
         <StepIndicator />
 
-        {/* Running cost estimate */}
         {selectedGiftBundle && selectedOffices.length > 0 && (
           <div className="flex items-center gap-2 p-2.5 bg-amber-500/10 rounded-lg text-sm">
             <DollarSign className="w-4 h-4 text-amber-600" />
@@ -264,40 +321,84 @@ export function PhysicalCampaignCreator({ open, onOpenChange, onCampaignCreated 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label className="text-base font-semibold">Select Target Offices *</Label>
-                <Button variant="outline" size="sm" onClick={handleSelectAll}>
-                  {filteredOffices.length > 0 && filteredOffices.every(o => selectedOffices.includes(o.id)) ? 'Deselect All' : 'Select All'}
+                <Button variant="outline" size="sm" onClick={handleSelectAll} disabled={currentOfficeList.length === 0}>
+                  {currentOfficeList.length > 0 && currentOfficeList.every(o => selectedOffices.includes(o.id)) ? 'Deselect All' : 'Select All'}
                 </Button>
               </div>
+
+              {/* Source Toggle */}
+              <div className="flex items-center gap-2 p-2 bg-muted/40 rounded-lg">
+                <Button
+                  variant={officeSource === 'network' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => { setOfficeSource('network'); setSelectedOffices([]); setOfficeSearch(''); }}
+                  className="gap-1.5"
+                >
+                  <Users className="h-3.5 w-3.5" />
+                  Network Offices
+                </Button>
+                <Button
+                  variant={officeSource === 'discovered' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => { setOfficeSource('discovered'); setSelectedOffices([]); setOfficeSearch(''); }}
+                  className="gap-1.5"
+                >
+                  <FolderOpen className="h-3.5 w-3.5" />
+                  Discovered Groups
+                </Button>
+              </div>
+
+              {officeSource === 'discovered' && (
+                <Select value={selectedGroupId || ''} onValueChange={(val) => { setSelectedGroupId(val || null); setSelectedOffices([]); }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a group..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {groups.map(g => (
+                      <SelectItem key={g.id} value={g.id}>
+                        {g.name} ({g.member_count || 0} offices)
+                      </SelectItem>
+                    ))}
+                    {groups.length === 0 && (
+                      <div className="p-3 text-sm text-muted-foreground text-center">No groups yet</div>
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
               
               <div className="flex flex-col sm:flex-row gap-2">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input placeholder="Search offices..." value={officeSearch} onChange={(e) => setOfficeSearch(e.target.value)} className="pl-9" />
                 </div>
-                <div className="flex gap-1.5 flex-wrap">
-                  {TIER_FILTERS.map(t => (
-                    <Badge key={t} variant={tierFilter === t ? 'default' : 'outline'} className="cursor-pointer capitalize" onClick={() => setTierFilter(t)}>
-                      {t === 'all' ? `All (${offices.length})` : `${t} (${offices.filter(o => o.tier === t).length})`}
-                    </Badge>
-                  ))}
-                </div>
+                {officeSource === 'network' && (
+                  <div className="flex gap-1.5 flex-wrap">
+                    {TIER_FILTERS.map(t => (
+                      <Badge key={t} variant={tierFilter === t ? 'default' : 'outline'} className="cursor-pointer capitalize" onClick={() => setTierFilter(t)}>
+                        {t === 'all' ? `All (${offices.length})` : `${t} (${offices.filter(o => o.tier === t).length})`}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {loadingOffices ? (
+              {isLoadingList ? (
                 <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
+              ) : officeSource === 'discovered' && !selectedGroupId ? (
+                <p className="text-center text-sm text-muted-foreground py-6">Select a group above to see offices</p>
               ) : (
                 <div className="space-y-1.5 max-h-[400px] overflow-y-auto border rounded-lg p-3">
-                  {filteredOffices.map(office => (
+                  {currentOfficeList.map(office => (
                     <div key={office.id} className={`flex items-center gap-3 p-2.5 rounded-md cursor-pointer hover:bg-muted/50 transition-colors ${selectedOffices.includes(office.id) ? 'bg-primary/5' : ''}`} onClick={() => handleOfficeToggle(office.id)}>
                       <Checkbox checked={selectedOffices.includes(office.id)} onCheckedChange={() => handleOfficeToggle(office.id)} />
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-sm truncate">{office.name}</div>
                         <div className="text-xs text-muted-foreground truncate">{office.address}</div>
                       </div>
-                      <Badge variant="outline" className="text-xs shrink-0">{office.tier}</Badge>
+                      <Badge variant="outline" className="text-xs shrink-0">{office.badge}</Badge>
                     </div>
                   ))}
-                  {filteredOffices.length === 0 && <p className="text-center text-sm text-muted-foreground py-6">No offices match</p>}
+                  {currentOfficeList.length === 0 && <p className="text-center text-sm text-muted-foreground py-6">No offices match</p>}
                 </div>
               )}
               <p className="text-sm text-muted-foreground">{selectedOffices.length} office(s) selected</p>
@@ -314,6 +415,7 @@ export function PhysicalCampaignCreator({ open, onOpenChange, onCampaignCreated 
                     <div><span className="text-muted-foreground">Name</span><p className="font-medium">{campaignName}</p></div>
                     <div><span className="text-muted-foreground">Type</span><p className="font-medium capitalize">{campaignType.replace(/_/g, ' ')}</p></div>
                     <div><span className="text-muted-foreground">Gift</span><p className="font-medium">{selectedBundle?.icon} {selectedBundle?.name}</p></div>
+                    <div><span className="text-muted-foreground">Source</span><p className="font-medium">{officeSource === 'network' ? 'Network' : `Group: ${groups.find(g => g.id === selectedGroupId)?.name || ''}`}</p></div>
                     <div><span className="text-muted-foreground">Offices</span><p className="font-medium">{selectedOffices.length}</p></div>
                     {plannedDate && <div><span className="text-muted-foreground">Delivery Date</span><p className="font-medium">{format(plannedDate, 'MMM dd, yyyy')}</p></div>}
                     <div className="col-span-2 pt-2 border-t">

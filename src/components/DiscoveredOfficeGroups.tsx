@@ -19,7 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { FolderOpen, MoreHorizontal, Pencil, Trash2, Printer, MapPin, Check, X } from 'lucide-react';
+import { FolderOpen, MoreHorizontal, Pencil, Trash2, Printer, MapPin, Check, X, Mail, Gift } from 'lucide-react';
 import { type DiscoveredGroup } from '@/hooks/useDiscoveredGroups';
 import { useNavigate } from 'react-router-dom';
 
@@ -30,6 +30,8 @@ interface DiscoveredOfficeGroupsProps {
   onRenameGroup: (groupId: string, newName: string) => void;
   onDeleteGroup: (groupId: string) => void;
   groupMemberIds: string[];
+  onEmailCampaign?: (groupId: string) => void;
+  onGiftCampaign?: (groupId: string) => void;
 }
 
 export const DiscoveredOfficeGroups: React.FC<DiscoveredOfficeGroupsProps> = ({
@@ -39,6 +41,8 @@ export const DiscoveredOfficeGroups: React.FC<DiscoveredOfficeGroupsProps> = ({
   onRenameGroup,
   onDeleteGroup,
   groupMemberIds,
+  onEmailCampaign,
+  onGiftCampaign,
 }) => {
   const navigate = useNavigate();
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -59,14 +63,12 @@ export const DiscoveredOfficeGroups: React.FC<DiscoveredOfficeGroupsProps> = ({
     setRenamingId(null);
   };
 
-  const handlePrintLabels = () => {
-    if (groupMemberIds.length > 0) {
-      navigate(`/mailing-labels?discovered=true&ids=${groupMemberIds.join(',')}`);
-    }
+  const handlePrintLabels = (groupId: string) => {
+    navigate(`/mailing-labels?group=${groupId}`);
   };
 
-  const handleViewOnMap = () => {
-    navigate(`/map-view?showDiscovered=true`);
+  const handleViewOnMap = (groupId: string) => {
+    navigate(`/map-view?showDiscovered=true&group=${groupId}`);
   };
 
   return (
@@ -128,10 +130,18 @@ export const DiscoveredOfficeGroups: React.FC<DiscoveredOfficeGroupsProps> = ({
                     <DropdownMenuItem onClick={() => startRename(group)}>
                       <Pencil className="h-3.5 w-3.5 mr-2" /> Rename
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handlePrintLabels} disabled={!group.member_count}>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => onEmailCampaign?.(group.id)} disabled={!group.member_count}>
+                      <Mail className="h-3.5 w-3.5 mr-2" /> Email Campaign
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onGiftCampaign?.(group.id)} disabled={!group.member_count}>
+                      <Gift className="h-3.5 w-3.5 mr-2" /> Gift Campaign
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => handlePrintLabels(group.id)} disabled={!group.member_count}>
                       <Printer className="h-3.5 w-3.5 mr-2" /> Print Labels
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleViewOnMap} disabled={!group.member_count}>
+                    <DropdownMenuItem onClick={() => handleViewOnMap(group.id)} disabled={!group.member_count}>
                       <MapPin className="h-3.5 w-3.5 mr-2" /> View on Map
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />

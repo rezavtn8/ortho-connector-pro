@@ -93,6 +93,26 @@ export function SelectionActionBar({
                 <Button
                   variant="secondary"
                   size="sm"
+                  onClick={onEmailCampaign}
+                  className="gap-2"
+                >
+                  <Mail className="h-4 w-4" />
+                  <span className="hidden sm:inline">Email</span>
+                </Button>
+
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={onGiftCampaign}
+                  className="gap-2"
+                >
+                  <Gift className="h-4 w-4" />
+                  <span className="hidden sm:inline">Gift</span>
+                </Button>
+
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={handlePrintLabels}
                   className="gap-2"
                 >

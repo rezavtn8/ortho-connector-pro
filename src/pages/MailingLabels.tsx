@@ -7,9 +7,10 @@ import { EditableCell } from '@/components/EditableCell';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Download, Search, FileSpreadsheet, MapPin, CheckCircle2, Loader2, FileText, FileDown, RotateCcw, Pencil, X, Check, ArrowLeft } from 'lucide-react';
+import { Download, Search, FileSpreadsheet, MapPin, CheckCircle2, Loader2, FileText, FileDown, RotateCcw, Pencil, X, Check, ArrowLeft, FolderOpen } from 'lucide-react';
 import { downloadLabelsPDF } from '@/utils/pdfLabelGenerator';
 import { useOffices } from '@/hooks/useOffices';
+import { useDiscoveredGroups } from '@/hooks/useDiscoveredGroups';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -193,14 +194,17 @@ export function MailingLabels() {
   const [searchParams] = useSearchParams();
   const selectedIds = searchParams.get('ids')?.split(',').filter(Boolean) || [];
   const isDiscoveredSource = searchParams.get('discovered') === 'true';
+  const groupIdParam = searchParams.get('group') || null;
   const hasSelectedIds = selectedIds.length > 0;
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTiers, setSelectedTiers] = useState<string[]>(['VIP', 'Warm', 'Cold', 'Dormant']);
-  const [includeDiscovered, setIncludeDiscovered] = useState(isDiscoveredSource);
-  const [sourceFilter, setSourceFilter] = useState<'all' | 'partner' | 'discovered'>(
-    isDiscoveredSource && hasSelectedIds ? 'discovered' : 'all'
+  const [includeDiscovered, setIncludeDiscovered] = useState(isDiscoveredSource || !!groupIdParam);
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'partner' | 'discovered' | 'group'>(
+    groupIdParam ? 'group' : isDiscoveredSource && hasSelectedIds ? 'discovered' : 'all'
   );
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(groupIdParam);
+  const [groupMemberIds, setGroupMemberIds] = useState<string[]>([]);
   const [showParseErrors, setShowParseErrors] = useState(false);
   const [labelNameFormat, setLabelNameFormat] = useState<LabelNameFormat>('office');
   
@@ -213,6 +217,14 @@ export function MailingLabels() {
   const [showPreview, setShowPreview] = useState(false);
 
   const { data: offices = [], isLoading: officesLoading } = useOffices();
+  const { groups, getGroupMemberIds: fetchGroupMemberIds } = useDiscoveredGroups();
+
+  // Load group member IDs when group is selected
+  useEffect(() => {
+    if (sourceFilter === 'group' && selectedGroupId) {
+      fetchGroupMemberIds(selectedGroupId).then(ids => setGroupMemberIds(ids));
+    }
+  }, [sourceFilter, selectedGroupId]);
   
   // Enable discovered offices query when:
   // 1. User wants to include discovered offices
@@ -229,7 +241,7 @@ export function MailingLabels() {
       if (error) throw error;
       return data || [];
     },
-    enabled: includeDiscovered || sourceFilter === 'discovered' || isDiscoveredSource,
+    enabled: includeDiscovered || sourceFilter === 'discovered' || sourceFilter === 'group' || isDiscoveredSource,
   });
 
   // Phase 2: Filtering Logic + Error Detection
@@ -275,19 +287,25 @@ export function MailingLabels() {
     // Filter discovered offices
     // Include when: URL has discovered=true with IDs, OR user enabled discovered filter
     const shouldIncludeDiscovered = (isDiscoveredSource && hasSelectedIds) || 
+      sourceFilter === 'group' ||
       (!hasSelectedIds && (sourceFilter === 'all' || sourceFilter === 'discovered') && (includeDiscovered || sourceFilter === 'discovered'));
     
     if (shouldIncludeDiscovered) {
       const discovered = discoveredOffices
         .filter(office => {
+          const matchesSearch = searchTerm === '' || 
+            office.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (office.address?.toLowerCase().includes(searchTerm.toLowerCase()));
+
+          // If group filter, only show group members
+          if (sourceFilter === 'group' && selectedGroupId) {
+            return groupMemberIds.includes(office.id) && matchesSearch;
+          }
+          
           // If we have specific IDs from URL with discovered=true, filter by those
           if (isDiscoveredSource && hasSelectedIds) {
             return selectedIds.includes(office.id);
           }
-          
-          const matchesSearch = searchTerm === '' || 
-            office.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (office.address?.toLowerCase().includes(searchTerm.toLowerCase()));
           
           return matchesSearch;
         })
@@ -315,7 +333,7 @@ export function MailingLabels() {
     }
 
     return results;
-  }, [offices, discoveredOffices, selectedTiers, includeDiscovered, searchTerm, sourceFilter, showParseErrors, hasSelectedIds, selectedIds, isDiscoveredSource]);
+  }, [offices, discoveredOffices, selectedTiers, includeDiscovered, searchTerm, sourceFilter, showParseErrors, hasSelectedIds, selectedIds, isDiscoveredSource, groupMemberIds, selectedGroupId]);
 
   // Editable data state - syncs with filtered data but allows edits
   const [editableData, setEditableData] = useState<MailingLabelData[]>([]);
@@ -627,16 +645,32 @@ export function MailingLabels() {
             />
           </div>
 
-          <Select value={sourceFilter} onValueChange={(value: any) => setSourceFilter(value)}>
-            <SelectTrigger className="w-[160px] h-9">
+          <Select value={sourceFilter} onValueChange={(value: any) => { setSourceFilter(value); if (value !== 'group') setSelectedGroupId(null); }}>
+            <SelectTrigger className="w-[180px] h-9">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Offices</SelectItem>
               <SelectItem value="partner">Partner Only</SelectItem>
               <SelectItem value="discovered">Discovered Only</SelectItem>
+              <SelectItem value="group">
+                <span className="flex items-center gap-1.5"><FolderOpen className="h-3 w-3" /> By Group</span>
+              </SelectItem>
             </SelectContent>
           </Select>
+
+          {sourceFilter === 'group' && (
+            <Select value={selectedGroupId || ''} onValueChange={(val) => setSelectedGroupId(val || null)}>
+              <SelectTrigger className="w-[180px] h-9">
+                <SelectValue placeholder="Select group..." />
+              </SelectTrigger>
+              <SelectContent>
+                {groups.map(g => (
+                  <SelectItem key={g.id} value={g.id}>{g.name} ({g.member_count || 0})</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
 
           {(sourceFilter === 'all' || sourceFilter === 'partner') && (
             <div className="flex items-center gap-2">
