@@ -1,13 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { WifiOff, Wifi, RefreshCw } from 'lucide-react';
+import { WifiOff, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 export function ConnectionMonitor() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState(true);
   const [isRetrying, setIsRetrying] = useState(false);
+  const [hasSession, setHasSession] = useState(false);
+
+  // Track auth session
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setHasSession(!!data.session);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setHasSession(!!session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Monitor network connection
   useEffect(() => {
@@ -23,21 +37,21 @@ export function ConnectionMonitor() {
     };
   }, []);
 
-  // Monitor Supabase connection
+  // Monitor Supabase connection only when authenticated
   useEffect(() => {
+    if (!hasSession) return;
+
     const checkSupabaseConnection = async () => {
       try {
         const { error } = await supabase.from('user_profiles').select('id').limit(1);
         setIsSupabaseConnected(!error);
-      } catch (error) {
+      } catch {
         setIsSupabaseConnected(false);
       }
     };
 
-    // Check initially
     checkSupabaseConnection();
 
-    // Check every 30 seconds when offline
     const interval = setInterval(() => {
       if (!isSupabaseConnected || !isOnline) {
         checkSupabaseConnection();
@@ -45,22 +59,21 @@ export function ConnectionMonitor() {
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [isSupabaseConnected, isOnline]);
+  }, [isSupabaseConnected, isOnline, hasSession]);
 
   const handleRetry = async () => {
     setIsRetrying(true);
-    
     try {
       const { error } = await supabase.from('user_profiles').select('id').limit(1);
       setIsSupabaseConnected(!error);
-    } catch (error) {
+    } catch {
       setIsSupabaseConnected(false);
     } finally {
       setIsRetrying(false);
     }
   };
 
-  const showBanner = !isOnline || !isSupabaseConnected;
+  const showBanner = !isOnline || (hasSession && !isSupabaseConnected);
 
   if (!showBanner) return null;
 
@@ -69,11 +82,7 @@ export function ConnectionMonitor() {
       <Alert className="rounded-none border-0 bg-destructive text-destructive-foreground">
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-2">
-            {!isOnline ? (
-              <WifiOff className="h-4 w-4" />
-            ) : (
-              <WifiOff className="h-4 w-4" />
-            )}
+            <WifiOff className="h-4 w-4" />
             <AlertDescription className="font-medium">
               {!isOnline 
                 ? "No internet connection. Please check your network." 

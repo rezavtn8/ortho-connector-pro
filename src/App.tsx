@@ -23,7 +23,6 @@ const queryClient = new QueryClient({
       gcTime: 1000 * 60 * 30, // 30 minutes - cached data persists
       refetchOnWindowFocus: true, // Background refetch on focus
       refetchOnReconnect: true, // Background refetch on reconnect
-      refetchInterval: 1000 * 60 * 10, // Auto-refetch every 10 minutes for critical data
     },
     mutations: {
       retry: (failureCount, error) => {
