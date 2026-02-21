@@ -1,119 +1,114 @@
 
 
-# Codebase Cleanup: Dead Code, Unused Files, and Performance Issues
+# Rebuild Activity Logs Page -- Comprehensive & Accurate
 
-## Overview
+## Problem
 
-A systematic audit of the codebase has identified **22 dead/unused files and exports**, **3 duplicate systems** doing the same job, and several performance concerns. All removals are safe -- nothing currently imported or routed.
+The current Logs page only shows data from 2 of the 7+ activity-generating tables in the database. Marketing visits (109 records), campaigns, campaign deliveries, discovery sessions, and office interactions are completely invisible. The page also lacks category tabs, summary stats, and pagination.
 
----
+## Data Sources to Include
 
-## Category 1: Dead Files (Never Imported Anywhere)
+| Source Table | Records | What It Tracks |
+|---|---|---|
+| `activity_log` | 49 | Source CRUD, tags, imports |
+| `patient_changes_log` | 19 | Patient count changes |
+| `marketing_visits` | 109 | Scheduled & completed visits |
+| `campaigns` | 1 | Campaign creation/status |
+| `campaign_deliveries` | 2 | Email/gift delivery events |
+| `office_interactions` | 0 | Calls, notes, referrals |
+| `discovered_offices` | 584 | Discovery activity (aggregated by session) |
+| `discovery_sessions` | ~varies | Search sessions run |
 
-These files exist on disk but are not imported by any other file in the project:
+## New Page Layout
 
-| File | Why It's Dead |
-|------|--------------|
-| `src/components/AIRecommendations.tsx` | Zero imports found |
-| `src/components/SimplifiedBusinessAnalysis.tsx` | Zero imports found |
-| `src/components/SmartEmptyState.tsx` | Zero imports found |
-| `src/components/OfficeHealthScore.tsx` | Zero imports found |
-| `src/components/OfficeActivityTimeline.tsx` | Zero imports found |
-| `src/components/VirtualizedOfficeList.tsx` | Zero imports found |
-| `src/components/PatientSourceGraph.tsx` | Zero imports found |
-| `src/components/ImportantDateCampaignDialog.tsx` | Zero imports found |
-| `src/components/ImportantDatesCalendar.tsx` | Zero imports found |
-| `src/components/ContextBanner.tsx` | Zero imports found |
-| `src/components/SetupChecklist.tsx` | Zero imports found |
-| `src/components/SubscriptionRequired.tsx` | Zero imports found |
-| `src/components/SecurityAuditLog.tsx` | Zero imports found |
-| `src/components/SecuritySettings.tsx` | Zero imports found |
-| `src/components/CalendarView.tsx` | Zero imports found |
-| `src/components/DateRangePicker.tsx` | Only imports `dateSync` but is never imported itself |
-| `src/pages/NotFound.tsx` | Never routed or imported |
-| `src/hooks/useOptimisticUpdate.ts` | Zero imports found |
-| `src/hooks/useErrorToast.ts` | Zero imports found |
-| `src/hooks/useSubscriptionCheck.ts` | Zero imports found |
-| `src/hooks/usePagination.ts` | Zero imports found |
-| `src/hooks/useDebounce.ts` | Zero imports found |
-| `src/utils/errorHandler.ts` | Zero imports found (GlobalErrorHandler class, never used) |
-| `src/lib/supabaseClient.ts` | `resilientSupabase` is never imported anywhere |
+```text
++-------------------------------------------------------+
+| Activity Log                              [Refresh]    |
++-------------------------------------------------------+
+| Summary Bar                                            |
+| [Total: 180] [Sources: 49] [Visits: 109] [Patients:19]|
++-------------------------------------------------------+
+| Category Tabs:                                         |
+|  All | Sources | Patient Data | Marketing | Campaigns  |
+|      | Discovery                                       |
++-------------------------------------------------------+
+| Filters: [Search...] [Date: All/Today/7d/30d] [Clear] |
++-------------------------------------------------------+
+| Table (paginated, 50 per page)                         |
+| Date | Time | Category | Icon | Description            |
+| ------------------------------------------------       |
+| 02/20/26 | 14:30 | Visit | ... | Visited "ABC Dental" |
+| 02/20/26 | 14:00 | Source| ... | Created "XYZ Ortho"  |
+| ...                                                    |
++-------------------------------------------------------+
+| Showing 1-50 of 180  [< Prev] [Next >]                |
++-------------------------------------------------------+
+```
 
-**Action:** Delete all 24 files.
+## Implementation Details
 
----
+### Step 1: Rewrite `src/pages/Logs.tsx`
 
-## Category 2: Dead Exports in Used Files
+**Data Loading** -- Fetch from all 6 tables in parallel:
+1. `activity_log` (source CRUD, tags, imports)
+2. `patient_changes_log` (with source name join)
+3. `marketing_visits` (with office name join via `patient_sources`)
+4. `campaigns` (campaign creation/updates)
+5. `campaign_deliveries` (with campaign name join)
+6. `discovery_sessions` (search sessions)
 
-These are exported functions/hooks that exist inside files that ARE used, but these specific exports are never imported:
+Each result gets normalized into a unified log entry shape:
+```text
+{
+  id, timestamp, category, action, icon, description, metadata
+}
+```
 
-| File | Dead Export |
-|------|-----------|
-| `src/hooks/useResilientQuery.ts` | `useCampaignsResilient()` -- never imported |
-| `src/hooks/useResilientQuery.ts` | `useMarketingVisitsResilient()` -- never imported |
-| `src/hooks/useResilientQuery.ts` | `usePatientSourcesResilient()` -- never imported |
+**Category Tabs** -- Filter by category:
+- All: everything combined
+- Sources: `activity_log` entries (source_created, source_deleted, source_updated, tag_added, tag_removed, import_completed)
+- Patient Data: `patient_changes_log` entries
+- Marketing: `marketing_visits` entries (scheduled, completed, with star ratings)
+- Campaigns: `campaigns` + `campaign_deliveries` entries
+- Discovery: `discovery_sessions` entries (searches run)
 
-**Action:** Remove these 3 dead exports from `useResilientQuery.ts` (keep `useResilientQuery` and `useProfileDataResilient` which ARE used).
+**Filters:**
+- Search: text search across description, resource names
+- Date range: Today / 7 Days / 30 Days / All Time
+- Clear button to reset
 
----
+**Pagination:**
+- 50 entries per page with Prev/Next controls
+- Total count displayed
 
-## Category 3: Duplicate Systems
+**Summary Stats Bar:**
+- Compact horizontal chips showing counts per category
 
-### 3a. Duplicate Network Monitoring
-Two independent systems both monitor network status and poll Supabase:
-- `ConnectionMonitor.tsx` (rendered in `App.tsx`) -- polls `user_profiles` every 30 seconds when offline
-- `useResilientQuery.ts` -- independently listens to online/offline events and checks Supabase connectivity
+**Description Formatting:**
+- Marketing visits: "Visited [Office Name] on [date] -- [visit_type]" or "Scheduled visit to [Office Name] for [date]"
+- Campaigns: "Created campaign [name] ([type])" / "Delivered [email/gift] to [office]"  
+- Discovery: "Searched for offices within [distance] miles -- found [count] results"
+- Patient changes: keep existing format (increase/decrease/manual edit)
+- Source activity: keep existing format (created/deleted/updated/tagged)
 
-**Problem:** Both make redundant health-check queries to the database.
+**Icons per category:**
+- Sources: Plus (green), Trash (red), Edit (blue), Tag (purple), Upload (purple)
+- Patient Data: TrendingUp (green), TrendingDown (red), Edit (blue)
+- Marketing: MapPin (blue) for scheduled, CheckCircle (green) for visited
+- Campaigns: Mail (blue) for email, Gift (pink) for gift, Send (green) for delivered
+- Discovery: Search (indigo) for search sessions
 
-**Action:** Keep `ConnectionMonitor` for the UI banner. Remove the duplicate network monitoring from `useResilientQuery` -- it already has `enabled: !!user?.id` which handles the offline case via React Query's built-in `refetchOnReconnect`.
+### Step 2: Increase query limits
 
-### 3b. Global refetchInterval in App.tsx
-`App.tsx` sets `refetchInterval: 1000 * 60 * 10` (every 10 minutes) for ALL queries globally. This means every single query in the app auto-refetches every 10 minutes, even pages the user isn't viewing.
+Currently limited to 300 activity + 200 patient logs. The new page will fetch up to 500 per table but use client-side pagination to keep rendering fast.
 
-**Problem:** Wastes bandwidth and Supabase quota. Combined with `refetchOnWindowFocus: true` and `refetchOnReconnect: true`, the global interval is unnecessary.
+### No Database Changes Required
 
-**Action:** Remove the global `refetchInterval` from `App.tsx`. Keep it only on the Campaigns page where it's explicitly set to 30s (that one is intentional).
+All the tables already exist with proper RLS policies. This is purely a frontend data-fetching and presentation change.
 
----
+### Files Modified
 
-## Category 4: Performance Concerns
-
-### 4a. ConnectionMonitor fires unauthenticated queries
-`ConnectionMonitor` calls `supabase.from('user_profiles').select('id').limit(1)` on mount even for unauthenticated users on the landing page. This will always fail due to RLS.
-
-**Action:** Add a guard to only run the health check when a user session exists.
-
-### 4b. useResilientQuery appends user.id to ALL query keys
-Line 55: `queryKey: [...queryKey, user?.id]` -- this means every time the user object reference changes (e.g., token refresh), all queries get new keys and refetch from scratch instead of using cache.
-
-**Action:** Use `user?.id` as a string dependency, not appended to queryKey. The auth is already enforced by RLS; the queryKey pollution causes unnecessary refetches.
-
----
-
-## Category 5: Minor Issues
-
-### 5a. Campaigns page refetchInterval: 30s is aggressive
-The campaigns page sets `refetchInterval: 30000` (every 30 seconds). Campaign data rarely changes that fast.
-
-**Action:** Increase to 5 minutes (300000) or remove entirely since `refetchOnWindowFocus` already handles staleness.
-
-### 5b. `performance/ErrorBoundary.tsx` is a re-export shim
-`src/components/performance/ErrorBoundary.tsx` just re-exports from `../ErrorBoundary`. Nothing imports from this path.
-
-**Action:** Delete the file and the `performance/` directory.
-
----
-
-## Implementation Order
-
-1. Delete all 24 dead files listed in Category 1
-2. Delete `src/components/performance/ErrorBoundary.tsx` and the `performance/` directory
-3. Clean dead exports from `useResilientQuery.ts`
-4. Remove duplicate network monitoring from `useResilientQuery.ts`
-5. Remove global `refetchInterval` from `App.tsx`
-6. Guard `ConnectionMonitor` against unauthenticated state
-7. Fix queryKey pollution in `useResilientQuery.ts`
-8. Reduce campaigns `refetchInterval` from 30s to 5 minutes
-9. Verify clean build
+| File | Change |
+|---|---|
+| `src/pages/Logs.tsx` | Full rewrite with comprehensive data sources, tabs, pagination |
 
