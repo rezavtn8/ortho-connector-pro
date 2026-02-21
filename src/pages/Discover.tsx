@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { RefreshCw, Search, Plus, Building2, Loader2, MapPin, Star, Globe, Compass } from 'lucide-react';
+import { RefreshCw, Search, Building2, Loader2, Star, Globe, MapPin } from 'lucide-react';
 import { DiscoveryWizard } from '@/components/DiscoveryWizard';
 import { DiscoveryResults } from '@/components/DiscoveryResults';
 import { SelectionActionBar } from '@/components/SelectionActionBar';
 import { BulkAddToNetworkDialog } from '@/components/BulkAddToNetworkDialog';
+import { SaveToGroupDialog } from '@/components/SaveToGroupDialog';
+import { DiscoveredOfficeGroups } from '@/components/DiscoveredOfficeGroups';
 import { calculateDistance } from '@/utils/distanceCalculation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useDiscoveredGroups } from '@/hooks/useDiscoveredGroups';
 
 interface DiscoveredOffice {
   id: string;
@@ -72,9 +74,13 @@ export const Discover = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showBulkAddDialog, setShowBulkAddDialog] = useState(false);
   const [showNewSearchDialog, setShowNewSearchDialog] = useState(false);
+  const [showSaveToGroupDialog, setShowSaveToGroupDialog] = useState(false);
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  const [activeGroupMemberIds, setActiveGroupMemberIds] = useState<string[]>([]);
   
   const { user } = useAuth();
   const { toast } = useToast();
+  const { groups, createGroup, addToGroup, renameGroup, deleteGroup, getGroupMemberIds, loadGroups } = useDiscoveredGroups();
 
   useEffect(() => {
     if (user) {
@@ -83,6 +89,15 @@ export const Discover = () => {
       loadDiscoveredOfficesFromDB();
     }
   }, [user]);
+
+  // Load group members when active group changes
+  useEffect(() => {
+    if (activeGroupId) {
+      getGroupMemberIds(activeGroupId).then(setActiveGroupMemberIds);
+    } else {
+      setActiveGroupMemberIds([]);
+    }
+  }, [activeGroupId, groups]);
 
   const loadDiscoveredOfficesFromDB = async () => {
     if (!user) return;
@@ -439,16 +454,43 @@ export const Discover = () => {
     }
   };
 
+  // Group handlers
+  const handleSaveToGroupCreate = async (name: string) => {
+    await createGroup(name, selectedIds);
+    setSelectedIds([]);
+  };
+
+  const handleSaveToGroupExisting = async (groupId: string) => {
+    await addToGroup(groupId, selectedIds);
+    setSelectedIds([]);
+  };
+
+  const handleSelectGroup = async (groupId: string | null) => {
+    setActiveGroupId(groupId);
+    setSelectedIds([]);
+  };
+
+  const handleDeleteGroup = async (groupId: string) => {
+    if (activeGroupId === groupId) setActiveGroupId(null);
+    await deleteGroup(groupId);
+  };
+
   const selectedOffices = discoveredOffices.filter(o => selectedIds.includes(o.id));
   const selectedNames = selectedOffices.map(o => o.name);
 
-  // Calculate stats
-  const newOffices = discoveredOffices.filter(o => !o.imported);
+  // Filter offices by active group
+  const displayedOffices = activeGroupId
+    ? discoveredOffices.filter(o => activeGroupMemberIds.includes(o.id))
+    : discoveredOffices;
+
+  // Stats from displayed offices
+  const newOffices = displayedOffices.filter(o => !o.imported);
   const highRatedOffices = newOffices.filter(o => (o.google_rating || 0) >= 4.0);
   const withWebsite = newOffices.filter(o => o.website);
-  const avgRating = newOffices.length > 0 
-    ? (newOffices.reduce((sum, o) => sum + (o.google_rating || 0), 0) / newOffices.filter(o => o.google_rating).length).toFixed(1)
-    : '0';
+  const ratedOffices = newOffices.filter(o => o.google_rating);
+  const avgRating = ratedOffices.length > 0
+    ? (ratedOffices.reduce((sum, o) => sum + (o.google_rating || 0), 0) / ratedOffices.length).toFixed(1)
+    : '—';
 
   if (isLoadingFromDB) {
     return (
@@ -566,6 +608,18 @@ export const Discover = () => {
               </Dialog>
             </div>
           </div>
+
+          {/* Group Selector */}
+          {groups.length > 0 && (
+            <DiscoveredOfficeGroups
+              groups={groups}
+              activeGroupId={activeGroupId}
+              onSelectGroup={handleSelectGroup}
+              onRenameGroup={renameGroup}
+              onDeleteGroup={handleDeleteGroup}
+              groupMemberIds={activeGroupMemberIds}
+            />
+          )}
         </>
       ) : null}
 
@@ -580,14 +634,15 @@ export const Discover = () => {
         />
       ) : (
         <DiscoveryResults
-          offices={discoveredOffices}
+          offices={displayedOffices}
           session={currentSession}
           onAddToNetwork={() => {}}
           onOfficeAdded={handleOfficeAdded}
           isLoading={isLoading}
           selectedIds={selectedIds}
           onSelectionChange={handleSelectionChange}
-          onStartOver={handleStartOver}
+          onStartOver={activeGroupId ? undefined : handleStartOver}
+          activeGroupName={activeGroupId ? groups.find(g => g.id === activeGroupId)?.name : undefined}
         />
       )}
 
@@ -599,6 +654,7 @@ export const Discover = () => {
           onClear={handleClearSelection}
           onBulkAdd={handleBulkAdd}
           onRemove={handleRemoveSelected}
+          onSaveToGroup={() => setShowSaveToGroupDialog(true)}
           isDiscoveredOffices={true}
         />
       )}
@@ -609,6 +665,16 @@ export const Discover = () => {
         onOpenChange={setShowBulkAddDialog}
         offices={selectedOffices}
         onComplete={handleBulkAddComplete}
+      />
+
+      {/* Save to Group Dialog */}
+      <SaveToGroupDialog
+        open={showSaveToGroupDialog}
+        onOpenChange={setShowSaveToGroupDialog}
+        groups={groups}
+        selectedCount={selectedIds.length}
+        onCreateNew={handleSaveToGroupCreate}
+        onAddToExisting={handleSaveToGroupExisting}
       />
     </div>
   );

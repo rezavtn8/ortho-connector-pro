@@ -620,6 +620,66 @@ export type Database = {
           },
         ]
       }
+      discovered_office_group_members: {
+        Row: {
+          added_at: string
+          group_id: string
+          id: string
+          office_id: string
+        }
+        Insert: {
+          added_at?: string
+          group_id: string
+          id?: string
+          office_id: string
+        }
+        Update: {
+          added_at?: string
+          group_id?: string
+          id?: string
+          office_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discovered_office_group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "discovered_office_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discovered_office_group_members_office_id_fkey"
+            columns: ["office_id"]
+            isOneToOne: false
+            referencedRelation: "discovered_offices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      discovered_office_groups: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       discovered_offices: {
         Row: {
           address: string | null
@@ -2459,6 +2519,10 @@ export type Database = {
       }
       update_user_pin_code: { Args: { new_pin: string }; Returns: Json }
       user_has_clinic_admin_access: { Args: never; Returns: boolean }
+      user_owns_discovered_group: {
+        Args: { p_group_id: string }
+        Returns: boolean
+      }
       validate_auth_context: { Args: never; Returns: Json }
       verify_pin_code: {
         Args: { encrypted_pin: string; pin_text: string }
