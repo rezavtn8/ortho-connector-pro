@@ -1,32 +1,64 @@
 
-# Email System — COMPLETED
+# Analytics Platform Redesign
 
-All steps implemented except pg_cron scheduling (requires manual SQL execution).
+## Problems Found
 
-## What Was Done
+1. **Reports tab is broken** -- It embeds a separate component with its own date/period selectors that conflict with the parent page's controls. It duplicates data already shown in other tabs (trends, distribution, top sources).
+2. **Outreach tab is empty** -- Shows placeholder dashes ("-") and a "Coming Soon" message with no real data, despite `marketing_visits` and `campaigns` data being available in the database.
+3. **Too many fragmented tabs (7)** -- Trends, Distribution, Performance, Growing, Declining, Outreach, Reports spread information too thin. Users have to click through many tabs to get a full picture.
+4. **No unified data flow** -- The parent Analytics page fetches data one way, the embedded Reports component fetches it again independently with different queries.
 
-1. ✅ **Welcome email fixed** — "Get Started" button now links to `https://nexoradental.lovable.app`
-2. ✅ **email_preferences column** added to `user_profiles` (jsonb, defaults all to true)
-3. ✅ **Settings Notifications tab** — now DB-backed with Switch components, includes Biweekly Digest toggle
-4. ✅ **Biweekly Digest edge function** — `send-biweekly-digest` deployed, fetches practice data per user and sends via Resend
-5. ✅ **Unsubscribe endpoint** — `email-unsubscribe` deployed with HMAC-signed token verification
-6. ✅ **config.toml** updated with new function entries
-7. ✅ **pg_cron + pg_net extensions** enabled
+## Redesign Plan
 
-## Remaining: Schedule the Cron Job
+Consolidate from 7 tabs down to 4 focused, data-rich tabs. Remove the separate Reports component and merge its best features (PDF/CSV export, period comparison) into the main Analytics page.
 
-Run this SQL in the Supabase SQL Editor (cannot be done via read-only query tool):
+### New Tab Structure
 
-```sql
-SELECT cron.schedule(
-  'send-biweekly-digest',
-  '0 9 1,15 * *',
-  $$
-  SELECT net.http_post(
-    url := 'https://vqkzqwibbcvmdwgqladn.supabase.co/functions/v1/send-biweekly-digest',
-    headers := '{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxa3pxd2liYmN2bWR3Z3FsYWRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM2MDAyMDQsImV4cCI6MjA2OTE3NjIwNH0.S6qvIFA1itxemVUTzfz4dDr2J9jz2z69NEv-fgb4gK4"}'::jsonb,
-    body := '{"scheduled": true}'::jsonb
-  ) AS request_id;
-  $$
-);
+```text
+[Overview]  [Sources]  [Outreach]  [Export]
 ```
+
+### Tab 1: Overview (merge Trends + Distribution)
+- Summary stat cards at top (already exist, keep them)
+- Area chart showing monthly patient trends (full width)
+- Pie chart for source type distribution (side panel)
+- Period-over-period comparison badges on stat cards (from Reports logic)
+
+### Tab 2: Sources (merge Performance + Growing + Declining)
+- Sortable table of ALL sources with columns: Name, Type, Current Period, Previous Period, Change %, Trend indicator
+- Color-coded rows: green for growing, red for declining
+- Built-in sort by clicking column headers (patients, change %)
+- Quick filter chips: All / Growing / Declining / Stable
+- Bar chart showing top 10 performers above the table
+
+### Tab 3: Outreach (fully functional, replaces empty placeholder)
+- Pull real data from `marketing_visits` and `campaigns` tables (already fetched but unused)
+- Stat cards: Total Visits, Completed Visits, Completion Rate, Total Campaigns, Active Campaigns
+- Bar chart: visits per month over the selected period
+- Table: recent marketing visits with office name, date, rep, status
+- Campaign summary: active vs completed vs draft
+
+### Tab 4: Export (replaces Reports tab)
+- Period selector (Monthly/Quarterly/Yearly) and month picker
+- Live preview of key metrics for the selected export period
+- PDF export button (branded report with overview, top sources, campaigns, visits)
+- CSV export button
+- No redundant charts -- just the export controls and a summary preview
+
+## Technical Details
+
+### Files to modify:
+- **`src/pages/Analytics.tsx`** -- Complete rewrite of tab content. Consolidate data fetching to include marketing_visits and campaigns in the main query. Remove the Reports import. Reduce to 4 tabs. Add sortable source table, real outreach data, and export functionality (absorb from Reports.tsx).
+- **`src/pages/Reports.tsx`** -- Delete this file entirely. Its PDF/CSV export logic will be moved into Analytics.
+
+### Data fetching changes:
+- Add `marketing_visits` and `campaigns` queries to the existing `loadAnalytics` function
+- Switch from raw `useEffect` + `setState` to `useQuery` for better caching and loading states
+- Single data fetch serves all tabs
+
+### New features in the rewrite:
+- Sortable source table with filter chips (All/Growing/Declining/Stable)
+- Real outreach analytics with visit trends chart and campaign stats
+- Integrated PDF/CSV export with period selection
+- Period-over-period comparison on overview stat cards
+- Cleaner 4-tab layout that shows more data per view
