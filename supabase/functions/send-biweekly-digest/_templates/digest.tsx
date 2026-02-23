@@ -104,7 +104,7 @@ export const DigestEmail = ({
 
           <Section style={buttonContainer}>
             <Link
-              href="https://nexoradental.lovable.app"
+              href="https://nexoradental.com"
               target="_blank"
               style={button}
             >
@@ -121,7 +121,7 @@ export const DigestEmail = ({
               Unsubscribe
             </Link>
             {' · '}
-            <Link href="https://nexoradental.lovable.app/settings" style={unsubscribeLink}>
+            <Link href="https://nexoradental.com/settings" style={unsubscribeLink}>
               Manage preferences
             </Link>
           </Text>
