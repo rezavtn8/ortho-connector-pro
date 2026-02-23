@@ -9,6 +9,7 @@ import { useProfileDataResilient } from '@/hooks/useResilientQuery';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { ResilientErrorBoundary } from '@/components/ResilientErrorBoundary';
+import { Switch } from '@/components/ui/switch';
 import { 
   MapPin,
   User,
@@ -41,7 +42,7 @@ interface ClinicSettings {
 }
 
 interface NotificationSettings {
-  email_notifications: boolean;
+  biweekly_digest: boolean;
   weekly_reports: boolean;
   monthly_reports: boolean;
   referral_alerts: boolean;
@@ -57,7 +58,7 @@ const initialClinicSettings: ClinicSettings = {
 };
 
 const initialNotificationSettings: NotificationSettings = {
-  email_notifications: true,
+  biweekly_digest: true,
   weekly_reports: true,
   monthly_reports: true,
   referral_alerts: true
@@ -85,17 +86,32 @@ function SettingsContent() {
     setLocalProfile(profile);
   }, [profile]);
 
-  // Load notification settings from localStorage
+  // Load notification settings from database
   useEffect(() => {
-    const saved = localStorage.getItem('notification_settings');
-    if (saved) {
+    if (!user?.id) return;
+    const loadEmailPrefs = async () => {
       try {
-        setNotifications(JSON.parse(saved));
+        const { data, error } = await supabase
+          .from('user_profiles')
+          .select('email_preferences')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (error) throw error;
+        if (data?.email_preferences) {
+          const prefs = data.email_preferences as Record<string, boolean>;
+          setNotifications({
+            biweekly_digest: prefs.biweekly_digest ?? true,
+            weekly_reports: prefs.weekly_reports ?? true,
+            monthly_reports: prefs.monthly_reports ?? true,
+            referral_alerts: prefs.referral_alerts ?? true,
+          });
+        }
       } catch (error) {
-        console.error('Error loading notification settings:', error);
+        console.error('Error loading email preferences:', error);
       }
-    }
-  }, []);
+    };
+    loadEmailPrefs();
+  }, [user?.id]);
 
   const loadClinicSettings = async (clinicId: string) => {
     setClinicLoading(true);
@@ -386,18 +402,30 @@ function SettingsContent() {
   };
 
   const saveNotificationSettings = async () => {
+    if (!user?.id) return;
+    setSaving(true);
     try {
-      localStorage.setItem('notification_settings', JSON.stringify(notifications));
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          email_preferences: notifications as unknown as Record<string, boolean>,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', user.id);
+      if (error) throw error;
       toast({
         title: 'Success',
         description: 'Notification preferences saved',
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Error saving notification settings:', error);
       toast({
         title: 'Error',
-        description: 'Failed to save notification settings',
+        description: error.message || 'Failed to save notification settings',
         variant: 'destructive',
       });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -882,65 +910,57 @@ function SettingsContent() {
                   <CardContent className="space-y-6">
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <div>
-                          <Label htmlFor="email_notifications">Email Notifications</Label>
-                          <p className="text-sm text-muted-foreground">Receive email notifications for important updates</p>
+                        <div className="space-y-0.5">
+                          <Label htmlFor="biweekly_digest">Biweekly Practice Digest</Label>
+                          <p className="text-sm text-muted-foreground">Receive a summary of your practice activity every two weeks</p>
                         </div>
-                        <input
-                          id="email_notifications"
-                          type="checkbox"
-                          checked={notifications.email_notifications}
-                          onChange={(e) => setNotifications(prev => ({ ...prev, email_notifications: e.target.checked }))}
-                          className="rounded"
+                        <Switch
+                          id="biweekly_digest"
+                          checked={notifications.biweekly_digest}
+                          onCheckedChange={(checked) => setNotifications(prev => ({ ...prev, biweekly_digest: checked }))}
                         />
                       </div>
 
                       <div className="flex items-center justify-between">
-                        <div>
+                        <div className="space-y-0.5">
                           <Label htmlFor="weekly_reports">Weekly Reports</Label>
                           <p className="text-sm text-muted-foreground">Receive weekly summary reports</p>
                         </div>
-                        <input
+                        <Switch
                           id="weekly_reports"
-                          type="checkbox"
                           checked={notifications.weekly_reports}
-                          onChange={(e) => setNotifications(prev => ({ ...prev, weekly_reports: e.target.checked }))}
-                          className="rounded"
+                          onCheckedChange={(checked) => setNotifications(prev => ({ ...prev, weekly_reports: checked }))}
                         />
                       </div>
 
                       <div className="flex items-center justify-between">
-                        <div>
+                        <div className="space-y-0.5">
                           <Label htmlFor="monthly_reports">Monthly Reports</Label>
                           <p className="text-sm text-muted-foreground">Receive monthly analytics reports</p>
                         </div>
-                        <input
+                        <Switch
                           id="monthly_reports"
-                          type="checkbox"
                           checked={notifications.monthly_reports}
-                          onChange={(e) => setNotifications(prev => ({ ...prev, monthly_reports: e.target.checked }))}
-                          className="rounded"
+                          onCheckedChange={(checked) => setNotifications(prev => ({ ...prev, monthly_reports: checked }))}
                         />
                       </div>
 
                       <div className="flex items-center justify-between">
-                        <div>
+                        <div className="space-y-0.5">
                           <Label htmlFor="referral_alerts">Referral Alerts</Label>
                           <p className="text-sm text-muted-foreground">Get notified of new referrals</p>
                         </div>
-                        <input
+                        <Switch
                           id="referral_alerts"
-                          type="checkbox"
                           checked={notifications.referral_alerts}
-                          onChange={(e) => setNotifications(prev => ({ ...prev, referral_alerts: e.target.checked }))}
-                          className="rounded"
+                          onCheckedChange={(checked) => setNotifications(prev => ({ ...prev, referral_alerts: checked }))}
                         />
                       </div>
                     </div>
 
                     <div className="pt-4">
-                      <Button onClick={saveNotificationSettings} className="gap-2">
-                        <CheckCircle className="h-4 w-4" />
+                      <Button onClick={saveNotificationSettings} disabled={saving || isOffline} className="gap-2">
+                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
                         Save Preferences
                       </Button>
                     </div>
