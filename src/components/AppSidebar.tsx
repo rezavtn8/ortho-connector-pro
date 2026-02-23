@@ -43,7 +43,8 @@ const mainNavItems = [
   { id: 'daily-patients', title: 'Daily Patients', icon: Calendar, path: '/daily-patients' },
   { id: 'sources', title: 'Patient Sources', icon: Users, path: '/sources' },
   { id: 'offices', title: 'Partner Offices', icon: Building, path: '/offices' },
-  { id: 'analytics', title: 'Reports', icon: TrendingUp, path: '/analytics' },
+  { id: 'analytics', title: 'Analytics', icon: BarChart3, path: '/analytics' },
+  { id: 'reports', title: 'Reports', icon: TrendingUp, path: '/reports' },
   { id: 'ai-assistant', title: 'AI Assistant', icon: Bot, path: '/ai-assistant' },
 ];
 
