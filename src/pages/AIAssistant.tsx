@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Brain, MessageSquare, Settings, Users, Activity, TrendingUp, TrendingDown } from 'lucide-react';
+import { Brain, MessageSquare, Settings, Users, Activity, TrendingUp, TrendingDown, Target } from 'lucide-react';
 import { AIAnalysisTab } from '@/components/ai/AIAnalysisTab';
 import { AIChatTab } from '@/components/ai/AIChatTab';
 import { AISettingsTab } from '@/components/ai/AISettingsTab';
+import { AIForecastTab } from '@/components/ai/AIForecastTab';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -159,6 +160,16 @@ export function AIAssistant() {
                   <span className="hidden sm:inline">Chat</span>
                 </TabsTrigger>
                 <TabsTrigger 
+                  value="forecast" 
+                  className="flex items-center gap-2 px-4 py-2.5 data-[state=active]:bg-background data-[state=active]:text-teal-600 dark:data-[state=active]:text-teal-400 data-[state=active]:shadow-sm rounded-lg"
+                >
+                  <Target className="h-4 w-4" />
+                  <span className="hidden sm:inline">Forecast</span>
+                  <Badge variant="secondary" className="ml-1 text-xs bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300">
+                    AI
+                  </Badge>
+                </TabsTrigger>
+                <TabsTrigger 
                   value="settings" 
                   className="flex items-center gap-2 px-4 py-2.5 data-[state=active]:bg-background data-[state=active]:text-teal-600 dark:data-[state=active]:text-teal-400 data-[state=active]:shadow-sm rounded-lg"
                 >
@@ -175,6 +186,10 @@ export function AIAssistant() {
 
               <TabsContent value="chat" className="mt-0">
                 <AIChatTab />
+              </TabsContent>
+
+              <TabsContent value="forecast" className="mt-0">
+                <AIForecastTab />
               </TabsContent>
 
               <TabsContent value="settings" className="mt-0">
