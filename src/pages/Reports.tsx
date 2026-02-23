@@ -39,7 +39,7 @@ type ReportMonth = string; // YYYY-MM
 
 const CHART_COLORS = ['hsl(var(--primary))', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16'];
 
-export function Reports() {
+export function Reports({ embedded = false }: { embedded?: boolean }) {
   const { user } = useAuth();
   const { toast } = useToast();
   const reportRef = useRef<HTMLDivElement>(null);
@@ -368,17 +368,19 @@ export function Reports() {
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <FileText className="h-6 w-6 text-primary" />
-            Reports
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Generate and export referral performance reports
-          </p>
-        </div>
+        {!embedded && (
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <FileText className="h-6 w-6 text-primary" />
+              Reports
+            </h1>
+            <p className="text-muted-foreground text-sm mt-1">
+              Generate and export referral performance reports
+            </p>
+          </div>
+        )}
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className={`flex items-center gap-2 flex-wrap ${embedded ? 'w-full justify-between' : ''}`}>
           <Select value={period} onValueChange={(v) => setPeriod(v as ReportPeriod)}>
             <SelectTrigger className="w-36">
               <SelectValue />

@@ -29,7 +29,7 @@ import DailyPatients from '@/pages/DailyPatients';
 import SubscriptionSuccess from '@/pages/SubscriptionSuccess';
 import SubscriptionCancel from '@/pages/SubscriptionCancel';
 import { HelpCenter } from '@/pages/HelpCenter';
-import { Reports } from '@/pages/Reports';
+
 
 import { useState } from 'react';
 
@@ -159,14 +159,6 @@ const Index = () => {
             element={
               <SuspenseWrapper type="page">
                 <Analytics />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/reports/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <Reports />
               </SuspenseWrapper>
             } 
           />
