@@ -80,7 +80,7 @@ export const WelcomeEmail = ({
 
           <Section style={buttonContainer}>
             <Link
-              href="https://nexoradental.lovable.app"
+              href="https://nexoradental.com"
               target="_blank"
               style={button}
             >

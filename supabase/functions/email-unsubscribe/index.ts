@@ -84,7 +84,7 @@ serve(async (req) => {
     return new Response(
       htmlPage(
         "Unsubscribed Successfully",
-        "You've been unsubscribed from the Biweekly Practice Digest. You can re-enable it anytime in your <a href='https://nexoradental.lovable.app/settings' style='color: #6BB7AD;'>Settings</a>."
+        "You've been unsubscribed from the Biweekly Practice Digest. You can re-enable it anytime in your <a href='https://nexoradental.com/settings' style='color: #6BB7AD;'>Settings</a>."
       ),
       { status: 200, headers: { "Content-Type": "text/html" } }
     );
