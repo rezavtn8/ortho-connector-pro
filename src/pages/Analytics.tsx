@@ -1,5 +1,6 @@
 // src/pages/Analytics.tsx
 import React, { useState, useEffect } from 'react';
+import { Reports } from '@/pages/Reports';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -489,7 +490,7 @@ export function Analytics() {
 
       {/* Analytics Tabs */}
       <Tabs defaultValue="trends" className="w-full">
-        <TabsList className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 w-full max-w-4xl">
+        <TabsList className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 w-full max-w-5xl">
           <TabsTrigger value="trends" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             <span className="hidden sm:inline">Trends</span>
@@ -513,6 +514,10 @@ export function Analytics() {
           <TabsTrigger value="outreach" className="flex items-center gap-2">
             <Target className="h-4 w-4" />
             <span className="hidden sm:inline">Outreach</span>
+          </TabsTrigger>
+          <TabsTrigger value="reports" className="flex items-center gap-2">
+            <LineChart className="h-4 w-4" />
+            <span className="hidden sm:inline">Reports</span>
           </TabsTrigger>
         </TabsList>
 
@@ -891,6 +896,10 @@ export function Analytics() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="reports" className="space-y-4">
+          <Reports embedded />
         </TabsContent>
         </div>
       </Tabs>
