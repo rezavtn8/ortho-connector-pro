@@ -2172,6 +2172,7 @@ export type Database = {
           created_at: string
           degrees: string | null
           email: string
+          email_preferences: Json
           first_name: string | null
           full_name: string | null
           id: string
@@ -2190,6 +2191,7 @@ export type Database = {
           created_at?: string
           degrees?: string | null
           email: string
+          email_preferences?: Json
           first_name?: string | null
           full_name?: string | null
           id?: string
@@ -2208,6 +2210,7 @@ export type Database = {
           created_at?: string
           degrees?: string | null
           email?: string
+          email_preferences?: Json
           first_name?: string | null
           full_name?: string | null
           id?: string
