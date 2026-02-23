@@ -1,64 +1,61 @@
 
-# Analytics Platform Redesign
 
-## Problems Found
+# AI-Powered Referral Forecasting
 
-1. **Reports tab is broken** -- It embeds a separate component with its own date/period selectors that conflict with the parent page's controls. It duplicates data already shown in other tabs (trends, distribution, top sources).
-2. **Outreach tab is empty** -- Shows placeholder dashes ("-") and a "Coming Soon" message with no real data, despite `marketing_visits` and `campaigns` data being available in the database.
-3. **Too many fragmented tabs (7)** -- Trends, Distribution, Performance, Growing, Declining, Outreach, Reports spread information too thin. Users have to click through many tabs to get a full picture.
-4. **No unified data flow** -- The parent Analytics page fetches data one way, the embedded Reports component fetches it again independently with different queries.
+## Placement Decision
 
-## Redesign Plan
+Add a **Forecast** tab to the **AI Assistant** page (alongside Analysis, Chat, Settings). This is the natural home because:
+- It's AI-powered content, not raw analytics
+- It complements the existing AI Analysis tab (which looks backward) with forward-looking predictions
+- Keeps the Analytics page focused on historical data and export
 
-Consolidate from 7 tabs down to 4 focused, data-rich tabs. Remove the separate Reports component and merge its best features (PDF/CSV export, period comparison) into the main Analytics page.
+## What the Forecast Tab Will Show
 
-### New Tab Structure
+1. **Forecast Summary Cards** -- Predicted next-month patient volume, projected growth rate, confidence level (high/medium/low)
+2. **3-Month Projection Chart** -- Area chart showing historical trend + projected future months (dashed line for forecasted data)
+3. **Source-Level Predictions** -- Table of top sources with predicted next-month volume, trend direction, and risk flags (e.g., "likely to decline")
+4. **AI Strategic Recommendations** -- 3-5 specific actions based on the forecast (e.g., "Re-engage Office X before they go cold", "Double down on Office Y momentum")
+5. **Risk Alerts** -- Flagged sources showing early signs of decline that need intervention
+
+## Technical Implementation
+
+### New Edge Function: `supabase/functions/ai-forecast/index.ts`
+- Fetches last 12 months of `monthly_patients`, `patient_sources`, `marketing_visits`, and `campaigns` for the authenticated user
+- Computes basic trend math server-side (month-over-month deltas, rolling averages) to include in the prompt
+- Calls OpenAI `gpt-4o-mini` with tool calling to return structured forecast JSON:
+  - `overall_forecast`: next 3 months projected totals, growth phase (expansion/plateau/decline), confidence
+  - `source_forecasts`: per-source predictions with risk level
+  - `strategic_actions`: 3-5 specific recommended actions
+  - `risk_alerts`: sources flagged for intervention
+- Caches result in `ai_generated_content` table (content_type = 'forecast') for 12 hours
+- Uses existing OPENAI_API_KEY secret (already configured)
+
+### New Component: `src/components/ai/AIForecastTab.tsx`
+- Custom hook pattern similar to `useAIAnalysis` but calls the `ai-forecast` edge function
+- Renders forecast cards, projection chart (recharts AreaChart with dashed forecast line), source prediction table, and action cards
+- "Refresh Forecast" button to regenerate on demand
+- Loading skeleton and error states matching existing AI tab patterns
+
+### Modified Files
+- **`src/pages/AIAssistant.tsx`** -- Add "Forecast" tab trigger with a crystal ball or target icon, import and render `AIForecastTab`
+- **`supabase/config.toml`** -- Add `[functions.ai-forecast]` with `verify_jwt = false` (auth handled in code)
+
+### Data Flow
 
 ```text
-[Overview]  [Sources]  [Outreach]  [Export]
+User clicks Forecast tab
+  --> Check ai_generated_content for cached forecast (< 12 hours old)
+  --> If cached: display immediately
+  --> If stale/missing: call ai-forecast edge function
+      --> Edge function fetches user's data from DB
+      --> Computes trend metrics server-side
+      --> Sends to OpenAI with structured tool calling
+      --> Caches result, returns to client
+  --> Render: summary cards, projection chart, source table, actions
 ```
 
-### Tab 1: Overview (merge Trends + Distribution)
-- Summary stat cards at top (already exist, keep them)
-- Area chart showing monthly patient trends (full width)
-- Pie chart for source type distribution (side panel)
-- Period-over-period comparison badges on stat cards (from Reports logic)
+### No Database Changes Required
+- Reuses existing `ai_generated_content` table with `content_type = 'forecast'`
+- Reuses existing `monthly_patients`, `patient_sources`, `marketing_visits`, `campaigns` tables
+- No new migrations needed
 
-### Tab 2: Sources (merge Performance + Growing + Declining)
-- Sortable table of ALL sources with columns: Name, Type, Current Period, Previous Period, Change %, Trend indicator
-- Color-coded rows: green for growing, red for declining
-- Built-in sort by clicking column headers (patients, change %)
-- Quick filter chips: All / Growing / Declining / Stable
-- Bar chart showing top 10 performers above the table
-
-### Tab 3: Outreach (fully functional, replaces empty placeholder)
-- Pull real data from `marketing_visits` and `campaigns` tables (already fetched but unused)
-- Stat cards: Total Visits, Completed Visits, Completion Rate, Total Campaigns, Active Campaigns
-- Bar chart: visits per month over the selected period
-- Table: recent marketing visits with office name, date, rep, status
-- Campaign summary: active vs completed vs draft
-
-### Tab 4: Export (replaces Reports tab)
-- Period selector (Monthly/Quarterly/Yearly) and month picker
-- Live preview of key metrics for the selected export period
-- PDF export button (branded report with overview, top sources, campaigns, visits)
-- CSV export button
-- No redundant charts -- just the export controls and a summary preview
-
-## Technical Details
-
-### Files to modify:
-- **`src/pages/Analytics.tsx`** -- Complete rewrite of tab content. Consolidate data fetching to include marketing_visits and campaigns in the main query. Remove the Reports import. Reduce to 4 tabs. Add sortable source table, real outreach data, and export functionality (absorb from Reports.tsx).
-- **`src/pages/Reports.tsx`** -- Delete this file entirely. Its PDF/CSV export logic will be moved into Analytics.
-
-### Data fetching changes:
-- Add `marketing_visits` and `campaigns` queries to the existing `loadAnalytics` function
-- Switch from raw `useEffect` + `setState` to `useQuery` for better caching and loading states
-- Single data fetch serves all tabs
-
-### New features in the rewrite:
-- Sortable source table with filter chips (All/Growing/Declining/Stable)
-- Real outreach analytics with visit trends chart and campaign stats
-- Integrated PDF/CSV export with period selection
-- Period-over-period comparison on overview stat cards
-- Cleaner 4-tab layout that shows more data per view
