@@ -1,45 +1,42 @@
-// src/pages/Analytics.tsx
-import React, { useState, useEffect } from 'react';
-import { Reports } from '@/pages/Reports';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useMemo, useRef } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
-  PatientSource,
-  MonthlyPatients,
   SOURCE_TYPE_CONFIG,
   SourceType,
   formatYearMonth
 } from '@/lib/database.types';
 import { supabase } from '@/integrations/supabase/client';
-import { nowPostgres } from '@/lib/dateSync';
+import { useAuth } from '@/hooks/useAuth';
 import {
-  Activity,
   TrendingUp,
   TrendingDown,
   Users,
   Calendar,
   Download,
   BarChart3,
-  PieChart,
-  LineChart,
+  PieChart as PieChartIcon,
   Building2,
   ArrowUp,
   ArrowDown,
+  Minus,
   Target,
-  Database,
-  Info
+  FileText,
+  Megaphone,
+  ArrowUpDown,
+  CheckCircle2,
+  Clock,
+  MapPin
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   ResponsiveContainer,
   BarChart,
   Bar,
-  LineChart as RechartsLineChart,
-  Line,
   PieChart as RechartsPieChart,
   Pie,
   Cell,
@@ -47,862 +44,721 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend
+  Area,
+  AreaChart,
 } from 'recharts';
+import { useQuery } from '@tanstack/react-query';
+import { format, subMonths } from 'date-fns';
+import jsPDF from 'jspdf';
 
-interface SourceAnalytics {
-  source: PatientSource;
-  totalPatients: number;
-  averageMonthly: number;
-  trend: 'up' | 'down' | 'stable';
-  trendPercentage: number;
-  monthlyData: MonthlyPatients[];
-}
+const CHART_COLORS = [
+  'hsl(var(--primary))', '#10b981', '#f59e0b', '#ef4444',
+  '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16'
+];
 
-interface DailyPatientSummary {
-  total: number;
-  uniqueDays: number;
-  hasData: boolean;
-}
+type SortField = 'name' | 'current' | 'prev' | 'change';
+type SortDir = 'asc' | 'desc';
+type SourceFilter = 'all' | 'growing' | 'declining' | 'stable';
 
 export function Analytics() {
-  const [sources, setSources] = useState<PatientSource[]>([]);
-  const [monthlyData, setMonthlyData] = useState<MonthlyPatients[]>([]);
-  const [dailySummary, setDailySummary] = useState<DailyPatientSummary>({ total: 0, uniqueDays: 0, hasData: false });
-  const [analytics, setAnalytics] = useState<SourceAnalytics[]>([]);
-  const [selectedType, setSelectedType] = useState<SourceType | 'all' | 'online' | 'offices' | 'insurance' | 'word-of-mouth' | 'other'>('all');
-  const [selectedPeriod, setSelectedPeriod] = useState<'3m' | '6m' | '12m' | 'all'>('6m');
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
   const { toast } = useToast();
+  const [selectedPeriod, setSelectedPeriod] = useState<'3m' | '6m' | '12m'>('6m');
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all');
+  const [sortField, setSortField] = useState<SortField>('current');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
 
-  // Chart colors
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
+  // Export controls
+  const [exportPeriod, setExportPeriod] = useState<'monthly' | 'quarterly' | 'yearly'>('monthly');
+  const [exportMonth, setExportMonth] = useState(format(new Date(), 'yyyy-MM'));
 
-  useEffect(() => {
-    loadAnalytics();
+  const dateRange = useMemo(() => {
+    const now = new Date();
+    const months = selectedPeriod === '3m' ? 3 : selectedPeriod === '6m' ? 6 : 12;
+    const start = new Date(now.getFullYear(), now.getMonth() - months, 1);
+    const startYM = `${start.getFullYear()}-${(start.getMonth() + 1).toString().padStart(2, '0')}`;
+    const endYM = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+    const prevStart = new Date(start.getFullYear(), start.getMonth() - months, 1);
+    const prevStartYM = `${prevStart.getFullYear()}-${(prevStart.getMonth() + 1).toString().padStart(2, '0')}`;
+    const prevEndYM = `${start.getFullYear()}-${(start.getMonth()).toString().padStart(2, '0')}`;
+    const startDate = `${startYM}-01`;
+    return { startYM, endYM, prevStartYM, prevEndYM, startDate };
   }, [selectedPeriod]);
 
-  const loadAnalytics = async () => {
-    try {
-      setLoading(true);
+  const { data, isLoading } = useQuery({
+    queryKey: ['analytics-unified', dateRange.startYM, dateRange.endYM, dateRange.prevStartYM],
+    queryFn: async () => {
+      const [sourcesRes, currentRes, prevRes, visitsRes, campaignsRes] = await Promise.all([
+        supabase.from('patient_sources').select('*').eq('is_active', true),
+        supabase.from('monthly_patients').select('*').gte('year_month', dateRange.startYM).lte('year_month', dateRange.endYM),
+        supabase.from('monthly_patients').select('*').gte('year_month', dateRange.prevStartYM).lte('year_month', dateRange.prevEndYM),
+        supabase.from('marketing_visits').select('*, patient_sources!marketing_visits_office_id_fkey(name)').gte('visit_date', dateRange.startDate).order('visit_date', { ascending: false }),
+        supabase.from('campaigns').select('*').order('created_at', { ascending: false }),
+      ]);
+      return {
+        sources: sourcesRes.data || [],
+        currentMonthly: currentRes.data || [],
+        prevMonthly: prevRes.data || [],
+        visits: visitsRes.data || [],
+        campaigns: campaignsRes.data || [],
+      };
+    },
+    enabled: !!user,
+  });
 
-      // Load sources
-      const { data: sourcesData, error: sourcesError } = await supabase
-        .from('patient_sources')
-        .select('*')
-        .eq('is_active', true);
+  const analytics = useMemo(() => {
+    if (!data) return null;
+    const { sources, currentMonthly, prevMonthly, visits, campaigns } = data;
 
-      if (sourcesError) throw sourcesError;
+    const totalPatients = currentMonthly.reduce((s, m) => s + m.patient_count, 0);
+    const prevTotal = prevMonthly.reduce((s, m) => s + m.patient_count, 0);
+    const changePercent = prevTotal > 0 ? Math.round(((totalPatients - prevTotal) / prevTotal) * 100) : 0;
 
-      // Calculate date range based on selected period
-      const now = new Date();
-      let startDate: Date;
-      
-      switch (selectedPeriod) {
-        case '3m':
-          startDate = new Date(now.getFullYear(), now.getMonth() - 3, 1);
-          break;
-        case '6m':
-          startDate = new Date(now.getFullYear(), now.getMonth() - 6, 1);
-          break;
-        case '12m':
-          startDate = new Date(now.getFullYear(), now.getMonth() - 12, 1);
-          break;
-        default:
-          startDate = new Date(2020, 0, 1); // All time
-      }
+    // Per-source breakdown
+    const bySource = sources.map(src => {
+      const current = currentMonthly.filter(m => m.source_id === src.id).reduce((s, m) => s + m.patient_count, 0);
+      const prev = prevMonthly.filter(m => m.source_id === src.id).reduce((s, m) => s + m.patient_count, 0);
+      const change = prev > 0 ? Math.round(((current - prev) / prev) * 100) : current > 0 ? 100 : 0;
+      const trend: 'up' | 'down' | 'stable' = change > 0 ? 'up' : change < 0 ? 'down' : 'stable';
+      return { ...src, current, prev, change, trend };
+    }).filter(s => s.current > 0 || s.prev > 0);
 
-      const startYearMonth = `${startDate.getFullYear()}-${(startDate.getMonth() + 1).toString().padStart(2, '0')}`;
-      const startDateStr = `${startDate.getFullYear()}-${(startDate.getMonth() + 1).toString().padStart(2, '0')}-01`;
-
-      // Load monthly data (aggregated totals)
-      const { data: monthlyDataResult, error: monthlyError } = await supabase
-        .from('monthly_patients')
-        .select('*')
-        .gte('year_month', startYearMonth)
-        .order('year_month', { ascending: true });
-
-      if (monthlyError) throw monthlyError;
-
-      // Load daily data summary to check if user is using daily tracking
-      const { data: dailyDataResult, error: dailyError } = await supabase
-        .from('daily_patients')
-        .select('id, patient_count, patient_date')
-        .gte('patient_date', startDateStr);
-
-      if (dailyError) throw dailyError;
-
-      // Calculate daily summary
-      const dailyTotal = (dailyDataResult || []).reduce((sum, d) => sum + d.patient_count, 0);
-      const uniqueDays = new Set((dailyDataResult || []).map(d => d.patient_date)).size;
-      
-      setDailySummary({
-        total: dailyTotal,
-        uniqueDays,
-        hasData: dailyDataResult && dailyDataResult.length > 0
-      });
-
-      setSources(sourcesData || []);
-      setMonthlyData(monthlyDataResult || []);
-
-      // Calculate analytics for each source (using monthly data for trends)
-      const analyticsData: SourceAnalytics[] = (sourcesData || []).map(source => {
-        const sourceMonthlyData = (monthlyDataResult || []).filter(m => m.source_id === source.id);
-        const totalPatients = sourceMonthlyData.reduce((sum, m) => sum + m.patient_count, 0);
-        const averageMonthly = sourceMonthlyData.length > 0 
-          ? Math.round(totalPatients / sourceMonthlyData.length)
-          : 0;
-
-        // Calculate trend based on last 2 months with data
-        let trend: 'up' | 'down' | 'stable' = 'stable';
-        let trendPercentage = 0;
-
-        if (sourceMonthlyData.length >= 2) {
-          const sortedData = [...sourceMonthlyData].sort((a, b) => a.year_month.localeCompare(b.year_month));
-          const recent = sortedData[sortedData.length - 1].patient_count;
-          const previous = sortedData[sortedData.length - 2].patient_count;
-          
-          if (recent > previous) {
-            trend = 'up';
-            trendPercentage = previous > 0 ? Math.round(((recent - previous) / previous) * 100) : 100;
-          } else if (recent < previous) {
-            trend = 'down';
-            trendPercentage = previous > 0 ? Math.round(((previous - recent) / previous) * -100) : -100;
-          }
-        }
-
-        return {
-          source,
-          totalPatients,
-          averageMonthly,
-          trend,
-          trendPercentage,
-          monthlyData: sourceMonthlyData
-        };
-      });
-
-      setAnalytics(analyticsData);
-    } catch (error) {
-      console.error('Error loading analytics:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load analytics data",
-        variant: "destructive",
-      });
-      // Set empty data on error
-      setSources([]);
-      setMonthlyData([]);
-      setAnalytics([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-
-
-  // Helper function to determine source category
-  const getSourceCategory = (sourceType: SourceType) => {
-    switch (sourceType) {
-      case 'Yelp':
-      case 'Google':
-      case 'Website':
-      case 'Social Media':
-        return 'online';
-      case 'Office':
-        return 'offices';
-      case 'Insurance':
-        return 'insurance';
-      case 'Word of Mouth':
-        return 'word-of-mouth';
-      case 'Other':
-        return 'other';
-      default:
-        return 'other';
-    }
-  };
-
-  // Filter analytics by source type or category
-  const filteredAnalytics = selectedType === 'all' 
-    ? analytics
-    : selectedType === 'online' || selectedType === 'offices' || selectedType === 'insurance' || selectedType === 'word-of-mouth' || selectedType === 'other'
-    ? analytics.filter(a => getSourceCategory(a.source.source_type) === selectedType)
-    : analytics.filter(a => a.source.source_type === selectedType);
-
-  // Prepare data for charts
-  const getMonthlyChartData = () => {
-    const monthlyTotals: { [key: string]: number } = {};
-    
-    monthlyData.forEach(data => {
-      const source = sources.find(s => s.id === data.source_id);
-      if (!source) return;
-      
-      const matchesFilter = selectedType === 'all' || 
-        (selectedType === 'online' || selectedType === 'offices' || selectedType === 'insurance' || selectedType === 'word-of-mouth' || selectedType === 'other'
-          ? getSourceCategory(source.source_type) === selectedType
-          : source.source_type === selectedType);
-      
-      if (matchesFilter) {
-        monthlyTotals[data.year_month] = (monthlyTotals[data.year_month] || 0) + data.patient_count;
-      }
+    // Monthly trend
+    const monthlyTotals: Record<string, number> = {};
+    currentMonthly.forEach(m => {
+      monthlyTotals[m.year_month] = (monthlyTotals[m.year_month] || 0) + m.patient_count;
     });
+    const trendData = Object.entries(monthlyTotals)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, count]) => ({ month: formatYearMonth(month), count }));
 
-    return Object.entries(monthlyTotals)
-      .sort(([a], [b]) => a.localeCompare(b)) // Sort by year-month string first
-      .map(([month, count]) => ({
-        month: formatYearMonth(month),
-        count
-      }));
-  };
-
-  const getTypeDistribution = () => {
-    const distribution: { [key: string]: number } = {};
-    
-    analytics.forEach(a => {
-      const type = a.source.source_type;
-      distribution[type] = (distribution[type] || 0) + a.totalPatients;
+    // Type distribution
+    const byType: Record<string, number> = {};
+    sources.forEach(src => {
+      const count = currentMonthly.filter(m => m.source_id === src.id).reduce((s, m) => s + m.patient_count, 0);
+      if (count > 0) byType[src.source_type] = (byType[src.source_type] || 0) + count;
     });
-
-    return Object.entries(distribution).map(([type, count]) => ({
-      name: SOURCE_TYPE_CONFIG[type as SourceType].label,
-      value: count,
-      icon: SOURCE_TYPE_CONFIG[type as SourceType].icon
-    }));
-  };
-
-  const getTopPerformers = () => {
-    return [...filteredAnalytics]
-      .sort((a, b) => b.totalPatients - a.totalPatients)
-      .slice(0, 10);
-  };
-
-  const getDecliningSourcesAnalysis = () => {
-    return [...filteredAnalytics]
-      .filter(a => a.trend === 'down')
-      .sort((a, b) => a.trendPercentage - b.trendPercentage) // Sort by worst decline first
-      .slice(0, 10);
-  };
-
-  const getGrowingSourcesAnalysis = () => {
-    return [...filteredAnalytics]
-      .filter(a => a.trend === 'up')
-      .sort((a, b) => b.trendPercentage - a.trendPercentage) // Sort by best growth first
-      .slice(0, 10);
-  };
-
-  // Calculate summary statistics
-  const totalPatients = filteredAnalytics.reduce((sum, a) => sum + a.totalPatients, 0);
-  const totalSources = filteredAnalytics.length;
-  const averagePerSource = totalSources > 0 ? Math.round(totalPatients / totalSources) : 0;
-  const growingSources = filteredAnalytics.filter(a => a.trend === 'up').length;
-
-  const exportData = () => {
-    const csvData = filteredAnalytics.map(a => ({
-      'Source Name': a.source.name,
-      'Type': SOURCE_TYPE_CONFIG[a.source.source_type].label,
-      'Total Patients': a.totalPatients,
-      'Average Monthly': a.averageMonthly,
-      'Trend': a.trend,
-      'Trend %': a.trendPercentage,
-      'Status': a.source.is_active ? 'Active' : 'Inactive'
+    const typeDistribution = Object.entries(byType).map(([type, value]) => ({
+      name: SOURCE_TYPE_CONFIG[type as SourceType]?.label || type,
+      value,
     }));
 
-    const csvString = [
-      Object.keys(csvData[0]).join(','),
-      ...csvData.map(row => Object.values(row).map(value => `"${value}"`).join(','))
-    ].join('\n');
+    // Outreach
+    const totalVisits = visits.length;
+    const completedVisits = visits.filter(v => v.visited).length;
+    const uniqueOfficesVisited = new Set(visits.map(v => v.office_id)).size;
+    const visitsByMonth: Record<string, number> = {};
+    visits.forEach(v => {
+      const ym = v.visit_date.substring(0, 7);
+      visitsByMonth[ym] = (visitsByMonth[ym] || 0) + 1;
+    });
+    const visitTrendData = Object.entries(visitsByMonth)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, count]) => ({ month: formatYearMonth(month), count }));
 
-    const blob = new Blob([csvString], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
+    const totalCampaigns = campaigns.length;
+    const activeCampaigns = campaigns.filter(c => c.status === 'Active').length;
+    const completedCampaigns = campaigns.filter(c => c.status === 'Completed').length;
+    const draftCampaigns = campaigns.filter(c => c.status === 'Draft').length;
+
+    const growingCount = bySource.filter(s => s.trend === 'up').length;
+    const decliningCount = bySource.filter(s => s.trend === 'down').length;
+
+    return {
+      totalPatients, prevTotal, changePercent,
+      bySource, trendData, typeDistribution,
+      totalVisits, completedVisits, uniqueOfficesVisited, visitTrendData, visits,
+      totalCampaigns, activeCampaigns, completedCampaigns, draftCampaigns, campaigns,
+      growingCount, decliningCount,
+      activeSources: bySource.filter(s => s.current > 0).length,
+    };
+  }, [data]);
+
+  // Sorted & filtered sources
+  const sortedSources = useMemo(() => {
+    if (!analytics) return [];
+    let filtered = analytics.bySource;
+    if (sourceFilter === 'growing') filtered = filtered.filter(s => s.trend === 'up');
+    else if (sourceFilter === 'declining') filtered = filtered.filter(s => s.trend === 'down');
+    else if (sourceFilter === 'stable') filtered = filtered.filter(s => s.trend === 'stable');
+
+    return [...filtered].sort((a, b) => {
+      let cmp = 0;
+      if (sortField === 'name') cmp = a.name.localeCompare(b.name);
+      else if (sortField === 'current') cmp = a.current - b.current;
+      else if (sortField === 'prev') cmp = a.prev - b.prev;
+      else if (sortField === 'change') cmp = a.change - b.change;
+      return sortDir === 'desc' ? -cmp : cmp;
+    });
+  }, [analytics, sourceFilter, sortField, sortDir]);
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortField(field); setSortDir('desc'); }
+  };
+
+  // Export month options
+  const monthOptions = useMemo(() => {
+    const months = [];
+    for (let i = 0; i < 24; i++) {
+      const d = subMonths(new Date(), i);
+      months.push({ value: format(d, 'yyyy-MM'), label: format(d, 'MMMM yyyy') });
+    }
+    return months;
+  }, []);
+
+  const handleExportCSV = () => {
+    if (!analytics || analytics.bySource.length === 0) return;
+    const rows = analytics.bySource.map(s => ({
+      Source: s.name, Type: s.source_type,
+      'Current Period': s.current, 'Previous Period': s.prev, 'Change %': s.change,
+    }));
+    const csv = [Object.keys(rows[0]).join(','), ...rows.map(r => Object.values(r).map(v => `"${v}"`).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `analytics-${nowPostgres()}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
+    a.href = url; a.download = `analytics-export-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+    toast({ title: 'CSV Downloaded' });
   };
 
-  if (loading) {
+  const handleExportPDF = () => {
+    if (!analytics) return;
+    try {
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const margin = 15;
+      let y = 20;
+
+      pdf.setFontSize(18); pdf.setFont('helvetica', 'bold');
+      pdf.text('Referral Performance Report', margin, y); y += 8;
+      pdf.setFontSize(10); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(100);
+      pdf.text(`Period: ${selectedPeriod === '3m' ? 'Last 3 Months' : selectedPeriod === '6m' ? 'Last 6 Months' : 'Last 12 Months'}`, margin, y); y += 5;
+      pdf.text(`Generated: ${format(new Date(), 'MMMM d, yyyy')}`, margin, y); y += 10;
+      pdf.setTextColor(0);
+
+      pdf.setDrawColor(200); pdf.line(margin, y, 195, y); y += 8;
+
+      pdf.setFontSize(13); pdf.setFont('helvetica', 'bold');
+      pdf.text('Overview', margin, y); y += 7;
+      pdf.setFontSize(10); pdf.setFont('helvetica', 'normal');
+      const overview = [
+        ['Total Patients', analytics.totalPatients.toString()],
+        ['vs Previous Period', `${analytics.changePercent >= 0 ? '+' : ''}${analytics.changePercent}%`],
+        ['Active Sources', analytics.activeSources.toString()],
+        ['Growing', analytics.growingCount.toString()],
+        ['Declining', analytics.decliningCount.toString()],
+        ['Marketing Visits', analytics.totalVisits.toString()],
+        ['Campaigns', analytics.totalCampaigns.toString()],
+      ];
+      overview.forEach(([l, v]) => {
+        pdf.text(l, margin + 2, y); pdf.setFont('helvetica', 'bold');
+        pdf.text(v, margin + 80, y); pdf.setFont('helvetica', 'normal'); y += 6;
+      }); y += 4;
+
+      pdf.setFontSize(13); pdf.setFont('helvetica', 'bold');
+      pdf.text('Top Sources', margin, y); y += 7;
+      pdf.setFontSize(9); pdf.setFont('helvetica', 'bold');
+      pdf.text('Source', margin + 2, y); pdf.text('Current', 120, y); pdf.text('Change', 150, y);
+      pdf.setFont('helvetica', 'normal'); y += 5;
+      analytics.bySource.slice(0, 20).forEach(src => {
+        if (y > 275) { pdf.addPage(); y = 20; }
+        pdf.text(String(src.name).substring(0, 50), margin + 2, y);
+        pdf.text(src.current.toString(), 120, y);
+        pdf.text(`${src.change >= 0 ? '+' : ''}${src.change}%`, 150, y); y += 5;
+      });
+
+      pdf.save(`referral-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+      toast({ title: 'PDF Downloaded' });
+    } catch (err) {
+      toast({ title: 'Export Failed', variant: 'destructive' });
+    }
+  };
+
+  const SortHeader = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
+    <button onClick={() => toggleSort(field)} className="flex items-center gap-1 font-medium text-xs uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors">
+      {children}
+      <ArrowUpDown className={`h-3 w-3 ${sortField === field ? 'text-primary' : 'text-muted-foreground/50'}`} />
+    </button>
+  );
+
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading analytics...</p>
+      <div className="space-y-6 animate-fade-in">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)}
         </div>
+        <Skeleton className="h-96 rounded-xl" />
       </div>
     );
   }
 
+  if (!analytics) {
+    return <div className="text-center text-muted-foreground py-16">No analytics data available.</div>;
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
-
-      {/* Data Source Indicator */}
-      <Alert className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-800">
-        <Database className="h-4 w-4 text-blue-600" />
-        <AlertDescription className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
-            Data Source:
-          </span>
-          <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900 dark:text-blue-200">
-            Monthly Totals ({monthlyData.length} records)
-          </Badge>
-          {dailySummary.hasData && (
-            <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-200">
-              + Daily Entries ({dailySummary.uniqueDays} days tracked)
-            </Badge>
-          )}
-          <span className="text-xs text-muted-foreground ml-2">
-            <Info className="w-3 h-3 inline mr-1" />
-            Analytics use monthly aggregates for trend analysis
-          </span>
-        </AlertDescription>
-      </Alert>
-
-      {/* Controls */}
-      <div className="flex justify-between items-center">
-        <div className="flex gap-4">
-          <Select value={selectedType} onValueChange={(v) => setSelectedType(v as any)}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="All Categories" />
-            </SelectTrigger>
-            <SelectContent className="bg-background border z-50">
-              <SelectItem value="all">All Categories</SelectItem>
-              <SelectItem value="online">
-                <span className="flex items-center gap-2">
-                  <span>🌐</span>
-                  Online Sources
-                </span>
-              </SelectItem>
-              <SelectItem value="offices">
-                <span className="flex items-center gap-2">
-                  <span>🏢</span>
-                  Offices
-                </span>
-              </SelectItem>
-              <SelectItem value="insurance">
-                <span className="flex items-center gap-2">
-                  <span>📋</span>
-                  Insurance
-                </span>
-              </SelectItem>
-              <SelectItem value="word-of-mouth">
-                <span className="flex items-center gap-2">
-                  <span>💬</span>
-                  Word of Mouth
-                </span>
-              </SelectItem>
-              <SelectItem value="other">
-                <span className="flex items-center gap-2">
-                  <span>📌</span>
-                  Other
-                </span>
-              </SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={selectedPeriod} onValueChange={(v) => setSelectedPeriod(v as '3m' | '6m' | '12m' | 'all')}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Time Period" />
-            </SelectTrigger>
-            <SelectContent className="bg-background border z-50">
-              <SelectItem value="3m">Last 3 Months</SelectItem>
-              <SelectItem value="6m">Last 6 Months</SelectItem>
-              <SelectItem value="12m">Last 12 Months</SelectItem>
-              <SelectItem value="all">All Time</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <Button onClick={exportData} variant="outline">
-          <Download className="w-4 h-4 mr-2" />
-          Export Data
-        </Button>
+      {/* Period selector */}
+      <div className="flex items-center justify-between">
+        <Select value={selectedPeriod} onValueChange={(v) => setSelectedPeriod(v as any)}>
+          <SelectTrigger className="w-44">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="bg-background border z-50">
+            <SelectItem value="3m">Last 3 Months</SelectItem>
+            <SelectItem value="6m">Last 6 Months</SelectItem>
+            <SelectItem value="12m">Last 12 Months</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
-
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Users className="w-5 h-5" />
-              Total Patients
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-primary">{totalPatients}</div>
-            <p className="text-sm text-muted-foreground">From {totalSources} sources</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Activity className="w-5 h-5" />
-              Average/Source
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-primary">{averagePerSource}</div>
-            <p className="text-sm text-muted-foreground">Patients per source</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <TrendingUp className="w-5 h-5" />
-              Growing Sources
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-green-600">{growingSources}</div>
-            <p className="text-sm text-muted-foreground">Trending upward</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <TrendingDown className="w-5 h-5" />
-              Declining Sources
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-red-600">
-              {filteredAnalytics.filter(a => a.trend === 'down').length}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="border-border/50">
+          <CardContent className="pt-5 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-lg bg-primary/10"><Users className="h-5 w-5 text-primary" /></div>
+              <div>
+                <p className="text-2xl font-bold">{analytics.totalPatients.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Total Patients</p>
+              </div>
             </div>
-            <div className="flex justify-between text-sm text-muted-foreground mt-2">
-              <span>Need attention</span>
-              <span>
-                Avg decline: {
-                  filteredAnalytics.filter(a => a.trend === 'down').length > 0
-                    ? Math.abs(Math.round(
-                        filteredAnalytics
-                          .filter(a => a.trend === 'down')
-                          .reduce((sum, a) => sum + a.trendPercentage, 0) /
-                        filteredAnalytics.filter(a => a.trend === 'down').length
-                      ))
-                    : 0
-                }%
-              </span>
+            <div className={`mt-2 text-xs font-medium flex items-center gap-1 ${analytics.changePercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {analytics.changePercent >= 0 ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+              {Math.abs(analytics.changePercent)}% vs previous
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/50">
+          <CardContent className="pt-5 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-lg bg-green-500/10"><TrendingUp className="h-5 w-5 text-green-600" /></div>
+              <div>
+                <p className="text-2xl font-bold">{analytics.growingCount}</p>
+                <p className="text-xs text-muted-foreground">Growing Sources</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/50">
+          <CardContent className="pt-5 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-lg bg-red-500/10"><TrendingDown className="h-5 w-5 text-red-600" /></div>
+              <div>
+                <p className="text-2xl font-bold">{analytics.decliningCount}</p>
+                <p className="text-xs text-muted-foreground">Declining Sources</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/50">
+          <CardContent className="pt-5 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-lg bg-blue-500/10"><MapPin className="h-5 w-5 text-blue-600" /></div>
+              <div>
+                <p className="text-2xl font-bold">{analytics.totalVisits}</p>
+                <p className="text-xs text-muted-foreground">Marketing Visits</p>
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Analytics Tabs */}
-      <Tabs defaultValue="trends" className="w-full">
-        <TabsList className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 w-full max-w-5xl">
-          <TabsTrigger value="trends" className="flex items-center gap-2">
+      {/* Tabs */}
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList className="grid grid-cols-4 w-full max-w-lg">
+          <TabsTrigger value="overview" className="flex items-center gap-1.5">
             <BarChart3 className="h-4 w-4" />
-            <span className="hidden sm:inline">Trends</span>
+            <span className="hidden sm:inline">Overview</span>
           </TabsTrigger>
-          <TabsTrigger value="distribution" className="flex items-center gap-2">
-            <PieChart className="h-4 w-4" />
-            <span className="hidden sm:inline">Distribution</span>
+          <TabsTrigger value="sources" className="flex items-center gap-1.5">
+            <Building2 className="h-4 w-4" />
+            <span className="hidden sm:inline">Sources</span>
           </TabsTrigger>
-          <TabsTrigger value="performance" className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4" />
-            <span className="hidden sm:inline">Top Performers</span>
-          </TabsTrigger>
-          <TabsTrigger value="growing" className="flex items-center gap-2">
-            <ArrowUp className="h-4 w-4" />
-            <span className="hidden sm:inline">Growing</span>
-          </TabsTrigger>
-          <TabsTrigger value="declining" className="flex items-center gap-2">
-            <ArrowDown className="h-4 w-4" />
-            <span className="hidden sm:inline">Declining</span>
-          </TabsTrigger>
-          <TabsTrigger value="outreach" className="flex items-center gap-2">
-            <Target className="h-4 w-4" />
+          <TabsTrigger value="outreach" className="flex items-center gap-1.5">
+            <Megaphone className="h-4 w-4" />
             <span className="hidden sm:inline">Outreach</span>
           </TabsTrigger>
-          <TabsTrigger value="reports" className="flex items-center gap-2">
-            <LineChart className="h-4 w-4" />
-            <span className="hidden sm:inline">Reports</span>
+          <TabsTrigger value="export" className="flex items-center gap-1.5">
+            <Download className="h-4 w-4" />
+            <span className="hidden sm:inline">Export</span>
           </TabsTrigger>
         </TabsList>
 
-        <div className="mt-6">
-          <TabsContent value="trends" className="space-y-4">
-                  <Card>
-            <CardHeader>
-              <CardTitle>Monthly Patient Trends</CardTitle>
-              <CardDescription>
-                Total patients from all sources over time
-              </CardDescription>
+        {/* ===== OVERVIEW TAB ===== */}
+        <TabsContent value="overview" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Area chart */}
+            <Card className="lg:col-span-2">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Patient Trends</CardTitle>
+                <CardDescription>Monthly patient volume over time</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {analytics.trendData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={analytics.trendData}>
+                      <defs>
+                        <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="month" className="text-xs" tick={{ fontSize: 11 }} />
+                      <YAxis className="text-xs" tick={{ fontSize: 11 }} />
+                      <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))' }} />
+                      <Area type="monotone" dataKey="count" stroke="hsl(var(--primary))" strokeWidth={2} fillOpacity={1} fill="url(#areaGrad)" name="Patients" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-64 text-muted-foreground text-sm">No trend data available</div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Pie chart */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <PieChartIcon className="h-4 w-4" />
+                  Distribution
+                </CardTitle>
+                <CardDescription>By source type</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {analytics.typeDistribution.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <RechartsPieChart>
+                      <Pie data={analytics.typeDistribution} cx="50%" cy="50%" innerRadius={45} outerRadius={85} paddingAngle={3} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
+                        {analytics.typeDistribution.map((_, i) => (
+                          <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </RechartsPieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-64 text-muted-foreground text-sm">No data</div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Top 10 bar chart */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Top 10 Sources</CardTitle>
+              <CardDescription>Highest patient volume this period</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <RechartsLineChart data={getMonthlyChartData()}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Line 
-                    type="monotone" 
-                    dataKey="count" 
-                    stroke="#8884d8" 
-                    name="Patients"
-                    strokeWidth={2}
-                  />
-                </RechartsLineChart>
-              </ResponsiveContainer>
+              {analytics.bySource.length > 0 ? (
+                <ResponsiveContainer width="100%" height={320}>
+                  <BarChart
+                    data={analytics.bySource.slice(0, 10).map(s => ({
+                      name: s.name.length > 18 ? s.name.substring(0, 18) + '…' : s.name,
+                      patients: s.current,
+                    }))}
+                    margin={{ top: 10, right: 20, left: 10, bottom: 60 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="name" angle={-40} textAnchor="end" height={80} tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} />
+                    <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))' }} />
+                    <Bar dataKey="patients" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="text-center py-12 text-muted-foreground text-sm">No source data</div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="distribution" className="space-y-4">
+        {/* ===== SOURCES TAB ===== */}
+        <TabsContent value="sources" className="space-y-4">
+          {/* Filter chips */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {(['all', 'growing', 'declining', 'stable'] as SourceFilter[]).map(f => (
+              <Button
+                key={f}
+                size="sm"
+                variant={sourceFilter === f ? 'default' : 'outline'}
+                onClick={() => setSourceFilter(f)}
+                className="capitalize"
+              >
+                {f === 'growing' && <ArrowUp className="h-3 w-3 mr-1" />}
+                {f === 'declining' && <ArrowDown className="h-3 w-3 mr-1" />}
+                {f === 'stable' && <Minus className="h-3 w-3 mr-1" />}
+                {f} ({f === 'all' ? analytics.bySource.length
+                  : f === 'growing' ? analytics.growingCount
+                  : f === 'declining' ? analytics.decliningCount
+                  : analytics.bySource.filter(s => s.trend === 'stable').length})
+              </Button>
+            ))}
+          </div>
+
+          {/* Sortable table */}
           <Card>
-            <CardHeader>
-              <CardTitle>Patient Distribution by Source Type</CardTitle>
-              <CardDescription>
-                Breakdown of patients by source category
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <RechartsPieChart>
-                  <Pie
-                    data={getTypeDistribution()}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {getTypeDistribution().map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/30">
+                      <th className="text-left p-3"><SortHeader field="name">Source</SortHeader></th>
+                      <th className="text-left p-3 font-medium text-xs uppercase tracking-wider text-muted-foreground">Type</th>
+                      <th className="text-right p-3"><SortHeader field="current">Current</SortHeader></th>
+                      <th className="text-right p-3"><SortHeader field="prev">Previous</SortHeader></th>
+                      <th className="text-right p-3"><SortHeader field="change">Change</SortHeader></th>
+                      <th className="text-center p-3 font-medium text-xs uppercase tracking-wider text-muted-foreground">Trend</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/30">
+                    {sortedSources.map(src => (
+                      <tr key={src.id} className={`hover:bg-muted/20 transition-colors ${src.trend === 'up' ? 'bg-green-500/[0.03]' : src.trend === 'down' ? 'bg-red-500/[0.03]' : ''}`}>
+                        <td className="p-3 font-medium">{src.name}</td>
+                        <td className="p-3">
+                          <Badge variant="outline" className="text-xs gap-1">
+                            <span>{SOURCE_TYPE_CONFIG[src.source_type as SourceType]?.icon}</span>
+                            {SOURCE_TYPE_CONFIG[src.source_type as SourceType]?.label}
+                          </Badge>
+                        </td>
+                        <td className="p-3 text-right font-semibold tabular-nums">{src.current}</td>
+                        <td className="p-3 text-right text-muted-foreground tabular-nums">{src.prev}</td>
+                        <td className="p-3 text-right">
+                          <span className={`inline-flex items-center gap-0.5 font-semibold tabular-nums ${src.change > 0 ? 'text-green-600' : src.change < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
+                            {src.change > 0 ? '+' : ''}{src.change}%
+                          </span>
+                        </td>
+                        <td className="p-3 text-center">
+                          {src.trend === 'up' && <ArrowUp className="h-4 w-4 text-green-600 mx-auto" />}
+                          {src.trend === 'down' && <ArrowDown className="h-4 w-4 text-red-600 mx-auto" />}
+                          {src.trend === 'stable' && <Minus className="h-4 w-4 text-muted-foreground mx-auto" />}
+                        </td>
+                      </tr>
                     ))}
-                  </Pie>
-                  <Tooltip />
-                </RechartsPieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="performance" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Top Performing Sources</CardTitle>
-              <CardDescription>
-                Sources with the highest patient counts
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={400}>
-                <BarChart 
-                  data={getTopPerformers().map(a => ({
-                    name: a.source.name.length > 20 
-                      ? a.source.name.substring(0, 20) + '...' 
-                      : a.source.name,
-                    patients: a.totalPatients
-                  }))}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="name" 
-                    angle={-45}
-                    textAnchor="end"
-                    height={100}
-                  />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="patients" fill="#8884d8" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="growing" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Growing Sources Chart</CardTitle>
-                <CardDescription>
-                  Sources with positive trends - percentage growth
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart 
-                    data={getGrowingSourcesAnalysis().map(a => ({
-                      name: a.source.name.length > 20 
-                        ? a.source.name.substring(0, 20) + '...' 
-                        : a.source.name,
-                      growth: a.trendPercentage
-                    }))}
-                    margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="name" 
-                      angle={-45}
-                      textAnchor="end"
-                      height={100}
-                    />
-                    <YAxis />
-                    <Tooltip formatter={(value) => [`${value}%`, 'Growth']} />
-                    <Bar dataKey="growth" fill="#22c55e" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Growing Sources Performance</CardTitle>
-                <CardDescription>
-                  Sources showing positive momentum
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {getGrowingSourcesAnalysis().length === 0 ? (
-                  <div className="text-center text-muted-foreground py-8">
-                    <TrendingUp className="w-12 h-12 mx-auto mb-2 text-muted-foreground/50" />
-                    <p className="text-sm">No growing sources found</p>
-                  </div>
-                ) : (
-                  <div className="rounded-lg border border-border/50 overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b bg-muted/30">
-                          <th className="text-left p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Source Name</th>
-                          <th className="text-left p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Category</th>
-                          <th className="text-right p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Total Count</th>
-                          <th className="text-right p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Growth Rate</th>
-                          <th className="text-right p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Monthly Avg</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border/30">
-                        {getGrowingSourcesAnalysis().map((analytics, index) => (
-                          <tr key={analytics.source.id} className="hover:bg-muted/20 transition-colors">
-                            <td className="p-3">
-                              <div className="font-medium text-sm text-foreground">{analytics.source.name}</div>
-                            </td>
-                            <td className="p-3">
-                              <div className="flex items-center gap-2">
-                                <span className="text-base">
-                                  {SOURCE_TYPE_CONFIG[analytics.source.source_type].icon}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                  {SOURCE_TYPE_CONFIG[analytics.source.source_type].label}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="p-3 text-right">
-                              <span className="font-medium text-sm text-foreground">
-                                {analytics.totalPatients.toLocaleString()}
-                              </span>
-                            </td>
-                            <td className="p-3 text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                <TrendingUp className="w-3 h-3 text-green-500" />
-                                <span className="text-green-600 font-semibold text-sm">
-                                  +{analytics.trendPercentage}%
-                                </span>
-                              </div>
-                            </td>
-                            <td className="p-3 text-right">
-                              <span className="text-muted-foreground text-sm">
-                                {analytics.averageMonthly}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  </tbody>
+                </table>
+                {sortedSources.length === 0 && (
+                  <div className="text-center py-12 text-muted-foreground text-sm">No sources match this filter</div>
                 )}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="declining" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Declining Sources Chart</CardTitle>
-                <CardDescription>
-                  Sources with negative trends - percentage decline
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart 
-                    data={getDecliningSourcesAnalysis().map(a => ({
-                      name: a.source.name.length > 20 
-                        ? a.source.name.substring(0, 20) + '...' 
-                        : a.source.name,
-                      decline: Math.abs(a.trendPercentage)
-                    }))}
-                    margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="name" 
-                      angle={-45}
-                      textAnchor="end"
-                      height={100}
-                    />
-                    <YAxis />
-                    <Tooltip formatter={(value) => [`${value}%`, 'Decline']} />
-                    <Bar dataKey="decline" fill="#ef4444" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Declining Sources Details</CardTitle>
-                <CardDescription>
-                  Sources that need immediate attention
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {getDecliningSourcesAnalysis().length === 0 ? (
-                  <div className="text-center text-muted-foreground py-8">
-                    <TrendingDown className="w-12 h-12 mx-auto mb-2 text-muted-foreground/50" />
-                    <p className="text-sm">No declining sources found</p>
-                  </div>
-                ) : (
-                  <div className="rounded-lg border border-border/50 overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b bg-muted/30">
-                          <th className="text-left p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Source Name</th>
-                          <th className="text-left p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Category</th>
-                          <th className="text-right p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Total Count</th>
-                          <th className="text-right p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Decline Rate</th>
-                          <th className="text-right p-3 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Monthly Avg</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border/30">
-                        {getDecliningSourcesAnalysis().map((analytics, index) => (
-                          <tr key={analytics.source.id} className="hover:bg-muted/20 transition-colors">
-                            <td className="p-3">
-                              <div className="font-medium text-sm text-foreground">{analytics.source.name}</div>
-                            </td>
-                            <td className="p-3">
-                              <div className="flex items-center gap-2">
-                                <span className="text-base">
-                                  {SOURCE_TYPE_CONFIG[analytics.source.source_type].icon}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                  {SOURCE_TYPE_CONFIG[analytics.source.source_type].label}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="p-3 text-right">
-                              <span className="font-medium text-sm text-foreground">
-                                {analytics.totalPatients.toLocaleString()}
-                              </span>
-                            </td>
-                            <td className="p-3 text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                <TrendingDown className="w-3 h-3 text-red-500" />
-                                <span className="text-red-600 font-semibold text-sm">
-                                  {Math.abs(analytics.trendPercentage)}%
-                                </span>
-                              </div>
-                            </td>
-                            <td className="p-3 text-right">
-                              <span className="text-muted-foreground text-sm">
-                                {analytics.averageMonthly}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* Marketing Outreach Tab */}
-        <TabsContent value="marketing" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Calendar className="w-5 h-5" />
-                  Total Visits
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-primary">
-                  {/* This would need to be populated with actual visit data */}
-                  -
-                </div>
-                <p className="text-sm text-muted-foreground">All marketing visits</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Building2 className="w-5 h-5" />
-                  Offices Visited
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-primary">
-                  -
-                </div>
-                <p className="text-sm text-muted-foreground">Unique offices</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5" />
-                  Conversion Rate
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-primary">
-                  -
-                </div>
-                <p className="text-sm text-muted-foreground">Visits to referrals</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Marketing Outreach Analytics</CardTitle>
-              <CardDescription>
-                Track the effectiveness of your marketing visits and materials
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-12">
-                <Calendar className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Marketing Analytics Coming Soon</h3>
-                <p className="text-muted-foreground max-w-md mx-auto">
-                  Detailed analytics showing visit trends, referral conversion rates by materials, 
-                  and before/after visit comparisons will be available here.
-                </p>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="reports" className="space-y-4">
-          <Reports embedded />
+        {/* ===== OUTREACH TAB ===== */}
+        <TabsContent value="outreach" className="space-y-6">
+          {/* Stat cards */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <Card className="border-border/50">
+              <CardContent className="pt-4 pb-3 text-center">
+                <Calendar className="h-5 w-5 mx-auto text-primary mb-1" />
+                <p className="text-2xl font-bold">{analytics.totalVisits}</p>
+                <p className="text-xs text-muted-foreground">Total Visits</p>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50">
+              <CardContent className="pt-4 pb-3 text-center">
+                <CheckCircle2 className="h-5 w-5 mx-auto text-green-600 mb-1" />
+                <p className="text-2xl font-bold text-green-600">{analytics.completedVisits}</p>
+                <p className="text-xs text-muted-foreground">Completed</p>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50">
+              <CardContent className="pt-4 pb-3 text-center">
+                <Building2 className="h-5 w-5 mx-auto text-blue-600 mb-1" />
+                <p className="text-2xl font-bold">{analytics.uniqueOfficesVisited}</p>
+                <p className="text-xs text-muted-foreground">Offices Visited</p>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50">
+              <CardContent className="pt-4 pb-3 text-center">
+                <Target className="h-5 w-5 mx-auto text-purple-600 mb-1" />
+                <p className="text-2xl font-bold">{analytics.totalCampaigns}</p>
+                <p className="text-xs text-muted-foreground">Campaigns</p>
+              </CardContent>
+            </Card>
+            <Card className="border-border/50">
+              <CardContent className="pt-4 pb-3 text-center">
+                <Clock className="h-5 w-5 mx-auto text-amber-600 mb-1" />
+                <p className="text-2xl font-bold">
+                  {analytics.totalVisits > 0 ? Math.round((analytics.completedVisits / analytics.totalVisits) * 100) : 0}%
+                </p>
+                <p className="text-xs text-muted-foreground">Completion Rate</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Visit trend chart */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Visit Trend</CardTitle>
+                <CardDescription>Marketing visits per month</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {analytics.visitTrendData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={260}>
+                    <BarChart data={analytics.visitTrendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                      <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))' }} />
+                      <Bar dataKey="count" fill="#8b5cf6" radius={[4, 4, 0, 0]} name="Visits" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">No visit data yet</div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Campaign breakdown */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Campaign Status</CardTitle>
+                <CardDescription>Breakdown of all campaigns</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-4 mb-6">
+                  <div className="text-center p-3 rounded-lg bg-muted/30">
+                    <p className="text-xl font-bold text-green-600">{analytics.completedCampaigns}</p>
+                    <p className="text-xs text-muted-foreground">Completed</p>
+                  </div>
+                  <div className="text-center p-3 rounded-lg bg-muted/30">
+                    <p className="text-xl font-bold text-blue-600">{analytics.activeCampaigns}</p>
+                    <p className="text-xs text-muted-foreground">Active</p>
+                  </div>
+                  <div className="text-center p-3 rounded-lg bg-muted/30">
+                    <p className="text-xl font-bold text-muted-foreground">{analytics.draftCampaigns}</p>
+                    <p className="text-xs text-muted-foreground">Draft</p>
+                  </div>
+                </div>
+
+                {analytics.campaigns.length > 0 ? (
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {analytics.campaigns.slice(0, 8).map(c => (
+                      <div key={c.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/20 text-sm">
+                        <span className="font-medium truncate max-w-[60%]">{c.name}</span>
+                        <Badge variant={c.status === 'Active' ? 'default' : c.status === 'Completed' ? 'secondary' : 'outline'} className="text-xs">
+                          {c.status}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center text-muted-foreground text-sm py-4">No campaigns yet</div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Recent visits table */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Recent Marketing Visits</CardTitle>
+              <CardDescription>Latest visit activity</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/30">
+                      <th className="text-left p-3 font-medium text-xs uppercase tracking-wider text-muted-foreground">Office</th>
+                      <th className="text-left p-3 font-medium text-xs uppercase tracking-wider text-muted-foreground">Date</th>
+                      <th className="text-left p-3 font-medium text-xs uppercase tracking-wider text-muted-foreground">Rep</th>
+                      <th className="text-left p-3 font-medium text-xs uppercase tracking-wider text-muted-foreground">Type</th>
+                      <th className="text-center p-3 font-medium text-xs uppercase tracking-wider text-muted-foreground">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/30">
+                    {analytics.visits.slice(0, 15).map(v => (
+                      <tr key={v.id} className="hover:bg-muted/20 transition-colors">
+                        <td className="p-3 font-medium">{(v as any).patient_sources?.name || '—'}</td>
+                        <td className="p-3 text-muted-foreground">{format(new Date(v.visit_date), 'MMM d, yyyy')}</td>
+                        <td className="p-3">{v.rep_name}</td>
+                        <td className="p-3"><Badge variant="outline" className="text-xs">{v.visit_type}</Badge></td>
+                        <td className="p-3 text-center">
+                          {v.visited
+                            ? <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">Done</Badge>
+                            : <Badge variant="outline" className="text-xs">Pending</Badge>
+                          }
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {analytics.visits.length === 0 && (
+                  <div className="text-center py-12 text-muted-foreground text-sm">No visits recorded yet</div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
-        </div>
+
+        {/* ===== EXPORT TAB ===== */}
+        <TabsContent value="export" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" />
+                Export Report
+              </CardTitle>
+              <CardDescription>Download analytics data as PDF or CSV</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Period</label>
+                  <Select value={exportPeriod} onValueChange={(v) => setExportPeriod(v as any)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent className="bg-background border">
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="quarterly">Quarterly</SelectItem>
+                      <SelectItem value="yearly">Yearly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground mb-1 block">End Month</label>
+                  <Select value={exportMonth} onValueChange={setExportMonth}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent className="bg-background border">
+                      {monthOptions.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Summary preview */}
+              <div className="rounded-lg border p-4 bg-muted/20">
+                <h3 className="text-sm font-semibold mb-3">Export Preview</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div><span className="text-muted-foreground">Total Patients:</span> <span className="font-semibold ml-1">{analytics.totalPatients}</span></div>
+                  <div><span className="text-muted-foreground">Sources:</span> <span className="font-semibold ml-1">{analytics.activeSources}</span></div>
+                  <div><span className="text-muted-foreground">Visits:</span> <span className="font-semibold ml-1">{analytics.totalVisits}</span></div>
+                  <div><span className="text-muted-foreground">Campaigns:</span> <span className="font-semibold ml-1">{analytics.totalCampaigns}</span></div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <Button onClick={handleExportCSV} variant="outline" className="gap-2">
+                  <Download className="h-4 w-4" /> Download CSV
+                </Button>
+                <Button onClick={handleExportPDF} className="gap-2">
+                  <FileText className="h-4 w-4" /> Download PDF
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </div>
   );
 }
+
+export default Analytics;
