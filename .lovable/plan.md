@@ -1,38 +1,137 @@
 
 
-# Fix: Remaining Incomplete Addresses in Discovered Offices
+# Personalized Letter Campaign System
 
-## Root Cause Analysis
+## Overview
 
-The previous fix correctly updated the address preference order for **new** API fetches. However, two issues remain:
+A new "Letter" campaign type in the Campaigns page that generates tier-based template letters with personalized per-office merge fields (doctor name, office name), a rich letter preview with customizable branding (logo, fonts, colors, heading), and PDF export for printing.
 
-1. **Cached DB records**: Offices discovered before the fix still have short `vicinity` addresses stored in the database. When cache is valid (7-day window), these old records are returned as-is (lines 120-166) without re-fetching details.
+## How It Works
 
-2. **Silent Place Details failures**: When a Place Details API call fails for a specific office (line 405-408), `details` is `null`, so the code falls through to `place.vicinity` — the short address. There's no retry or fallback to re-fetch.
+The key insight from your request: **one AI call per tier** (not per office). The AI generates a template letter body per tier (VIP, Warm, Cold, Dormant, New), then each office gets personalized with its doctor name, office name, and address via simple merge-field substitution. This is efficient and keeps tone consistent within tiers.
 
-## The Fix (Two Parts)
+```text
+User creates Letter Campaign
+  --> Selects offices (same existing flow)
+  --> Clicks "Generate Letters"
+      --> Groups offices by tier
+      --> One AI call generates template text for each tier
+      --> Merge fields {{doctor_name}}, {{office_name}}, {{clinic_name}} substituted per office
+  --> Preview: styled letter with logo, fonts, heading
+  --> Edit individual letters if needed
+  --> Export all as multi-page PDF for printing
+```
 
-### Part 1: Backfill incomplete addresses on cache return
+## Technical Implementation
 
-When returning cached results (line 120-166), detect offices with incomplete addresses (missing state/ZIP pattern) and batch-fetch their `formatted_address` from Place Details before returning. This fixes all existing records without requiring a full re-discovery.
+### 1. New Edge Function: `supabase/functions/generate-campaign-letters/index.ts`
 
-Add a helper that:
-- Filters cached offices where `address` lacks a US state abbreviation or ZIP code (regex: no match for `, [A-Z]{2} \d{5}`)
-- For those offices, calls Place Details with `fields=formatted_address` using their `google_place_id`
-- Updates the `discovered_offices` rows in-place with the corrected addresses
-- Returns the corrected list
+- Receives: list of unique tiers, campaign context (clinic name, sender name/title/degrees, campaign type)
+- Fetches user profile, clinic info, AI business profile (same pattern as `generate-campaign-emails`)
+- Makes **one AI call** with tool calling that returns structured output: a `letters` array where each entry has `tier` and `body` (the template text with merge placeholders `{{doctor_name}}`, `{{office_name}}`, `{{sender_name}}`, `{{clinic_name}}`)
+- Returns the tier templates; the frontend handles per-office merging
+- Uses existing `OPENAI_API_KEY` secret
 
-### Part 2: Retry on Place Details failure during fresh fetch
+### 2. New Campaign Creator: `src/components/campaign/LetterCampaignCreator.tsx`
 
-In the batch details fetch (line 388-424), if a Place Details call fails or returns no `formatted_address`, add a single retry after a short delay. This reduces the chance of silent failures leaving offices with short addresses.
+- Same wizard pattern as `EmailCampaignCreator` (3 steps: type, office selection, review)
+- Sets `delivery_method: 'letter'` on the campaign record
+- Campaign types: Referral Appreciation, New Office Introduction, Re-engagement, Holiday/Seasonal
 
-### Files Modified
+### 3. New Letter Execution Dialog: `src/components/campaign/LetterExecutionDialog.tsx`
 
-- `supabase/functions/discover-nearby-offices/index.ts` — Add address backfill logic in the cache-return path (~lines 120-166) and retry logic in the batch details fetch (~lines 390-410)
+The main feature component. When opened:
+- Fetches deliveries with office data and contacts (primary contact name for "Dear Dr. XXX")
+- "Generate Letters" button → calls `generate-campaign-letters` edge function
+- Receives tier templates → merges per office using `office_contacts.name` (primary) or parsed doctor name from office name
+- Stores generated letter in `campaign_deliveries.email_body` (reuses existing column)
 
-### No Other Changes Needed
+**Letter Preview Panel** (the rich part):
+- Renders each letter as a styled document with:
+  - **Header**: Clinic logo (from `clinic_brand_settings.logo_url`) + clinic name
+  - **Date line**: Current date formatted
+  - **Recipient block**: Doctor name, office name, address
+  - **Salutation**: "Dear Dr. {{last_name}},"
+  - **Body**: The tier-appropriate AI-generated text
+  - **Closing/Signature**: Sender name, degrees, title, clinic name
+- **Customization sidebar** (collapsible):
+  - Font family selector (serif options like Georgia, Times New Roman, Garamond + sans options)
+  - Font size (body text)
+  - Heading color picker
+  - Logo toggle (on/off)
+  - Margin size (compact/standard/generous)
+- Navigate between letters with prev/next buttons
+- Edit individual letter text inline
 
-- No database migration
-- No frontend changes
-- No new edge functions
+**PDF Export**:
+- "Export All as PDF" button generates a multi-page PDF using `jspdf` (already installed)
+- One letter per page, US Letter size (8.5" × 11")
+- Applies the same styling (font, logo, colors) to the PDF
+- Downloads as `{campaign_name}_letters_{date}.pdf`
+
+### 4. Modified Files
+
+- **`src/pages/Campaigns.tsx`**: 
+  - Add "Letter" button next to Email/Gift in toolbar
+  - Add `letter` filter tab alongside All/Email/Gift
+  - Filter `letterCampaigns` where `delivery_method === 'letter'`
+  - Import and render `LetterCampaignCreator` and `LetterExecutionDialog`
+  - Letter campaign cards show FileText icon instead of Mail/Gift
+
+- **`supabase/config.toml`**: Register `generate-campaign-letters` function
+
+### 5. Data Model (No Migration Needed)
+
+Reuses existing tables:
+- `campaigns` table: `delivery_method = 'letter'`, `campaign_mode = 'ai_powered'`
+- `campaign_deliveries` table: `email_body` stores the merged letter text, `email_status` tracks generation state, `action_mode = 'letter_only'`
+- `clinic_brand_settings`: pulls logo and branding
+- `office_contacts`: pulls primary contact name for personalization
+
+### Component Structure
+
+```text
+LetterExecutionDialog
+├── Customization Controls (font, size, color, logo, margins)
+├── Letter Navigation (prev/next, page X of Y)
+├── Letter Preview (styled HTML rendering)
+│   ├── Logo + Clinic Header
+│   ├── Date
+│   ├── Recipient Address Block
+│   ├── "Dear Dr. LastName,"
+│   ├── Tier-based AI body text
+│   └── Sender Signature Block
+├── Edit Mode (inline text editing)
+└── Export PDF Button (jspdf multi-page)
+```
+
+### AI Prompt Strategy
+
+The edge function sends one prompt with all tiers needed. Example tool-calling schema:
+
+```json
+{
+  "name": "generate_letters",
+  "parameters": {
+    "letters": [
+      {
+        "tier": "VIP",
+        "body": "We are deeply grateful for the trust you place in {{clinic_name}}..."
+      },
+      {
+        "tier": "Cold", 
+        "body": "I'm writing to introduce {{clinic_name}} and share how we can support..."
+      }
+    ]
+  }
+}
+```
+
+The prompt instructs the AI to:
+- Write 2-3 paragraphs per tier
+- Use warm, appreciative language for VIP/Warm
+- Use professional introductory language for Cold/New
+- Use re-engagement language for Dormant
+- Include `{{doctor_name}}`, `{{office_name}}`, `{{clinic_name}}`, `{{sender_name}}` placeholders
+- Match the practice's communication style from AI business profile
 
