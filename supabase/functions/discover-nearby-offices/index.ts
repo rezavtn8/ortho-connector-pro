@@ -127,6 +127,55 @@ serve(async (req) => {
       const newOfficesCount = cachedOffices.length - alreadyInNetworkCount;
       
       console.log(`✅ Found ${cachedOffices.length} valid cached offices (age: ${cacheAge}s, expires in: ${expiresIn}s)`);
+
+      // BACKFILL: Detect and fix incomplete addresses in cached results
+      const googleApiKey = Deno.env.get('GOOGLE_MAPS_API_KEY');
+      if (googleApiKey) {
+        const incompleteAddressPattern = /,\s*[A-Z]{2}\s+\d{5}/;
+        const officesToBackfill = cachedOffices.filter(
+          o => o.address && o.google_place_id && !incompleteAddressPattern.test(o.address)
+        );
+
+        if (officesToBackfill.length > 0) {
+          console.log(`🔧 Backfilling ${officesToBackfill.length} offices with incomplete addresses...`);
+          const backfillBatchSize = 10;
+          for (let i = 0; i < officesToBackfill.length; i += backfillBatchSize) {
+            const batch = officesToBackfill.slice(i, i + backfillBatchSize);
+            const backfillPromises = batch.map(async (office) => {
+              try {
+                const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${office.google_place_id}&fields=formatted_address&key=${googleApiKey}`;
+                const response = await fetch(detailsUrl);
+                const data = await response.json();
+                if (data.status === 'OK' && data.result?.formatted_address) {
+                  return { id: office.id, address: data.result.formatted_address };
+                }
+              } catch (err) {
+                console.error(`Backfill error for ${office.name}:`, err);
+              }
+              return null;
+            });
+
+            const results = await Promise.all(backfillPromises);
+            for (const result of results) {
+              if (result) {
+                // Update DB
+                await supabase
+                  .from('discovered_offices')
+                  .update({ address: result.address })
+                  .eq('id', result.id);
+                // Update in-memory cached object
+                const cached = cachedOffices.find(o => o.id === result.id);
+                if (cached) cached.address = result.address;
+              }
+            }
+
+            if (i + backfillBatchSize < officesToBackfill.length) {
+              await new Promise(resolve => setTimeout(resolve, 200));
+            }
+          }
+          console.log(`✅ Address backfill complete`);
+        }
+      }
       
       // Update session with cache hit metadata
       const { data: cachedSession } = await supabase
@@ -388,11 +437,10 @@ serve(async (req) => {
       for (let i = 0; i < placeIds.length; i += batchSize) {
         const batch = placeIds.slice(i, i + batchSize);
         const batchPromises = batch.map(async (placeId) => {
-          try {
+          const fetchDetails = async (): Promise<any> => {
             const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=formatted_address,formatted_phone_number,website,user_ratings_total&key=${googleApiKey}`;
             const response = await fetch(detailsUrl);
             const data = await response.json();
-            
             if (data.status === 'OK' && data.result) {
               return {
                 placeId,
@@ -402,8 +450,30 @@ serve(async (req) => {
                 user_ratings_total: data.result.user_ratings_total || null
               };
             }
+            return null;
+          };
+
+          try {
+            let result = await fetchDetails();
+            // Retry once if formatted_address is missing
+            if (result && !result.formatted_address) {
+              console.log(`⚠️ No formatted_address for ${placeId}, retrying...`);
+              await new Promise(resolve => setTimeout(resolve, 300));
+              const retry = await fetchDetails();
+              if (retry?.formatted_address) {
+                result = retry;
+              }
+            }
+            return result;
           } catch (error) {
             console.error(`Error fetching details for ${placeId}:`, error);
+            // Single retry on network failure
+            try {
+              await new Promise(resolve => setTimeout(resolve, 500));
+              return await fetchDetails();
+            } catch (retryError) {
+              console.error(`Retry also failed for ${placeId}:`, retryError);
+            }
           }
           return null;
         });
@@ -544,7 +614,7 @@ serve(async (req) => {
           .from('discovery_sessions')
           .update({ 
             api_response_time_ms: apiResponseTime,
-            results_count: totalFound
+            results_count: offices.length + alreadyInNetworkOffices.length
           })
           .eq('id', session.id);
       }
