@@ -389,13 +389,14 @@ serve(async (req) => {
         const batch = placeIds.slice(i, i + batchSize);
         const batchPromises = batch.map(async (placeId) => {
           try {
-            const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=formatted_phone_number,website,user_ratings_total&key=${googleApiKey}`;
+            const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=formatted_address,formatted_phone_number,website,user_ratings_total&key=${googleApiKey}`;
             const response = await fetch(detailsUrl);
             const data = await response.json();
             
             if (data.status === 'OK' && data.result) {
               return {
                 placeId,
+                formatted_address: data.result.formatted_address || null,
                 phone: data.result.formatted_phone_number || null,
                 website: data.result.website || null,
                 user_ratings_total: data.result.user_ratings_total || null
@@ -479,7 +480,7 @@ serve(async (req) => {
           const office = {
             google_place_id: place.place_id,
             name: place.name,
-            address: place.vicinity || place.formatted_address || null,
+            address: details?.formatted_address || place.formatted_address || place.vicinity || null,
             phone,
             website,
             google_rating: place.rating || null,
