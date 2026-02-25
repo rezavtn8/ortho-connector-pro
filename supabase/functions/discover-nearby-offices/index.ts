@@ -513,8 +513,8 @@ serve(async (req) => {
       }
 
       // Calculate total before using it
-      const totalFound = offices.length + alreadyInNetworkOffices.length;
-      console.log(`✅ Successfully processed ${totalFound} offices (${offices.length} new, ${alreadyInNetworkOffices.length} already in network)`);
+      const blockTotal = offices.length + alreadyInNetworkOffices.length;
+      console.log(`✅ Successfully processed ${blockTotal} offices (${offices.length} new, ${alreadyInNetworkOffices.length} already in network)`);
 
       // Insert new offices
       if (offices.length > 0) {
@@ -549,6 +549,9 @@ serve(async (req) => {
           .eq('id', session.id);
       }
     }
+
+    // Calculate total after processing (outside the if block so it's always available)
+    const totalFound = offices.length + alreadyInNetworkOffices.length;
 
     // PHASE 3: Enhanced metadata in response
     return new Response(
