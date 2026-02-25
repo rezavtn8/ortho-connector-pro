@@ -9,10 +9,12 @@ import { useResilientQuery } from '@/hooks/useResilientQuery';
 import { supabase } from '@/integrations/supabase/client';
 import { EmailCampaignCreator } from '@/components/campaign/EmailCampaignCreator';
 import { PhysicalCampaignCreator } from '@/components/campaign/PhysicalCampaignCreator';
+import { LetterCampaignCreator } from '@/components/campaign/LetterCampaignCreator';
 import { EmailCampaignDetailDialog } from '@/components/campaign/EmailCampaignDetailDialog';
 import { GiftCampaignDetailDialog } from '@/components/campaign/GiftCampaignDetailDialog';
 import { EmailExecutionDialog } from '@/components/campaign/EmailExecutionDialog';
 import { GiftDeliveryDialog } from '@/components/campaign/GiftDeliveryDialog';
+import { LetterExecutionDialog } from '@/components/campaign/LetterExecutionDialog';
 import { ResilientErrorBoundary } from '@/components/ResilientErrorBoundary';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
@@ -42,7 +44,7 @@ import {
 import { 
   Loader2, AlertCircle, WifiOff, Calendar, Mail, Gift, Package, Plus,
   Send, CheckCircle2, Clock, Target, Users, ArrowRight, Search,
-  MoreVertical, Trash2, Copy, Eye, Zap
+  MoreVertical, Trash2, Copy, Eye, Zap, FileText
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -72,10 +74,12 @@ function CampaignsContent() {
   
   const [showEmailCreator, setShowEmailCreator] = useState(false);
   const [showGiftCreator, setShowGiftCreator] = useState(false);
+  const [showLetterCreator, setShowLetterCreator] = useState(false);
   const [showEmailDetail, setShowEmailDetail] = useState(false);
   const [showGiftDetail, setShowGiftDetail] = useState(false);
   const [showEmailExecution, setShowEmailExecution] = useState(false);
   const [showGiftDelivery, setShowGiftDelivery] = useState(false);
+  const [showLetterExecution, setShowLetterExecution] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -140,6 +144,7 @@ function CampaignsContent() {
   const allCampaigns = filterCampaigns(campaigns || []);
   const emailCampaigns = allCampaigns.filter(c => c.delivery_method === 'email');
   const giftCampaigns = allCampaigns.filter(c => c.delivery_method === 'physical');
+  const letterCampaigns = allCampaigns.filter(c => c.delivery_method === 'letter');
 
   // Stats (unfiltered)
   const total = campaigns?.length || 0;
@@ -151,6 +156,7 @@ function CampaignsContent() {
   const handleExecute = (campaign: Campaign) => {
     setSelectedCampaign(campaign);
     if (campaign.delivery_method === 'email') setShowEmailExecution(true);
+    else if (campaign.delivery_method === 'letter') setShowLetterExecution(true);
     else setShowGiftDelivery(true);
   };
 
@@ -251,6 +257,7 @@ function CampaignsContent() {
 
   const renderCampaignCard = (campaign: Campaign) => {
     const isEmail = campaign.delivery_method === 'email';
+    const isLetter = campaign.delivery_method === 'letter';
     const progress = getProgress(campaign);
 
     return (
@@ -263,8 +270,8 @@ function CampaignsContent() {
           {/* Header */}
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0 flex-1">
-              <div className={`p-1.5 rounded-md shrink-0 ${isEmail ? 'bg-primary/10' : 'bg-amber-500/10'}`}>
-                {isEmail ? <Mail className="w-4 h-4 text-primary" /> : <Gift className="w-4 h-4 text-amber-600" />}
+              <div className={`p-1.5 rounded-md shrink-0 ${isEmail ? 'bg-primary/10' : isLetter ? 'bg-blue-500/10' : 'bg-amber-500/10'}`}>
+                {isEmail ? <Mail className="w-4 h-4 text-primary" /> : isLetter ? <FileText className="w-4 h-4 text-blue-600" /> : <Gift className="w-4 h-4 text-amber-600" />}
               </div>
               <div className="min-w-0 flex-1">
                 <h3 className="font-semibold text-sm truncate">{campaign.name}</h3>
@@ -286,7 +293,7 @@ function CampaignsContent() {
                     <Eye className="w-3.5 h-3.5 mr-2" /> View Details
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => handleExecute(campaign)}>
-                    <Zap className="w-3.5 h-3.5 mr-2" /> {isEmail ? 'Execute Emails' : 'Manage Deliveries'}
+                    <Zap className="w-3.5 h-3.5 mr-2" /> {isEmail ? 'Execute Emails' : isLetter ? 'Manage Letters' : 'Manage Deliveries'}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => handleDuplicate(campaign)}>
                     <Copy className="w-3.5 h-3.5 mr-2" /> Duplicate
@@ -346,12 +353,12 @@ function CampaignsContent() {
           {/* Quick action */}
           <div className="pt-1" onClick={(e) => e.stopPropagation()}>
             <Button 
-              variant={isEmail ? "default" : "secondary"}
+              variant={isEmail ? "default" : isLetter ? "default" : "secondary"}
               size="sm" 
               className="w-full text-xs h-8 gap-1"
               onClick={() => handleExecute(campaign)}
             >
-              {isEmail ? 'Execute Emails' : 'Manage Deliveries'}
+              {isEmail ? 'Execute Emails' : isLetter ? 'Manage Letters' : 'Manage Deliveries'}
               <ArrowRight className="w-3 h-3" />
             </Button>
           </div>
@@ -488,6 +495,9 @@ function CampaignsContent() {
         <Button onClick={() => setShowGiftCreator(true)} disabled={isOffline} variant="secondary" size="sm" className="gap-1">
           <Plus className="w-4 h-4" /><Gift className="w-3.5 h-3.5" /> Gift
         </Button>
+        <Button onClick={() => setShowLetterCreator(true)} disabled={isOffline} variant="outline" size="sm" className="gap-1">
+          <Plus className="w-4 h-4" /><FileText className="w-3.5 h-3.5" /> Letter
+        </Button>
       </div>
 
       {/* Tabs */}
@@ -496,10 +506,12 @@ function CampaignsContent() {
           <TabsTrigger value="all">All ({allCampaigns.length})</TabsTrigger>
           <TabsTrigger value="email">Email ({emailCampaigns.length})</TabsTrigger>
           <TabsTrigger value="gift">Gift ({giftCampaigns.length})</TabsTrigger>
+          <TabsTrigger value="letter">Letter ({letterCampaigns.length})</TabsTrigger>
         </TabsList>
         <TabsContent value="all">{renderCampaignList(allCampaigns)}</TabsContent>
         <TabsContent value="email">{renderCampaignList(emailCampaigns)}</TabsContent>
         <TabsContent value="gift">{renderCampaignList(giftCampaigns)}</TabsContent>
+        <TabsContent value="letter">{renderCampaignList(letterCampaigns)}</TabsContent>
       </Tabs>
 
       {/* Delete Confirmation */}
@@ -523,6 +535,7 @@ function CampaignsContent() {
       {/* Creator Dialogs */}
       <EmailCampaignCreator open={showEmailCreator} onOpenChange={setShowEmailCreator} onCampaignCreated={handleCampaignUpdated} />
       <PhysicalCampaignCreator open={showGiftCreator} onOpenChange={setShowGiftCreator} onCampaignCreated={handleCampaignUpdated} />
+      <LetterCampaignCreator open={showLetterCreator} onOpenChange={setShowLetterCreator} onCampaignCreated={handleCampaignUpdated} />
 
       {/* Detail/Execution Dialogs */}
       {selectedCampaign && (
@@ -549,6 +562,12 @@ function CampaignsContent() {
             campaign={selectedCampaign}
             open={showGiftDelivery}
             onOpenChange={setShowGiftDelivery}
+            onCampaignUpdated={handleCampaignUpdated}
+          />
+          <LetterExecutionDialog
+            campaign={selectedCampaign}
+            open={showLetterExecution}
+            onOpenChange={setShowLetterExecution}
             onCampaignUpdated={handleCampaignUpdated}
           />
         </>
