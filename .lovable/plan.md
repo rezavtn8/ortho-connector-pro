@@ -1,57 +1,38 @@
 
 
-# Root Cause: Incomplete Addresses in Discovered Offices
+# Fix: Remaining Incomplete Addresses in Discovered Offices
 
-## The Problem
+## Root Cause Analysis
 
-Google Places API returns two different address fields depending on the search type:
+The previous fix correctly updated the address preference order for **new** API fetches. However, two issues remain:
 
-- **Nearby Search** returns `vicinity` -- a shortened address like `"1234 Main St, Torrance"` (no state, no ZIP)
-- **Text Search** returns `formatted_address` -- the full address like `"1234 Main St, Torrance, CA 90501, USA"`
+1. **Cached DB records**: Offices discovered before the fix still have short `vicinity` addresses stored in the database. When cache is valid (7-day window), these old records are returned as-is (lines 120-166) without re-fetching details.
 
-The edge function on line 482 of `discover-nearby-offices/index.ts` does:
+2. **Silent Place Details failures**: When a Place Details API call fails for a specific office (line 405-408), `details` is `null`, so the code falls through to `place.vicinity` — the short address. There's no retry or fallback to re-fetch.
 
-```typescript
-address: place.vicinity || place.formatted_address || null
-```
+## The Fix (Two Parts)
 
-This **prefers** the incomplete `vicinity` over the complete `formatted_address`. Since the primary search is a Nearby Search, most offices get truncated addresses. Text Search results that also have `formatted_address` still lose it because `vicinity` is checked first.
+### Part 1: Backfill incomplete addresses on cache return
 
-Furthermore, the Place Details batch fetch (line 392) requests only `formatted_phone_number,website,user_ratings_total`. It does NOT request `formatted_address`, which would provide the complete address for every result regardless of search type.
+When returning cached results (line 120-166), detect offices with incomplete addresses (missing state/ZIP pattern) and batch-fetch their `formatted_address` from Place Details before returning. This fixes all existing records without requiring a full re-discovery.
 
-## The Fix
+Add a helper that:
+- Filters cached offices where `address` lacks a US state abbreviation or ZIP code (regex: no match for `, [A-Z]{2} \d{5}`)
+- For those offices, calls Place Details with `fields=formatted_address` using their `google_place_id`
+- Updates the `discovered_offices` rows in-place with the corrected addresses
+- Returns the corrected list
 
-Two changes to `supabase/functions/discover-nearby-offices/index.ts`:
+### Part 2: Retry on Place Details failure during fresh fetch
 
-1. **Add `formatted_address` to the Place Details fields request** (line 392). Change:
-   ```
-   fields=formatted_phone_number,website,user_ratings_total
-   ```
-   to:
-   ```
-   fields=formatted_address,formatted_phone_number,website,user_ratings_total
-   ```
-
-2. **Prefer the full address from Details, then `formatted_address`, then `vicinity`** (line 482). Change:
-   ```typescript
-   address: place.vicinity || place.formatted_address || null
-   ```
-   to:
-   ```typescript
-   address: details?.formatted_address || place.formatted_address || place.vicinity || null
-   ```
-
-This ensures every discovered office gets the most complete address available -- the Place Details `formatted_address` is authoritative and always includes street, city, state, ZIP, and country.
+In the batch details fetch (line 388-424), if a Place Details call fails or returns no `formatted_address`, add a single retry after a short delay. This reduces the chance of silent failures leaving offices with short addresses.
 
 ### Files Modified
 
-- `supabase/functions/discover-nearby-offices/index.ts` -- Two line changes (Details fields and address preference order)
+- `supabase/functions/discover-nearby-offices/index.ts` — Add address backfill logic in the cache-return path (~lines 120-166) and retry logic in the batch details fetch (~lines 390-410)
 
-### Impact on Existing Data
+### No Other Changes Needed
 
-Cached offices already in the database will retain their incomplete addresses. Users can either:
-- Run a new discovery search (clears cache after 7 days, or they can force refresh)
-- Use the existing "Correct Addresses" feature which calls Google Geocoding to fix stored addresses
-
-No database migration needed. No frontend changes needed.
+- No database migration
+- No frontend changes
+- No new edge functions
 
