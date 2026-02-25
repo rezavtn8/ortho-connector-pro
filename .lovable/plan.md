@@ -1,61 +1,57 @@
 
 
-# AI-Powered Referral Forecasting
+# Root Cause: Incomplete Addresses in Discovered Offices
 
-## Placement Decision
+## The Problem
 
-Add a **Forecast** tab to the **AI Assistant** page (alongside Analysis, Chat, Settings). This is the natural home because:
-- It's AI-powered content, not raw analytics
-- It complements the existing AI Analysis tab (which looks backward) with forward-looking predictions
-- Keeps the Analytics page focused on historical data and export
+Google Places API returns two different address fields depending on the search type:
 
-## What the Forecast Tab Will Show
+- **Nearby Search** returns `vicinity` -- a shortened address like `"1234 Main St, Torrance"` (no state, no ZIP)
+- **Text Search** returns `formatted_address` -- the full address like `"1234 Main St, Torrance, CA 90501, USA"`
 
-1. **Forecast Summary Cards** -- Predicted next-month patient volume, projected growth rate, confidence level (high/medium/low)
-2. **3-Month Projection Chart** -- Area chart showing historical trend + projected future months (dashed line for forecasted data)
-3. **Source-Level Predictions** -- Table of top sources with predicted next-month volume, trend direction, and risk flags (e.g., "likely to decline")
-4. **AI Strategic Recommendations** -- 3-5 specific actions based on the forecast (e.g., "Re-engage Office X before they go cold", "Double down on Office Y momentum")
-5. **Risk Alerts** -- Flagged sources showing early signs of decline that need intervention
+The edge function on line 482 of `discover-nearby-offices/index.ts` does:
 
-## Technical Implementation
-
-### New Edge Function: `supabase/functions/ai-forecast/index.ts`
-- Fetches last 12 months of `monthly_patients`, `patient_sources`, `marketing_visits`, and `campaigns` for the authenticated user
-- Computes basic trend math server-side (month-over-month deltas, rolling averages) to include in the prompt
-- Calls OpenAI `gpt-4o-mini` with tool calling to return structured forecast JSON:
-  - `overall_forecast`: next 3 months projected totals, growth phase (expansion/plateau/decline), confidence
-  - `source_forecasts`: per-source predictions with risk level
-  - `strategic_actions`: 3-5 specific recommended actions
-  - `risk_alerts`: sources flagged for intervention
-- Caches result in `ai_generated_content` table (content_type = 'forecast') for 12 hours
-- Uses existing OPENAI_API_KEY secret (already configured)
-
-### New Component: `src/components/ai/AIForecastTab.tsx`
-- Custom hook pattern similar to `useAIAnalysis` but calls the `ai-forecast` edge function
-- Renders forecast cards, projection chart (recharts AreaChart with dashed forecast line), source prediction table, and action cards
-- "Refresh Forecast" button to regenerate on demand
-- Loading skeleton and error states matching existing AI tab patterns
-
-### Modified Files
-- **`src/pages/AIAssistant.tsx`** -- Add "Forecast" tab trigger with a crystal ball or target icon, import and render `AIForecastTab`
-- **`supabase/config.toml`** -- Add `[functions.ai-forecast]` with `verify_jwt = false` (auth handled in code)
-
-### Data Flow
-
-```text
-User clicks Forecast tab
-  --> Check ai_generated_content for cached forecast (< 12 hours old)
-  --> If cached: display immediately
-  --> If stale/missing: call ai-forecast edge function
-      --> Edge function fetches user's data from DB
-      --> Computes trend metrics server-side
-      --> Sends to OpenAI with structured tool calling
-      --> Caches result, returns to client
-  --> Render: summary cards, projection chart, source table, actions
+```typescript
+address: place.vicinity || place.formatted_address || null
 ```
 
-### No Database Changes Required
-- Reuses existing `ai_generated_content` table with `content_type = 'forecast'`
-- Reuses existing `monthly_patients`, `patient_sources`, `marketing_visits`, `campaigns` tables
-- No new migrations needed
+This **prefers** the incomplete `vicinity` over the complete `formatted_address`. Since the primary search is a Nearby Search, most offices get truncated addresses. Text Search results that also have `formatted_address` still lose it because `vicinity` is checked first.
+
+Furthermore, the Place Details batch fetch (line 392) requests only `formatted_phone_number,website,user_ratings_total`. It does NOT request `formatted_address`, which would provide the complete address for every result regardless of search type.
+
+## The Fix
+
+Two changes to `supabase/functions/discover-nearby-offices/index.ts`:
+
+1. **Add `formatted_address` to the Place Details fields request** (line 392). Change:
+   ```
+   fields=formatted_phone_number,website,user_ratings_total
+   ```
+   to:
+   ```
+   fields=formatted_address,formatted_phone_number,website,user_ratings_total
+   ```
+
+2. **Prefer the full address from Details, then `formatted_address`, then `vicinity`** (line 482). Change:
+   ```typescript
+   address: place.vicinity || place.formatted_address || null
+   ```
+   to:
+   ```typescript
+   address: details?.formatted_address || place.formatted_address || place.vicinity || null
+   ```
+
+This ensures every discovered office gets the most complete address available -- the Place Details `formatted_address` is authoritative and always includes street, city, state, ZIP, and country.
+
+### Files Modified
+
+- `supabase/functions/discover-nearby-offices/index.ts` -- Two line changes (Details fields and address preference order)
+
+### Impact on Existing Data
+
+Cached offices already in the database will retain their incomplete addresses. Users can either:
+- Run a new discovery search (clears cache after 7 days, or they can force refresh)
+- Use the existing "Correct Addresses" feature which calls Google Geocoding to fix stored addresses
+
+No database migration needed. No frontend changes needed.
 
