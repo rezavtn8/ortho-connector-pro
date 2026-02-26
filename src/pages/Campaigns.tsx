@@ -382,9 +382,12 @@ function CampaignsContent() {
                 : 'Create your first campaign to get started.'}
             </p>
             {!searchQuery && statusFilter === 'all' && (
-              <div className="flex gap-2 justify-center">
+              <div className="flex gap-2 justify-center flex-wrap">
                 <Button variant="outline" size="sm" onClick={() => setShowEmailCreator(true)} className="gap-1">
                   <Mail className="w-3.5 h-3.5" /> Email Campaign
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setShowLetterCreator(true)} className="gap-1">
+                  <FileText className="w-3.5 h-3.5" /> Letter Campaign
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => setShowGiftCreator(true)} className="gap-1">
                   <Gift className="w-3.5 h-3.5" /> Gift Campaign
