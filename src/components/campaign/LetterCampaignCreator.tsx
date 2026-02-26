@@ -46,6 +46,7 @@ export function LetterCampaignCreator({ open, onOpenChange, onCampaignCreated }:
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [discoveredOfficesList, setDiscoveredOfficesList] = useState<any[]>([]);
   const [loadingDiscovered, setLoadingDiscovered] = useState(false);
+  const [importToNetwork, setImportToNetwork] = useState(false);
 
   const { data: officesData, isLoading: loadingOffices } = useOffices();
   const { groups, getGroupOffices } = useDiscoveredGroups();
@@ -103,7 +104,7 @@ export function LetterCampaignCreator({ open, onOpenChange, onCampaignCreated }:
   };
 
   // Import discovered offices into patient_sources and return a map of discovered_id -> patient_source_id
-  const importDiscoveredOffices = async (userId: string, discoveredIds: string[]): Promise<Map<string, string>> => {
+  const importDiscoveredOffices = async (userId: string, discoveredIds: string[], addToNetwork: boolean): Promise<Map<string, string>> => {
     const idMap = new Map<string, string>();
 
     // Fetch the discovered offices details
@@ -148,6 +149,7 @@ export function LetterCampaignCreator({ open, onOpenChange, onCampaignCreated }:
           opening_hours: disc.opening_hours,
           yelp_rating: disc.yelp_rating,
           created_by: userId,
+          is_active: addToNetwork,
         })
         .select('id')
         .single();
@@ -155,8 +157,10 @@ export function LetterCampaignCreator({ open, onOpenChange, onCampaignCreated }:
       if (insertError) throw new Error(`Failed to import ${disc.name}: ${insertError.message}`);
       idMap.set(disc.id, inserted.id);
 
-      // Mark as imported in discovered_offices
-      await supabase.from('discovered_offices').update({ imported: true }).eq('id', disc.id);
+      // Only mark as imported in discovered_offices if adding to network
+      if (addToNetwork) {
+        await supabase.from('discovered_offices').update({ imported: true }).eq('id', disc.id);
+      }
     }
 
     return idMap;
@@ -175,7 +179,7 @@ export function LetterCampaignCreator({ open, onOpenChange, onCampaignCreated }:
       // If using discovered offices, import them to patient_sources first
       let officeIdMap: Map<string, string> | null = null;
       if (officeSource === 'discovered') {
-        officeIdMap = await importDiscoveredOffices(user.id, selectedOffices);
+        officeIdMap = await importDiscoveredOffices(user.id, selectedOffices, importToNetwork);
       }
 
       const { data: campaign, error: campaignError } = await supabase
@@ -235,6 +239,7 @@ export function LetterCampaignCreator({ open, onOpenChange, onCampaignCreated }:
     setOfficeSource('network');
     setSelectedGroupId(null);
     setDiscoveredOfficesList([]);
+    setImportToNetwork(false);
   };
 
   useEffect(() => { if (!open) resetForm(); }, [open]);
@@ -328,7 +333,11 @@ export function LetterCampaignCreator({ open, onOpenChange, onCampaignCreated }:
                         {groups.length === 0 && <div className="p-3 text-sm text-muted-foreground text-center">No groups yet</div>}
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">Discovered offices will be automatically added to your network when the campaign is created.</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Checkbox id="importToNetwork" checked={importToNetwork} onCheckedChange={(checked) => setImportToNetwork(checked === true)} />
+                      <Label htmlFor="importToNetwork" className="text-sm font-medium cursor-pointer">Also add these offices to my network</Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">If unchecked, offices will only be used for this campaign's letters and won't appear in your network.</p>
                   </>
                 )}
 
@@ -384,7 +393,9 @@ export function LetterCampaignCreator({ open, onOpenChange, onCampaignCreated }:
                     <div><span className="text-muted-foreground">Print Date</span><p className="font-medium">{plannedDate ? format(plannedDate, 'PPP') : 'Not set'}</p></div>
                   </div>
                   {officeSource === 'discovered' && (
-                    <p className="text-xs text-amber-600">Selected discovered offices will be imported to your network automatically.</p>
+                    <p className={`text-xs ${importToNetwork ? 'text-green-600' : 'text-muted-foreground'}`}>
+                      {importToNetwork ? '✓ Selected offices will be added to your network.' : 'Letter printing only — offices will not be added to your network.'}
+                    </p>
                   )}
                   {notes && <div className="text-sm"><span className="text-muted-foreground">Notes</span><p>{notes}</p></div>}
                 </CardContent>
