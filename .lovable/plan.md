@@ -1,137 +1,72 @@
 
 
-# Personalized Letter Campaign System
+# Fix: Letter Campaign Constraint Violations + Improvements
 
-## Overview
+## Root Cause
 
-A new "Letter" campaign type in the Campaigns page that generates tier-based template letters with personalized per-office merge fields (doctor name, office name), a rich letter preview with customizable branding (logo, fonts, colors, heading), and PDF export for printing.
+The `LetterCampaignCreator` inserts values that violate two database CHECK constraints:
 
-## How It Works
+1. **`campaigns_delivery_method_check`**: Only allows `'In-Person', 'USPS', 'Courier', 'email', 'physical'`. The code uses `'letter'` which is not in the list.
+2. **`campaigns_campaign_type_check`**: Only allows `'Intro Package', 'Mug Drop', 'Lunch Drop', 'CE Invite Pack', 'Monthly Promo Pack', 'Holiday Card Drop', 'Educational Material Drop', 'referral_outreach', 'new_office', 're_engagement', 'important_date'`. The code uses `'referral_appreciation'` and `'holiday_seasonal'` which are not in the list.
 
-The key insight from your request: **one AI call per tier** (not per office). The AI generates a template letter body per tier (VIP, Warm, Cold, Dormant, New), then each office gets personalized with its doctor name, office name, and address via simple merge-field substitution. This is efficient and keeps tone consistent within tiers.
+## Fix Strategy
 
-```text
-User creates Letter Campaign
-  --> Selects offices (same existing flow)
-  --> Clicks "Generate Letters"
-      --> Groups offices by tier
-      --> One AI call generates template text for each tier
-      --> Merge fields {{doctor_name}}, {{office_name}}, {{clinic_name}} substituted per office
-  --> Preview: styled letter with logo, fonts, heading
-  --> Edit individual letters if needed
-  --> Export all as multi-page PDF for printing
+Two-part fix: add `'letter'` to the delivery method constraint, and align the campaign types to use values already in the constraint (or add the new ones).
+
+### Part 1: Database Migration
+
+Add `'letter'` to `campaigns_delivery_method_check` and add `'referral_appreciation'` and `'holiday_seasonal'` to `campaigns_campaign_type_check`:
+
+```sql
+ALTER TABLE campaigns DROP CONSTRAINT campaigns_delivery_method_check;
+ALTER TABLE campaigns ADD CONSTRAINT campaigns_delivery_method_check 
+  CHECK (delivery_method = ANY (ARRAY['In-Person','USPS','Courier','email','physical','letter']));
+
+ALTER TABLE campaigns DROP CONSTRAINT campaigns_campaign_type_check;
+ALTER TABLE campaigns ADD CONSTRAINT campaigns_campaign_type_check 
+  CHECK (campaign_type = ANY (ARRAY[
+    'Intro Package','Mug Drop','Lunch Drop','CE Invite Pack','Monthly Promo Pack',
+    'Holiday Card Drop','Educational Material Drop','referral_outreach','new_office',
+    're_engagement','important_date','referral_appreciation','holiday_seasonal'
+  ]));
 ```
 
-## Technical Implementation
+### Part 2: Frontend — LetterCampaignCreator improvements
 
-### 1. New Edge Function: `supabase/functions/generate-campaign-letters/index.ts`
+**File: `src/components/campaign/LetterCampaignCreator.tsx`**
 
-- Receives: list of unique tiers, campaign context (clinic name, sender name/title/degrees, campaign type)
-- Fetches user profile, clinic info, AI business profile (same pattern as `generate-campaign-emails`)
-- Makes **one AI call** with tool calling that returns structured output: a `letters` array where each entry has `tier` and `body` (the template text with merge placeholders `{{doctor_name}}`, `{{office_name}}`, `{{sender_name}}`, `{{clinic_name}}`)
-- Returns the tier templates; the frontend handles per-office merging
-- Uses existing `OPENAI_API_KEY` secret
+- Map campaign types to include both letter-specific and existing valid types. Update `CAMPAIGN_TYPES` to use values that align with the updated constraint:
+  - `referral_appreciation` — Referral Appreciation
+  - `new_office` — New Office Introduction (already valid)
+  - `re_engagement` — Re-engagement (already valid)
+  - `holiday_seasonal` — Holiday / Seasonal
 
-### 2. New Campaign Creator: `src/components/campaign/LetterCampaignCreator.tsx`
+No other changes needed here — the rest of the wizard is correct.
 
-- Same wizard pattern as `EmailCampaignCreator` (3 steps: type, office selection, review)
-- Sets `delivery_method: 'letter'` on the campaign record
-- Campaign types: Referral Appreciation, New Office Introduction, Re-engagement, Holiday/Seasonal
+### Part 3: Frontend — LetterExecutionDialog improvements
 
-### 3. New Letter Execution Dialog: `src/components/campaign/LetterExecutionDialog.tsx`
+**File: `src/components/campaign/LetterExecutionDialog.tsx`**
 
-The main feature component. When opened:
-- Fetches deliveries with office data and contacts (primary contact name for "Dear Dr. XXX")
-- "Generate Letters" button → calls `generate-campaign-letters` edge function
-- Receives tier templates → merges per office using `office_contacts.name` (primary) or parsed doctor name from office name
-- Stores generated letter in `campaign_deliveries.email_body` (reuses existing column)
+Several quality improvements:
 
-**Letter Preview Panel** (the rich part):
-- Renders each letter as a styled document with:
-  - **Header**: Clinic logo (from `clinic_brand_settings.logo_url`) + clinic name
-  - **Date line**: Current date formatted
-  - **Recipient block**: Doctor name, office name, address
-  - **Salutation**: "Dear Dr. {{last_name}},"
-  - **Body**: The tier-appropriate AI-generated text
-  - **Closing/Signature**: Sender name, degrees, title, clinic name
-- **Customization sidebar** (collapsible):
-  - Font family selector (serif options like Georgia, Times New Roman, Garamond + sans options)
-  - Font size (body text)
-  - Heading color picker
-  - Logo toggle (on/off)
-  - Margin size (compact/standard/generous)
-- Navigate between letters with prev/next buttons
-- Edit individual letter text inline
+1. **Progress indicator**: Add a small progress bar showing how many letters have been generated (email_status = 'ready') vs total.
+2. **Batch status tracking**: After generation, show a summary badge "X of Y ready".
+3. **Keyboard navigation**: Add left/right arrow key support for navigating between letters.
+4. **Better empty state**: Show tier distribution of selected offices before generating.
+5. **Loading state on individual save**: Show saving indicator when editing a letter.
 
-**PDF Export**:
-- "Export All as PDF" button generates a multi-page PDF using `jspdf` (already installed)
-- One letter per page, US Letter size (8.5" × 11")
-- Applies the same styling (font, logo, colors) to the PDF
-- Downloads as `{campaign_name}_letters_{date}.pdf`
+### Part 4: Campaigns.tsx — Letter tab in empty state
 
-### 4. Modified Files
+Add a "Letter Campaign" button to the empty state section alongside Email and Gift buttons (currently missing).
 
-- **`src/pages/Campaigns.tsx`**: 
-  - Add "Letter" button next to Email/Gift in toolbar
-  - Add `letter` filter tab alongside All/Email/Gift
-  - Filter `letterCampaigns` where `delivery_method === 'letter'`
-  - Import and render `LetterCampaignCreator` and `LetterExecutionDialog`
-  - Letter campaign cards show FileText icon instead of Mail/Gift
+### Part 5: Edge function — No changes needed
 
-- **`supabase/config.toml`**: Register `generate-campaign-letters` function
+The `generate-campaign-letters` edge function is well-structured and working correctly. No modifications required.
 
-### 5. Data Model (No Migration Needed)
+## Files Modified
 
-Reuses existing tables:
-- `campaigns` table: `delivery_method = 'letter'`, `campaign_mode = 'ai_powered'`
-- `campaign_deliveries` table: `email_body` stores the merged letter text, `email_status` tracks generation state, `action_mode = 'letter_only'`
-- `clinic_brand_settings`: pulls logo and branding
-- `office_contacts`: pulls primary contact name for personalization
-
-### Component Structure
-
-```text
-LetterExecutionDialog
-├── Customization Controls (font, size, color, logo, margins)
-├── Letter Navigation (prev/next, page X of Y)
-├── Letter Preview (styled HTML rendering)
-│   ├── Logo + Clinic Header
-│   ├── Date
-│   ├── Recipient Address Block
-│   ├── "Dear Dr. LastName,"
-│   ├── Tier-based AI body text
-│   └── Sender Signature Block
-├── Edit Mode (inline text editing)
-└── Export PDF Button (jspdf multi-page)
-```
-
-### AI Prompt Strategy
-
-The edge function sends one prompt with all tiers needed. Example tool-calling schema:
-
-```json
-{
-  "name": "generate_letters",
-  "parameters": {
-    "letters": [
-      {
-        "tier": "VIP",
-        "body": "We are deeply grateful for the trust you place in {{clinic_name}}..."
-      },
-      {
-        "tier": "Cold", 
-        "body": "I'm writing to introduce {{clinic_name}} and share how we can support..."
-      }
-    ]
-  }
-}
-```
-
-The prompt instructs the AI to:
-- Write 2-3 paragraphs per tier
-- Use warm, appreciative language for VIP/Warm
-- Use professional introductory language for Cold/New
-- Use re-engagement language for Dormant
-- Include `{{doctor_name}}`, `{{office_name}}`, `{{clinic_name}}`, `{{sender_name}}` placeholders
-- Match the practice's communication style from AI business profile
+- **Database migration**: Add `'letter'` to delivery_method constraint, add `'referral_appreciation'` and `'holiday_seasonal'` to campaign_type constraint
+- **`src/components/campaign/LetterCampaignCreator.tsx`**: No code changes needed (types already correct for updated constraint)
+- **`src/components/campaign/LetterExecutionDialog.tsx`**: Add progress indicator, keyboard nav, better empty state with tier breakdown, save loading state
+- **`src/pages/Campaigns.tsx`**: Add Letter Campaign button to empty state
 
