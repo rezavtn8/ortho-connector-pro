@@ -26,6 +26,12 @@ interface Campaign {
   name: string;
   campaign_type: string;
   status: string;
+  email_settings?: any;
+}
+
+interface CachedLetterTemplates {
+  templates: { tier: string; body: string }[];
+  generated_at: string;
 }
 
 interface LetterDelivery {
@@ -86,6 +92,7 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
   const [saving, setSaving] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [cachedTemplates, setCachedTemplates] = useState<CachedLetterTemplates | null>(null);
 
   const [senderContext, setSenderContext] = useState({
     sender_name: '', sender_degrees: '', sender_title: '', clinic_name: '', clinic_address: '', logo_url: '' as string | null,
@@ -135,8 +142,71 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
     if (open && campaign) {
       fetchDeliveries();
       fetchBranding();
+      loadCachedTemplates();
     }
   }, [open, campaign]);
+
+  const loadCachedTemplates = async () => {
+    if (!campaign) return;
+    try {
+      const { data } = await supabase
+        .from('campaigns')
+        .select('email_settings')
+        .eq('id', campaign.id)
+        .single();
+      const settings = data?.email_settings as any;
+      if (settings?.letter_templates?.templates?.length) {
+        setCachedTemplates(settings.letter_templates);
+      } else {
+        setCachedTemplates(null);
+      }
+    } catch {
+      setCachedTemplates(null);
+    }
+  };
+
+  const saveCachedTemplates = async (templates: { tier: string; body: string }[]) => {
+    if (!campaign) return;
+    const letterTemplates: CachedLetterTemplates = {
+      templates,
+      generated_at: new Date().toISOString(),
+    };
+    setCachedTemplates(letterTemplates);
+    await supabase
+      .from('campaigns')
+      .update({ email_settings: { letter_templates: letterTemplates } as any })
+      .eq('id', campaign.id);
+  };
+
+  const applyTemplates = async (templates: { tier: string; body: string }[]) => {
+    if (!deliveries.length || !templates.length) return;
+    setGenerating(true);
+    try {
+      const tierTemplates = new Map<string, string>();
+      templates.forEach(t => tierTemplates.set(t.tier, t.body));
+
+      for (const delivery of deliveries) {
+        const tier = delivery.referral_tier || 'Cold';
+        let template = tierTemplates.get(tier) || tierTemplates.values().next().value || '';
+        const info = extractDoctorInfo(delivery);
+        const body = template
+          .replace(/\{\{doctor_name\}\}/g, info.displayName)
+          .replace(/\{\{office_name\}\}/g, delivery.office.name)
+          .replace(/\{\{clinic_name\}\}/g, senderContext.clinic_name)
+          .replace(/\{\{sender_name\}\}/g, senderContext.sender_name);
+
+        await supabase.from('campaign_deliveries')
+          .update({ email_body: body, email_status: 'ready' })
+          .eq('id', delivery.id);
+      }
+      await fetchDeliveries();
+      toast({ title: "Templates Applied", description: `${deliveries.length} letters personalized from cached templates` });
+    } catch (err: any) {
+      toast({ title: "Apply Failed", description: err.message, variant: "destructive" });
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   const fetchBranding = async () => {
     if (!user) return;
@@ -208,6 +278,9 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
 
       const tierTemplates = new Map<string, string>();
       data.letters.forEach((l: any) => tierTemplates.set(l.tier, l.body));
+
+      // Cache the raw tier templates in the campaign
+      await saveCachedTemplates(data.letters);
 
       if (data.context) {
         setSenderContext(prev => ({
@@ -454,9 +527,25 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
         <div className="space-y-3 p-3 bg-muted/30 rounded-lg">
           <div className="flex flex-wrap items-center gap-2">
             {!lettersGenerated ? (
-              <Button onClick={generateLetters} disabled={generating || !deliveries.length} className="gap-2">
-                <Wand2 className="w-4 h-4" /> {generating ? 'Generating...' : 'Generate Letters'}
-              </Button>
+              <div className="flex items-center gap-2">
+                {cachedTemplates ? (
+                  <>
+                    <Button onClick={() => applyTemplates(cachedTemplates.templates)} disabled={generating || !deliveries.length} className="gap-2">
+                      <Wand2 className="w-4 h-4" /> {generating ? 'Applying...' : 'Apply Cached Templates'}
+                    </Button>
+                    <Button variant="outline" onClick={generateLetters} disabled={generating || !deliveries.length} className="gap-2">
+                      <RefreshCw className={`w-4 h-4 ${generating ? 'animate-spin' : ''}`} /> Generate New
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      Cached {new Date(cachedTemplates.generated_at).toLocaleDateString()}
+                    </span>
+                  </>
+                ) : (
+                  <Button onClick={generateLetters} disabled={generating || !deliveries.length} className="gap-2">
+                    <Wand2 className="w-4 h-4" /> {generating ? 'Generating...' : 'Generate Letters'}
+                  </Button>
+                )}
+              </div>
             ) : (
               <>
                 <Button variant="outline" size="sm" onClick={generateLetters} disabled={generating} className="gap-1.5">
