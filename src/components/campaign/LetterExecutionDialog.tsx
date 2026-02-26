@@ -391,8 +391,8 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
       const smallFontSize = style.fontSize * 0.75;
       const lineHeight = style.fontSize * 1.6;
 
-      // Logo dimensions matching preview w-14 h-14 (56px ≈ 42pt)
-      const logoSizePt = 42;
+      // Logo max dimensions matching preview w-14 h-14 (56px ≈ 42pt)
+      const logoMaxPt = 42;
 
       for (let i = 0; i < deliveries.length; i++) {
         if (i > 0) doc.addPage();
@@ -402,16 +402,25 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
         doc.setFont(pdfFont, 'normal');
 
         if (logoData) {
-          try { doc.addImage(logoData, 'PNG', margin.x, y, logoSizePt, logoSizePt); } catch {}
+          // Preserve aspect ratio: fit within logoMaxPt box
+          let logoW = logoMaxPt;
+          let logoH = logoMaxPt;
+          try {
+            const img = doc.getImageProperties(logoData);
+            const aspect = img.width / img.height;
+            if (aspect > 1) { logoH = logoMaxPt / aspect; } else { logoW = logoMaxPt * aspect; }
+          } catch {}
+          try { doc.addImage(logoData, 'PNG', margin.x, y + (logoMaxPt - logoH) / 2, logoW, logoH); } catch {}
+          const textX = margin.x + logoMaxPt + 12;
           doc.setFontSize(headingFontSize);
           doc.setFont(pdfFont, 'bold');
           doc.setTextColor(style.headingColor);
-          doc.text(senderContext.clinic_name, margin.x + logoSizePt + 12, y + headingFontSize);
+          doc.text(senderContext.clinic_name, textX, y + headingFontSize);
           doc.setFontSize(smallFontSize);
           doc.setFont(pdfFont, 'normal');
           doc.setTextColor('#888888');
-          if (senderContext.clinic_address) doc.text(senderContext.clinic_address, margin.x + logoSizePt + 12, y + headingFontSize + smallFontSize + 4);
-          y += logoSizePt + 12;
+          if (senderContext.clinic_address) doc.text(senderContext.clinic_address, textX, y + headingFontSize + smallFontSize + 4);
+          y += logoMaxPt + 12;
         } else {
           doc.setFontSize(headingFontSize);
           doc.setFont(pdfFont, 'bold');
@@ -436,10 +445,13 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
         y += dateFontSize + 20;
 
         // Recipient address block
-        const info = extractDoctorInfo(d);
+    const info = extractDoctorInfo(d);
         doc.setFontSize(addressFontSize);
         doc.setTextColor('#333333');
-        doc.text(info.displayName, margin.x, y); y += addressFontSize + 4;
+        // Only show displayName if it's different from office name (i.e. a doctor was found)
+        if (info.displayName !== d.office.name) {
+          doc.text(info.displayName, margin.x, y); y += addressFontSize + 4;
+        }
         doc.text(d.office.name, margin.x, y); y += addressFontSize + 4;
         if (d.office.address) {
           const addrLines = doc.splitTextToSize(d.office.address, contentW);
@@ -692,7 +704,9 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
 
                     {/* Recipient */}
                     <div style={{ fontSize: '0.9em', marginBottom: '20px', lineHeight: 1.5 }}>
-                      <div>{extractDoctorInfo(current).displayName}</div>
+                      {extractDoctorInfo(current).displayName !== current.office.name && (
+                        <div>{extractDoctorInfo(current).displayName}</div>
+                      )}
                       <div>{current.office.name}</div>
                       {current.office.address && <div>{current.office.address}</div>}
                     </div>
