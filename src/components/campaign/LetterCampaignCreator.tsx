@@ -8,11 +8,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent } from '@/components/ui/card';
-import { Loader2, FileText, ArrowRight, ArrowLeft, Search, CheckCircle2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader2, FileText, ArrowRight, ArrowLeft, Search, Users, CheckCircle2, FolderOpen } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { EnhancedDatePicker } from '../EnhancedDatePicker';
 import { useOffices } from '@/hooks/useOffices';
+import { useDiscoveredGroups } from '@/hooks/useDiscoveredGroups';
 import { format } from 'date-fns';
 
 interface LetterCampaignCreatorProps {
@@ -40,8 +42,13 @@ export function LetterCampaignCreator({ open, onOpenChange, onCampaignCreated }:
   const [campaignName, setCampaignName] = useState('');
   const [plannedDate, setPlannedDate] = useState<Date>();
   const [notes, setNotes] = useState('');
+  const [officeSource, setOfficeSource] = useState<'network' | 'discovered'>('network');
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [discoveredOfficesList, setDiscoveredOfficesList] = useState<any[]>([]);
+  const [loadingDiscovered, setLoadingDiscovered] = useState(false);
 
   const { data: officesData, isLoading: loadingOffices } = useOffices();
+  const { groups, getGroupOffices } = useDiscoveredGroups();
 
   const offices = useMemo(() => (officesData || []).map(office => ({
     id: office.id,
@@ -50,14 +57,33 @@ export function LetterCampaignCreator({ open, onOpenChange, onCampaignCreated }:
     tier: office.tier || 'Cold',
   })), [officesData]);
 
-  const currentOfficeList = useMemo(() => {
-    let result = tierFilter === 'all' ? offices : offices.filter(o => o.tier === tierFilter);
-    if (officeSearch) {
-      const q = officeSearch.toLowerCase();
-      result = result.filter(o => o.name.toLowerCase().includes(q) || o.address.toLowerCase().includes(q));
+  useEffect(() => {
+    if (officeSource === 'discovered' && selectedGroupId) {
+      setLoadingDiscovered(true);
+      getGroupOffices(selectedGroupId).then(offices => {
+        setDiscoveredOfficesList(offices.map(o => ({ id: o.id, name: o.name, address: o.address || '', office_type: o.office_type || undefined })));
+        setLoadingDiscovered(false);
+      });
     }
-    return result.map(o => ({ id: o.id, name: o.name, address: o.address, badge: o.tier }));
-  }, [offices, tierFilter, officeSearch]);
+  }, [officeSource, selectedGroupId]);
+
+  const currentOfficeList = useMemo(() => {
+    if (officeSource === 'network') {
+      let result = tierFilter === 'all' ? offices : offices.filter(o => o.tier === tierFilter);
+      if (officeSearch) {
+        const q = officeSearch.toLowerCase();
+        result = result.filter(o => o.name.toLowerCase().includes(q) || o.address.toLowerCase().includes(q));
+      }
+      return result.map(o => ({ id: o.id, name: o.name, address: o.address, badge: o.tier }));
+    } else {
+      let result = discoveredOfficesList;
+      if (officeSearch) {
+        const q = officeSearch.toLowerCase();
+        result = result.filter((o: any) => o.name.toLowerCase().includes(q) || o.address.toLowerCase().includes(q));
+      }
+      return result.map((o: any) => ({ id: o.id, name: o.name, address: o.address, badge: o.office_type || 'Discovered' }));
+    }
+  }, [officeSource, offices, discoveredOfficesList, tierFilter, officeSearch]);
 
   useEffect(() => {
     if (!campaignName && campaignType) {
@@ -76,6 +102,66 @@ export function LetterCampaignCreator({ open, onOpenChange, onCampaignCreated }:
     setSelectedOffices(prev => allSelected ? prev.filter(id => !ids.includes(id)) : [...new Set([...prev, ...ids])]);
   };
 
+  // Import discovered offices into patient_sources and return a map of discovered_id -> patient_source_id
+  const importDiscoveredOffices = async (userId: string, discoveredIds: string[]): Promise<Map<string, string>> => {
+    const idMap = new Map<string, string>();
+
+    // Fetch the discovered offices details
+    const { data: discoveredData, error } = await supabase
+      .from('discovered_offices')
+      .select('id, name, address, phone, email, website, google_place_id, google_rating, latitude, longitude, distance_miles, opening_hours, yelp_rating, office_type')
+      .in('id', discoveredIds);
+
+    if (error || !discoveredData) throw new Error('Failed to fetch discovered offices');
+
+    for (const disc of discoveredData) {
+      // Check if already imported (exists in patient_sources by google_place_id)
+      if (disc.google_place_id) {
+        const { data: existing } = await supabase
+          .from('patient_sources')
+          .select('id')
+          .eq('google_place_id', disc.google_place_id)
+          .eq('created_by', userId)
+          .maybeSingle();
+
+        if (existing) {
+          idMap.set(disc.id, existing.id);
+          continue;
+        }
+      }
+
+      // Insert into patient_sources
+      const { data: inserted, error: insertError } = await supabase
+        .from('patient_sources')
+        .insert({
+          name: disc.name,
+          source_type: 'Office' as any,
+          address: disc.address,
+          phone: disc.phone,
+          email: disc.email,
+          website: disc.website,
+          google_place_id: disc.google_place_id,
+          google_rating: disc.google_rating,
+          latitude: disc.latitude,
+          longitude: disc.longitude,
+          distance_miles: disc.distance_miles,
+          opening_hours: disc.opening_hours,
+          yelp_rating: disc.yelp_rating,
+          created_by: userId,
+        })
+        .select('id')
+        .single();
+
+      if (insertError) throw new Error(`Failed to import ${disc.name}: ${insertError.message}`);
+      idMap.set(disc.id, inserted.id);
+
+      // Mark as imported in discovered_offices
+      await supabase.from('discovered_offices').update({ imported: true }).eq('id', disc.id);
+    }
+
+    return idMap;
+  };
+
   const handleSubmit = async () => {
     if (!campaignName || selectedOffices.length === 0) {
       toast.error('Please provide a name and select at least one office');
@@ -85,6 +171,12 @@ export function LetterCampaignCreator({ open, onOpenChange, onCampaignCreated }:
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
+
+      // If using discovered offices, import them to patient_sources first
+      let officeIdMap: Map<string, string> | null = null;
+      if (officeSource === 'discovered') {
+        officeIdMap = await importDiscoveredOffices(user.id, selectedOffices);
+      }
 
       const { data: campaign, error: campaignError } = await supabase
         .from('campaigns')
@@ -104,10 +196,11 @@ export function LetterCampaignCreator({ open, onOpenChange, onCampaignCreated }:
       if (campaignError) throw campaignError;
 
       const deliveries = selectedOffices.map(officeId => {
+        const resolvedId = officeIdMap ? officeIdMap.get(officeId) || officeId : officeId;
         const office = currentOfficeList.find(o => o.id === officeId);
         return {
           campaign_id: campaign.id,
-          office_id: officeId,
+          office_id: resolvedId,
           email_status: 'pending',
           action_mode: 'letter_only',
           delivery_status: 'Not Started',
@@ -139,6 +232,9 @@ export function LetterCampaignCreator({ open, onOpenChange, onCampaignCreated }:
     setSelectedOffices([]);
     setTierFilter('all');
     setOfficeSearch('');
+    setOfficeSource('network');
+    setSelectedGroupId(null);
+    setDiscoveredOfficesList([]);
   };
 
   useEffect(() => { if (!open) resetForm(); }, [open]);
@@ -212,22 +308,50 @@ export function LetterCampaignCreator({ open, onOpenChange, onCampaignCreated }:
                   </Button>
                 </div>
 
+                <div className="flex items-center gap-2 p-2 bg-muted/40 rounded-lg">
+                  <Button variant={officeSource === 'network' ? 'default' : 'ghost'} size="sm"
+                    onClick={() => { setOfficeSource('network'); setSelectedOffices([]); setOfficeSearch(''); }} className="gap-1.5">
+                    <Users className="h-3.5 w-3.5" /> Network Offices
+                  </Button>
+                  <Button variant={officeSource === 'discovered' ? 'default' : 'ghost'} size="sm"
+                    onClick={() => { setOfficeSource('discovered'); setSelectedOffices([]); setOfficeSearch(''); }} className="gap-1.5">
+                    <FolderOpen className="h-3.5 w-3.5" /> Discovered Groups
+                  </Button>
+                </div>
+
+                {officeSource === 'discovered' && (
+                  <>
+                    <Select value={selectedGroupId || ''} onValueChange={(val) => { setSelectedGroupId(val || null); setSelectedOffices([]); }}>
+                      <SelectTrigger><SelectValue placeholder="Select a group..." /></SelectTrigger>
+                      <SelectContent>
+                        {groups.map(g => <SelectItem key={g.id} value={g.id}>{g.name} ({g.member_count || 0} offices)</SelectItem>)}
+                        {groups.length === 0 && <div className="p-3 text-sm text-muted-foreground text-center">No groups yet</div>}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">Discovered offices will be automatically added to your network when the campaign is created.</p>
+                  </>
+                )}
+
                 <div className="flex flex-col sm:flex-row gap-2">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input placeholder="Search offices..." value={officeSearch} onChange={(e) => setOfficeSearch(e.target.value)} className="pl-9" />
                   </div>
-                  <div className="flex gap-1.5 flex-wrap">
-                    {TIER_FILTERS.map(t => (
-                      <Badge key={t} variant={tierFilter === t ? 'default' : 'outline'} className="cursor-pointer capitalize" onClick={() => setTierFilter(t)}>
-                        {t === 'all' ? `All (${offices.length})` : `${t} (${offices.filter(o => o.tier === t).length})`}
-                      </Badge>
-                    ))}
-                  </div>
+                  {officeSource === 'network' && (
+                    <div className="flex gap-1.5 flex-wrap">
+                      {TIER_FILTERS.map(t => (
+                        <Badge key={t} variant={tierFilter === t ? 'default' : 'outline'} className="cursor-pointer capitalize" onClick={() => setTierFilter(t)}>
+                          {t === 'all' ? `All (${offices.length})` : `${t} (${offices.filter(o => o.tier === t).length})`}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                {loadingOffices ? (
+                {(officeSource === 'network' ? loadingOffices : loadingDiscovered) ? (
                   <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
+                ) : officeSource === 'discovered' && !selectedGroupId ? (
+                  <p className="text-center text-sm text-muted-foreground py-6">Select a group above to see offices</p>
                 ) : (
                   <div className="space-y-1.5 max-h-[300px] overflow-y-auto border rounded-lg p-3">
                     {currentOfficeList.map(office => (
@@ -259,6 +383,9 @@ export function LetterCampaignCreator({ open, onOpenChange, onCampaignCreated }:
                     <div><span className="text-muted-foreground">Offices</span><p className="font-medium">{selectedOffices.length} selected</p></div>
                     <div><span className="text-muted-foreground">Print Date</span><p className="font-medium">{plannedDate ? format(plannedDate, 'PPP') : 'Not set'}</p></div>
                   </div>
+                  {officeSource === 'discovered' && (
+                    <p className="text-xs text-amber-600">Selected discovered offices will be imported to your network automatically.</p>
+                  )}
                   {notes && <div className="text-sm"><span className="text-muted-foreground">Notes</span><p>{notes}</p></div>}
                 </CardContent>
               </Card>
