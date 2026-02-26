@@ -223,9 +223,9 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
         const tier = delivery.referral_tier || 'Cold';
         let template = tierTemplates.get(tier) || tierTemplates.values().next().value || '';
 
-        const doctorName = extractDoctorName(delivery);
+        const info = extractDoctorInfo(delivery);
         const body = template
-          .replace(/\{\{doctor_name\}\}/g, doctorName)
+          .replace(/\{\{doctor_name\}\}/g, info.displayName)
           .replace(/\{\{office_name\}\}/g, delivery.office.name)
           .replace(/\{\{clinic_name\}\}/g, senderContext.clinic_name)
           .replace(/\{\{sender_name\}\}/g, senderContext.sender_name);
@@ -244,15 +244,23 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
     }
   };
 
-  const extractDoctorName = (delivery: LetterDelivery): string => {
+  const extractDoctorInfo = (delivery: LetterDelivery): { displayName: string; salutation: string } => {
     if (delivery.primary_contact) {
-      const name = delivery.primary_contact;
-      if (/^dr\.?\s/i.test(name)) return name;
-      return `Dr. ${name.split(' ').pop()}`;
+      const name = delivery.primary_contact.trim();
+      if (/^dr\.?\s/i.test(name)) {
+        const lastName = name.replace(/^dr\.?\s*/i, '').split(' ').pop() || name;
+        return { displayName: name, salutation: `Dear ${name},` };
+      }
+      const lastName = name.split(' ').pop() || name;
+      return { displayName: `Dr. ${lastName}`, salutation: `Dear Dr. ${lastName},` };
     }
-    const drMatch = delivery.office.name.match(/Dr\.?\s*([A-Za-z\s]+)/i);
-    if (drMatch) return `Dr. ${drMatch[1].trim().split(' ').pop()}`;
-    return 'Doctor';
+    const drMatch = delivery.office.name.match(/Dr\.?\s+([A-Za-z]+(?:\s+[A-Za-z]+)?)/i);
+    if (drMatch) {
+      const extracted = drMatch[1].trim().split(' ').pop()!;
+      return { displayName: `Dr. ${extracted}`, salutation: `Dear Dr. ${extracted},` };
+    }
+    // No doctor name found — use friendly fallback
+    return { displayName: delivery.office.name, salutation: `Dear Friends at ${delivery.office.name},` };
   };
 
   const current = deliveries[currentIndex];
@@ -280,7 +288,6 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
       const pageH = 792;
       const margin = MARGIN_OPTIONS[style.marginSize];
       const contentW = pageW - margin.x * 2;
-      const lineHeight = style.fontSize * 1.6;
 
       let logoData: string | null = null;
       if (style.showLogo && senderContext.logo_url) {
@@ -295,55 +302,86 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
         } catch { /* skip logo */ }
       }
 
+      // Map web fonts to jsPDF built-in fonts
+      const getJsPDFFont = (fontFamily: string): string => {
+        const lower = fontFamily.toLowerCase();
+        if (/georgia|times|garamond|palatino|serif/i.test(lower)) return 'times';
+        if (/courier|mono/i.test(lower)) return 'courier';
+        return 'helvetica';
+      };
+      const pdfFont = getJsPDFFont(style.fontFamily);
+
+      // Preview-matched relative sizes
+      const headingFontSize = style.fontSize * 1.3;
+      const dateFontSize = style.fontSize * 0.85;
+      const addressFontSize = style.fontSize * 0.9;
+      const smallFontSize = style.fontSize * 0.75;
+      const lineHeight = style.fontSize * 1.6;
+
+      // Logo dimensions matching preview w-14 h-14 (56px ≈ 42pt)
+      const logoSizePt = 42;
+
       for (let i = 0; i < deliveries.length; i++) {
         if (i > 0) doc.addPage();
         const d = deliveries[i];
         let y = margin.y;
 
+        doc.setFont(pdfFont, 'normal');
+
         if (logoData) {
-          try { doc.addImage(logoData, 'PNG', margin.x, y, 60, 60); } catch {}
-          doc.setFontSize(16);
+          try { doc.addImage(logoData, 'PNG', margin.x, y, logoSizePt, logoSizePt); } catch {}
+          doc.setFontSize(headingFontSize);
+          doc.setFont(pdfFont, 'bold');
           doc.setTextColor(style.headingColor);
-          doc.text(senderContext.clinic_name, margin.x + 70, y + 22);
-          doc.setFontSize(9);
-          doc.setTextColor('#666666');
-          if (senderContext.clinic_address) doc.text(senderContext.clinic_address, margin.x + 70, y + 38);
-          y += 80;
+          doc.text(senderContext.clinic_name, margin.x + logoSizePt + 12, y + headingFontSize);
+          doc.setFontSize(smallFontSize);
+          doc.setFont(pdfFont, 'normal');
+          doc.setTextColor('#888888');
+          if (senderContext.clinic_address) doc.text(senderContext.clinic_address, margin.x + logoSizePt + 12, y + headingFontSize + smallFontSize + 4);
+          y += logoSizePt + 12;
         } else {
-          doc.setFontSize(18);
+          doc.setFontSize(headingFontSize);
+          doc.setFont(pdfFont, 'bold');
           doc.setTextColor(style.headingColor);
-          doc.text(senderContext.clinic_name, margin.x, y + 18);
-          doc.setFontSize(9);
-          doc.setTextColor('#666666');
-          if (senderContext.clinic_address) { y += 24; doc.text(senderContext.clinic_address, margin.x, y + 10); }
-          y += 30;
+          doc.text(senderContext.clinic_name, margin.x, y + headingFontSize);
+          doc.setFontSize(smallFontSize);
+          doc.setFont(pdfFont, 'normal');
+          doc.setTextColor('#888888');
+          if (senderContext.clinic_address) { y += headingFontSize + 6; doc.text(senderContext.clinic_address, margin.x, y + smallFontSize); }
+          y += smallFontSize + 16;
         }
 
-        doc.setDrawColor('#cccccc');
+        doc.setDrawColor('#dddddd');
         doc.line(margin.x, y, pageW - margin.x, y);
-        y += 20;
+        y += 16;
 
-        doc.setFontSize(10);
+        // Date
+        doc.setFontSize(dateFontSize);
+        doc.setFont(pdfFont, 'normal');
+        doc.setTextColor('#555555');
+        doc.text(format(new Date(), 'MMMM d, yyyy'), margin.x, y + dateFontSize);
+        y += dateFontSize + 20;
+
+        // Recipient address block
+        const info = extractDoctorInfo(d);
+        doc.setFontSize(addressFontSize);
         doc.setTextColor('#333333');
-        doc.text(format(new Date(), 'MMMM d, yyyy'), margin.x, y);
-        y += 24;
-
-        const doctorName = extractDoctorName(d);
-        doc.setFontSize(10);
-        doc.text(doctorName, margin.x, y); y += 14;
-        doc.text(d.office.name, margin.x, y); y += 14;
+        doc.text(info.displayName, margin.x, y); y += addressFontSize + 4;
+        doc.text(d.office.name, margin.x, y); y += addressFontSize + 4;
         if (d.office.address) {
           const addrLines = doc.splitTextToSize(d.office.address, contentW);
-          addrLines.forEach((line: string) => { doc.text(line, margin.x, y); y += 14; });
+          addrLines.forEach((line: string) => { doc.text(line, margin.x, y); y += addressFontSize + 4; });
         }
-        y += 10;
+        y += 12;
 
-        const lastName = doctorName.replace(/^Dr\.?\s*/i, '').split(' ').pop() || 'Doctor';
+        // Salutation
         doc.setFontSize(style.fontSize);
+        doc.setFont(pdfFont, 'normal');
         doc.setTextColor('#111111');
-        doc.text(`Dear Dr. ${lastName},`, margin.x, y);
+        doc.text(info.salutation, margin.x, y);
         y += lineHeight + 4;
 
+        // Body
         if (d.email_body) {
           const paragraphs = d.email_body.split(/\n\n+/);
           for (const para of paragraphs) {
@@ -357,15 +395,16 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
           }
         }
 
+        // Signature
         y += lineHeight;
         if (y > pageH - margin.y - 50) { doc.addPage(); y = margin.y; }
         doc.text('Sincerely,', margin.x, y); y += lineHeight * 1.5;
         const sigLine = senderContext.sender_degrees
           ? `${senderContext.sender_name}, ${senderContext.sender_degrees}`
           : senderContext.sender_name;
-        doc.setFont('helvetica', 'bold');
+        doc.setFont(pdfFont, 'bold');
         doc.text(sigLine, margin.x, y); y += lineHeight;
-        doc.setFont('helvetica', 'normal');
+        doc.setFont(pdfFont, 'normal');
         if (senderContext.sender_title) { doc.text(senderContext.sender_title, margin.x, y); y += lineHeight; }
         doc.text(senderContext.clinic_name, margin.x, y);
       }
@@ -564,14 +603,14 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
 
                     {/* Recipient */}
                     <div style={{ fontSize: '0.9em', marginBottom: '20px', lineHeight: 1.5 }}>
-                      <div>{extractDoctorName(current)}</div>
+                      <div>{extractDoctorInfo(current).displayName}</div>
                       <div>{current.office.name}</div>
                       {current.office.address && <div>{current.office.address}</div>}
                     </div>
 
                     {/* Salutation */}
                     <div style={{ marginBottom: '16px' }}>
-                      Dear Dr. {extractDoctorName(current).replace(/^Dr\.?\s*/i, '').split(' ').pop() || 'Doctor'},
+                      {extractDoctorInfo(current).salutation}
                     </div>
 
                     {/* Body */}
