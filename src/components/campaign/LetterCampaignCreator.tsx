@@ -8,13 +8,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, FileText, ArrowRight, ArrowLeft, Search, Users, CheckCircle2, FolderOpen } from 'lucide-react';
+import { Loader2, FileText, ArrowRight, ArrowLeft, Search, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { EnhancedDatePicker } from '../EnhancedDatePicker';
 import { useOffices } from '@/hooks/useOffices';
-import { useDiscoveredGroups } from '@/hooks/useDiscoveredGroups';
 import { format } from 'date-fns';
 
 interface LetterCampaignCreatorProps {
@@ -42,13 +40,8 @@ export function LetterCampaignCreator({ open, onOpenChange, onCampaignCreated }:
   const [campaignName, setCampaignName] = useState('');
   const [plannedDate, setPlannedDate] = useState<Date>();
   const [notes, setNotes] = useState('');
-  const [officeSource, setOfficeSource] = useState<'network' | 'discovered'>('network');
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
-  const [discoveredOfficesList, setDiscoveredOfficesList] = useState<any[]>([]);
-  const [loadingDiscovered, setLoadingDiscovered] = useState(false);
 
   const { data: officesData, isLoading: loadingOffices } = useOffices();
-  const { groups, getGroupOffices } = useDiscoveredGroups();
 
   const offices = useMemo(() => (officesData || []).map(office => ({
     id: office.id,
@@ -57,33 +50,14 @@ export function LetterCampaignCreator({ open, onOpenChange, onCampaignCreated }:
     tier: office.tier || 'Cold',
   })), [officesData]);
 
-  useEffect(() => {
-    if (officeSource === 'discovered' && selectedGroupId) {
-      setLoadingDiscovered(true);
-      getGroupOffices(selectedGroupId).then(offices => {
-        setDiscoveredOfficesList(offices.map(o => ({ id: o.id, name: o.name, address: o.address || '', office_type: o.office_type || undefined })));
-        setLoadingDiscovered(false);
-      });
-    }
-  }, [officeSource, selectedGroupId]);
-
   const currentOfficeList = useMemo(() => {
-    if (officeSource === 'network') {
-      let result = tierFilter === 'all' ? offices : offices.filter(o => o.tier === tierFilter);
-      if (officeSearch) {
-        const q = officeSearch.toLowerCase();
-        result = result.filter(o => o.name.toLowerCase().includes(q) || o.address.toLowerCase().includes(q));
-      }
-      return result.map(o => ({ id: o.id, name: o.name, address: o.address, badge: o.tier }));
-    } else {
-      let result = discoveredOfficesList;
-      if (officeSearch) {
-        const q = officeSearch.toLowerCase();
-        result = result.filter((o: any) => o.name.toLowerCase().includes(q) || o.address.toLowerCase().includes(q));
-      }
-      return result.map((o: any) => ({ id: o.id, name: o.name, address: o.address, badge: o.office_type || 'Discovered' }));
+    let result = tierFilter === 'all' ? offices : offices.filter(o => o.tier === tierFilter);
+    if (officeSearch) {
+      const q = officeSearch.toLowerCase();
+      result = result.filter(o => o.name.toLowerCase().includes(q) || o.address.toLowerCase().includes(q));
     }
-  }, [officeSource, offices, discoveredOfficesList, tierFilter, officeSearch]);
+    return result.map(o => ({ id: o.id, name: o.name, address: o.address, badge: o.tier }));
+  }, [offices, tierFilter, officeSearch]);
 
   useEffect(() => {
     if (!campaignName && campaignType) {
@@ -165,9 +139,6 @@ export function LetterCampaignCreator({ open, onOpenChange, onCampaignCreated }:
     setSelectedOffices([]);
     setTierFilter('all');
     setOfficeSearch('');
-    setOfficeSource('network');
-    setSelectedGroupId(null);
-    setDiscoveredOfficesList([]);
   };
 
   useEffect(() => { if (!open) resetForm(); }, [open]);
@@ -241,47 +212,22 @@ export function LetterCampaignCreator({ open, onOpenChange, onCampaignCreated }:
                   </Button>
                 </div>
 
-                <div className="flex items-center gap-2 p-2 bg-muted/40 rounded-lg">
-                  <Button variant={officeSource === 'network' ? 'default' : 'ghost'} size="sm"
-                    onClick={() => { setOfficeSource('network'); setSelectedOffices([]); setOfficeSearch(''); }} className="gap-1.5">
-                    <Users className="h-3.5 w-3.5" /> Network Offices
-                  </Button>
-                  <Button variant={officeSource === 'discovered' ? 'default' : 'ghost'} size="sm"
-                    onClick={() => { setOfficeSource('discovered'); setSelectedOffices([]); setOfficeSearch(''); }} className="gap-1.5">
-                    <FolderOpen className="h-3.5 w-3.5" /> Discovered Groups
-                  </Button>
-                </div>
-
-                {officeSource === 'discovered' && (
-                  <Select value={selectedGroupId || ''} onValueChange={(val) => { setSelectedGroupId(val || null); setSelectedOffices([]); }}>
-                    <SelectTrigger><SelectValue placeholder="Select a group..." /></SelectTrigger>
-                    <SelectContent>
-                      {groups.map(g => <SelectItem key={g.id} value={g.id}>{g.name} ({g.member_count || 0} offices)</SelectItem>)}
-                      {groups.length === 0 && <div className="p-3 text-sm text-muted-foreground text-center">No groups yet</div>}
-                    </SelectContent>
-                  </Select>
-                )}
-
                 <div className="flex flex-col sm:flex-row gap-2">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input placeholder="Search offices..." value={officeSearch} onChange={(e) => setOfficeSearch(e.target.value)} className="pl-9" />
                   </div>
-                  {officeSource === 'network' && (
-                    <div className="flex gap-1.5 flex-wrap">
-                      {TIER_FILTERS.map(t => (
-                        <Badge key={t} variant={tierFilter === t ? 'default' : 'outline'} className="cursor-pointer capitalize" onClick={() => setTierFilter(t)}>
-                          {t === 'all' ? `All (${offices.length})` : `${t} (${offices.filter(o => o.tier === t).length})`}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
+                  <div className="flex gap-1.5 flex-wrap">
+                    {TIER_FILTERS.map(t => (
+                      <Badge key={t} variant={tierFilter === t ? 'default' : 'outline'} className="cursor-pointer capitalize" onClick={() => setTierFilter(t)}>
+                        {t === 'all' ? `All (${offices.length})` : `${t} (${offices.filter(o => o.tier === t).length})`}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
 
-                {(officeSource === 'network' ? loadingOffices : loadingDiscovered) ? (
+                {loadingOffices ? (
                   <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
-                ) : officeSource === 'discovered' && !selectedGroupId ? (
-                  <p className="text-center text-sm text-muted-foreground py-6">Select a group above to see offices</p>
                 ) : (
                   <div className="space-y-1.5 max-h-[300px] overflow-y-auto border rounded-lg p-3">
                     {currentOfficeList.map(office => (
