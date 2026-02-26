@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -15,7 +15,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   FileText, Wand2, RefreshCw, ChevronLeft, ChevronRight, Download,
-  Settings2, ChevronDown, ChevronUp, Pencil, Check, X,
+  Settings2, ChevronDown, ChevronUp, Pencil, Check, X, Loader2, Users,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -83,6 +83,7 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
   const [currentIndex, setCurrentIndex] = useState(0);
   const [editing, setEditing] = useState(false);
   const [editedBody, setEditedBody] = useState('');
+  const [saving, setSaving] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
 
@@ -97,6 +98,38 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
     showLogo: true,
     marginSize: 'standard',
   });
+
+  // Progress tracking
+  const readyCount = useMemo(() => deliveries.filter(d => d.email_status === 'ready' || d.email_body).length, [deliveries]);
+  const progressPercent = deliveries.length > 0 ? Math.round((readyCount / deliveries.length) * 100) : 0;
+
+  // Tier distribution
+  const tierDistribution = useMemo(() => {
+    const counts: Record<string, number> = {};
+    deliveries.forEach(d => {
+      const tier = d.referral_tier || 'Unknown';
+      counts[tier] = (counts[tier] || 0) + 1;
+    });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  }, [deliveries]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    if (!open || !deliveries.length) return;
+    const handler = (e: KeyboardEvent) => {
+      if (editing) return;
+      if (e.key === 'ArrowLeft' && currentIndex > 0) {
+        setCurrentIndex(i => i - 1);
+        setEditing(false);
+      }
+      if (e.key === 'ArrowRight' && currentIndex < deliveries.length - 1) {
+        setCurrentIndex(i => i + 1);
+        setEditing(false);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [open, deliveries.length, currentIndex, editing]);
 
   useEffect(() => {
     if (open && campaign) {
@@ -137,7 +170,6 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
         .order('created_at');
       if (error) throw error;
 
-      // Fetch primary contacts for all offices
       const officeIds = (data || []).map((d: any) => d.office_id);
       const { data: contacts } = await supabase
         .from('office_contacts')
@@ -177,7 +209,6 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
       const tierTemplates = new Map<string, string>();
       data.letters.forEach((l: any) => tierTemplates.set(l.tier, l.body));
 
-      // Update context from response
       if (data.context) {
         setSenderContext(prev => ({
           ...prev,
@@ -188,7 +219,6 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
         }));
       }
 
-      // Merge per office and save
       for (const delivery of deliveries) {
         const tier = delivery.referral_tier || 'Cold';
         let template = tierTemplates.get(tier) || tierTemplates.values().next().value || '';
@@ -230,10 +260,15 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
 
   const saveEdit = async () => {
     if (!current) return;
-    await supabase.from('campaign_deliveries').update({ email_body: editedBody }).eq('id', current.id);
-    setEditing(false);
-    fetchDeliveries();
-    toast({ title: "Letter Updated" });
+    setSaving(true);
+    try {
+      await supabase.from('campaign_deliveries').update({ email_body: editedBody }).eq('id', current.id);
+      setEditing(false);
+      await fetchDeliveries();
+      toast({ title: "Letter Updated" });
+    } finally {
+      setSaving(false);
+    }
   };
 
   // PDF Export
@@ -247,7 +282,6 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
       const contentW = pageW - margin.x * 2;
       const lineHeight = style.fontSize * 1.6;
 
-      // Load logo if needed
       let logoData: string | null = null;
       if (style.showLogo && senderContext.logo_url) {
         try {
@@ -266,7 +300,6 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
         const d = deliveries[i];
         let y = margin.y;
 
-        // Logo + Clinic Header
         if (logoData) {
           try { doc.addImage(logoData, 'PNG', margin.x, y, 60, 60); } catch {}
           doc.setFontSize(16);
@@ -286,18 +319,15 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
           y += 30;
         }
 
-        // Divider
         doc.setDrawColor('#cccccc');
         doc.line(margin.x, y, pageW - margin.x, y);
         y += 20;
 
-        // Date
         doc.setFontSize(10);
         doc.setTextColor('#333333');
         doc.text(format(new Date(), 'MMMM d, yyyy'), margin.x, y);
         y += 24;
 
-        // Recipient
         const doctorName = extractDoctorName(d);
         doc.setFontSize(10);
         doc.text(doctorName, margin.x, y); y += 14;
@@ -308,14 +338,12 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
         }
         y += 10;
 
-        // Salutation
         const lastName = doctorName.replace(/^Dr\.?\s*/i, '').split(' ').pop() || 'Doctor';
         doc.setFontSize(style.fontSize);
         doc.setTextColor('#111111');
         doc.text(`Dear Dr. ${lastName},`, margin.x, y);
         y += lineHeight + 4;
 
-        // Body
         if (d.email_body) {
           const paragraphs = d.email_body.split(/\n\n+/);
           for (const para of paragraphs) {
@@ -329,7 +357,6 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
           }
         }
 
-        // Signature
         y += lineHeight;
         if (y > pageH - margin.y - 50) { doc.addPage(); y = margin.y; }
         doc.text('Sincerely,', margin.x, y); y += lineHeight * 1.5;
@@ -367,6 +394,22 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
             Generate personalized letters for {deliveries.length} offices, preview, and export as PDF
           </DialogDescription>
         </DialogHeader>
+
+        {/* Progress Bar */}
+        {deliveries.length > 0 && (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5" />
+                {readyCount} of {deliveries.length} letters ready
+              </span>
+              <Badge variant={readyCount === deliveries.length ? 'default' : 'secondary'} className="text-xs">
+                {progressPercent}%
+              </Badge>
+            </div>
+            <Progress value={progressPercent} className="h-2" />
+          </div>
+        )}
 
         {/* Controls Bar */}
         <div className="space-y-3 p-3 bg-muted/30 rounded-lg">
@@ -444,10 +487,27 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
               <p className="text-sm text-muted-foreground">{generating ? 'Generating personalized letters...' : 'Loading...'}</p>
             </div>
           ) : !lettersGenerated ? (
-            <div className="text-center py-16">
+            <div className="text-center py-12 space-y-4">
               <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
               <h3 className="font-semibold mb-1">No letters generated yet</h3>
               <p className="text-sm text-muted-foreground">Click "Generate Letters" to create AI-powered tier-based letters</p>
+              
+              {/* Tier Distribution Preview */}
+              {tierDistribution.length > 0 && (
+                <div className="max-w-sm mx-auto mt-4 p-4 bg-muted/30 rounded-lg">
+                  <p className="text-xs font-medium text-muted-foreground mb-2">Office Tier Distribution</p>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {tierDistribution.map(([tier, count]) => (
+                      <Badge key={tier} variant="outline" className="text-xs gap-1">
+                        {tier}: {count}
+                      </Badge>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {tierDistribution.length} unique tier{tierDistribution.length !== 1 ? 's' : ''} → {tierDistribution.length} AI call{tierDistribution.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+              )}
             </div>
           ) : current ? (
             <div className="space-y-3">
@@ -462,6 +522,7 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
                     Letter {currentIndex + 1} of {deliveries.length}
                     {current.referral_tier && <Badge variant="outline" className="ml-2 text-xs">{current.referral_tier}</Badge>}
                   </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">← → arrow keys to navigate</p>
                 </div>
                 <Button variant="ghost" size="sm" disabled={currentIndex === deliveries.length - 1} onClick={() => { setCurrentIndex(i => i + 1); setEditing(false); }}>
                   <ChevronRight className="w-4 h-4" />
@@ -523,8 +584,13 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
                           style={{ fontFamily: style.fontFamily, fontSize: `${style.fontSize}px` }}
                         />
                         <div className="flex gap-2">
-                          <Button size="sm" onClick={saveEdit} className="gap-1"><Check className="w-3 h-3" /> Save</Button>
-                          <Button size="sm" variant="outline" onClick={() => setEditing(false)} className="gap-1"><X className="w-3 h-3" /> Cancel</Button>
+                          <Button size="sm" onClick={saveEdit} disabled={saving} className="gap-1">
+                            {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                            {saving ? 'Saving...' : 'Save'}
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setEditing(false)} disabled={saving} className="gap-1">
+                            <X className="w-3 h-3" /> Cancel
+                          </Button>
                         </div>
                       </div>
                     ) : (
