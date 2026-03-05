@@ -235,8 +235,9 @@ function SettingsContent() {
             name: clinicSettings.clinic_name,
             address: clinicSettings.clinic_address,
             google_place_id: clinicSettings.google_place_id || null,
+            specialty: clinicSettings.specialty || null,
             updated_at: new Date().toISOString()
-          })
+          } as any)
           .eq('id', clinicId);
 
         if (clinicError) throw clinicError;
