@@ -31,21 +31,24 @@ serve(async (req) => {
     const payload = await req.text();
     const headers = Object.fromEntries(req.headers);
 
-    // If webhook secret is configured, verify the webhook signature
-    if (hookSecret) {
-      const wh = new Webhook(hookSecret);
-      try {
-        wh.verify(payload, headers);
-      } catch (error) {
-        console.error("Webhook verification failed:", error);
-        return new Response(
-          JSON.stringify({ error: "Webhook verification failed" }),
-          {
-            status: 401,
-            headers: { "Content-Type": "application/json", ...corsHeaders },
-          }
-        );
-      }
+    // Verify webhook signature (mandatory)
+    if (!hookSecret) {
+      console.error("SEND_EMAIL_HOOK_SECRET is not configured — rejecting request");
+      return new Response(
+        JSON.stringify({ error: "Webhook secret not configured" }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const wh = new Webhook(hookSecret);
+    try {
+      wh.verify(payload, headers);
+    } catch (error) {
+      console.error("Webhook verification failed:", error);
+      return new Response(
+        JSON.stringify({ error: "Webhook verification failed" }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
     }
 
     const body = JSON.parse(payload);

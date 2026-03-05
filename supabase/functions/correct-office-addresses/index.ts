@@ -52,58 +52,37 @@ serve(async (req) => {
       throw new Error('Google Maps API key not configured');
     }
 
-    // PHASE 3: Get authorization header and decode JWT
+    // Authenticate user via getClaims (cryptographic JWT verification)
     const authHeader = req.headers.get('Authorization');
     console.log(`correct-office-addresses: Auth header present: ${!!authHeader} [${requestId}]`);
     
-    if (!authHeader) {
-      console.error(`correct-office-addresses: Missing Authorization header [${requestId}]`);
-      console.error(`correct-office-addresses: Available headers: ${JSON.stringify([...req.headers.keys()])} [${requestId}]`);
+    if (!authHeader?.startsWith('Bearer ')) {
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Unauthorized - No authorization header',
-          requestId 
-        }),
-        { 
-          status: 401, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        JSON.stringify({ success: false, error: 'Unauthorized - No authorization header', requestId }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Extract JWT token
     const token = authHeader.replace('Bearer ', '');
-    
-    // Decode JWT to get user_id (we don't verify signature, just extract payload)
-    let userId: string;
-    try {
-      const parts = token.split('.');
-      if (parts.length !== 3) {
-        throw new Error('Invalid JWT format');
-      }
-      const payload = JSON.parse(atob(parts[1]));
-      userId = payload.sub;
-      
-      if (!userId) {
-        throw new Error('No user ID in token');
-      }
-      
-      console.log(`correct-office-addresses: Authenticated user: ${userId} [${requestId}]`);
-    } catch (decodeError) {
-      console.error(`correct-office-addresses: JWT decode failed [${requestId}]`, decodeError);
+
+    // Verify JWT cryptographically using getClaims
+    const supabaseAuth = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims?.sub) {
+      console.error(`correct-office-addresses: JWT verification failed [${requestId}]`, claimsError);
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Unauthorized - Invalid token',
-          requestId 
-        }),
-        { 
-          status: 401, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        JSON.stringify({ success: false, error: 'Unauthorized - Invalid token', requestId }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const userId = claimsData.claims.sub as string;
+    console.log(`correct-office-addresses: Authenticated user: ${userId} [${requestId}]`);
 
     // Create Supabase admin client for database operations
     const supabaseAdmin = createClient(

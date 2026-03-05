@@ -26,41 +26,34 @@ serve(async (req) => {
       }
     );
 
-    // Get user from auth header using admin client
+    // Authenticate user via getClaims
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('Authorization header required');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     const token = authHeader.replace('Bearer ', '');
 
-    // Decode JWT locally to extract user id (sub) and validate exp
-    const decodeBase64Url = (str: string) => {
-      const pad = str.length % 4;
-      const base64 = (pad ? str + '='.repeat(4 - pad) : str)
-        .replace(/-/g, '+')
-        .replace(/_/g, '/');
-      return atob(base64);
-    };
+    // Create an anon client to verify the JWT cryptographically
+    const supabaseAuth = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
 
-    const [, payloadB64] = token.split('.');
-    const payload = JSON.parse(decodeBase64Url(payloadB64));
-    const now = Math.floor(Date.now() / 1000);
-    if (!payload?.sub || (payload?.exp && payload.exp < now)) {
-      throw new Error('Invalid or expired token');
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims?.sub) {
+      console.error('JWT verification failed:', claimsError);
+      return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
-    // Verify the user exists via Admin API (does not rely on session)
-    const { data: adminUser, error: adminError } = await supabaseAdmin.auth.admin.getUserById(payload.sub);
-    if (adminError || !adminUser?.user) {
-      console.error('Admin user lookup failed:', adminError);
-      throw new Error('Authentication failed');
-    }
+    const user = { id: claimsData.claims.sub as string };
 
-    // Maintain original variable shape used throughout the function
-    const user = { id: adminUser.user.id } as { id: string };
-
-    // Use admin client for all database operations
+    // Use admin client for all database operations (RLS bypass for cross-table queries)
     const supabase = supabaseAdmin;
 
     const { 
