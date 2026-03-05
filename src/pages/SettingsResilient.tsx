@@ -152,6 +152,7 @@ function SettingsContent() {
           clinic_name: data.name || '',
           clinic_address: data.address || '',
           google_place_id: data.google_place_id || '',
+          specialty: (data as any).specialty || '',
           logo_url: brandData?.logo_url || '',
           website_url: brandData?.website_url || '',
           social_links: (brandData?.social_links as any) || {}
