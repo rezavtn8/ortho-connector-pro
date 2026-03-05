@@ -29,6 +29,7 @@ import DailyPatients from '@/pages/DailyPatients';
 import SubscriptionSuccess from '@/pages/SubscriptionSuccess';
 import SubscriptionCancel from '@/pages/SubscriptionCancel';
 import { HelpCenter } from '@/pages/HelpCenter';
+import CompetitorWatch from '@/pages/CompetitorWatch';
 
 
 import { useState } from 'react';
@@ -159,6 +160,14 @@ const Index = () => {
             element={
               <SuspenseWrapper type="page">
                 <Analytics />
+              </SuspenseWrapper>
+            } 
+          />
+          <Route 
+            path="/competitor-watch/*" 
+            element={
+              <SuspenseWrapper type="page">
+                <CompetitorWatch />
               </SuspenseWrapper>
             } 
           />

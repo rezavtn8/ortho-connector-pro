@@ -17,6 +17,7 @@ import {
   Sparkles,
   Mail,
   HelpCircle,
+  Shield,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -44,6 +45,7 @@ const mainNavItems = [
   { id: 'sources', title: 'Patient Sources', icon: Users, path: '/sources' },
   { id: 'offices', title: 'Partner Offices', icon: Building, path: '/offices' },
   { id: 'analytics', title: 'Analytics', icon: BarChart3, path: '/analytics' },
+  { id: 'competitor-watch', title: 'Competitor Watch', icon: Shield, path: '/competitor-watch' },
   { id: 'ai-assistant', title: 'AI Assistant', icon: Bot, path: '/ai-assistant' },
 ];
 
