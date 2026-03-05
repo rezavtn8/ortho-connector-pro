@@ -33,7 +33,6 @@ import {
   MapPin,
   Shield
 } from 'lucide-react';
-import { CompetitorBenchmarking } from '@/components/analytics/CompetitorBenchmarking';
 import { useToast } from '@/hooks/use-toast';
 import {
   ResponsiveContainer,
