@@ -799,6 +799,22 @@ function SettingsContent() {
                         </div>
 
                         <div className="space-y-2">
+                          <Label htmlFor="specialty">Practice Specialty</Label>
+                          <select
+                            id="specialty"
+                            value={clinicSettings.specialty}
+                            onChange={(e) => setClinicSettings(prev => ({ ...prev, specialty: e.target.value }))}
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          >
+                            <option value="">Select specialty...</option>
+                            {SPECIALTY_OPTIONS.map(opt => (
+                              <option key={opt} value={opt}>{opt}</option>
+                            ))}
+                          </select>
+                          <p className="text-xs text-muted-foreground">Used by Competitor Watch to suggest same-specialty practices</p>
+                        </div>
+
+                        <div className="space-y-2">
                           <Label>Logo</Label>
                           <div className="space-y-3">
                             {clinicSettings.logo_url ? (
