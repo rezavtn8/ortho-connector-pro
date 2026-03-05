@@ -104,12 +104,12 @@ export function CompetitorBenchmarking() {
 
   // Fetch suggestions from discovered offices
   const { data: suggestions, isLoading: suggestionsLoading } = useQuery({
-    queryKey: ['competitor-suggestions', clinic?.id],
+    queryKey: ['competitor-suggestions', clinic?.id, clinic?.specialty],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('competitor-snapshot', {
         body: {
           action: 'suggest',
-          watchlist_entry: { specialty: (clinic as any)?.specialty || 'dentist' },
+          watchlist_entry: { specialty: clinic?.specialty || 'dentist' },
         },
       });
       if (error) throw error;
