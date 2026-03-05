@@ -164,6 +164,14 @@ const Index = () => {
             } 
           />
           <Route 
+            path="/competitor-watch/*" 
+            element={
+              <SuspenseWrapper type="page">
+                <CompetitorWatch />
+              </SuspenseWrapper>
+            } 
+          />
+          <Route 
             path="/ai-assistant/*" 
             element={
               <SuspenseWrapper type="page">

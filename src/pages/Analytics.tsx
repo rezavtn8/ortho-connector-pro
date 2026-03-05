@@ -551,10 +551,6 @@ export function Analytics() {
           </Card>
         </TabsContent>
 
-        {/* ===== COMPETITORS TAB ===== */}
-        <TabsContent value="competitors" className="space-y-6">
-          <CompetitorBenchmarking />
-        </TabsContent>
 
         {/* ===== OUTREACH TAB ===== */}
         <TabsContent value="outreach" className="space-y-6">
