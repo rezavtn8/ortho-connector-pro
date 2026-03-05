@@ -1,57 +1,156 @@
 
 
-# Fix Letter Campaign: Doctor Name Fallback & PDF Fidelity
+# Comprehensive Security Analysis
 
-## Problem 1: "Dear Dr. Doctor!" when no contact exists
+## Executive Summary
 
-The `extractDoctorName` function falls back to `'Doctor'`, then the salutation does `Dear Dr. Doctor` — doubling up. The logic also naively takes the last word of the office name as a surname.
+The application has a solid security foundation — Zod validation, DOMPurify sanitization, RLS policies, rate limiting, and session timeout management are all in place. However, there are several medium-to-critical issues that should be addressed.
 
-### Fix in `LetterExecutionDialog.tsx`
+---
 
-**Update `extractDoctorName`** to return a structured result `{ displayName, salutation }` instead of a single string:
-- If `primary_contact` exists: use it for both (e.g., display "Dr. Smith", salutation "Dr. Smith")
-- If office name contains "Dr. X": extract and use that
-- If neither: `displayName = office name`, `salutation = null` (meaning use "Dear Friends at [Office Name]," instead of "Dear Dr. Doctor,")
+## CRITICAL Issues
 
-**Update the salutation line** (line 573-575) to use the structured result — if no doctor name is available, render `"Dear Friends at {office.name},"` instead of `"Dear Dr. Doctor,"`.
+### 1. Stripe Webhook Has No Signature Verification
+**File:** `supabase/functions/stripe-webhook/index.ts`
 
-**Update the PDF export** salutation (line 341-344) with the same logic.
+The webhook handler accepts any POST request without verifying the Stripe signature. An attacker can forge webhook payloads to grant themselves subscriptions or manipulate billing state. The code even has a comment saying "Placeholder" — this must be completed before going live with payments.
 
-**Update `generateLetters`** merge (line 226-231): when replacing `{{doctor_name}}`, use the display name; also replace a new `{{salutation}}` placeholder or just fix the hardcoded "Dear Dr." in the template prompt to handle the no-name case.
+**Fix:** Implement `stripe.webhooks.constructEvent(payload, sig, webhookSecret)` to verify the `stripe-signature` header.
 
-## Problem 2: PDF doesn't match the preview
+---
 
-The PDF uses jsPDF's built-in `helvetica` font (the only font available by default), ignoring the user's selected `style.fontFamily`. The logo is rendered as a small 60x60 image vs the preview's styled version. Layout spacing differs.
+### 2. `correct-office-addresses` Decodes JWT Without Verifying Signature
+**File:** `supabase/functions/correct-office-addresses/index.ts` (lines 78-90)
 
-### Fix: Use `html2canvas` to capture the preview exactly
+The code manually decodes the JWT payload with `atob()` and trusts the `sub` claim **without cryptographic verification**. An attacker can craft a fake JWT with any `user_id` and the function will accept it. It then uses a `SUPABASE_SERVICE_ROLE_KEY` client to perform operations, so RLS is bypassed entirely.
 
-Replace the manual jsPDF text-drawing approach with an `html2canvas`-based capture of each letter's styled preview div. This guarantees font, color, logo, and spacing fidelity.
+**Fix:** Replace manual JWT decoding with `supabase.auth.getClaims(token)` or `supabase.auth.getUser(token)`.
 
-**Changes to `exportPdf`:**
-1. Add `html2canvas` (already available or add as dependency)
-2. For each delivery:
-   - Render the letter into a hidden off-screen div with the exact same styles as the preview (reuse the preview JSX)
-   - Capture with `html2canvas` at `scale: 2` and `useCORS: true`
-   - Add the canvas as an image to jsPDF at letter-size dimensions
-3. Remove the manual text-drawing code (lines 278-371)
+---
 
-Actually, since `html2canvas` would be a new dependency and adds complexity, a simpler approach: **use jsPDF's font embedding** to match the preview font, and replicate the preview layout more faithfully.
+### 3. `discover-nearby-offices` Also Decodes JWT Without Verification
+**File:** `supabase/functions/discover-nearby-offices/index.ts` (lines 38-50)
 
-**Simpler approach — fix the PDF to closely match:**
-1. For fonts: jsPDF only supports `helvetica`, `times`, `courier` natively. Map `style.fontFamily` to the closest jsPDF font:
-   - Georgia/Times New Roman/Garamond/Palatino → `times`
-   - System Sans/Segoe UI → `helvetica`
-2. Use `style.headingColor` for the clinic name in PDF (already done but verify hex format)
-3. Fix logo sizing: match the preview's `w-14 h-14` (56px = ~42pt) proportionally
-4. Use `style.fontSize` consistently (already done for body but ensure heading/date/address use the same relative sizes as preview: heading 1.3em, date 0.85em, etc.)
-5. Match line spacing to preview's `lineHeight: 1.6`
+Same vulnerability as above — manually decodes JWT base64 payload, trusts `sub` without verification, then uses a service-role client. Any crafted token grants full access.
 
-### Implementation summary for PDF fix:
-- Add font mapping function: `getJsPDFFont(fontFamily) → 'times' | 'helvetica' | 'courier'`
-- Apply mapped font throughout the PDF generation instead of hardcoded `'helvetica'`
-- Fix logo dimensions to match preview proportions
-- Use relative font sizes matching the preview CSS (heading = fontSize * 1.3, date = fontSize * 0.85, etc.)
+**Fix:** Same as above — use `getClaims()`.
 
-## Files to modify
-- `src/components/campaign/LetterExecutionDialog.tsx` — both fixes
+---
+
+### 4. `sync-google-business-reviews` Has No Authentication At All
+**File:** `supabase/functions/sync-google-business-reviews/index.ts`
+
+This function uses `SUPABASE_SERVICE_ROLE_KEY` and accepts a `clinic_id` from the request body with zero authentication. Anyone who knows the function URL can trigger a sync for any clinic, and the function reads/writes Google Business tokens (including access tokens and refresh tokens) for arbitrary users.
+
+**Fix:** Add JWT verification to ensure only the token owner can trigger their own sync.
+
+---
+
+### 5. `send-welcome-email` Webhook Secret is Optional
+**File:** `supabase/functions/send-welcome-email/index.ts` (line 35)
+
+The webhook verification is wrapped in `if (hookSecret)` — if `SEND_EMAIL_HOOK_SECRET` is not set, any caller can trigger welcome emails to arbitrary addresses. This could be used for email spam/abuse.
+
+**Fix:** Make webhook verification mandatory, or add an alternative auth check.
+
+---
+
+## HIGH Issues
+
+### 6. Client-Side Rate Limiting is Trivially Bypassable
+**File:** `src/hooks/useAuth.ts` (lines 40-97)
+
+Login rate limiting is stored in `localStorage`. An attacker can simply clear localStorage (or use a private window) to reset the counter and brute-force passwords indefinitely. The server-side `check_rate_limit` DB function exists but is never called during authentication.
+
+**Fix:** Implement server-side rate limiting for auth attempts (Supabase has built-in rate limiting on auth endpoints, but custom enforcement via the `check_rate_limit` function should be wired up).
+
+---
+
+### 7. Inconsistent Auth Patterns Across Edge Functions
+Some functions use `getClaims()` (secure — `get-mapbox-token`, `ai-forecast`, `refresh-google-business-token`), while others use `getUser()` (works but slower), and two functions manually decode JWTs without verification. This inconsistency creates confusion and risk.
+
+**Functions using insecure manual JWT decoding:**
+- `correct-office-addresses`
+- `discover-nearby-offices`
+
+**Functions using no auth at all:**
+- `sync-google-business-reviews`
+- `stripe-webhook`
+
+---
+
+### 8. CORS is `Access-Control-Allow-Origin: *` on All Functions
+Every edge function sets `'Access-Control-Allow-Origin': '*'`. This means any website can make authenticated requests to your edge functions if it has the user's token. For functions that handle sensitive data (Google Business tokens, AI analysis, address corrections), this should be restricted to your domain.
+
+**Fix:** Replace `'*'` with `'https://nexoradental.lovable.app'` (or use an environment variable for the allowed origin).
+
+---
+
+## MEDIUM Issues
+
+### 9. `dashboard_summary` View/Table Has No RLS Policies
+The `dashboard_summary` table has RLS enabled but zero policies defined. This means **no user can read from it via the client** (which may cause silent failures), OR if RLS is accidentally disabled, all users' summaries are exposed.
+
+**Fix:** Add a SELECT policy: `USING (user_id = auth.uid())`.
+
+---
+
+### 10. Several Foreign Key References Are Missing
+Multiple tables (`campaign_deliveries`, `campaigns`, `marketing_visits`, etc.) show empty `<foreign-keys>` sections. Without FK constraints, orphaned records can accumulate and referential integrity is not enforced at the database level.
+
+---
+
+### 11. `SafeText` Uses `dangerouslySetInnerHTML` After Escaping
+**File:** `src/components/SafeText.tsx`
+
+The `escapeHTML` function correctly escapes content, but then `SafeText` renders it via `dangerouslySetInnerHTML`. While currently safe because `escapeHTML` is applied first, this pattern is fragile — a future refactor could accidentally pass unsanitized content. Simply using `{safeContent}` as a text child would be safer and simpler.
+
+---
+
+### 12. `handle_new_user` Trigger Embeds the Anon Key in Plain Text
+**File:** DB function `handle_new_user()`
+
+The Supabase anon key is hardcoded in the trigger function body. While the anon key is technically public, embedding it in a database function means it cannot be rotated without a migration. The trigger also calls the edge function via `net.http_post` with this key — if the key is rotated, signup breaks silently.
+
+---
+
+### 13. No Password Reset Flow
+There is no `/reset-password` page or forgot-password component. Users who forget their password have no way to recover their accounts.
+
+---
+
+## LOW Issues
+
+### 14. `user_profiles.role` is Stored Directly on the Profile Table
+Per security best practices (and the system instructions), roles should be in a separate `user_roles` table to prevent privilege escalation. Currently, `user_profiles` has a `role` column, and while the `validate_user_profile_update` trigger prevents self-promotion to "Owner", a more robust approach would use a separate table with a `SECURITY DEFINER` function.
+
+---
+
+### 15. No CSRF Protection
+The Supabase auth flow relies on bearer tokens (not cookies), so traditional CSRF is not a major risk. However, the Google OAuth callback and other state-changing GET endpoints could benefit from anti-CSRF state parameters.
+
+---
+
+### 16. Edge Function Dependency Versions Are Pinned to Old Versions
+Multiple functions use `@supabase/supabase-js@2.7.1` (from 2023). The client library has had security patches since then. Consider updating to a consistent, recent version across all functions.
+
+---
+
+## Prioritized Action Items
+
+| Priority | Issue | Effort |
+|----------|-------|--------|
+| P0 | Fix Stripe webhook — add signature verification | Small |
+| P0 | Fix `correct-office-addresses` — replace manual JWT decode with `getClaims()` | Small |
+| P0 | Fix `discover-nearby-offices` — replace manual JWT decode with `getClaims()` | Small |
+| P0 | Fix `sync-google-business-reviews` — add authentication | Small |
+| P1 | Make `send-welcome-email` webhook secret mandatory | Small |
+| P1 | Restrict CORS to your domain on sensitive functions | Medium |
+| P1 | Add server-side auth rate limiting | Medium |
+| P1 | Add RLS policy to `dashboard_summary` | Small |
+| P2 | Standardize all edge functions to use `getClaims()` | Medium |
+| P2 | Remove `dangerouslySetInnerHTML` from SafeText | Small |
+| P2 | Implement password reset flow | Medium |
+| P3 | Move roles to separate table | Large |
+| P3 | Update edge function dependency versions | Small |
 
