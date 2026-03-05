@@ -33,6 +33,7 @@ interface ClinicSettings {
   google_place_id: string;
   logo_url: string;
   website_url: string;
+  specialty: string;
   social_links: {
     facebook?: string;
     instagram?: string;
@@ -40,6 +41,20 @@ interface ClinicSettings {
     linkedin?: string;
   };
 }
+
+const SPECIALTY_OPTIONS = [
+  'General Dentist',
+  'Endodontics',
+  'Orthodontics',
+  'Periodontics',
+  'Prosthodontics',
+  'Oral Surgery',
+  'Pediatric Dentistry',
+  'Cosmetic Dentistry',
+  'Implant Dentistry',
+  'Oral & Maxillofacial Surgery',
+  'Other',
+];
 
 interface NotificationSettings {
   biweekly_digest: boolean;
