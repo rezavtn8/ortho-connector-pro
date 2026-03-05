@@ -210,27 +210,36 @@ serve(async (req: Request) => {
         clinicPlaceId = clinicData?.google_place_id || null;
       }
 
-      // Query discovered offices matching specialty
-      let query = supabase
+      // Query discovered offices
+      const { data: discovered } = await supabase
         .from('discovered_offices')
         .select('id, name, address, google_place_id, google_rating, user_ratings_total, latitude, longitude, office_type, distance_miles')
         .eq('discovered_by', userId)
         .eq('is_active', true)
         .order('distance_miles', { ascending: true })
-        .limit(20);
+        .limit(30);
 
-      const { data: discovered } = await query;
-
-      // Filter: match specialty keyword and exclude watched/own clinic
+      // Filter: exclude watched/own clinic, use broad dental-family matching
       const excludeIds = new Set(watchedPlaceIds);
       if (clinicPlaceId) excludeIds.add(clinicPlaceId);
 
+      // Dental-family keywords: if any of these appear in the office_type, it's a potential competitor
+      const dentalFamily = ['dent', 'ortho', 'endo', 'perio', 'prosth', 'oral', 'maxillo', 'pedodont', 'implant'];
       const specLower = specialty.toLowerCase();
+      
+      const isDentalSpec = dentalFamily.some(kw => specLower.includes(kw));
+
       const suggestions = (discovered || [])
         .filter(d => {
           if (excludeIds.has(d.google_place_id)) return false;
           const officeType = (d.office_type || '').toLowerCase();
-          // Match if office_type contains the specialty keyword or is similar
+          
+          // If user's specialty is dental-family, match all dental-family offices
+          if (isDentalSpec) {
+            return dentalFamily.some(kw => officeType.includes(kw)) || officeType === 'unknown';
+          }
+          
+          // Otherwise do flexible matching
           return officeType.includes(specLower) || specLower.includes(officeType) || officeType === 'unknown';
         })
         .slice(0, 10)

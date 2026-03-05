@@ -57,7 +57,7 @@ export function CompetitorBenchmarking() {
             google_place_id: clinic.google_place_id,
             name: clinic.name,
             address: clinic.address,
-            specialty: 'dental', // dynamic based on clinic
+            specialty: (clinic as any)?.specialty || 'dentist',
             latitude: clinic.latitude,
             longitude: clinic.longitude,
             clinic_id: clinic.id,
@@ -109,7 +109,7 @@ export function CompetitorBenchmarking() {
       const { data, error } = await supabase.functions.invoke('competitor-snapshot', {
         body: {
           action: 'suggest',
-          watchlist_entry: { specialty: 'dental' },
+          watchlist_entry: { specialty: (clinic as any)?.specialty || 'dentist' },
         },
       });
       if (error) throw error;
@@ -133,7 +133,7 @@ export function CompetitorBenchmarking() {
           watchlist_entry: {
             latitude: clinic.latitude,
             longitude: clinic.longitude,
-            specialty: searchQuery || 'dental office',
+            specialty: searchQuery || (clinic as any)?.specialty || 'dentist',
             radius_miles: 10,
           },
         },
@@ -385,12 +385,12 @@ export function CompetitorBenchmarking() {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="suggested" className="w-full">
-            <TabsList variant="pills" className="w-full mb-4">
-              <TabsTrigger value="suggested" variant="pills" className="flex-1 gap-1.5">
+            <TabsList className="w-full mb-4">
+              <TabsTrigger value="suggested" className="flex-1 gap-1.5">
                 <Sparkles className="h-3.5 w-3.5" />
                 Suggested
               </TabsTrigger>
-              <TabsTrigger value="search" variant="pills" className="flex-1 gap-1.5">
+              <TabsTrigger value="search" className="flex-1 gap-1.5">
                 <Search className="h-3.5 w-3.5" />
                 Search Google
               </TabsTrigger>
