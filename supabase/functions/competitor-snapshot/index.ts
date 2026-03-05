@@ -37,7 +37,8 @@ serve(async (req: Request) => {
       throw new Error('GOOGLE_MAPS_API_KEY not configured');
     }
 
-    const { action, watchlist_entry, place_id } = await req.json();
+    const body = await req.json();
+    const { action, watchlist_entry, place_id } = body;
 
     // Action: add competitor to watchlist
     if (action === 'add') {
@@ -112,7 +113,6 @@ serve(async (req: Request) => {
           const snapshot = await fetchGooglePlaceData(entry.google_place_id, GOOGLE_MAPS_API_KEY);
           if (!snapshot) continue;
 
-          // Get previous snapshot to calculate velocity
           const { data: prevSnapshots } = await supabase
             .from('competitor_snapshots')
             .select('review_count, snapshot_date')
@@ -127,7 +127,7 @@ serve(async (req: Request) => {
               (new Date(today).getTime() - new Date(prev.snapshot_date).getTime()) / (1000 * 60 * 60 * 24)
             ));
             const reviewDiff = (snapshot.review_count || 0) - (prev.review_count || 0);
-            velocity = Math.round((reviewDiff / daysDiff) * 7 * 100) / 100; // per week
+            velocity = Math.round((reviewDiff / daysDiff) * 7 * 100) / 100;
           }
 
           await supabase.from('competitor_snapshots').upsert({
@@ -153,13 +153,13 @@ serve(async (req: Request) => {
 
     // Action: search for competitors by specialty near a location
     if (action === 'search') {
-      const { latitude, longitude, specialty, radius_miles } = await req.json().catch(() => ({}));
-      const lat = watchlist_entry?.latitude || latitude;
-      const lng = watchlist_entry?.longitude || longitude;
-      const spec = watchlist_entry?.specialty || specialty || 'dentist';
-      const radiusMeters = ((watchlist_entry?.radius_miles || radius_miles || 10) * 1609.34).toFixed(0);
+      const lat = watchlist_entry?.latitude;
+      const lng = watchlist_entry?.longitude;
+      const spec = watchlist_entry?.specialty || 'dentist';
+      const radiusMeters = ((watchlist_entry?.radius_miles || 10) * 1609.34).toFixed(0);
 
-      const searchUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radiusMeters}&keyword=${encodeURIComponent(spec)}&type=dentist&key=${GOOGLE_MAPS_API_KEY}`;
+      // Use keyword for specialty, don't hardcode type=dentist
+      const searchUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radiusMeters}&keyword=${encodeURIComponent(spec)}&key=${GOOGLE_MAPS_API_KEY}`;
       
       const searchRes = await fetch(searchUrl);
       const searchData = await searchRes.json();
@@ -176,6 +176,77 @@ serve(async (req: Request) => {
       }));
 
       return new Response(JSON.stringify({ success: true, results }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Action: suggest competitors from discovered offices
+    if (action === 'suggest') {
+      const specialty = watchlist_entry?.specialty || 'dentist';
+
+      // Get already-watched place IDs
+      const { data: watched } = await supabase
+        .from('competitor_watchlist')
+        .select('google_place_id')
+        .eq('user_id', userId)
+        .eq('is_active', true);
+      
+      const watchedPlaceIds = (watched || []).map(w => w.google_place_id);
+
+      // Get user's clinic google_place_id to exclude it
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('clinic_id')
+        .eq('user_id', userId)
+        .single();
+
+      let clinicPlaceId: string | null = null;
+      if (profile?.clinic_id) {
+        const { data: clinicData } = await supabase
+          .from('clinics')
+          .select('google_place_id')
+          .eq('id', profile.clinic_id)
+          .single();
+        clinicPlaceId = clinicData?.google_place_id || null;
+      }
+
+      // Query discovered offices matching specialty
+      let query = supabase
+        .from('discovered_offices')
+        .select('id, name, address, google_place_id, google_rating, user_ratings_total, latitude, longitude, office_type, distance_miles')
+        .eq('discovered_by', userId)
+        .eq('is_active', true)
+        .order('distance_miles', { ascending: true })
+        .limit(20);
+
+      const { data: discovered } = await query;
+
+      // Filter: match specialty keyword and exclude watched/own clinic
+      const excludeIds = new Set(watchedPlaceIds);
+      if (clinicPlaceId) excludeIds.add(clinicPlaceId);
+
+      const specLower = specialty.toLowerCase();
+      const suggestions = (discovered || [])
+        .filter(d => {
+          if (excludeIds.has(d.google_place_id)) return false;
+          const officeType = (d.office_type || '').toLowerCase();
+          // Match if office_type contains the specialty keyword or is similar
+          return officeType.includes(specLower) || specLower.includes(officeType) || officeType === 'unknown';
+        })
+        .slice(0, 10)
+        .map(d => ({
+          google_place_id: d.google_place_id,
+          name: d.name,
+          address: d.address,
+          latitude: d.latitude,
+          longitude: d.longitude,
+          google_rating: d.google_rating,
+          review_count: d.user_ratings_total,
+          specialty,
+          distance_miles: d.distance_miles,
+        }));
+
+      return new Response(JSON.stringify({ success: true, results: suggestions }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
