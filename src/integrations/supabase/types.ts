@@ -562,6 +562,103 @@ export type Database = {
         }
         Relationships: []
       }
+      competitor_snapshots: {
+        Row: {
+          created_at: string
+          google_rating: number | null
+          id: string
+          raw_data: Json | null
+          review_count: number | null
+          review_velocity: number | null
+          snapshot_date: string
+          user_id: string
+          watchlist_id: string
+        }
+        Insert: {
+          created_at?: string
+          google_rating?: number | null
+          id?: string
+          raw_data?: Json | null
+          review_count?: number | null
+          review_velocity?: number | null
+          snapshot_date?: string
+          user_id: string
+          watchlist_id: string
+        }
+        Update: {
+          created_at?: string
+          google_rating?: number | null
+          id?: string
+          raw_data?: Json | null
+          review_count?: number | null
+          review_velocity?: number | null
+          snapshot_date?: string
+          user_id?: string
+          watchlist_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "competitor_snapshots_watchlist_id_fkey"
+            columns: ["watchlist_id"]
+            isOneToOne: false
+            referencedRelation: "competitor_watchlist"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      competitor_watchlist: {
+        Row: {
+          address: string | null
+          clinic_id: string | null
+          created_at: string
+          google_place_id: string
+          id: string
+          is_active: boolean
+          latitude: number | null
+          longitude: number | null
+          name: string
+          specialty: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          clinic_id?: string | null
+          created_at?: string
+          google_place_id: string
+          id?: string
+          is_active?: boolean
+          latitude?: number | null
+          longitude?: number | null
+          name: string
+          specialty?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          clinic_id?: string | null
+          created_at?: string
+          google_place_id?: string
+          id?: string
+          is_active?: boolean
+          latitude?: number | null
+          longitude?: number | null
+          name?: string
+          specialty?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "competitor_watchlist_clinic_id_fkey"
+            columns: ["clinic_id"]
+            isOneToOne: false
+            referencedRelation: "clinics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_patients: {
         Row: {
           clinic_id: string | null
