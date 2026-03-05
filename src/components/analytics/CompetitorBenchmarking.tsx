@@ -57,7 +57,7 @@ export function CompetitorBenchmarking() {
             google_place_id: clinic.google_place_id,
             name: clinic.name,
             address: clinic.address,
-            specialty: 'dental', // dynamic based on clinic
+            specialty: (clinic as any)?.specialty || 'dentist',
             latitude: clinic.latitude,
             longitude: clinic.longitude,
             clinic_id: clinic.id,
