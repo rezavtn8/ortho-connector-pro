@@ -62,3 +62,6 @@ verify_jwt = false
 
 [functions.generate-campaign-letters]
 verify_jwt = false
+
+[functions.competitor-snapshot]
+verify_jwt = false

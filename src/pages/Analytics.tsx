@@ -30,8 +30,10 @@ import {
   ArrowUpDown,
   CheckCircle2,
   Clock,
-  MapPin
+  MapPin,
+  Shield
 } from 'lucide-react';
+import { CompetitorBenchmarking } from '@/components/analytics/CompetitorBenchmarking';
 import { useToast } from '@/hooks/use-toast';
 import {
   ResponsiveContainer,
@@ -369,7 +371,7 @@ export function Analytics() {
 
       {/* Tabs */}
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid grid-cols-4 w-full max-w-lg">
+        <TabsList className="grid grid-cols-5 w-full max-w-2xl">
           <TabsTrigger value="overview" className="flex items-center gap-1.5">
             <BarChart3 className="h-4 w-4" />
             <span className="hidden sm:inline">Overview</span>
@@ -377,6 +379,10 @@ export function Analytics() {
           <TabsTrigger value="sources" className="flex items-center gap-1.5">
             <Building2 className="h-4 w-4" />
             <span className="hidden sm:inline">Sources</span>
+          </TabsTrigger>
+          <TabsTrigger value="competitors" className="flex items-center gap-1.5">
+            <Shield className="h-4 w-4" />
+            <span className="hidden sm:inline">Competitors</span>
           </TabsTrigger>
           <TabsTrigger value="outreach" className="flex items-center gap-1.5">
             <Megaphone className="h-4 w-4" />
@@ -548,6 +554,11 @@ export function Analytics() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ===== COMPETITORS TAB ===== */}
+        <TabsContent value="competitors" className="space-y-6">
+          <CompetitorBenchmarking />
         </TabsContent>
 
         {/* ===== OUTREACH TAB ===== */}
