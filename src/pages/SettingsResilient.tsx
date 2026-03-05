@@ -249,8 +249,9 @@ function SettingsContent() {
             name: clinicSettings.clinic_name,
             address: clinicSettings.clinic_address,
             google_place_id: clinicSettings.google_place_id || null,
+            specialty: clinicSettings.specialty || null,
             owner_id: user.id
-          })
+          } as any)
           .select()
           .single();
 
