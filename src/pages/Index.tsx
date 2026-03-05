@@ -29,6 +29,7 @@ import DailyPatients from '@/pages/DailyPatients';
 import SubscriptionSuccess from '@/pages/SubscriptionSuccess';
 import SubscriptionCancel from '@/pages/SubscriptionCancel';
 import { HelpCenter } from '@/pages/HelpCenter';
+import CompetitorWatch from '@/pages/CompetitorWatch';
 
 
 import { useState } from 'react';
