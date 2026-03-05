@@ -133,7 +133,7 @@ export function CompetitorBenchmarking() {
           watchlist_entry: {
             latitude: clinic.latitude,
             longitude: clinic.longitude,
-            specialty: searchQuery || 'dental office',
+            specialty: searchQuery || (clinic as any)?.specialty || 'dentist',
             radius_miles: 10,
           },
         },
