@@ -134,7 +134,7 @@ function SettingsContent() {
     try {
       const { data, error } = await supabase
         .from('clinics')
-        .select('name, address, google_place_id')
+        .select('name, address, google_place_id, specialty')
         .eq('id', clinicId)
         .maybeSingle();
 
