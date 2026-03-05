@@ -69,6 +69,7 @@ const initialClinicSettings: ClinicSettings = {
   google_place_id: '',
   logo_url: '',
   website_url: '',
+  specialty: '',
   social_links: {}
 };
 
