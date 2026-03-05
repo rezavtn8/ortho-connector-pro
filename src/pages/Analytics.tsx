@@ -370,7 +370,7 @@ export function Analytics() {
 
       {/* Tabs */}
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid grid-cols-5 w-full max-w-2xl">
+        <TabsList className="grid grid-cols-4 w-full max-w-lg">
           <TabsTrigger value="overview" className="flex items-center gap-1.5">
             <BarChart3 className="h-4 w-4" />
             <span className="hidden sm:inline">Overview</span>
@@ -378,10 +378,6 @@ export function Analytics() {
           <TabsTrigger value="sources" className="flex items-center gap-1.5">
             <Building2 className="h-4 w-4" />
             <span className="hidden sm:inline">Sources</span>
-          </TabsTrigger>
-          <TabsTrigger value="competitors" className="flex items-center gap-1.5">
-            <Shield className="h-4 w-4" />
-            <span className="hidden sm:inline">Competitors</span>
           </TabsTrigger>
           <TabsTrigger value="outreach" className="flex items-center gap-1.5">
             <Megaphone className="h-4 w-4" />
