@@ -17,6 +17,7 @@ import {
   Sparkles,
   Mail,
   HelpCircle,
+  Shield,
 } from 'lucide-react';
 import {
   Sidebar,
