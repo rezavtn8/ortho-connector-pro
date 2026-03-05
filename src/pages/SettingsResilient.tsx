@@ -33,6 +33,7 @@ interface ClinicSettings {
   google_place_id: string;
   logo_url: string;
   website_url: string;
+  specialty: string;
   social_links: {
     facebook?: string;
     instagram?: string;
@@ -40,6 +41,20 @@ interface ClinicSettings {
     linkedin?: string;
   };
 }
+
+const SPECIALTY_OPTIONS = [
+  'General Dentist',
+  'Endodontics',
+  'Orthodontics',
+  'Periodontics',
+  'Prosthodontics',
+  'Oral Surgery',
+  'Pediatric Dentistry',
+  'Cosmetic Dentistry',
+  'Implant Dentistry',
+  'Oral & Maxillofacial Surgery',
+  'Other',
+];
 
 interface NotificationSettings {
   biweekly_digest: boolean;
@@ -54,6 +69,7 @@ const initialClinicSettings: ClinicSettings = {
   google_place_id: '',
   logo_url: '',
   website_url: '',
+  specialty: '',
   social_links: {}
 };
 
@@ -118,7 +134,7 @@ function SettingsContent() {
     try {
       const { data, error } = await supabase
         .from('clinics')
-        .select('name, address, google_place_id')
+        .select('name, address, google_place_id, specialty')
         .eq('id', clinicId)
         .maybeSingle();
 
@@ -136,6 +152,7 @@ function SettingsContent() {
           clinic_name: data.name || '',
           clinic_address: data.address || '',
           google_place_id: data.google_place_id || '',
+          specialty: (data as any).specialty || '',
           logo_url: brandData?.logo_url || '',
           website_url: brandData?.website_url || '',
           social_links: (brandData?.social_links as any) || {}
@@ -218,8 +235,9 @@ function SettingsContent() {
             name: clinicSettings.clinic_name,
             address: clinicSettings.clinic_address,
             google_place_id: clinicSettings.google_place_id || null,
+            specialty: clinicSettings.specialty || null,
             updated_at: new Date().toISOString()
-          })
+          } as any)
           .eq('id', clinicId);
 
         if (clinicError) throw clinicError;
@@ -231,8 +249,9 @@ function SettingsContent() {
             name: clinicSettings.clinic_name,
             address: clinicSettings.clinic_address,
             google_place_id: clinicSettings.google_place_id || null,
+            specialty: clinicSettings.specialty || null,
             owner_id: user.id
-          })
+          } as any)
           .select()
           .single();
 
@@ -724,6 +743,11 @@ function SettingsContent() {
                         </div>
 
                         <div className="space-y-1">
+                          <Label className="text-sm font-medium text-muted-foreground">Specialty</Label>
+                          <p className="text-base font-medium">{clinicSettings.specialty || 'Not set'}</p>
+                        </div>
+
+                        <div className="space-y-1">
                           <Label className="text-sm font-medium text-muted-foreground">Logo</Label>
                           {clinicSettings.logo_url ? (
                             <img src={clinicSettings.logo_url} alt="Clinic logo" className="h-16 w-auto object-contain" />
@@ -772,6 +796,22 @@ function SettingsContent() {
                             onChange={(e) => setClinicSettings(prev => ({ ...prev, clinic_name: e.target.value }))}
                             placeholder="Enter clinic name..."
                           />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="specialty">Practice Specialty</Label>
+                          <select
+                            id="specialty"
+                            value={clinicSettings.specialty}
+                            onChange={(e) => setClinicSettings(prev => ({ ...prev, specialty: e.target.value }))}
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          >
+                            <option value="">Select specialty...</option>
+                            {SPECIALTY_OPTIONS.map(opt => (
+                              <option key={opt} value={opt}>{opt}</option>
+                            ))}
+                          </select>
+                          <p className="text-xs text-muted-foreground">Used by Competitor Watch to suggest same-specialty practices</p>
                         </div>
 
                         <div className="space-y-2">
