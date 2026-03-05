@@ -57,7 +57,7 @@ export function CompetitorBenchmarking() {
             google_place_id: clinic.google_place_id,
             name: clinic.name,
             address: clinic.address,
-            specialty: (clinic as any)?.specialty || 'dentist',
+            specialty: clinic?.specialty || 'dentist',
             latitude: clinic.latitude,
             longitude: clinic.longitude,
             clinic_id: clinic.id,
@@ -104,12 +104,12 @@ export function CompetitorBenchmarking() {
 
   // Fetch suggestions from discovered offices
   const { data: suggestions, isLoading: suggestionsLoading } = useQuery({
-    queryKey: ['competitor-suggestions', clinic?.id],
+    queryKey: ['competitor-suggestions', clinic?.id, clinic?.specialty],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('competitor-snapshot', {
         body: {
           action: 'suggest',
-          watchlist_entry: { specialty: (clinic as any)?.specialty || 'dentist' },
+          watchlist_entry: { specialty: clinic?.specialty || 'dentist' },
         },
       });
       if (error) throw error;
