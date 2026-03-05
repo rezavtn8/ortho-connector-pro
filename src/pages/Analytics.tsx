@@ -30,8 +30,7 @@ import {
   ArrowUpDown,
   CheckCircle2,
   Clock,
-  MapPin,
-  Shield
+  MapPin
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
