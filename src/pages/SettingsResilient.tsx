@@ -743,6 +743,11 @@ function SettingsContent() {
                         </div>
 
                         <div className="space-y-1">
+                          <Label className="text-sm font-medium text-muted-foreground">Specialty</Label>
+                          <p className="text-base font-medium">{clinicSettings.specialty || 'Not set'}</p>
+                        </div>
+
+                        <div className="space-y-1">
                           <Label className="text-sm font-medium text-muted-foreground">Logo</Label>
                           {clinicSettings.logo_url ? (
                             <img src={clinicSettings.logo_url} alt="Clinic logo" className="h-16 w-auto object-contain" />
