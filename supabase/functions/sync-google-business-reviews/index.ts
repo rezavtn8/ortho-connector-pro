@@ -74,18 +74,43 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    // Authenticate the caller via getClaims
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const supabaseAuth = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims?.sub) {
+      console.error('JWT verification failed:', claimsError);
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      });
+    }
+
+    const authenticatedUserId = claimsData.claims.sub as string;
+
     const body: SyncRequest = await req.json().catch(() => ({}));
     const { clinic_id, sync_all } = body;
 
-    console.log('Sync request received:', { clinic_id, sync_all });
+    console.log('Sync request received:', { clinic_id, sync_all, user: authenticatedUserId });
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Get tokens to sync
-    let tokenQuery = supabase.from('google_business_tokens').select('*');
+    // Only allow syncing tokens owned by the authenticated user
+    let tokenQuery = supabase.from('google_business_tokens').select('*').eq('user_id', authenticatedUserId);
     
     if (clinic_id && !sync_all) {
       tokenQuery = tokenQuery.eq('clinic_id', clinic_id);

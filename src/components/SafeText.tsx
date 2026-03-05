@@ -16,13 +16,10 @@ export const SafeText: React.FC<SafeTextProps> = ({
   className, 
   as: Component = 'span' 
 }) => {
-  const safeContent = escapeHTML(children || '');
-  
   return (
-    <Component 
-      className={className}
-      dangerouslySetInnerHTML={{ __html: safeContent }}
-    />
+    <Component className={className}>
+      {children || ''}
+    </Component>
   );
 };
 
