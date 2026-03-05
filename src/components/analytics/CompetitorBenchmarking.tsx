@@ -109,7 +109,7 @@ export function CompetitorBenchmarking() {
       const { data, error } = await supabase.functions.invoke('competitor-snapshot', {
         body: {
           action: 'suggest',
-          watchlist_entry: { specialty: 'dental' },
+          watchlist_entry: { specialty: (clinic as any)?.specialty || 'dentist' },
         },
       });
       if (error) throw error;
