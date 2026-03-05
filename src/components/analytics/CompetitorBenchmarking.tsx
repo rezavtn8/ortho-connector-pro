@@ -385,12 +385,12 @@ export function CompetitorBenchmarking() {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="suggested" className="w-full">
-            <TabsList variant="pills" className="w-full mb-4">
-              <TabsTrigger value="suggested" variant="pills" className="flex-1 gap-1.5">
+            <TabsList className="w-full mb-4">
+              <TabsTrigger value="suggested" className="flex-1 gap-1.5">
                 <Sparkles className="h-3.5 w-3.5" />
                 Suggested
               </TabsTrigger>
-              <TabsTrigger value="search" variant="pills" className="flex-1 gap-1.5">
+              <TabsTrigger value="search" className="flex-1 gap-1.5">
                 <Search className="h-3.5 w-3.5" />
                 Search Google
               </TabsTrigger>
