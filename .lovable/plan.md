@@ -1,57 +1,45 @@
 
 
-# Fix Letter Campaign: Doctor Name Fallback & PDF Fidelity
+# Competitor Watch -- Diagnosis & Fix Plan
 
-## Problem 1: "Dear Dr. Doctor!" when no contact exists
+## Root Causes Identified
 
-The `extractDoctorName` function falls back to `'Doctor'`, then the salutation does `Dear Dr. Doctor` — doubling up. The logic also naively takes the last word of the office name as a surname.
+1. **Specialty matching is broken**: The `clinics` table has no `specialty` column. The component hardcodes `"dental"` as the specialty. The `suggest` action in the edge function tries to match `"dental"` against `office_type` values like `"General Dentist"`, `"Endodontics"`, `"Orthodontics"` -- but `"general dentist".includes("dental")` is `false` (it's "dentist" not "dental"), so zero suggestions are returned despite 587 discovered offices existing.
 
-### Fix in `LetterExecutionDialog.tsx`
+2. **Search Google likely works** but may appear broken because the empty suggest tab is shown first, and the user's clinic is "Irvine Endodontics" which is an Endodontics practice -- searching with the default "dental" keyword may return unrelated results. The specialty should be set dynamically.
 
-**Update `extractDoctorName`** to return a structured result `{ displayName, salutation }` instead of a single string:
-- If `primary_contact` exists: use it for both (e.g., display "Dr. Smith", salutation "Dr. Smith")
-- If office name contains "Dr. X": extract and use that
-- If neither: `displayName = office name`, `salutation = null` (meaning use "Dear Friends at [Office Name]," instead of "Dear Dr. Doctor,")
+3. **Header doesn't match other pages**: Per project design conventions, pages use stats-first layout with no large headers. The current page has a Shield icon + title + description block. Also, tabs use `variant="pills"` but the design standard is `variant="default"` (beveled rectangle).
 
-**Update the salutation line** (line 573-575) to use the structured result — if no doctor name is available, render `"Dear Friends at {office.name},"` instead of `"Dear Dr. Doctor,"`.
+## Plan
 
-**Update the PDF export** salutation (line 341-344) with the same logic.
+### 1. Add `specialty` column to `clinics` table
+- Add `specialty TEXT` column to `clinics`, defaulting to `NULL`
+- This lets users set their actual specialty (e.g., "Endodontics", "General Dentist")
 
-**Update `generateLetters`** merge (line 226-231): when replacing `{{doctor_name}}`, use the display name; also replace a new `{{salutation}}` placeholder or just fix the hardcoded "Dear Dr." in the template prompt to handle the no-name case.
+### 2. Fix edge function suggest logic
+**File:** `supabase/functions/competitor-snapshot/index.ts`
+- In the `suggest` action, broaden the matching: instead of strict `includes()` checks, use a set of related keywords. For example, if specialty is "Endodontics" or "dental", also match "General Dentist" and all dental-related office types.
+- Better approach: if no specific specialty filter, return all discovered offices sorted by distance (dental practices are all competitors to each other).
+- Fetch the clinic's specialty from the DB if not provided in the request.
 
-## Problem 2: PDF doesn't match the preview
+### 3. Fix component specialty handling
+**File:** `src/components/analytics/CompetitorBenchmarking.tsx`
+- Use `clinic.specialty` (from the new column) instead of hardcoded `"dental"`
+- If no specialty is set, default to the clinic's office type or a broad dental keyword
+- Pass the actual specialty to both `suggest` and `search` actions
 
-The PDF uses jsPDF's built-in `helvetica` font (the only font available by default), ignoring the user's selected `style.fontFamily`. The logo is rendered as a small 60x60 image vs the preview's styled version. Layout spacing differs.
+### 4. Remove page header, stats-first layout
+**File:** `src/pages/CompetitorWatch.tsx`
+- Remove the header block (icon + title + description)
+- Let the `CompetitorBenchmarking` component's hero card serve as the top element (stats-first)
 
-### Fix: Use `html2canvas` to capture the preview exactly
+### 5. Fix tab variant
+**File:** `src/components/analytics/CompetitorBenchmarking.tsx`
+- Change `TabsList variant="pills"` to `variant="default"` and `TabsTrigger variant="pills"` to `variant="default"` to match project design standards
 
-Replace the manual jsPDF text-drawing approach with an `html2canvas`-based capture of each letter's styled preview div. This guarantees font, color, logo, and spacing fidelity.
+## Technical Details
 
-**Changes to `exportPdf`:**
-1. Add `html2canvas` (already available or add as dependency)
-2. For each delivery:
-   - Render the letter into a hidden off-screen div with the exact same styles as the preview (reuse the preview JSX)
-   - Capture with `html2canvas` at `scale: 2` and `useCORS: true`
-   - Add the canvas as an image to jsPDF at letter-size dimensions
-3. Remove the manual text-drawing code (lines 278-371)
-
-Actually, since `html2canvas` would be a new dependency and adds complexity, a simpler approach: **use jsPDF's font embedding** to match the preview font, and replicate the preview layout more faithfully.
-
-**Simpler approach — fix the PDF to closely match:**
-1. For fonts: jsPDF only supports `helvetica`, `times`, `courier` natively. Map `style.fontFamily` to the closest jsPDF font:
-   - Georgia/Times New Roman/Garamond/Palatino → `times`
-   - System Sans/Segoe UI → `helvetica`
-2. Use `style.headingColor` for the clinic name in PDF (already done but verify hex format)
-3. Fix logo sizing: match the preview's `w-14 h-14` (56px = ~42pt) proportionally
-4. Use `style.fontSize` consistently (already done for body but ensure heading/date/address use the same relative sizes as preview: heading 1.3em, date 0.85em, etc.)
-5. Match line spacing to preview's `lineHeight: 1.6`
-
-### Implementation summary for PDF fix:
-- Add font mapping function: `getJsPDFFont(fontFamily) → 'times' | 'helvetica' | 'courier'`
-- Apply mapped font throughout the PDF generation instead of hardcoded `'helvetica'`
-- Fix logo dimensions to match preview proportions
-- Use relative font sizes matching the preview CSS (heading = fontSize * 1.3, date = fontSize * 0.85, etc.)
-
-## Files to modify
-- `src/components/campaign/LetterExecutionDialog.tsx` — both fixes
+- Migration: `ALTER TABLE clinics ADD COLUMN specialty TEXT;`
+- Edge function fix: Replace the strict `officeType.includes(specLower)` filter with a broader dental-family matcher -- if the specialty contains "dent" or "endo" or "ortho" etc., treat all dental office types as potential competitors
+- No new dependencies needed
 
