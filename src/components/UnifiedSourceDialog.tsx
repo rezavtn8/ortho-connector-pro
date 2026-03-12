@@ -371,9 +371,10 @@ export const UnifiedSourceDialog: React.FC<UnifiedSourceDialogProps> = ({
                 setFormData(prev => ({
                   ...prev,
                   name: office.name,
-                  address: office.address || '',
-                  phone: office.phone && !prev.phone ? office.phone : prev.phone,
-                  website: office.website && !prev.website ? office.website : prev.website,
+                  address: office.address || prev.address,
+                  phone: office.phone || prev.phone,
+                  website: office.website || prev.website,
+                  google_rating: office.google_rating?.toString() || prev.google_rating,
                 }));
               }
             }}
