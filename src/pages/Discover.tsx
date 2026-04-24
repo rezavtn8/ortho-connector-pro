@@ -509,7 +509,16 @@ export const Discover = () => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Discovered Offices');
     const date = new Date().toISOString().split('T')[0];
-    XLSX.writeFile(wb, `discovered-offices-${date}.xlsx`);
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `discovered-offices-${date}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
     toast({
       title: 'Export complete',
       description: `Exported ${rows.length} office${rows.length === 1 ? '' : 's'} to Excel.`,
