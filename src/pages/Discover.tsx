@@ -4,7 +4,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { RefreshCw, Search, Building2, Loader2, Star, Globe, MapPin } from 'lucide-react';
+import { RefreshCw, Search, Building2, Loader2, Star, Globe, MapPin, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { DiscoveryWizard } from '@/components/DiscoveryWizard';
 import { DiscoveryResults } from '@/components/DiscoveryResults';
 import { SelectionActionBar } from '@/components/SelectionActionBar';
@@ -483,6 +484,38 @@ export const Discover = () => {
     ? discoveredOffices.filter(o => activeGroupMemberIds.includes(o.id))
     : discoveredOffices;
 
+  const handleExportExcel = () => {
+    const rows = displayedOffices.map((o) => ({
+      Name: o.name,
+      Address: o.address ?? '',
+      Phone: o.phone ?? '',
+      Website: o.website ?? '',
+      'Google Rating': o.google_rating ?? '',
+      'Total Reviews': o.user_ratings_total ?? '',
+      'Office Type': o.office_type,
+      'Distance (mi)': o.distance != null ? o.distance.toFixed(2) : '',
+      Latitude: o.latitude ?? '',
+      Longitude: o.longitude ?? '',
+      'In Network': o.imported ? 'Yes' : 'No',
+      'Google Place ID': o.google_place_id,
+      'Discovered At': o.fetched_at,
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [
+      { wch: 32 }, { wch: 40 }, { wch: 16 }, { wch: 30 },
+      { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 14 },
+      { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 28 }, { wch: 22 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Discovered Offices');
+    const date = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `discovered-offices-${date}.xlsx`);
+    toast({
+      title: 'Export complete',
+      description: `Exported ${rows.length} office${rows.length === 1 ? '' : 's'} to Excel.`,
+    });
+  };
+
   // Stats from displayed offices
   const newOffices = displayedOffices.filter(o => !o.imported);
   const highRatedOffices = newOffices.filter(o => (o.google_rating || 0) >= 4.0);
@@ -576,6 +609,15 @@ export const Discover = () => {
             
             {/* Action Buttons */}
             <div className="flex gap-2 shrink-0">
+              <Button
+                onClick={handleExportExcel}
+                variant="outline"
+                disabled={displayedOffices.length === 0}
+                className="flex items-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Export Excel
+              </Button>
               <Button 
                 onClick={handleForceRefresh}
                 variant="outline"
