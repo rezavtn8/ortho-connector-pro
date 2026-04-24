@@ -484,6 +484,38 @@ export const Discover = () => {
     ? discoveredOffices.filter(o => activeGroupMemberIds.includes(o.id))
     : discoveredOffices;
 
+  const handleExportExcel = () => {
+    const rows = displayedOffices.map((o) => ({
+      Name: o.name,
+      Address: o.address ?? '',
+      Phone: o.phone ?? '',
+      Website: o.website ?? '',
+      'Google Rating': o.google_rating ?? '',
+      'Total Reviews': o.user_ratings_total ?? '',
+      'Office Type': o.office_type,
+      'Distance (mi)': o.distance != null ? o.distance.toFixed(2) : '',
+      Latitude: o.latitude ?? '',
+      Longitude: o.longitude ?? '',
+      'In Network': o.imported ? 'Yes' : 'No',
+      'Google Place ID': o.google_place_id,
+      'Discovered At': o.fetched_at,
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [
+      { wch: 32 }, { wch: 40 }, { wch: 16 }, { wch: 30 },
+      { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 14 },
+      { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 28 }, { wch: 22 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Discovered Offices');
+    const date = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `discovered-offices-${date}.xlsx`);
+    toast({
+      title: 'Export complete',
+      description: `Exported ${rows.length} office${rows.length === 1 ? '' : 's'} to Excel.`,
+    });
+  };
+
   // Stats from displayed offices
   const newOffices = displayedOffices.filter(o => !o.imported);
   const highRatedOffices = newOffices.filter(o => (o.google_rating || 0) >= 4.0);
