@@ -577,6 +577,15 @@ export const Discover = () => {
             
             {/* Action Buttons */}
             <div className="flex gap-2 shrink-0">
+              <Button
+                onClick={handleExportExcel}
+                variant="outline"
+                disabled={displayedOffices.length === 0}
+                className="flex items-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Export Excel
+              </Button>
               <Button 
                 onClick={handleForceRefresh}
                 variant="outline"
