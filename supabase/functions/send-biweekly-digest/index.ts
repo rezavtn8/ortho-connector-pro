@@ -5,11 +5,7 @@ import { renderAsync } from "npm:@react-email/components@0.0.22";
 import React from "npm:react@18.3.1";
 import { DigestEmail } from "./_templates/digest.tsx";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-cron-secret",
-};
+import { getCorsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
 
 /**
  * This function is scheduler-triggered, runs with the service-role key, and emails every
@@ -20,20 +16,7 @@ const corsHeaders = {
  * Requires the DIGEST_CRON_SECRET function secret, sent by the scheduler as x-cron-secret.
  * Fails closed when unset: no secret configured means no digest goes out.
  */
-function timingSafeEqual(a: string, b: string): boolean {
-  const enc = new TextEncoder();
-  const aBytes = enc.encode(a);
-  const bBytes = enc.encode(b);
-  // Compare a fixed number of bytes so the loop count never depends on the real secret.
-  let mismatch = aBytes.length === bBytes.length ? 0 : 1;
-  const len = Math.max(aBytes.length, bBytes.length);
-  for (let i = 0; i < len; i++) {
-    mismatch |= (aBytes[i] ?? 0) ^ (bBytes[i] ?? 0);
-  }
-  return mismatch === 0;
-}
-
-function authorize(req: Request): Response | null {
+function authorize(req: Request, corsHeaders: Record<string, string>): Response | null {
   const expected = Deno.env.get("DIGEST_CRON_SECRET");
   if (!expected) {
     console.error("DIGEST_CRON_SECRET is not configured — refusing to send any digest");
@@ -71,9 +54,24 @@ async function generateUnsubscribeToken(userId: string, secret: string): Promise
   return token;
 }
 
+function timingSafeEqual(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const aBytes = enc.encode(a);
+  const bBytes = enc.encode(b);
+  // Compare a fixed number of bytes so the loop count never depends on the real secret.
+  let mismatch = aBytes.length === bBytes.length ? 0 : 1;
+  const len = Math.max(aBytes.length, bBytes.length);
+  for (let i = 0; i < len; i++) {
+    mismatch |= (aBytes[i] ?? 0) ^ (bBytes[i] ?? 0);
+  }
+  return mismatch === 0;
+}
+
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+  const corsHeaders = getCorsHeaders(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret" });
+
+  if (req.method === 'OPTIONS') {
+    return handleCorsPreflight(req, corsHeaders);
   }
 
   if (req.method !== "POST") {
@@ -83,7 +81,7 @@ serve(async (req) => {
     );
   }
 
-  const denied = authorize(req);
+  const denied = authorize(req, corsHeaders);
   if (denied) return denied;
 
   try {

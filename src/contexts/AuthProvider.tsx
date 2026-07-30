@@ -35,6 +35,33 @@ interface SessionTimeoutData {
   warningShown: boolean;
 }
 
+/** Verdict from the server-side login limiter. */
+interface RateLimitVerdict {
+  allowed: boolean;
+  retryAfter: number;
+  message?: string;
+}
+
+/** Supabase attaches the failed response to the thrown error; the body may not be JSON. */
+async function readErrorBody(
+  error: unknown,
+): Promise<{ error?: string; retry_after_seconds?: number } | null> {
+  const context = (error as { context?: { json?: () => Promise<unknown> } })?.context;
+  if (typeof context?.json !== 'function') return null;
+  try {
+    return (await context.json()) as { error?: string; retry_after_seconds?: number };
+  } catch {
+    return null;
+  }
+}
+
+function describeLockout(verdict: RateLimitVerdict): string {
+  const base = verdict.message ?? 'Too many failed sign-in attempts. Please try again later.';
+  const minutes = Math.ceil(verdict.retryAfter / 60);
+  if (minutes <= 0) return base;
+  return `${base} Try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`;
+}
+
 const readJson = <T,>(key: string, fallback: T): T => {
   const stored = localStorage.getItem(key);
   if (!stored) return fallback;
@@ -104,6 +131,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRateLimitData({ attempts: 0, lockoutUntil: null, lastAttempt: 0 });
     setIsLocked(false);
     setLockoutTimeRemaining(0);
+  }, []);
+
+  /**
+   * Ask the `auth-rate-limit` edge function whether this email may attempt a sign-in, and
+   * record the outcome. Deliberately fails closed: if the limiter is unreachable we refuse
+   * the attempt rather than silently dropping back to the client-only counter, which an
+   * attacker controls.
+   */
+  const callServerRateLimit = useCallback(
+    async (email: string, action: 'check' | 'failure' | 'success'): Promise<RateLimitVerdict> => {
+      const unavailable: RateLimitVerdict = {
+        allowed: false,
+        retryAfter: 0,
+        message: 'Sign-in is temporarily unavailable. Please try again shortly.',
+      };
+
+      try {
+        const { data, error } = await supabase.functions.invoke('auth-rate-limit', {
+          body: { email, action },
+        });
+
+        // A 429 or 503 arrives as an error with the response attached rather than as data.
+        if (error) {
+          const body = await readErrorBody(error);
+          return {
+            allowed: false,
+            retryAfter: Number(body?.retry_after_seconds ?? 0),
+            message: body?.error ?? unavailable.message,
+          };
+        }
+
+        return {
+          allowed: data?.allowed !== false,
+          retryAfter: Number(data?.retry_after_seconds ?? 0),
+          message: data?.error,
+        };
+      } catch {
+        return unavailable;
+      }
+    },
+    [],
+  );
+
+  /** Mirror a server-imposed lockout into local state so the UI reflects it immediately. */
+  const applyServerLockout = useCallback((retryAfterSeconds: number) => {
+    if (retryAfterSeconds <= 0) return;
+    setIsLocked(true);
+    setLockoutTimeRemaining(retryAfterSeconds);
+    setRateLimitData({
+      attempts: MAX_ATTEMPTS,
+      lockoutUntil: timestamp() + retryAfterSeconds * 1000,
+      lastAttempt: timestamp(),
+    });
   }, []);
 
   const setSessionActivity = (data: SessionTimeoutData) => {
@@ -253,6 +333,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(
     async (email: string, password: string) => {
+      // Client-side lockout first: instant feedback, no round trip. This is UX only —
+      // clearing localStorage defeats it, which is why the server check below exists.
       if (checkLockoutStatus()) {
         const minutes = Math.ceil(lockoutTimeRemaining / 60);
         return {
@@ -262,11 +344,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
       }
 
+      // The real control. Survives cleared storage, private windows, and callers that
+      // skip the UI entirely.
+      const preCheck = await callServerRateLimit(email, 'check');
+      if (!preCheck.allowed) {
+        applyServerLockout(preCheck.retryAfter);
+        return { error: { message: describeLockout(preCheck) } };
+      }
+
       const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) recordFailedAttempt();
+
+      if (error) {
+        recordFailedAttempt();
+        const afterFailure = await callServerRateLimit(email, 'failure');
+        if (!afterFailure.allowed) applyServerLockout(afterFailure.retryAfter);
+      } else {
+        resetFailedAttempts();
+        await callServerRateLimit(email, 'success');
+      }
+
       return { error };
     },
-    [checkLockoutStatus, lockoutTimeRemaining, recordFailedAttempt],
+    [
+      applyServerLockout,
+      callServerRateLimit,
+      checkLockoutStatus,
+      lockoutTimeRemaining,
+      recordFailedAttempt,
+      resetFailedAttempts,
+    ],
   );
 
   const signUp = useCallback(
