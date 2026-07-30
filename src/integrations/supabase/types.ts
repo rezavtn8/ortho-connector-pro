@@ -2465,6 +2465,15 @@ export type Database = {
         Args: { source_id_param: string }
         Returns: string
       }
+      check_login_rate_limit: {
+        Args: {
+          p_key: string
+          p_max_attempts?: number
+          p_record_failure?: boolean
+          p_window_minutes?: number
+        }
+        Returns: Json
+      }
       check_rate_limit: {
         Args: {
           p_endpoint: string
@@ -2603,6 +2612,7 @@ export type Database = {
         }
         Returns: string
       }
+      reset_login_rate_limit: { Args: { p_key: string }; Returns: undefined }
       set_patient_count: {
         Args: {
           p_count: number
