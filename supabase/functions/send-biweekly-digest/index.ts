@@ -7,7 +7,7 @@ import { DigestEmail } from "./_templates/digest.tsx";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret",
 };
 
 async function generateUnsubscribeToken(userId: string, secret: string): Promise<string> {
@@ -26,10 +26,35 @@ async function generateUnsubscribeToken(userId: string, secret: string): Promise
   return token;
 }
 
+function timingSafeEqual(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const ab = enc.encode(a);
+  const bb = enc.encode(b);
+  if (ab.length !== bb.length) return false;
+  let diff = 0;
+  for (let i = 0; i < ab.length; i++) diff |= ab[i] ^ bb[i];
+  return diff === 0;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+  // This function runs on the service-role key and emails every user.
+  // It is callable only by the scheduler holding DIGEST_CRON_SECRET, and
+  // fails closed when the secret is not configured.
+  const cronSecret = Deno.env.get("DIGEST_CRON_SECRET");
+  const providedSecret = req.headers.get("x-cron-secret") ?? "";
+  if (!cronSecret || !timingSafeEqual(providedSecret, cronSecret)) {
+    console.warn("Unauthorized digest invocation rejected");
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
+  }
+
+
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
