@@ -18,15 +18,18 @@ async function hashIdentifier(email: string): Promise<string> {
     .join("");
 }
 
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json", ...corsHeaders },
-  });
+function makeJson(corsHeaders: Record<string, string>) {
+  return (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
 }
 
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" });
+
+  const json = makeJson(corsHeaders);
 
   if (req.method === 'OPTIONS') {
     return handleCorsPreflight(req, corsHeaders);
