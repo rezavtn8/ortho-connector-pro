@@ -2447,7 +2447,6 @@ export type Database = {
       }
     }
     Functions: {
-      __dump_schema_ddl: { Args: never; Returns: string }
       accept_invitation: { Args: { p_token: string }; Returns: Json }
       add_daily_patients: {
         Args: {
