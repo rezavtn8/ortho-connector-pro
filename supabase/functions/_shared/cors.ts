@@ -39,9 +39,35 @@ export function getAllowedOrigins(): string[] {
   return cachedList;
 }
 
+/**
+ * Lovable preview/sandbox hosts are always allowed: they are our own build
+ * previews and their subdomain changes per project/branch, so they cannot be
+ * pinned as exact strings in the secret.
+ */
+const ALLOWED_HOST_SUFFIXES = [".lovableproject.com", ".lovable.app"];
+
 export function isOriginAllowed(origin: string | null): boolean {
   if (!origin) return false;
-  return getAllowedOrigins().includes(normalize(origin));
+  const normalized = normalize(origin);
+  if (getAllowedOrigins().includes(normalized)) return true;
+
+  // Support wildcard entries such as "https://*.example.com" in the secret.
+  for (const entry of getAllowedOrigins()) {
+    if (entry.includes("*")) {
+      const pattern = new RegExp(
+        "^" + entry.split("*").map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("[^/]*") + "$",
+      );
+      if (pattern.test(normalized)) return true;
+    }
+  }
+
+  try {
+    const url = new URL(normalized);
+    if (url.protocol !== "https:") return false;
+    return ALLOWED_HOST_SUFFIXES.some((suffix) => url.hostname.endsWith(suffix));
+  } catch {
+    return false;
+  }
 }
 
 /**
