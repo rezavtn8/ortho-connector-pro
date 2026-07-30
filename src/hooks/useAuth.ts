@@ -304,10 +304,73 @@ export function useAuth() {
     return () => clearInterval(timer);
   }, [isLocked, lockoutTimeRemaining]);
 
+  // Server-side rate limit, keyed on the email address and recorded in the database.
+  // This is the real control — the localStorage lockout below is only UX feedback.
+  const callServerRateLimit = async (
+    email: string,
+    action: 'check' | 'failure' | 'success'
+  ): Promise<{ allowed: boolean; retryAfter: number; message?: string }> => {
+    try {
+      const { data, error } = await supabase.functions.invoke('auth-rate-limit', {
+        body: { email, action },
+      });
+
+      // Non-2xx (429 / 503) comes back as an error with the body attached.
+      if (error) {
+        let body: any = null;
+        try {
+          body = await (error as any)?.context?.json?.();
+        } catch {
+          body = null;
+        }
+        return {
+          allowed: false,
+          retryAfter: Number(body?.retry_after_seconds ?? 0),
+          message: body?.error ?? 'Sign-in is temporarily unavailable. Please try again shortly.',
+        };
+      }
+
+      return {
+        allowed: data?.allowed !== false,
+        retryAfter: Number(data?.retry_after_seconds ?? 0),
+        message: data?.error,
+      };
+    } catch {
+      // Fail closed rather than silently falling back to the client-only limit.
+      return {
+        allowed: false,
+        retryAfter: 0,
+        message: 'Sign-in is temporarily unavailable. Please try again shortly.',
+      };
+    }
+  };
+
   const signIn = async (email: string, password: string) => {
-    // Check if account is locked
+    // Client-side lockout: fast UX feedback only (kept intentionally).
     if (checkLockoutStatus()) {
       return { error: { message: `Account locked due to too many failed attempts. Try again in ${Math.ceil(lockoutTimeRemaining / 60)} minutes.` } };
+    }
+
+    // Server-side enforcement: survives clearing localStorage / private windows.
+    const preCheck = await callServerRateLimit(email, 'check');
+    if (!preCheck.allowed) {
+      if (preCheck.retryAfter > 0) {
+        setIsLocked(true);
+        setLockoutTimeRemaining(preCheck.retryAfter);
+        setRateLimitData({
+          attempts: MAX_ATTEMPTS,
+          lockoutUntil: timestamp() + preCheck.retryAfter * 1000,
+          lastAttempt: timestamp(),
+        });
+      }
+      const mins = Math.ceil(preCheck.retryAfter / 60);
+      return {
+        error: {
+          message: preCheck.message
+            ? `${preCheck.message}${mins > 0 ? ` Try again in ${mins} minute${mins === 1 ? '' : 's'}.` : ''}`
+            : 'Too many failed sign-in attempts. Please try again later.',
+        },
+      };
     }
 
     const { error } = await supabase.auth.signInWithPassword({
@@ -317,10 +380,24 @@ export function useAuth() {
 
     if (error) {
       recordFailedAttempt();
+      const after = await callServerRateLimit(email, 'failure');
+      if (!after.allowed && after.retryAfter > 0) {
+        setIsLocked(true);
+        setLockoutTimeRemaining(after.retryAfter);
+        setRateLimitData({
+          attempts: MAX_ATTEMPTS,
+          lockoutUntil: timestamp() + after.retryAfter * 1000,
+          lastAttempt: timestamp(),
+        });
+      }
+    } else {
+      resetFailedAttempts();
+      await callServerRateLimit(email, 'success');
     }
 
     return { error };
   };
+
 
   const signUp = async (email: string, password: string, firstName?: string, lastName?: string, phone?: string, jobTitle?: string, degrees?: string) => {
     const redirectUrl = `${window.location.origin}/`;
