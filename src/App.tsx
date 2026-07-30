@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ProductionErrorBoundary } from "@/components/ProductionErrorBoundary";
 import { ConnectionMonitor } from "@/components/ConnectionMonitor";
+import { AuthProvider } from "@/contexts/AuthProvider";
 import Index from "./pages/Index";
 
 const queryClient = new QueryClient({
@@ -43,16 +44,18 @@ const queryClient = new QueryClient({
 const App = () => (
   <ProductionErrorBoundary>
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <ConnectionMonitor />
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/*" element={<Index />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
+      <AuthProvider>
+        <TooltipProvider>
+          <ConnectionMonitor />
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/*" element={<Index />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </AuthProvider>
     </QueryClientProvider>
   </ProductionErrorBoundary>
 );

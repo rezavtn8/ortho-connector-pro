@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Check, ChevronsUpDown, MapPin, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader } from '@googlemaps/js-api-loader';
+// @googlemaps/js-api-loader is imported dynamically below — a static import here would
+// pull the Maps SDK loader into the main bundle for every user.
 
 interface Office {
   id: string;
@@ -82,6 +83,7 @@ export function AddressSearch({ value, onSelect, placeholder = "Search offices..
           return;
         }
 
+        const { Loader } = await import('@googlemaps/js-api-loader');
         const loader = new Loader({
           apiKey,
           version: 'weekly',

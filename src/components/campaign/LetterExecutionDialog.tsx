@@ -187,7 +187,7 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
 
       for (const delivery of deliveries) {
         const tier = delivery.referral_tier || 'Cold';
-        let template = tierTemplates.get(tier) || tierTemplates.values().next().value || '';
+        const template = tierTemplates.get(tier) || tierTemplates.values().next().value || '';
         const info = extractDoctorInfo(delivery);
         const body = template
           .replace(/\{\{doctor_name\}\}/g, info.displayName)
@@ -294,7 +294,7 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
 
       for (const delivery of deliveries) {
         const tier = delivery.referral_tier || 'Cold';
-        let template = tierTemplates.get(tier) || tierTemplates.values().next().value || '';
+        const template = tierTemplates.get(tier) || tierTemplates.values().next().value || '';
 
         const info = extractDoctorInfo(delivery);
         const body = template
@@ -409,8 +409,15 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
             const img = doc.getImageProperties(logoData);
             const aspect = img.width / img.height;
             if (aspect > 1) { logoH = logoMaxPt / aspect; } else { logoW = logoMaxPt * aspect; }
-          } catch {}
-          try { doc.addImage(logoData, 'PNG', margin.x, y + (logoMaxPt - logoH) / 2, logoW, logoH); } catch {}
+          } catch {
+            // Unreadable logo: fall back to the square logoMaxPt box.
+          }
+          try {
+            doc.addImage(logoData, 'PNG', margin.x, y + (logoMaxPt - logoH) / 2, logoW, logoH);
+          } catch (err) {
+            // A bad logo must not abort the whole PDF — render the letter without it.
+            console.warn('Skipping letter logo, could not embed image:', err);
+          }
           const textX = margin.x + logoMaxPt + 12;
           doc.setFontSize(headingFontSize);
           doc.setFont(pdfFont, 'bold');

@@ -6,7 +6,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, Check, X, MapPin, Phone, Globe, Building2, AlertTriangle, Info, Clock, Shield } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader } from '@googlemaps/js-api-loader';
+// @googlemaps/js-api-loader is imported dynamically below — a static import here would
+// pull the Maps SDK loader into the main bundle for every user.
 
 interface ImportedOffice {
   id: string;
@@ -332,6 +333,7 @@ export function OfficeMatchConfirmation({ importedOffices, onComplete }: OfficeM
           return;
         }
 
+        const { Loader } = await import('@googlemaps/js-api-loader');
         const loader = new Loader({
           apiKey,
           version: 'weekly',

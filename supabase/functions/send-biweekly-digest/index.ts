@@ -7,8 +7,53 @@ import { DigestEmail } from "./_templates/digest.tsx";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-cron-secret",
 };
+
+/**
+ * This function is scheduler-triggered, runs with the service-role key, and emails every
+ * opted-in user. `verify_jwt = false` in config.toml means Supabase does not authenticate
+ * callers for us, so it has to be done here — otherwise anyone who learns the URL can mail
+ * the entire user base on demand and torch the sending domain's reputation.
+ *
+ * Requires the DIGEST_CRON_SECRET function secret, sent by the scheduler as x-cron-secret.
+ * Fails closed when unset: no secret configured means no digest goes out.
+ */
+function timingSafeEqual(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const aBytes = enc.encode(a);
+  const bBytes = enc.encode(b);
+  // Compare a fixed number of bytes so the loop count never depends on the real secret.
+  let mismatch = aBytes.length === bBytes.length ? 0 : 1;
+  const len = Math.max(aBytes.length, bBytes.length);
+  for (let i = 0; i < len; i++) {
+    mismatch |= (aBytes[i] ?? 0) ^ (bBytes[i] ?? 0);
+  }
+  return mismatch === 0;
+}
+
+function authorize(req: Request): Response | null {
+  const expected = Deno.env.get("DIGEST_CRON_SECRET");
+  if (!expected) {
+    console.error("DIGEST_CRON_SECRET is not configured — refusing to send any digest");
+    return new Response(
+      JSON.stringify({ error: "Cron secret not configured" }),
+      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } },
+    );
+  }
+
+  const provided = req.headers.get("x-cron-secret");
+  if (!provided || !timingSafeEqual(provided, expected)) {
+    console.warn("Rejected send-biweekly-digest call with a missing or bad x-cron-secret");
+    return new Response(
+      JSON.stringify({ error: "Unauthorized" }),
+      { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } },
+    );
+  }
+
+  return null;
+}
 
 async function generateUnsubscribeToken(userId: string, secret: string): Promise<string> {
   const payload = JSON.stringify({ user_id: userId, type: "biweekly_digest", ts: Date.now() });
@@ -30,6 +75,16 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+  if (req.method !== "POST") {
+    return new Response(
+      JSON.stringify({ error: "Method not allowed" }),
+      { status: 405, headers: { "Content-Type": "application/json", ...corsHeaders } },
+    );
+  }
+
+  const denied = authorize(req);
+  if (denied) return denied;
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;

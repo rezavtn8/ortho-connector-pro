@@ -8,7 +8,7 @@ const emailSchema = z.string()
 
 const phoneSchema = z.string()
   .optional()
-  .refine((val) => !val || /^[\+]?[\s\-\(\)]*([0-9][\s\-\(\)]*){6,}$/.test(val), {
+  .refine((val) => !val || /^\+?[\s\-()]*([0-9][\s\-()]*){6,}$/.test(val), {
     message: 'Please enter a valid phone number'
   });
 

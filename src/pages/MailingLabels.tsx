@@ -247,7 +247,7 @@ export function MailingLabels() {
   // Phase 2: Filtering Logic + Error Detection
   const filteredData = useMemo(() => {
     let results: MailingLabelData[] = [];
-    let errors: string[] = [];
+    const errors: string[] = [];
 
     // Filter partner offices
     if (sourceFilter === 'all' || sourceFilter === 'partner') {

@@ -209,7 +209,7 @@ export function Logs() {
 
     if (dateFilter !== 'all') {
       const now = new Date();
-      let cutoff = new Date();
+      const cutoff = new Date();
       if (dateFilter === 'today') cutoff.setHours(0, 0, 0, 0);
       else if (dateFilter === 'week') cutoff.setDate(now.getDate() - 7);
       else if (dateFilter === 'month') cutoff.setMonth(now.getMonth() - 1);

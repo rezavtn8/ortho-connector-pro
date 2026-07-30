@@ -1,93 +1,78 @@
-# Welcome to your Lovable project
+# Nexora
 
-## Project info
+Dental practice growth platform. Track referral sources, measure where patients actually
+come from, run outreach campaigns to referring offices, and watch competitors — all in one
+place.
 
-**URL**: https://lovable.dev/projects/4a57be9c-5d39-424a-b353-97dc407786e4
+## Stack
 
-## How can I edit this code?
+| Layer    | Choice                                             |
+| -------- | -------------------------------------------------- |
+| Frontend | React 18, TypeScript, Vite, Tailwind, shadcn/ui    |
+| Data     | TanStack Query                                     |
+| Backend  | Supabase (Postgres + Auth + RLS + Edge Functions)  |
+| Maps     | Google Maps / Places, Mapbox, Leaflet              |
+| Email    | Resend                                             |
+| Billing  | Stripe                                             |
 
-There are several ways of editing your application.
+## Getting started
 
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/4a57be9c-5d39-424a-b353-97dc407786e4) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+Requires Node.js 20+ and npm.
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+npm install
+cp .env.example .env   # then fill in the values
+npm run dev            # http://localhost:8080
 ```
 
-**Edit a file directly in GitHub**
+## Environment
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+All frontend config comes from `.env` (Vite only exposes `VITE_`-prefixed vars to the
+browser). See `.env.example` for the full list. Never put a service-role key or any
+third-party API secret in a `VITE_` variable — those ship to the browser. Server-side
+secrets live in Supabase Edge Function secrets.
 
-**Use GitHub Codespaces**
+## Scripts
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+| Command             | Does                                        |
+| ------------------- | ------------------------------------------- |
+| `npm run dev`       | Dev server on port 8080                     |
+| `npm run build`     | Typecheck, then production build to `dist/` |
+| `npm run preview`   | Serve the production build locally          |
+| `npm run typecheck` | TypeScript only, no emit                    |
+| `npm run lint`      | ESLint over `src/`                          |
 
-## What technologies are used for this project?
+## Layout
 
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/4a57be9c-5d39-424a-b353-97dc407786e4) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
-
-## Error Handling System
-
-This project includes a comprehensive error boundary system for robust error handling:
-
-- **React Error Boundaries**: Catch component errors gracefully
-- **Automatic Error Logging**: Errors logged to Supabase database with user context
-- **User-Friendly Fallbacks**: Graceful degradation with retry options
-- **Development Tools**: Detailed error information in development mode
-- **Error Recovery**: Multiple retry strategies based on error type
-
-For detailed documentation, see [docs/ERROR_BOUNDARY_GUIDE.md](docs/ERROR_BOUNDARY_GUIDE.md).
-
-### Testing Error Boundaries
-
-In development, you can test the error boundary system by adding the ErrorTest component to any page:
-
-```tsx
-import { ErrorTest } from '@/components/ErrorTest';
 ```
+src/
+  pages/               one component per route (see pages/Index.tsx for the route table)
+  components/          feature components
+  components/ui/       shadcn/ui primitives — generated, avoid hand-editing
+  hooks/               data-fetching and stateful logic
+  lib/                 cross-cutting helpers (sanitize, validation, date sync)
+  utils/               pure domain helpers (label layout, distance, PDF)
+  integrations/supabase/
+                       client + generated database types
+supabase/
+  functions/           Deno edge functions
+  migrations/          SQL migrations
+```
+
+## Architecture notes
+
+- **Routing** is nested: `App.tsx` mounts a single catch-all route into `pages/Index.tsx`,
+  which gates on auth and holds the real route table.
+- **Error handling** is layered: `ProductionErrorBoundary` at the root, `ErrorBoundary`
+  per section, with errors logged to the `error_logs` table. See
+  [docs/ERROR_BOUNDARY_GUIDE.md](docs/ERROR_BOUNDARY_GUIDE.md).
+- **Every table has RLS enabled**; the client only ever uses the anon key and relies on
+  RLS for tenant isolation.
+- **Edge functions run with `verify_jwt = false`** and authenticate requests themselves
+  (see `supabase/config.toml`). Any new function must do its own auth check.
+
+## Known gaps
+
+See [docs/ROADMAP.md](docs/ROADMAP.md) for the current hardening backlog, and
+[docs/LOVABLE-BRIEF.md](docs/LOVABLE-BRIEF.md) for paste-ready prompts to work through it
+in Lovable — including the guardrails that stop Lovable from reverting decisions made here.

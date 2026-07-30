@@ -282,7 +282,7 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
     let sourcesCreated = 0;
     let sourcesUpdated = 0;
     let dataPointsCreated = 0;
-    let errors: string[] = [];
+    const errors: string[] = [];
     
     try {
       for (let i = 0; i < parsedData.length; i++) {
@@ -336,7 +336,7 @@ export function ImportDataDialog({ onImportComplete }: ImportDataDialogProps) {
               // Create new source with auto-detected type
               const detectedType = detectSourceType(row.source);
               
-              let sourceData: any = {
+              const sourceData: any = {
                 name: row.source,
                 source_type: detectedType,
                 is_active: true,

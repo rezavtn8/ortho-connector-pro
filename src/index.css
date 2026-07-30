@@ -438,24 +438,27 @@ All colors MUST be HSL.
     transform: scale(1.05);
   }
 
-  /* Performance & Accessibility - Respect user preferences */
-  @media (prefers-reduced-motion: reduce) {
-    .animate-pulse-line,
-    .animate-pulse-intense,
-    .animate-ping-intense,
-    .animate-travel-line,
-    .animate-float,
-    .animate-pulse-glow,
-    .animate-pulse-dot,
-    .animate-flow,
-    .animate-bob {
-      animation: none;
-    }
-    
-    .group:hover .group-hover\\:scale-110,
-    .hover\\:scale-110,
-    .hover\\:scale-125 {
-      transform: none;
-    }
+}
+
+/* Performance & accessibility — respect the user's motion preference.
+   Deliberately outside @layer base: Tailwind rewrites escaped utility selectors
+   inside a layer, and these overrides have to beat the utilities they target. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse-line,
+  .animate-pulse-intense,
+  .animate-ping-intense,
+  .animate-travel-line,
+  .animate-float,
+  .animate-pulse-glow,
+  .animate-pulse-dot,
+  .animate-flow,
+  .animate-bob {
+    animation: none !important;
+  }
+
+  .group:hover .group-hover\:scale-110,
+  .hover\:scale-110,
+  .hover\:scale-125 {
+    transform: none !important;
   }
 }

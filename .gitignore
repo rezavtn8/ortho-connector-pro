@@ -12,6 +12,17 @@ dist
 dist-ssr
 *.local
 
+# Environment — never commit real values; see .env.example
+.env
+.env.*
+!.env.example
+
+# Alternate package managers (this project uses npm + package-lock.json)
+bun.lock
+bun.lockb
+yarn.lock
+pnpm-lock.yaml
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -1,51 +1,77 @@
 // src/pages/Index.tsx
-import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { lazy, useState } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { AuthForm } from '@/components/AuthForm';
 import { Layout } from '@/components/Layout';
 import { LandingPage } from '@/components/LandingPage';
 import { SessionTimeoutWarning } from '@/components/SessionTimeoutWarning';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import GoogleBusinessOAuthCallback from '@/pages/GoogleBusinessOAuthCallback';
 import { SuspenseWrapper } from '@/components/SuspenseWrapper';
-import { usePrefetch } from '@/hooks/usePrefetch';
-import { Dashboard } from '@/pages/Dashboard';
-import { Sources } from '@/pages/Sources';
-import { Offices } from '@/pages/Offices';
-import { MarketingVisits } from '@/pages/MarketingVisits';
-import Campaigns from '@/pages/Campaigns';
-import { Settings } from '@/pages/Settings';
-import { Analytics } from '@/pages/Analytics';
-import { SourceDetail } from '@/pages/SourceDetail';
-import { MapView } from '@/pages/MapView';
-import { Reviews } from '@/pages/Reviews';
-import ReviewMagic from '@/pages/ReviewMagic';
-import { Discover } from '@/pages/Discover';
-import { Logs } from '@/pages/Logs';
-import { AIAssistant } from '@/pages/AIAssistant';
-import { MailingLabels } from '@/pages/MailingLabels';
-import DailyPatients from '@/pages/DailyPatients';
-import SubscriptionSuccess from '@/pages/SubscriptionSuccess';
-import SubscriptionCancel from '@/pages/SubscriptionCancel';
-import { HelpCenter } from '@/pages/HelpCenter';
-import CompetitorWatch from '@/pages/CompetitorWatch';
 
+// Every route is code-split. Only the landing page, layout chrome and error handling
+// above ship in the initial bundle — the rest arrives when a route is first visited.
+// Pages with a named export need the `default` shim that React.lazy expects.
+const Dashboard = lazy(() => import('@/pages/Dashboard').then((m) => ({ default: m.Dashboard })));
+const Sources = lazy(() => import('@/pages/Sources').then((m) => ({ default: m.Sources })));
+const SourceDetail = lazy(() =>
+  import('@/pages/SourceDetail').then((m) => ({ default: m.SourceDetail })),
+);
+const Offices = lazy(() => import('@/pages/Offices').then((m) => ({ default: m.Offices })));
+const MarketingVisits = lazy(() =>
+  import('@/pages/MarketingVisits').then((m) => ({ default: m.MarketingVisits })),
+);
+const Settings = lazy(() => import('@/pages/Settings').then((m) => ({ default: m.Settings })));
+const Analytics = lazy(() => import('@/pages/Analytics').then((m) => ({ default: m.Analytics })));
+const MapView = lazy(() => import('@/pages/MapView').then((m) => ({ default: m.MapView })));
+const Reviews = lazy(() => import('@/pages/Reviews').then((m) => ({ default: m.Reviews })));
+const Discover = lazy(() => import('@/pages/Discover').then((m) => ({ default: m.Discover })));
+const Logs = lazy(() => import('@/pages/Logs').then((m) => ({ default: m.Logs })));
+const AIAssistant = lazy(() =>
+  import('@/pages/AIAssistant').then((m) => ({ default: m.AIAssistant })),
+);
+const MailingLabels = lazy(() =>
+  import('@/pages/MailingLabels').then((m) => ({ default: m.MailingLabels })),
+);
+const HelpCenter = lazy(() => import('@/pages/HelpCenter').then((m) => ({ default: m.HelpCenter })));
 
-import { useState } from 'react';
+const Campaigns = lazy(() => import('@/pages/Campaigns'));
+const ReviewMagic = lazy(() => import('@/pages/ReviewMagic'));
+const DailyPatients = lazy(() => import('@/pages/DailyPatients'));
+const CompetitorWatch = lazy(() => import('@/pages/CompetitorWatch'));
+const SubscriptionSuccess = lazy(() => import('@/pages/SubscriptionSuccess'));
+const SubscriptionCancel = lazy(() => import('@/pages/SubscriptionCancel'));
+const GoogleBusinessOAuthCallback = lazy(() => import('@/pages/GoogleBusinessOAuthCallback'));
+
+/** Route path -> page component. Every entry is wrapped in a page-level Suspense below. */
+const ROUTES: ReadonlyArray<[path: string, Component: React.ComponentType]> = [
+  ['/dashboard/*', Dashboard],
+  ['/daily-patients/*', DailyPatients],
+  ['/sources/*', Sources],
+  ['/sources/:sourceId/*', SourceDetail],
+  ['/offices/*', Offices],
+  ['/marketing-visits/*', MarketingVisits],
+  ['/campaigns/*', Campaigns],
+  ['/discover/*', Discover],
+  ['/reviews/*', Reviews],
+  ['/review-magic/*', ReviewMagic],
+  ['/map-view/*', MapView],
+  ['/analytics/*', Analytics],
+  ['/competitor-watch/*', CompetitorWatch],
+  ['/ai-assistant/*', AIAssistant],
+  ['/mailing-labels/*', MailingLabels],
+  ['/logs/*', Logs],
+  ['/help/*', HelpCenter],
+  ['/settings/*', Settings],
+  ['/google-business/oauth/callback', GoogleBusinessOAuthCallback],
+  ['/subscription/success', SubscriptionSuccess],
+  ['/subscription/cancel', SubscriptionCancel],
+];
 
 const Index = () => {
   const { user, loading } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
-  const [pendingPlan, setPendingPlan] = useState<string | null>(null);
-  const { prefetchDashboardData, prefetchOfficesList, prefetchAnalytics, prefetchCampaigns } = usePrefetch();
 
-  const handleGetStarted = (planId?: string) => {
-    if (planId) {
-      setPendingPlan(planId);
-    }
-    setShowAuth(true);
-  };
+  const handleGetStarted = () => setShowAuth(true);
 
   if (loading) {
     return (
@@ -67,174 +93,17 @@ const Index = () => {
       <ErrorBoundary level="section">
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route 
-            path="/dashboard/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <Dashboard />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/daily-patients/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <DailyPatients />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/sources/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <Sources />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/sources/:sourceId/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <SourceDetail />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/offices/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <Offices />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/marketing-visits/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <MarketingVisits />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/campaigns/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <Campaigns />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/discover/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <Discover />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/reviews/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <Reviews />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/review-magic/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <ReviewMagic />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/map-view/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <MapView />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/analytics/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <Analytics />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/competitor-watch/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <CompetitorWatch />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/ai-assistant/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <AIAssistant />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/mailing-labels/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <MailingLabels />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/logs/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <Logs />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/help/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <HelpCenter />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/settings/*" 
-            element={
-              <SuspenseWrapper type="page">
-                <Settings />
-              </SuspenseWrapper>
-            }
-          />
-          <Route 
-            path="/google-business/oauth/callback" 
-            element={
-              <SuspenseWrapper type="page">
-                <GoogleBusinessOAuthCallback />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/subscription/success" 
-            element={
-              <SuspenseWrapper type="page">
-                <SubscriptionSuccess />
-              </SuspenseWrapper>
-            } 
-          />
-          <Route 
-            path="/subscription/cancel" 
-            element={
-              <SuspenseWrapper type="page">
-                <SubscriptionCancel />
-              </SuspenseWrapper>
-            } 
-          />
+          {ROUTES.map(([path, Component]) => (
+            <Route
+              key={path}
+              path={path}
+              element={
+                <SuspenseWrapper type="page">
+                  <Component />
+                </SuspenseWrapper>
+              }
+            />
+          ))}
         </Routes>
       </ErrorBoundary>
       <SessionTimeoutWarning />
