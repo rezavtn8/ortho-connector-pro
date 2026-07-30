@@ -8,7 +8,9 @@
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "build:dev": "vite build --mode development"
+    "build:dev": "vite build --mode development",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@googlemaps/js-api-loader": "^1.16.10",
