@@ -1,11 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
 
+import { getCorsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
 const MAX_ATTEMPTS = 5;
 const WINDOW_MINUTES = 15;
 
@@ -21,16 +18,21 @@ async function hashIdentifier(email: string): Promise<string> {
     .join("");
 }
 
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json", ...corsHeaders },
-  });
+function makeJson(corsHeaders: Record<string, string>) {
+  return (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+  const corsHeaders = getCorsHeaders(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" });
+
+  const json = makeJson(corsHeaders);
+
+  if (req.method === 'OPTIONS') {
+    return handleCorsPreflight(req, corsHeaders);
   }
 
   try {
