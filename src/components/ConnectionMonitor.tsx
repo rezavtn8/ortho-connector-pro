@@ -3,25 +3,17 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { WifiOff, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 export function ConnectionMonitor() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState(true);
   const [isRetrying, setIsRetrying] = useState(false);
-  const [hasSession, setHasSession] = useState(false);
 
-  // Track auth session
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setHasSession(!!data.session);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setHasSession(!!session);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+  // Read the session from the provider rather than opening a second
+  // onAuthStateChange subscription — there should only ever be one.
+  const { session } = useAuth();
+  const hasSession = !!session;
 
   // Monitor network connection
   useEffect(() => {
