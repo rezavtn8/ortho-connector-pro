@@ -5,11 +5,8 @@ import { renderAsync } from "npm:@react-email/components@0.0.22";
 import React from "npm:react@18.3.1";
 import { DigestEmail } from "./_templates/digest.tsx";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret",
-};
 
+import { getCorsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
 async function generateUnsubscribeToken(userId: string, secret: string): Promise<string> {
   const payload = JSON.stringify({ user_id: userId, type: "biweekly_digest", ts: Date.now() });
   const encoder = new TextEncoder();
@@ -37,8 +34,10 @@ function timingSafeEqual(a: string, b: string): boolean {
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+  const corsHeaders = getCorsHeaders(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-cron-secret" });
+
+  if (req.method === 'OPTIONS') {
+    return handleCorsPreflight(req, corsHeaders);
   }
 
   // This function runs on the service-role key and emails every user.

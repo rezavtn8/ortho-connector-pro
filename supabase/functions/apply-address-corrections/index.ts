@@ -1,12 +1,8 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS'
-};
 
+import { getCorsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
 interface AddressUpdate {
   id: string;
   address: string;
@@ -16,8 +12,10 @@ serve(async (req) => {
   const requestId = crypto.randomUUID();
   console.log(`apply-address-corrections: ${req.method} request [${requestId}]`);
 
+  const corsHeaders = getCorsHeaders(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" });
+
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return handleCorsPreflight(req, corsHeaders);
   }
 
   if (req.method !== 'POST') {
