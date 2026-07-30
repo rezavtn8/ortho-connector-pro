@@ -1,7 +1,12 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { AuthForm } from './AuthForm';
+import { Loader2 } from 'lucide-react';
+
+// Only rendered once the visitor clicks through to sign in. Loading it lazily keeps
+// zod, react-hook-form and @hookform/resolvers out of the initial bundle, which every
+// anonymous visitor pays for.
+const AuthForm = lazy(() => import('./AuthForm').then((m) => ({ default: m.AuthForm })));
 import { Building2, BarChart3, Users, Search, ArrowRight, CheckCircle, Globe, MessageSquare, MapPin, Star, TrendingUp, Brain, Bot } from 'lucide-react';
 import { NexoraLogo } from '@/components/NexoraLogo';
 import { AnimatedNexoraLogo } from '@/components/AnimatedNexoraLogo';
@@ -470,7 +475,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
                 </div>
                 <p className="text-connection-muted">Access your practice growth dashboard</p>
               </div>
-              <AuthForm embedded />
+              <Suspense
+                fallback={
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-6 w-6 animate-spin text-connection-primary" />
+                  </div>
+                }
+              >
+                <AuthForm embedded />
+              </Suspense>
             </div>
           </div>
         )}

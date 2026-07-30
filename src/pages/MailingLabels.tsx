@@ -14,7 +14,8 @@ import { useDiscoveredGroups } from '@/hooks/useDiscoveredGroups';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import * as XLSX from 'xlsx';
+// xlsx is ~94 kB gzipped and only needed when the user actually exports, so it is
+// imported on demand inside the handler rather than at module scope.
 import {
   Select,
   SelectContent,
@@ -408,7 +409,8 @@ export function MailingLabels() {
   // Get export data (uses editable data)
 
   // Phase 4: Excel Export
-  const handleExportToExcel = () => {
+  const handleExportToExcel = async () => {
+    const XLSX = await import('xlsx');
     if (editableData.length === 0) {
       toast({
         title: "No data to export",

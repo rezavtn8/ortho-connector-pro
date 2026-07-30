@@ -140,7 +140,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * attacker controls.
    */
   const callServerRateLimit = useCallback(
-    async (email: string, action: 'check' | 'failure' | 'success'): Promise<RateLimitVerdict> => {
+    async (
+      email: string,
+      action: 'check' | 'failure' | 'success',
+      accessToken?: string,
+    ): Promise<RateLimitVerdict> => {
       const unavailable: RateLimitVerdict = {
         allowed: false,
         retryAfter: 0,
@@ -149,7 +153,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       try {
         const { data, error } = await supabase.functions.invoke('auth-rate-limit', {
-          body: { email, action },
+          // `success` carries the freshly-issued access token: the server verifies it
+          // belongs to this email before clearing the counter, so a reset cannot be
+          // faked by an attacker trying to wipe their own failed attempts.
+          body: { email, action, accessToken },
         });
 
         // A 429 or 503 arrives as an error with the response attached rather than as data.
@@ -352,7 +359,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: { message: describeLockout(preCheck) } };
       }
 
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
       if (error) {
         recordFailedAttempt();
@@ -360,7 +367,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!afterFailure.allowed) applyServerLockout(afterFailure.retryAfter);
       } else {
         resetFailedAttempts();
-        await callServerRateLimit(email, 'success');
+        // Hand the server the token it needs to verify this sign-in really happened.
+        await callServerRateLimit(email, 'success', data.session?.access_token);
       }
 
       return { error };

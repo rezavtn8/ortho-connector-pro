@@ -5,7 +5,8 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { RefreshCw, Search, Building2, Loader2, Star, Globe, MapPin, Download } from 'lucide-react';
-import * as XLSX from 'xlsx';
+// xlsx is ~94 kB gzipped and only needed when the user actually exports, so it is
+// imported on demand inside the handler rather than at module scope.
 import { DiscoveryWizard } from '@/components/DiscoveryWizard';
 import { DiscoveryResults } from '@/components/DiscoveryResults';
 import { SelectionActionBar } from '@/components/SelectionActionBar';
@@ -484,7 +485,8 @@ export const Discover = () => {
     ? discoveredOffices.filter(o => activeGroupMemberIds.includes(o.id))
     : discoveredOffices;
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
+    const XLSX = await import('xlsx');
     const rows = displayedOffices.map((o) => ({
       Name: o.name,
       Address: o.address ?? '',
