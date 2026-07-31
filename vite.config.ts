@@ -14,21 +14,19 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  build: {
-    rollupOptions: {
-      output: {
-        // Only pin the vendors the entry genuinely needs, so they get their own
-        // long-lived cacheable chunks. Everything heavy (maps, charts, xlsx, jspdf) is
-        // reached solely through lazy routes — Rollup already hoists those into shared
-        // chunks that load on demand, and pinning them here only risks creating an
-        // import edge from the entry that would put them back in the initial download.
-        manualChunks(id) {
-          if (!id.includes("node_modules")) return;
-          if (/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//.test(id))
-            return "vendor-react";
-          if (/node_modules\/(@supabase|@tanstack)\//.test(id)) return "vendor-data";
-        },
-      },
-    },
-  },
+  // No manualChunks here, deliberately. Two attempts at hand-splitting the vendors both
+  // went wrong, and the second one shipped a white screen:
+  //
+  //   1. The object form makes Vite synthesise a module that imports every listed package
+  //      from the entry, which dragged maps/charts/PDF back into the initial download and
+  //      undid the route splitting.
+  //   2. The function form split react and @supabase/@tanstack into sibling chunks that
+  //      ended up importing each other. Rollup cannot order a cycle, so vendor-data
+  //      evaluated first and blew up on `undefined.createContext` before React existed.
+  //
+  // Rollup's automatic chunking already gives each lazy route its own chunk and hoists
+  // genuinely shared code into shared chunks, without either failure mode. Any future
+  // attempt to hand-split must be verified by loading the built output in a browser and
+  // checking the console, not just by reading the chunk sizes.
+
 });
