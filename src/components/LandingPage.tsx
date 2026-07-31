@@ -1,44 +1,120 @@
 import React, { Suspense, lazy } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ArrowRight, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { NexoraLogo } from '@/components/NexoraLogo';
+import { useSubscription } from '@/hooks/useSubscription';
+import { useIntersectionObserver } from '@/hooks/useIntersectionObserver';
 
 // Only rendered once the visitor clicks through to sign in. Loading it lazily keeps
 // zod, react-hook-form and @hookform/resolvers out of the initial bundle, which every
 // anonymous visitor pays for.
 const AuthForm = lazy(() => import('./AuthForm').then((m) => ({ default: m.AuthForm })));
-import { Building2, BarChart3, Users, Search, ArrowRight, CheckCircle, Globe, MessageSquare, MapPin, Star, TrendingUp, Brain, Bot } from 'lucide-react';
-import { NexoraLogo } from '@/components/NexoraLogo';
-import { AnimatedNexoraLogo } from '@/components/AnimatedNexoraLogo';
-import { useSubscription } from '@/hooks/useSubscription';
-import { useIntersectionObserver } from '@/hooks/useIntersectionObserver';
 
 interface LandingPageProps {
   onGetStarted: () => void;
   showAuth?: boolean;
 }
 
+/** Small caps section marker, sitting on the hairline rule that runs down the page. */
+function SectionMark({ n, label, className = '' }: { n: string; label: string; className?: string }) {
+  return (
+    <div className={`flex items-baseline gap-3 ${className}`}>
+      <span className="text-connection-primary text-xs font-medium tabular-nums">{n}</span>
+      <span className="h-px w-8 bg-connection-primary/30 translate-y-[-3px]" />
+      <span className="text-[11px] uppercase tracking-[0.18em] text-connection-muted">{label}</span>
+    </div>
+  );
+}
+
+/**
+ * Prose sections put the marker in its own left column, so the text keeps a readable
+ * measure without leaving the right half of a wide screen looking abandoned.
+ */
+function ProseSection({
+  n,
+  label,
+  children,
+}: {
+  n: string;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="max-w-6xl mx-auto grid lg:grid-cols-[auto_minmax(0,42rem)] gap-y-8 gap-x-16 lg:gap-x-24">
+      <SectionMark n={n} label={label} className="lg:pt-2" />
+      <div>{children}</div>
+    </div>
+  );
+}
+
+/**
+ * The hero artifact. A plain reading of one month, which is the whole product in
+ * miniature: you can see at a glance that Kingsway has gone quiet. Deliberately built
+ * from type and rules rather than a screenshot, so it stays sharp and weighs nothing.
+ */
+function SourceLedger() {
+  const rows = [
+    { name: 'Google', kind: 'Online', count: 19, dir: 'up' as const, note: 'best month so far' },
+    { name: 'Bayview Family Dental', kind: 'Referring office', count: 12, dir: 'up' as const, note: 'up from 9' },
+    { name: 'Kingsway Dental', kind: 'Referring office', count: 3, dir: 'down' as const, note: 'was 14 in March' },
+    { name: 'Northside Orthodontics', kind: 'Referring office', count: 6, dir: 'flat' as const, note: 'steady' },
+    { name: 'Walk in', kind: 'Direct', count: 4, dir: 'flat' as const, note: '' },
+  ];
+
+  return (
+    <div className="rounded-2xl border border-connection-primary/15 bg-white/70 backdrop-blur-sm shadow-card overflow-hidden">
+      <div className="flex items-baseline justify-between px-6 py-4 border-b border-connection-primary/10">
+        <span className="text-[11px] uppercase tracking-[0.18em] text-connection-muted">
+          New patients, this month
+        </span>
+        <span className="text-sm tabular-nums text-connection-text font-medium">44</span>
+      </div>
+
+      <ul>
+        {rows.map((r) => (
+          <li
+            key={r.name}
+            className="flex items-center gap-4 px-6 py-3.5 border-b border-connection-primary/[0.07] last:border-b-0"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="text-sm text-connection-text truncate">{r.name}</div>
+              <div className="text-xs text-connection-muted mt-0.5">{r.kind}</div>
+            </div>
+
+            {r.note && (
+              <span
+                className={`hidden sm:inline text-xs ${
+                  r.dir === 'down' ? 'text-connection-text/70' : 'text-connection-muted'
+                }`}
+              >
+                {r.note}
+              </span>
+            )}
+
+            <div className="flex items-center gap-1.5 w-14 justify-end">
+              {r.dir === 'up' && <ArrowUpRight className="w-3.5 h-3.5 text-connection-primary" />}
+              {r.dir === 'down' && <ArrowDownRight className="w-3.5 h-3.5 text-connection-primary" />}
+              <span className="text-sm tabular-nums text-connection-text font-medium">{r.count}</span>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth = false }) => {
   const { createCheckoutSession } = useSubscription();
   const [selectedPlan, setSelectedPlan] = React.useState<string | null>(null);
-  
-  // Intersection observers for scroll animations
-  const featuresSection = useIntersectionObserver({ threshold: 0.1 });
-  const benefitsSection = useIntersectionObserver({ threshold: 0.1 });
-  const pricingSection = useIntersectionObserver({ threshold: 0.1 });
-  
+
+  const work = useIntersectionObserver({ threshold: 0.08 });
+  const pricing = useIntersectionObserver({ threshold: 0.08 });
+
   const handlePlanSelect = (planId: string) => {
-    if (showAuth) {
-      // User is viewing auth form, proceed with checkout after auth
-      setSelectedPlan(planId);
-    } else {
-      // Show auth form first
-      setSelectedPlan(planId);
-      onGetStarted();
-    }
+    setSelectedPlan(planId);
+    if (!showAuth) onGetStarted();
   };
 
-  // Trigger checkout after successful auth
   React.useEffect(() => {
     if (showAuth && selectedPlan) {
       createCheckoutSession.mutate(selectedPlan);
@@ -46,439 +122,109 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
     }
   }, [showAuth, selectedPlan, createCheckoutSession]);
 
-  const features = [
+  const capabilities = [
     {
-      icon: <Search className="w-8 h-8" />,
-      title: "Smart Office Discovery",
-      description: "Find 100+ dental offices within 50 miles using advanced filters. Search by specialties, ratings, patient volume, and practice types with our discovery wizard."
+      title: 'Patient sources',
+      body: 'Every new patient gets attributed to wherever they came from. A referring office, Google, a campaign, or the front door. The count is there whether or not anyone remembers to mention it.',
     },
     {
-      icon: <Star className="w-8 h-8" />,
-      title: "Google Reviews Management",
-      description: "Monitor all Google reviews across your network in one dashboard. Track competitor ratings, get new review alerts, and analyze review sentiment trends."
+      title: 'A page per office',
+      body: 'Who referred, how often, when you last visited, who you spoke to and what was said. The things that normally live in one person’s head.',
     },
     {
-      icon: <Bot className="w-8 h-8" />,
-      title: "AI-Powered Insights",
-      description: "AI analyzes relationship health, identifies outreach priorities, provides competitive intelligence, and generates actionable practice growth recommendations."
+      title: 'Reviews',
+      body: 'Your Google reviews in one list, with the practices near you alongside them. Replies can be drafted for you. Nothing gets posted until you say so.',
     },
     {
-      icon: <Globe className="w-8 h-8" />,
-      title: "Patient Source Intelligence",
-      description: "Track Google, Yelp, referrals, and walk-ins with multi-channel integration. Organize by dental offices, online platforms, and referral sources."
+      title: 'Visits and campaigns',
+      body: 'Plan the visit, print the labels, send the letters, then record what actually came of it. The follow up is the part that usually gets lost.',
     },
     {
-      icon: <BarChart3 className="w-8 h-8" />,
-      title: "Growth Analytics",
-      description: "Visual reports, trend analysis, and performance dashboards. Track patient acquisition metrics, source effectiveness, and relationship ROI."
+      title: 'Finding practices',
+      body: 'Search the area around you for practices you have not met yet, filtered by distance, rating and type.',
     },
     {
-      icon: <MessageSquare className="w-8 h-8" />,
-      title: "Campaign Management",
-      description: "Run targeted outreach campaigns with automated follow-ups. Track engagement rates, measure campaign ROI, and optimize your marketing efforts."
-    }
+      title: 'Twelve months of history',
+      body: 'Enough history that a slow decline looks like a slow decline, instead of looking like a quiet week.',
+    },
   ];
 
-  return (
-    <div className="min-h-screen bg-gradient-connection relative">
-      {/* Header */}
-      <header className="relative px-6 pt-8">
-        <nav className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <NexoraLogo size={32} className="text-connection-primary" />
-            <span className="text-2xl font-bold text-connection-text">Nexora</span>
-          </div>
-          {!showAuth && (
-            <Button 
-              variant="outline" 
-              onClick={onGetStarted}
-              className="border-connection-primary/30 text-connection-text hover:bg-connection-primary/10"
-            >
-              Sign In
-            </Button>
-          )}
-        </nav>
-      </header>
+  const plans = [
+    {
+      id: 'solo',
+      name: 'Solo',
+      price: '149',
+      for: 'One dentist, up to 50 referring offices',
+      points: ['One account', 'Sources, offices, visits and reviews', 'Email campaigns'],
+      featured: false,
+    },
+    {
+      id: 'group',
+      name: 'Group',
+      price: '399',
+      for: 'A team, up to 200 referring offices',
+      points: [
+        'Ten accounts',
+        'Everything in Solo',
+        'Drafted review replies, posted to Google',
+        'Full analytics and automation',
+      ],
+      featured: true,
+    },
+    {
+      id: 'multi',
+      name: 'Multi location',
+      price: '799',
+      for: 'Several practices, no limit on offices',
+      points: ['Unlimited accounts', 'Everything in Group', 'API access', 'Someone to call'],
+      featured: false,
+    },
+  ];
 
-      <div className={`flex ${showAuth ? 'min-h-[calc(100vh-100px)] items-center flex-col md:flex-row' : ''}`}>
-        {/* Main Content */}
-        <div className={`${showAuth ? 'hidden md:block md:w-1/2 px-6' : 'w-full'} relative z-20`}>
-          {/* Hero Section */}
-          <section className={`${showAuth ? 'px-0' : 'px-6'} pt-20 pb-24`}>
-            <div className="max-w-4xl mx-auto text-center">
-              <div className="flex justify-center mb-8">
-                <AnimatedNexoraLogo size={120} className="text-connection-primary hover-scale" animate={true} />
-              </div>
-              <h1 className="text-5xl md:text-6xl font-bold text-connection-text mb-6 leading-tight">
-                <span className="block animate-fade-in hover-scale" style={{ animationDelay: '0.5s', animationFillMode: 'both' }}>
-                  Grow Your Practice.
-                </span>
-                <span className="block text-connection-primary font-light animate-fade-in" style={{ animationDelay: '0.8s', animationFillMode: 'both' }}>
-                  Nurture Your Network.
-                </span>
-                <span className="block text-2xl font-bold text-connection-text animate-fade-in" style={{ animationDelay: '1.1s', animationFillMode: 'both' }}>
-                  with Nexora Dental
-                </span>
-              </h1>
-              
-              <p className="text-lg md:text-xl text-connection-muted mb-12 max-w-3xl mx-auto leading-relaxed animate-fade-in" style={{ animationDelay: '1.1s', animationFillMode: 'both' }}>
-                AI-powered practice growth platform with Google Reviews management, office discovery, and intelligent insights that drive measurable results.
-              </p>
-              
-              {!showAuth && (
-                <div className="flex flex-col gap-4 justify-center items-center animate-fade-in" style={{ animationDelay: '1.4s', animationFillMode: 'both' }}>
-                  {/* Navigation buttons row */}
-                  <div className="flex gap-4 justify-center">
-                    <Button 
-                      variant="outline"
-                      size="lg"
-                      onClick={() => document.getElementById('features-section')?.scrollIntoView({ behavior: 'smooth' })}
-                      className="border-connection-muted/40 text-connection-muted hover:bg-connection-muted/10 px-6 py-3 text-lg rounded-xl transition-all hover-scale"
-                    >
-                      Features
-                    </Button>
-                    <Button 
-                      variant="outline"
-                      size="lg"
-                      onClick={() => document.getElementById('pricing-section')?.scrollIntoView({ behavior: 'smooth' })}
-                      className="border-connection-muted/40 text-connection-muted hover:bg-connection-muted/10 px-6 py-3 text-lg rounded-xl transition-all hover-scale"
-                    >
-                      Pricing
-                    </Button>
-                  </div>
-                  
-                  {/* Primary CTA button */}
-                  <Button 
-                    size="lg"
-                    onClick={onGetStarted}
-                    className="bg-connection-primary hover:bg-connection-primary/90 text-white px-8 py-4 text-lg rounded-xl shadow-elegant hover:shadow-glow transition-all group hover-scale"
-                  >
-                    Sign In / Sign Up
-                    <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                  </Button>
-                </div>
-              )}
-            </div>
-          </section>
-          
-          {!showAuth && (
-            <>
-              {/* Features Section */}
-              <section id="features-section" className="px-6 py-24 bg-white/60 backdrop-blur-sm" ref={featuresSection.ref}>
-                <div className="max-w-6xl mx-auto">
-                  <div className="text-center mb-16">
-                    <p className="text-2xl md:text-3xl text-connection-text max-w-4xl mx-auto leading-relaxed" style={{ fontFamily: '"Dancing Script", cursive', fontWeight: 400 }}>
-                      "From discovering offices to managing reviews, leveraging AI insights to tracking patient sources - we bring everything together in one intelligent platform."
-                    </p>
-                  </div>
-
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {features.map((feature, index) => (
-                      <Card 
-                        key={index}
-                        variant="glass"
-                        className={`group border-connection-primary/20 hover:border-connection-primary/40 ${featuresSection.isVisible ? 'animate-fade-in' : 'opacity-0'}`}
-                        style={{ animationDelay: featuresSection.isVisible ? `${index * 0.1}s` : '0s', animationFillMode: 'both' }}
-                      >
-                        <CardContent className="p-8 text-center">
-                          <div className="w-16 h-16 mx-auto mb-6 rounded-xl bg-connection-bg flex items-center justify-center text-connection-primary group-hover:bg-connection-primary group-hover:text-white transition-all duration-300 shadow-sm">
-                            {feature.icon}
-                          </div>
-                          <h3 className="text-xl font-semibold text-connection-text mb-4">
-                            {feature.title}
-                          </h3>
-                          <p className="text-connection-muted leading-relaxed">
-                            {feature.description}
-                          </p>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
-              </section>
-
-              {/* Benefits Section */}
-              <section className="relative z-20 px-6 py-24" ref={benefitsSection.ref}>
-                <div className="max-w-4xl mx-auto">
-                  <div className="text-center mb-16">
-                    <h2 className="text-4xl md:text-5xl font-bold text-connection-text mb-6">
-                      Built for Dental Practices
-                    </h2>
-                    <p className="text-lg text-connection-muted">
-                      Designed specifically for dental professionals who want to grow through relationships and data-driven insights.
-                    </p>
-                  </div>
-
-                  <div className="grid md:grid-cols-2 gap-12 items-center">
-                    <div>
-                      <ul className="space-y-6">
-                        <li className={`flex items-start space-x-4 ${benefitsSection.isVisible ? 'animate-fade-in' : 'opacity-0'}`} style={{ animationDelay: benefitsSection.isVisible ? '0.1s' : '0s', animationFillMode: 'both' }}>
-                          <CheckCircle className="w-6 h-6 text-connection-primary flex-shrink-0 mt-1" />
-                          <div>
-                            <h4 className="font-semibold text-connection-text mb-2">AI-Driven Practice Analysis</h4>
-                            <p className="text-connection-muted">AI Assistant analyzes relationship health, identifies growth opportunities, and provides automated insights for better decision making.</p>
-                          </div>
-                        </li>
-                        <li className={`flex items-start space-x-4 ${benefitsSection.isVisible ? 'animate-fade-in' : 'opacity-0'}`} style={{ animationDelay: benefitsSection.isVisible ? '0.2s' : '0s', animationFillMode: 'both' }}>
-                          <CheckCircle className="w-6 h-6 text-connection-primary flex-shrink-0 mt-1" />
-                          <div>
-                            <h4 className="font-semibold text-connection-text mb-2">Google Reviews & Reputation</h4>
-                            <p className="text-connection-muted">Monitor all Google reviews across your network, track competitor ratings, and get alerts for new reviews requiring attention.</p>
-                          </div>
-                        </li>
-                        <li className={`flex items-start space-x-4 ${benefitsSection.isVisible ? 'animate-fade-in' : 'opacity-0'}`} style={{ animationDelay: benefitsSection.isVisible ? '0.3s' : '0s', animationFillMode: 'both' }}>
-                          <CheckCircle className="w-6 h-6 text-connection-primary flex-shrink-0 mt-1" />
-                          <div>
-                            <h4 className="font-semibold text-connection-text mb-2">Advanced Office Discovery</h4>
-                            <p className="text-connection-muted">Find offices within 50 miles, filter by specialties and ratings, import discovered data, and plan strategic outreach campaigns.</p>
-                          </div>
-                        </li>
-                      </ul>
-                    </div>
-                    <div className={`relative ${benefitsSection.isVisible ? 'animate-fade-in' : 'opacity-0'}`} style={{ animationDelay: benefitsSection.isVisible ? '0.4s' : '0s', animationFillMode: 'both' }}>
-                      <div className="w-full h-64 bg-gradient-glow rounded-2xl flex items-center justify-center relative overflow-hidden border border-connection-primary/20">
-                        <div className="flex items-center space-x-4">
-                          <Bot className="w-12 h-12 text-connection-primary opacity-80" />
-                          <Star className="w-16 h-16 text-connection-primary" />
-                          <Building2 className="w-10 h-10 text-connection-primary opacity-60" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-
-              {/* Pricing Section */}
-              <section id="pricing-section" className="px-6 py-24 bg-white/60 backdrop-blur-sm" ref={pricingSection.ref}>
-                <div className="max-w-6xl mx-auto">
-                  <div className="text-center mb-16">
-                    <h2 className="text-4xl md:text-5xl font-bold text-connection-text mb-6">
-                      Choose Your Growth Plan
-                    </h2>
-                    <p className="text-lg text-connection-muted max-w-2xl mx-auto">
-                      Select the perfect plan to scale your practice and strengthen your professional network.
-                    </p>
-                  </div>
-
-                  <div className="grid lg:grid-cols-3 gap-6 max-w-4xl mx-auto">
-                    {/* Solo Practice Plan */}
-                    <Card variant="glass" className={`group border-connection-primary/20 hover:border-connection-primary/40 ${pricingSection.isVisible ? 'animate-fade-in' : 'opacity-0'}`} style={{ animationDelay: pricingSection.isVisible ? '0.1s' : '0s', animationFillMode: 'both' }}>
-                      <CardContent className="p-6">
-                        <div className="text-center mb-6">
-                          <h3 className="text-xl font-bold text-connection-text mb-2">Solo Practice</h3>
-                          <p className="text-sm text-connection-muted mb-3">Up to 50 referring offices</p>
-                          <div className="mb-4">
-                            <span className="text-3xl font-bold text-connection-primary">$149</span>
-                            <span className="text-sm text-connection-muted">/month</span>
-                          </div>
-                        </div>
-                        <ul className="space-y-3 mb-6">
-                          <li className="flex items-center space-x-2">
-                            <CheckCircle className="w-4 h-4 text-connection-primary flex-shrink-0" />
-                            <span className="text-sm text-connection-text">1 user account</span>
-                          </li>
-                          <li className="flex items-center space-x-2">
-                            <CheckCircle className="w-4 h-4 text-connection-primary flex-shrink-0" />
-                            <span className="text-sm text-connection-text">Basic features + email campaigns</span>
-                          </li>
-                        </ul>
-                        <Button 
-                          className="w-full bg-connection-primary/10 text-connection-primary hover:bg-connection-primary hover:text-white transition-all"
-                          onClick={() => handlePlanSelect('solo')}
-                          disabled={createCheckoutSession.isPending}
-                        >
-                          Get Started
-                        </Button>
-                      </CardContent>
-                    </Card>
-
-                    {/* Group Practice Plan - Most Popular */}
-                    <Card variant="glass" className={`group border-connection-primary/40 hover:border-connection-primary relative scale-105 ${pricingSection.isVisible ? 'animate-fade-in' : 'opacity-0'}`} style={{ animationDelay: pricingSection.isVisible ? '0.2s' : '0s', animationFillMode: 'both' }}>
-                      <div className="absolute -top-2 left-1/2 transform -translate-x-1/2">
-                        <div className="bg-connection-primary text-white px-3 py-1 rounded-full text-xs font-medium flex items-center space-x-1">
-                          <span>⭐</span>
-                          <span>Most Popular</span>
-                        </div>
-                      </div>
-                      <CardContent className="p-6">
-                        <div className="text-center mb-6">
-                          <h3 className="text-xl font-bold text-connection-text mb-2">Group Practice</h3>
-                          <p className="text-sm text-connection-muted mb-3">Up to 200 referring offices</p>
-                          <div className="mb-4">
-                            <span className="text-3xl font-bold text-connection-primary">$399</span>
-                            <span className="text-sm text-connection-muted">/month</span>
-                          </div>
-                        </div>
-                        <ul className="space-y-3 mb-6">
-                          <li className="flex items-center space-x-2">
-                            <CheckCircle className="w-4 h-4 text-connection-primary flex-shrink-0" />
-                            <span className="text-sm text-connection-text">10 user accounts</span>
-                          </li>
-                          <li className="flex items-center space-x-2">
-                            <CheckCircle className="w-4 h-4 text-connection-primary flex-shrink-0" />
-                            <span className="text-sm text-connection-text">AI Review Writer + Direct Google Reply</span>
-                          </li>
-                          <li className="flex items-center space-x-2">
-                            <CheckCircle className="w-4 h-4 text-connection-primary flex-shrink-0" />
-                            <span className="text-sm text-connection-text">Advanced analytics & automation</span>
-                          </li>
-                        </ul>
-                        <Button 
-                          className="w-full bg-connection-primary text-white hover:bg-connection-primary/90 transition-all"
-                          onClick={() => handlePlanSelect('group')}
-                          disabled={createCheckoutSession.isPending}
-                        >
-                          Get Started
-                        </Button>
-                      </CardContent>
-                    </Card>
-
-                    {/* Multi-Location Plan */}
-                    <Card variant="glass" className={`group border-connection-primary/20 hover:border-connection-primary/40 ${pricingSection.isVisible ? 'animate-fade-in' : 'opacity-0'}`} style={{ animationDelay: pricingSection.isVisible ? '0.3s' : '0s', animationFillMode: 'both' }}>
-                      <CardContent className="p-6">
-                        <div className="text-center mb-6">
-                          <h3 className="text-xl font-bold text-connection-text mb-2">Multi-Location</h3>
-                          <p className="text-sm text-connection-muted mb-3">Unlimited referring offices</p>
-                          <div className="mb-4">
-                            <span className="text-3xl font-bold text-connection-primary">$799</span>
-                            <span className="text-sm text-connection-muted">/month</span>
-                          </div>
-                        </div>
-                        <ul className="space-y-3 mb-6">
-                          <li className="flex items-center space-x-2">
-                            <CheckCircle className="w-4 h-4 text-connection-primary flex-shrink-0" />
-                            <span className="text-sm text-connection-text">Unlimited users</span>
-                          </li>
-                          <li className="flex items-center space-x-2">
-                            <CheckCircle className="w-4 h-4 text-connection-primary flex-shrink-0" />
-                            <span className="text-sm text-connection-text">Unlimited offices and locations</span>
-                          </li>
-                          <li className="flex items-center space-x-2">
-                            <CheckCircle className="w-4 h-4 text-connection-primary flex-shrink-0" />
-                            <span className="text-sm text-connection-text">Everything in Group + API access</span>
-                          </li>
-                          <li className="flex items-center space-x-2">
-                            <CheckCircle className="w-4 h-4 text-connection-primary flex-shrink-0" />
-                            <span className="text-sm text-connection-text">Dedicated success manager</span>
-                          </li>
-                        </ul>
-                        <Button 
-                          className="w-full bg-connection-primary/10 text-connection-primary hover:bg-connection-primary hover:text-white transition-all"
-                          onClick={() => handlePlanSelect('multi')}
-                          disabled={createCheckoutSession.isPending}
-                        >
-                          Get Started
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </div>
-              </section>
-
-              {/* Footer */}
-              <footer className="bg-connection-text/95 text-white">
-                <div className="max-w-6xl mx-auto px-6 py-16">
-                  <div className="grid md:grid-cols-4 gap-8 mb-12">
-                    {/* Company Info */}
-                    <div className="md:col-span-1">
-                      <div className="flex items-center space-x-3 mb-6">
-                        <NexoraLogo size={40} className="text-connection-primary" />
-                        <span className="text-2xl font-bold">Nexora</span>
-                      </div>
-                      <p className="text-white/70 mb-6 leading-relaxed">
-                        Intelligent business growth platform helping dental practices track, analyze, and optimize their patient acquisition networks.
-                      </p>
-                      <div className="flex space-x-4">
-                        <Button variant="ghost" size="icon" className="text-white/70 hover:text-white hover:bg-white/10">
-                          <MessageSquare className="w-5 h-5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="text-white/70 hover:text-white hover:bg-white/10">
-                          <Globe className="w-5 h-5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="text-white/70 hover:text-white hover:bg-white/10">
-                          <Building2 className="w-5 h-5" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Product */}
-                    <div>
-                      <h3 className="font-semibold text-lg mb-6">Product</h3>
-                       <ul className="space-y-4">
-                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">AI Assistant</Button></li>
-                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Google Reviews</Button></li>
-                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Office Discovery</Button></li>
-                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Competitive Intelligence</Button></li>
-                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Growth Analytics</Button></li>
-                      </ul>
-                    </div>
-
-                    {/* Company */}
-                    <div>
-                      <h3 className="font-semibold text-lg mb-6">Company</h3>
-                      <ul className="space-y-4">
-                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">About Us</Button></li>
-                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Careers</Button></li>
-                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Press</Button></li>
-                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Partners</Button></li>
-                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Contact</Button></li>
-                      </ul>
-                    </div>
-
-                    {/* Support */}
-                    <div>
-                      <h3 className="font-semibold text-lg mb-6">Support</h3>
-                      <ul className="space-y-4">
-                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Help Center</Button></li>
-                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Documentation</Button></li>
-                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">API Reference</Button></li>
-                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Community</Button></li>
-                        <li><Button variant="ghost" className="text-white/70 hover:text-white p-0 h-auto font-normal justify-start">Status</Button></li>
-                      </ul>
-                    </div>
-                  </div>
-
-                  {/* Bottom Bar */}
-                  <div className="border-t border-white/20 pt-8">
-                    <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-                      <div className="text-white/60 text-sm">
-                        © 2024 Nexora. All rights reserved.
-                      </div>
-                      <div className="flex space-x-6 text-sm">
-                        <Button variant="ghost" className="text-white/60 hover:text-white p-0 h-auto font-normal">
-                          Privacy Policy
-                        </Button>
-                        <Button variant="ghost" className="text-white/60 hover:text-white p-0 h-auto font-normal">
-                          Terms of Service
-                        </Button>
-                        <Button variant="ghost" className="text-white/60 hover:text-white p-0 h-auto font-normal">
-                          Cookie Policy
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </footer>
-            </>
-          )}
+  const header = (
+    <header className="px-6 md:px-10 pt-7">
+      <nav className="max-w-6xl mx-auto flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <NexoraLogo size={26} />
+          <span className="text-[17px] tracking-tight text-connection-text font-medium">Nexora</span>
         </div>
+        {!showAuth && (
+          <button
+            onClick={onGetStarted}
+            className="text-sm text-connection-muted hover:text-connection-text transition-colors"
+          >
+            Sign in
+          </button>
+        )}
+      </nav>
+    </header>
+  );
 
-        {/* Auth Form Side Panel */}
-        {showAuth && (
-          <div className="w-full md:w-1/2 flex items-center justify-center p-4 md:p-6 relative">
-            <div className="w-full max-w-sm md:max-w-md bg-white/90 backdrop-blur-lg rounded-2xl p-6 md:p-8 shadow-xl border border-connection-primary/20 relative z-10">
-              <div className="text-center mb-8">
-                <div className="flex items-center justify-center space-x-3 mb-4">
-                  <NexoraLogo size={24} className="text-connection-primary" />
-                  <span className="text-xl font-semibold text-connection-text">Welcome Back</span>
-                </div>
-                <p className="text-connection-muted">Access your practice growth dashboard</p>
-              </div>
+  // Signing in: the page steps back to a quiet two column split so the form is the
+  // only thing asking for attention.
+  if (showAuth) {
+    return (
+      <div className="min-h-screen bg-gradient-connection flex flex-col">
+        {header}
+        <div className="flex-1 flex flex-col md:flex-row items-center max-w-6xl mx-auto w-full px-6 md:px-10 py-12 gap-16">
+          <div className="hidden md:block flex-1">
+            <h1 className="font-playfair text-4xl lg:text-5xl leading-[1.1] text-connection-text">
+              Welcome back.
+            </h1>
+            <p className="mt-5 text-connection-muted leading-relaxed max-w-sm">
+              Your offices, sources and reviews are where you left them.
+            </p>
+            <div className="mt-12 max-w-sm">
+              <SourceLedger />
+            </div>
+          </div>
+
+          <div className="w-full md:w-[420px] shrink-0">
+            <div className="rounded-2xl border border-connection-primary/15 bg-white/80 backdrop-blur-md shadow-elegant p-7 md:p-8">
               <Suspense
                 fallback={
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="h-6 w-6 animate-spin text-connection-primary" />
+                  <div className="flex items-center justify-center py-16">
+                    <Loader2 className="h-5 w-5 animate-spin text-connection-primary" />
                   </div>
                 }
               >
@@ -486,8 +232,230 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, showAuth
               </Suspense>
             </div>
           </div>
-        )}
+        </div>
       </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-connection">
+      {header}
+
+      {/* Hero */}
+      <section className="px-6 md:px-10 pt-20 md:pt-28 pb-20">
+        <div className="max-w-6xl mx-auto grid lg:grid-cols-[1.15fr_0.85fr] gap-14 lg:gap-20 items-center">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-connection-muted mb-7">
+              For dental practices
+            </p>
+
+            {/* text-balance keeps the rag even. Without it the measure is narrow enough
+                that "from." gets stranded on a line of its own. */}
+            <h1 className="font-playfair text-[2.4rem] sm:text-[2.9rem] lg:text-[3.15rem] leading-[1.1] text-connection-text text-balance">
+              Most practices guess where their patients come from.
+              <span className="block mt-2.5 text-connection-primary font-light italic">
+                Yours does not have to.
+              </span>
+            </h1>
+
+            <p className="mt-7 text-[17px] leading-relaxed text-connection-muted max-w-lg">
+              Nexora keeps a running record of every referring office, every review and every
+              visit your team makes. So when you sit down to plan the quarter, you are working
+              from what happened rather than what you remember.
+            </p>
+
+            <div className="mt-9 flex flex-wrap items-center gap-x-7 gap-y-4">
+              <Button
+                size="lg"
+                onClick={onGetStarted}
+                className="group bg-connection-primary hover:bg-connection-primary/90 text-white rounded-xl px-7 h-12 text-[15px] shadow-elegant hover:shadow-glow transition-all"
+              >
+                Start tracking
+                <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+              </Button>
+              <button
+                onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
+                className="text-sm text-connection-muted hover:text-connection-text transition-colors"
+              >
+                See pricing
+              </button>
+            </div>
+          </div>
+
+          <div className="lg:pl-4">
+            <SourceLedger />
+            <p className="mt-4 text-xs text-connection-muted/80 leading-relaxed">
+              An example month. Kingsway used to be your second best source.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* The problem */}
+      <section className="px-6 md:px-10 py-20 md:py-28 border-t border-connection-primary/10 bg-white/50">
+        <ProseSection n="01" label="Why this exists">
+          <p className="font-playfair text-[1.7rem] sm:text-[2rem] leading-[1.3] text-connection-text text-balance">
+            A referral relationship goes quiet slowly.
+          </p>
+          <div className="mt-6 space-y-5 text-connection-muted leading-relaxed">
+            <p>
+              Four patients a month, then two, then one. Nobody notices, because nobody is
+              counting. Six months later someone asks why the schedule looks thin and the honest
+              answer is that no one is quite sure.
+            </p>
+            <p>
+              The information was never really missing. It was spread across a receptionist’s
+              memory, a spreadsheet somebody stopped updating and a stack of referral pads. This
+              is a place to keep it instead.
+            </p>
+          </div>
+        </ProseSection>
+      </section>
+
+      {/* What it does */}
+      <section className="px-6 md:px-10 py-20 md:py-28" ref={work.ref}>
+        <div className="max-w-6xl mx-auto">
+          <SectionMark n="02" label="What it does" className="mb-10" />
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-12 lg:gap-y-14">
+            {capabilities.map((c, i) => (
+              <div
+                key={c.title}
+                className={work.isVisible ? 'animate-fade-in' : 'opacity-0'}
+                style={{
+                  animationDelay: work.isVisible ? `${i * 0.06}s` : '0s',
+                  animationFillMode: 'both',
+                }}
+              >
+                <div className="h-px w-full bg-connection-primary/15 mb-5" />
+                <h3 className="text-[15px] font-medium text-connection-text mb-3">{c.title}</h3>
+                <p className="text-sm leading-relaxed text-connection-muted">{c.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* The honest note about the assistant */}
+      <section className="px-6 md:px-10 py-20 md:py-24 border-y border-connection-primary/10 bg-white/50">
+        <ProseSection n="03" label="About the assistant">
+          <p className="text-connection-muted leading-relaxed">
+            There is an assistant built in. It drafts replies to reviews, writes first versions of
+            outreach letters and points out which offices have gone quiet. It is genuinely useful
+            and it is also just a first draft. It does not send anything, it does not decide
+            anything, and you can ignore it entirely and the rest of the product still works. That
+            felt like the right way round.
+          </p>
+        </ProseSection>
+      </section>
+
+      {/* Pricing */}
+      <section id="pricing" className="px-6 md:px-10 py-20 md:py-28" ref={pricing.ref}>
+        <div className="max-w-6xl mx-auto">
+          <SectionMark n="04" label="Pricing" className="mb-10" />
+
+          <div className="grid md:grid-cols-3 gap-6 lg:gap-8">
+            {plans.map((p, i) => (
+              <div
+                key={p.id}
+                className={`rounded-2xl border p-7 flex flex-col transition-colors ${
+                  p.featured
+                    ? 'border-connection-primary/40 bg-white/80'
+                    : 'border-connection-primary/15 bg-white/50 hover:border-connection-primary/30'
+                } ${pricing.isVisible ? 'animate-fade-in' : 'opacity-0'}`}
+                style={{
+                  animationDelay: pricing.isVisible ? `${i * 0.08}s` : '0s',
+                  animationFillMode: 'both',
+                }}
+              >
+                <div className="flex items-baseline justify-between">
+                  <h3 className="text-[15px] font-medium text-connection-text">{p.name}</h3>
+                  {p.featured && (
+                    <span className="text-[10px] uppercase tracking-[0.16em] text-connection-primary">
+                      Most chosen
+                    </span>
+                  )}
+                </div>
+
+                <p className="mt-2 text-sm text-connection-muted">{p.for}</p>
+
+                <div className="mt-7 flex items-baseline gap-1.5">
+                  <span className="font-playfair text-4xl text-connection-text tabular-nums">
+                    ${p.price}
+                  </span>
+                  <span className="text-sm text-connection-muted">a month</span>
+                </div>
+
+                <ul className="mt-7 space-y-2.5 flex-1">
+                  {p.points.map((pt) => (
+                    <li key={pt} className="flex gap-2.5 text-sm text-connection-muted">
+                      <span className="mt-[9px] h-px w-3 shrink-0 bg-connection-primary/40" />
+                      <span className="leading-relaxed">{pt}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <Button
+                  onClick={() => handlePlanSelect(p.id)}
+                  disabled={createCheckoutSession.isPending}
+                  className={`mt-8 w-full rounded-xl h-11 text-sm transition-all ${
+                    p.featured
+                      ? 'bg-connection-primary text-white hover:bg-connection-primary/90'
+                      : 'bg-transparent text-connection-text border border-connection-primary/25 hover:bg-connection-primary hover:text-white hover:border-connection-primary'
+                  }`}
+                >
+                  Choose {p.name}
+                </Button>
+              </div>
+            ))}
+          </div>
+
+          <p className="mt-8 text-xs text-connection-muted">
+            Prices are per practice. You can change plan or cancel whenever you like.
+          </p>
+        </div>
+      </section>
+
+      {/* Close */}
+      <section className="px-6 md:px-10 py-24 md:py-32 border-t border-connection-primary/10">
+        <div className="max-w-6xl mx-auto">
+          <div className="max-w-xl">
+            <h2 className="font-playfair text-[2rem] sm:text-[2.4rem] leading-[1.15] text-connection-text">
+              Start with one month of numbers.
+            </h2>
+            <p className="mt-5 text-connection-muted leading-relaxed">
+              Add your referring offices, record where this month’s patients came from, and see
+              what it tells you. That is usually enough to be worth it.
+            </p>
+            <Button
+              size="lg"
+              onClick={onGetStarted}
+              className="group mt-8 bg-connection-primary hover:bg-connection-primary/90 text-white rounded-xl px-7 h-12 text-[15px] shadow-elegant hover:shadow-glow transition-all"
+            >
+              Create an account
+              <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <footer className="px-6 md:px-10 py-10 border-t border-connection-primary/10">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
+          <div className="flex items-center gap-2.5">
+            <NexoraLogo size={20} />
+            <span className="text-sm text-connection-text">Nexora</span>
+            <span className="text-xs text-connection-muted ml-2">
+              Built for dental practices
+            </span>
+          </div>
+          <div className="flex items-center gap-6 text-xs text-connection-muted">
+            <a href="mailto:admin@nexoradental.com" className="hover:text-connection-text transition-colors">
+              admin@nexoradental.com
+            </a>
+            <span>&copy; {new Date().getFullYear()} Nexora</span>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };
