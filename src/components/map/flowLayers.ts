@@ -1,6 +1,6 @@
 import type mapboxgl from 'mapbox-gl';
 import type { ExpressionSpecification } from 'mapbox-gl';
-import type { TierColors } from './flowScales';
+import { lighten, withAlpha, type TierColors } from './flowScales';
 
 /**
  * Source and layer definitions for the patient-flow map.
@@ -17,13 +17,15 @@ export const SOURCES = {
   offices: 'network-offices',
   hubs: 'hubs',
   discovered: 'discovered-offices',
+  rings: 'catchment-rings',
 } as const;
 
 export type SourceId = (typeof SOURCES)[keyof typeof SOURCES];
 
 export const LAYERS = {
+  rings: 'catchment-rings',
+  ringLabels: 'catchment-ring-labels',
   arcGlow: 'flow-arcs-glow',
-  arcLine: 'flow-arcs-line',
   particles: 'flow-particles-dot',
   discovered: 'discovered-offices-icon',
   officeHalo: 'network-offices-halo',
@@ -32,6 +34,19 @@ export const LAYERS = {
   hubPulse: 'hub-pulse',
   hubDot: 'hub-dot',
 } as const;
+
+export const TIERS = ['VIP', 'Warm', 'Cold', 'Dormant'] as const;
+
+/**
+ * One arc layer per tier.
+ *
+ * `line-gradient` is what makes an arc read as *flowing* rather than as a static
+ * connector, but Mapbox gradient stops must be literal colours — the expression can
+ * only reference `line-progress`, never `['get', 'tier']`. So the tier split has to
+ * happen at the layer level, with each layer filtered to its own tier.
+ */
+export const arcLayerId = (tier: string) => `flow-arc-${tier}`;
+export const ARC_LAYER_IDS = TIERS.map(arcLayerId);
 
 /** Layers that respond to clicks and hover. Order matters: topmost first. */
 export const INTERACTIVE_LAYERS = [LAYERS.officeDot, LAYERS.discovered, LAYERS.hubDot];
@@ -51,6 +66,16 @@ const RATING_COLORS: Record<RatingCategory, string> = {
   Average: '#eab308',
   Low: '#9ca3af',
 };
+
+/** A brighter variant, so particles read as moving light on top of their arc. */
+function tierMatchBright(colors: TierColors, delta = 20): ExpressionSpecification {
+  return tierMatch({
+    VIP: lighten(colors.VIP, delta),
+    Warm: lighten(colors.Warm, delta),
+    Cold: lighten(colors.Cold, delta),
+    Dormant: lighten(colors.Dormant, delta),
+  });
+}
 
 function tierMatch(colors: TierColors): ExpressionSpecification {
   return [
@@ -143,16 +168,73 @@ export function installLayers(map: mapboxgl.Map, colors: TierColors, hubColor: s
   addDiscoveredIcons(map);
 
   for (const id of Object.values(SOURCES)) {
-    if (!map.getSource(id)) {
-      map.addSource(id, { type: 'geojson', data: EMPTY_FC });
-    }
+    if (map.getSource(id)) continue;
+    // `lineMetrics` computes `line-progress`, which the arc gradients depend on.
+    map.addSource(id, {
+      type: 'geojson',
+      data: EMPTY_FC,
+      ...(id === SOURCES.arcs ? { lineMetrics: true } : {}),
+    });
   }
 
+  /**
+   * Add a layer and verify it landed.
+   *
+   * Mapbox validates layer specs and, on failure, emits an error event and simply
+   * doesn't add the layer — `addLayer` neither throws nor returns a status. A bad
+   * paint value therefore yields a blank map with no obvious cause. Checking
+   * afterwards turns that into a loud, named failure.
+   */
   const add = (layer: mapboxgl.LayerSpecification) => {
-    if (!map.getLayer(layer.id)) map.addLayer(layer);
+    if (map.getLayer(layer.id)) return;
+    map.addLayer(layer);
+    if (!map.getLayer(layer.id)) {
+      console.error(
+        `[flowLayers] Mapbox rejected layer "${layer.id}" — it is NOT on the map. ` +
+          `Check the preceding Mapbox error; a common cause is a colour in CSS ` +
+          `Color Level 4 syntax, which Mapbox cannot parse.`,
+      );
+    }
   };
 
-  // --- Arcs (bottom) ---------------------------------------------------------
+  // `text-field` requires the style to declare `glyphs`. The dev preview harness
+  // uses a self-contained style without one, so skip labels rather than log noise.
+  const hasGlyphs = Boolean(map.getStyle()?.glyphs);
+
+  // --- Catchment rings (bottom) ---------------------------------------------
+  add({
+    id: LAYERS.rings,
+    type: 'line',
+    source: SOURCES.rings,
+    paint: {
+      'line-color': hubColor,
+      'line-opacity': 0.28,
+      'line-width': 1,
+      'line-dasharray': [3, 3],
+    },
+  });
+
+  if (hasGlyphs)
+    add({
+      id: LAYERS.ringLabels,
+      type: 'symbol',
+      source: SOURCES.rings,
+      layout: {
+        'text-field': ['get', 'label'],
+        'text-size': 10,
+        'symbol-placement': 'line',
+        'text-offset': [0, -0.6],
+        'text-allow-overlap': false,
+      },
+      paint: {
+        'text-color': hubColor,
+        'text-opacity': 0.65,
+        'text-halo-color': 'rgba(0,0,0,0.6)',
+        'text-halo-width': 1,
+      },
+    });
+
+  // --- Arc glow -------------------------------------------------------------
   add({
     id: LAYERS.arcGlow,
     type: 'line',
@@ -160,43 +242,62 @@ export function installLayers(map: mapboxgl.Map, colors: TierColors, hubColor: s
     layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: {
       'line-color': tierMatch(colors),
-      'line-blur': 3,
-      'line-opacity': 0.18,
+      'line-blur': 6,
+      'line-opacity': 0.32,
       'line-width': [
         'interpolate',
         ['linear'],
         ['zoom'],
         8,
-        ['*', ['get', 'w'], 1.6],
+        ['*', ['get', 'w'], 2.4],
         11,
-        ['*', ['get', 'w'], 2.8],
+        ['*', ['get', 'w'], 4],
         16,
-        ['*', ['get', 'w'], 4.5],
+        ['*', ['get', 'w'], 6.5],
       ],
     },
   });
 
-  add({
-    id: LAYERS.arcLine,
-    type: 'line',
-    source: SOURCES.arcs,
-    layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: {
-      'line-color': tierMatch(colors),
-      'line-opacity': arcOpacityExpr(null),
-      'line-width': [
-        'interpolate',
-        ['linear'],
-        ['zoom'],
-        8,
-        ['*', ['get', 'w'], 0.55],
-        11,
-        ['get', 'w'],
-        16,
-        ['*', ['get', 'w'], 1.8],
-      ],
-    },
-  });
+  // --- Arc bodies, one gradient layer per tier ------------------------------
+  for (const tier of TIERS) {
+    const tierColor = colors[tier];
+    add({
+      id: arcLayerId(tier),
+      type: 'line',
+      source: SOURCES.arcs,
+      filter: ['==', ['get', 'tier'], tier],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        // Fades in at the office and brightens into the practice, so the arc
+        // reads as directional without needing an arrowhead.
+        'line-gradient': [
+          'interpolate',
+          ['linear'],
+          ['line-progress'],
+          0,
+          withAlpha(tierColor, 0),
+          0.18,
+          withAlpha(tierColor, 0.55),
+          0.7,
+          tierColor,
+          1,
+          lighten(hubColor, 22),
+        ],
+        'line-opacity': arcOpacityExpr(null),
+        'line-width': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          8,
+          ['*', ['get', 'w'], 0.55],
+          11,
+          ['get', 'w'],
+          16,
+          ['*', ['get', 'w'], 1.8],
+        ],
+      },
+    });
+  }
 
   // --- Particles -------------------------------------------------------------
   add({
@@ -204,7 +305,7 @@ export function installLayers(map: mapboxgl.Map, colors: TierColors, hubColor: s
     type: 'circle',
     source: SOURCES.particles,
     paint: {
-      'circle-color': tierMatch(colors),
+      'circle-color': tierMatchBright(colors),
       'circle-opacity': particleOpacityExpr(null),
       'circle-blur': 0.25,
       'circle-pitch-alignment': 'map',
@@ -241,7 +342,8 @@ export function installLayers(map: mapboxgl.Map, colors: TierColors, hubColor: s
     source: SOURCES.offices,
     paint: {
       'circle-color': tierMatch(colors),
-      'circle-opacity': 0.15,
+      'circle-opacity': 0.22,
+      'circle-blur': 0.6,
       'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 8, 12, 14, 16, 22],
     },
   });
@@ -253,13 +355,15 @@ export function installLayers(map: mapboxgl.Map, colors: TierColors, hubColor: s
     paint: {
       'circle-color': tierMatch(colors),
       'circle-opacity': officeOpacityExpr(null),
-      'circle-stroke-color': '#ffffff',
-      'circle-stroke-width': 2,
-      'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 4, 12, 7, 16, 11],
+      // A dark rim separates the dot from the arc terminating beneath it; a white
+      // rim at this size dominates the dot's own tier colour on a dark basemap.
+      'circle-stroke-color': 'rgba(8, 14, 22, 0.85)',
+      'circle-stroke-width': 1.5,
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 3.5, 12, 6, 16, 10],
     },
   });
 
-  add({
+  if (hasGlyphs) add({
     id: LAYERS.officeLabel,
     type: 'symbol',
     source: SOURCES.offices,
@@ -296,9 +400,9 @@ export function installLayers(map: mapboxgl.Map, colors: TierColors, hubColor: s
     type: 'circle',
     source: SOURCES.hubs,
     paint: {
-      'circle-color': hubColor,
-      'circle-stroke-color': '#ffffff',
-      'circle-stroke-width': 3,
+      'circle-color': lighten(hubColor, 18),
+      'circle-stroke-color': 'rgba(255, 255, 255, 0.9)',
+      'circle-stroke-width': 2.5,
       'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 7, 12, 11, 16, 16],
     },
   });
@@ -314,19 +418,38 @@ export function applyColors(map: mapboxgl.Map, colors: TierColors, hubColor: str
   };
 
   set(LAYERS.arcGlow, 'line-color', tier);
-  set(LAYERS.arcLine, 'line-color', tier);
+  for (const t of TIERS) {
+    set(arcLayerId(t), 'line-gradient', [
+      'interpolate',
+      ['linear'],
+      ['line-progress'],
+      0,
+      withAlpha(colors[t], 0),
+      0.18,
+      withAlpha(colors[t], 0.55),
+      0.7,
+      colors[t],
+      1,
+      lighten(hubColor, 22),
+    ]);
+  }
   set(LAYERS.particles, 'circle-color', tier);
   set(LAYERS.officeHalo, 'circle-color', tier);
   set(LAYERS.officeDot, 'circle-color', tier);
   set(LAYERS.officeLabel, 'text-color', colors.Dormant);
   set(LAYERS.hubPulse, 'circle-color', hubColor);
   set(LAYERS.hubDot, 'circle-color', hubColor);
+  set(LAYERS.rings, 'line-color', hubColor);
+  set(LAYERS.ringLabels, 'text-color', hubColor);
 }
 
 /** Dim everything except the focused office. Paint-only — never re-tessellates. */
 export function applyFocus(map: mapboxgl.Map, focusId: string | null): void {
-  if (map.getLayer(LAYERS.arcLine)) {
-    map.setPaintProperty(LAYERS.arcLine, 'line-opacity', arcOpacityExpr(focusId) as never);
+  for (const tier of TIERS) {
+    const id = arcLayerId(tier);
+    if (map.getLayer(id)) {
+      map.setPaintProperty(id, 'line-opacity', arcOpacityExpr(focusId) as never);
+    }
   }
   if (map.getLayer(LAYERS.officeDot)) {
     map.setPaintProperty(LAYERS.officeDot, 'circle-opacity', officeOpacityExpr(focusId) as never);

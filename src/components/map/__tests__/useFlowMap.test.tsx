@@ -33,6 +33,9 @@ const setDataCalls: Array<{ source: string; features: number }> = [];
 const setPaintCalls: Array<{ layer: string; prop: string }> = [];
 const removeCalls = { count: 0 };
 const addLayerCalls: string[] = [];
+const setStyleCalls: string[] = [];
+/** The live fake, so a test can drive the map the way Mapbox itself would. */
+let lastMap: FakeMap | null = null;
 
 class FakeGeoJSONSource {
   constructor(public id: string) {}
@@ -49,6 +52,7 @@ class FakeMap {
 
   constructor(public options: Record<string, unknown>) {
     constructorCalls.count++;
+    lastMap = this;
     // Style loads asynchronously in the real thing; mirror that.
     queueMicrotask(() => this.fire('style.load'));
   }
@@ -93,10 +97,15 @@ class FakeMap {
     return { sprite: String(this.options.style) };
   }
   setStyle(style: string) {
+    setStyleCalls.push(style);
     this.options.style = style;
+    // A real setStyle discards every custom source and layer.
     this.layers.clear();
     this.sources.clear();
     queueMicrotask(() => this.fire('style.load'));
+  }
+  getZoom() {
+    return 8;
   }
   getCanvas() {
     return { style: {} };
@@ -129,7 +138,7 @@ vi.mock('mapbox-gl', () => ({
 vi.mock('mapbox-gl/dist/mapbox-gl.css', () => ({}));
 
 const { useFlowMap } = await import('../useFlowMap');
-const { SOURCES } = await import('../flowLayers');
+const { SOURCES, ARC_LAYER_IDS, LAYERS } = await import('../flowLayers');
 
 function makeFC(count: number): GeoJSON.FeatureCollection {
   return {
@@ -170,6 +179,8 @@ beforeEach(() => {
   setDataCalls.length = 0;
   setPaintCalls.length = 0;
   addLayerCalls.length = 0;
+  setStyleCalls.length = 0;
+  lastMap = null;
 
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -219,11 +230,18 @@ describe('useFlowMap lifecycle', () => {
   it('installs every source and layer once the style loads', async () => {
     await render(createElement(Harness, { arcCount: 1, theme: 'light' }));
 
-    expect(addLayerCalls).toContain('flow-arcs-line');
-    expect(addLayerCalls).toContain('flow-particles-dot');
-    expect(addLayerCalls).toContain('network-offices-dot');
-    expect(addLayerCalls).toContain('hub-dot');
-    expect(addLayerCalls).toContain('discovered-offices-icon');
+    // Arcs are one gradient layer per tier: a Mapbox `line-gradient` can only read
+    // `line-progress`, never `['get', 'tier']`, so the tier split lives in the
+    // layer list. Every one of them has to be installed, not just the first.
+    for (const id of ARC_LAYER_IDS) {
+      expect(addLayerCalls, `arc layer ${id}`).toContain(id);
+    }
+    expect(addLayerCalls).toContain(LAYERS.arcGlow);
+    expect(addLayerCalls).toContain(LAYERS.particles);
+    expect(addLayerCalls).toContain(LAYERS.officeDot);
+    expect(addLayerCalls).toContain(LAYERS.hubDot);
+    expect(addLayerCalls).toContain(LAYERS.discovered);
+    expect(addLayerCalls).toContain(LAYERS.rings);
   });
 
   it('buffers data written before the style has loaded, then replays it', async () => {
@@ -234,17 +252,41 @@ describe('useFlowMap lifecycle', () => {
     expect(arcWrites.some((c) => c.features === 4)).toBe(true);
   });
 
-  it('re-installs layers on theme change without rebuilding the map', async () => {
+  it('re-installs layers and replays data after a style reload', async () => {
     await render(createElement(Harness, { arcCount: 3, theme: 'light' }));
     addLayerCalls.length = 0;
+    setDataCalls.length = 0;
+
+    // A style reload wipes every custom source and layer. Drive it directly
+    // rather than via the theme, which no longer reloads anything (see below).
+    await act(async () => {
+      lastMap!.setStyle('mapbox://styles/mapbox/satellite-v9');
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // 'style.load' must bring the layers back and replay the buffered data.
+    expect(addLayerCalls).toContain(ARC_LAYER_IDS[0]);
+    expect(addLayerCalls).toContain(LAYERS.officeDot);
+    expect(setDataCalls.some((c) => c.source === SOURCES.arcs && c.features === 3)).toBe(true);
+    expect(constructorCalls.count).toBe(1);
+    expect(removeCalls.count).toBe(0);
+  });
+
+  it('recolours in place on theme change instead of reloading the basemap', async () => {
+    await render(createElement(Harness, { arcCount: 3, theme: 'light' }));
+    setPaintCalls.length = 0;
 
     await render(createElement(Harness, { arcCount: 3, theme: 'dark' }));
     await act(async () => {
       await Promise.resolve();
     });
 
-    // setStyle discards custom layers; 'style.load' must bring them all back.
-    expect(addLayerCalls).toContain('flow-arcs-line');
+    // Both themes render on the same dark basemap, so a theme switch is a token
+    // change only. Reloading the identical style would blank every layer and
+    // rebuild it for no visual difference.
+    expect(setStyleCalls).toEqual([]);
+    expect(setPaintCalls.length).toBeGreaterThan(0);
     expect(constructorCalls.count).toBe(1);
     expect(removeCalls.count).toBe(0);
   });

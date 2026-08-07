@@ -27,6 +27,16 @@ export interface PatientFlowData {
   flowsByMonth: Record<string, Flow[]>;
   totalsByMonth: Record<string, number>;
   /**
+   * Most recent month that actually has referrals, or null if there are none.
+   *
+   * The month axis always runs to the current calendar month, but counts are
+   * typically entered at month end — so on the 7th of a month the newest entry is
+   * usually empty. Defaulting the scrubber to the axis end therefore opened the map
+   * on a month with zero flows: office dots rendered, but no arcs and no motion,
+   * which read as "the map is broken". Always open on real data instead.
+   */
+  latestMonthWithData: string | null;
+  /**
    * Largest single-office monthly count across the *whole* window.
    *
    * Scaling is normalized against this global max rather than a per-month max on
@@ -43,6 +53,7 @@ const EMPTY: PatientFlowData = {
   months: [],
   flowsByMonth: {},
   totalsByMonth: {},
+  latestMonthWithData: null,
   maxFlowCount: 1,
 };
 
@@ -183,6 +194,7 @@ export function usePatientFlowData() {
       const flowsByMonth: Record<string, Flow[]> = {};
       const totalsByMonth: Record<string, number> = {};
       let maxFlowCount = 0;
+      let latestMonthWithData: string | null = null;
 
       for (const month of months) {
         const flows: Flow[] = [];
@@ -198,6 +210,8 @@ export function usePatientFlowData() {
 
         flowsByMonth[month] = flows;
         totalsByMonth[month] = total;
+        // months is ascending, so the last month to set this wins.
+        if (flows.length > 0) latestMonthWithData = month;
       }
 
       return {
@@ -207,6 +221,7 @@ export function usePatientFlowData() {
         months,
         flowsByMonth,
         totalsByMonth,
+        latestMonthWithData,
         maxFlowCount: Math.max(1, maxFlowCount),
       };
     },

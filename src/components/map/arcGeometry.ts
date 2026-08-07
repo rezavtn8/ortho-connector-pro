@@ -22,8 +22,14 @@ export const POINTS = 48;
 /** Bézier samples taken before resampling; only affects resampling accuracy. */
 const SAMPLES = 128;
 
-/** Control-point offset as a fraction of chord length. Higher = more curve. */
-const DEFAULT_BULGE = 0.2;
+/**
+ * Control-point offset as a fraction of chord length.
+ *
+ * 0.13 keeps arcs readable as curves that separate where they overlap, without the
+ * exaggerated swing of a higher value — at 0.2 a long arc bows so far off its chord
+ * that it reads as going somewhere it isn't.
+ */
+const DEFAULT_BULGE = 0.13;
 
 /**
  * Arcs stop just short of the hub.

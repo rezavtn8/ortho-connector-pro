@@ -13,8 +13,14 @@ import {
 import { readHubColor, readTierColors } from './flowScales';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
+/**
+ * The flow map is a data-visualisation surface, not a wayfinding map, so it uses a
+ * dark basemap in both app themes: glowing tier-coloured arcs and particles need to
+ * be the brightest thing on screen, and on a light basemap they have to fight the
+ * streets for contrast. Roads and labels stay as recessed context.
+ */
 const STYLES = {
-  light: 'mapbox://styles/mapbox/light-v11',
+  light: 'mapbox://styles/mapbox/dark-v11',
   dark: 'mapbox://styles/mapbox/dark-v11',
 } as const;
 
@@ -30,6 +36,13 @@ export interface UseFlowMapOptions {
   containerRef: RefObject<HTMLDivElement>;
   theme: 'light' | 'dark';
   handlers: FlowMapHandlers;
+  /**
+   * Replaces the Mapbox basemap style.
+   *
+   * Used by the dev preview harness, which supplies a self-contained style object
+   * so the map renders without a Mapbox account. Undefined in the app.
+   */
+  styleOverride?: mapboxgl.StyleSpecification;
 }
 
 /**
@@ -42,10 +55,30 @@ export interface UseFlowMapOptions {
  * toggle and data change. Everything here is instead a `setData` or a
  * `setPaintProperty` against the live instance.
  */
-export function useFlowMap({ token, containerRef, theme, handlers }: UseFlowMapOptions) {
+export function useFlowMap({
+  token,
+  containerRef,
+  theme,
+  handlers,
+  styleOverride,
+}: UseFlowMapOptions) {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [ready, setReady] = useState(false);
   const hasFitRef = useRef(false);
+
+  /**
+   * The basemap URL currently on the map, so the theme effect can tell whether a
+   * reload is actually needed.
+   *
+   * Tracked here rather than sniffed back out of `getStyle()`: the style object
+   * reports its sprite (`mapbox://sprites/mapbox/dark-v11`), not the URL it was
+   * loaded from, so any comparison against `STYLES[theme]` is a string coincidence.
+   * It stopped being one the moment both themes started pointing at the dark
+   * basemap — matching "light" against a dark sprite failed, and every switch to
+   * the light theme reloaded the identical style, blanking and rebuilding every
+   * layer for no visual change.
+   */
+  const appliedStyleRef = useRef<string | null>(null);
 
   /**
    * Latest data per source, held so it survives a style reload.
@@ -54,13 +87,14 @@ export function useFlowMap({ token, containerRef, theme, handlers }: UseFlowMapO
    * discards every custom source. Buffering here and replaying on `style.load` is
    * what makes both cases safe.
    */
-  const pendingRef = useRef<Record<SourceId, GeoJSON.FeatureCollection>>({
-    [SOURCES.arcs]: EMPTY_FC,
-    [SOURCES.particles]: EMPTY_FC,
-    [SOURCES.offices]: EMPTY_FC,
-    [SOURCES.hubs]: EMPTY_FC,
-    [SOURCES.discovered]: EMPTY_FC,
-  });
+  // Derived from SOURCES rather than listed by hand, so adding a source can't
+  // silently leave it without a replay slot.
+  const pendingRef = useRef<Record<SourceId, GeoJSON.FeatureCollection>>(
+    Object.fromEntries(Object.values(SOURCES).map((id) => [id, EMPTY_FC])) as Record<
+      SourceId,
+      GeoJSON.FeatureCollection
+    >,
+  );
 
   // Handlers are registered once, so they must be read through a ref to avoid
   // capturing a stale closure.
@@ -77,12 +111,16 @@ export function useFlowMap({ token, containerRef, theme, handlers }: UseFlowMapO
 
     const map = new mapboxgl.Map({
       container: containerRef.current,
-      style: STYLES[theme],
+      style: styleOverride ?? STYLES[theme],
       center: [-98.5, 39.8], // continental US; fitBounds takes over once data lands
       zoom: 3,
       attributionControl: true,
       cooperativeGestures: false,
     });
+
+    // The preview harness supplies its own style object; leave the ref null so a
+    // later theme change is treated as "not what's loaded" and skipped outright.
+    appliedStyleRef.current = styleOverride ? null : STYLES[theme];
 
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
     map.addControl(new mapboxgl.ScaleControl({ unit: 'imperial' }), 'bottom-left');
@@ -137,6 +175,13 @@ export function useFlowMap({ token, containerRef, theme, handlers }: UseFlowMapO
 
     mapRef.current = map;
 
+    // Dev-only handle so the preview harness (and the console) can inspect the
+    // live map — query rendered features, project coordinates, check layer state.
+    // Stripped from production builds along with the branch.
+    if (import.meta.env.DEV) {
+      (window as unknown as { __flowMap?: mapboxgl.Map }).__flowMap = map;
+    }
+
     return () => {
       map.remove();
       mapRef.current = null;
@@ -152,17 +197,20 @@ export function useFlowMap({ token, containerRef, theme, handlers }: UseFlowMapO
   // --- Effect B: theme ------------------------------------------------------
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !ready) return;
+    if (!map || !ready || styleOverride) return;
 
-    const current = map.getStyle()?.sprite;
     const want = STYLES[theme];
-    // setStyle triggers 'style.load', which reinstalls layers and replays data.
-    if (!current || !String(current).includes(theme)) {
-      setReady(false);
-      map.setStyle(want);
-    } else {
+    // Both themes currently resolve to the same basemap, so this is the usual
+    // path: the tokens have changed underneath us, but the tiles have not.
+    if (appliedStyleRef.current === want) {
       applyColors(map, readTierColors(), readHubColor());
+      return;
     }
+
+    // setStyle triggers 'style.load', which reinstalls layers and replays data.
+    appliedStyleRef.current = want;
+    setReady(false);
+    map.setStyle(want);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theme]);
 

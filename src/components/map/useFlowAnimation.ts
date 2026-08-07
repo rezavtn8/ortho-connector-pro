@@ -9,7 +9,7 @@ import {
   radiusFor,
   speedFor,
 } from './flowScales';
-import { SOURCES } from './flowLayers';
+import { LAYERS, SOURCES } from './flowLayers';
 import type { ArcBuildResult } from './geojson';
 
 /** 30fps. The bound is `setData` cost (serialize -> worker -> re-tile), not drawing. */
@@ -188,7 +188,34 @@ export function useFlowAnimation({
         props.sourceId = arc.sourceId;
       }
 
+      pulseHub(t);
       flush(particles.length);
+    };
+
+    /**
+     * A slow heartbeat on the hub halo, so the destination reads as the living
+     * centre of the network rather than one more dot.
+     *
+     * Radius is computed in JS from the current zoom rather than left as a zoom
+     * expression, because a paint property can be either an animated number or a
+     * zoom interpolation, not both.
+     */
+    let lastPulse = -1;
+    const pulseHub = (t: number) => {
+      const map = mapRef.current;
+      if (!map || !map.getLayer(LAYERS.hubPulse)) return;
+
+      // ~8Hz is plenty for a 3-second breath and keeps setPaintProperty cheap.
+      const tick = Math.floor(t * 8);
+      if (tick === lastPulse) return;
+      lastPulse = tick;
+
+      const phase = (Math.sin((t / 3) * Math.PI * 2) + 1) / 2; // 0..1
+      const zoom = map.getZoom();
+      const base = 12 + Math.max(0, zoom - 8) * 3.2;
+
+      map.setPaintProperty(LAYERS.hubPulse, 'circle-radius', base * (1 + phase * 0.55));
+      map.setPaintProperty(LAYERS.hubPulse, 'circle-opacity', 0.26 - phase * 0.17);
     };
 
     const stop = () => {

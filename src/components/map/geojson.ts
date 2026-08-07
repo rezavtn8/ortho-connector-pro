@@ -42,6 +42,49 @@ export function officesToFC(offices: readonly MapOffice[]): GeoJSON.FeatureColle
   );
 }
 
+/** Miles per degree of latitude. Longitude shrinks by cos(lat). */
+const MILES_PER_DEG_LAT = 69.0;
+
+/**
+ * Catchment rings around each hub — how far the practice actually reaches.
+ *
+ * Drawn as real geographic polygons rather than fixed-pixel circles so a "10 miles"
+ * ring stays 10 miles at every zoom level.
+ */
+export function ringsToFC(
+  hubs: readonly Hub[],
+  radiiMiles: readonly number[],
+  points = 96,
+): GeoJSON.FeatureCollection {
+  const features: GeoJSON.Feature[] = [];
+
+  for (const hub of hubs) {
+    const latScale = Math.cos((hub.latitude * Math.PI) / 180) || 1;
+
+    for (const miles of radiiMiles) {
+      const dLat = miles / MILES_PER_DEG_LAT;
+      const dLng = dLat / latScale;
+
+      const ring: [number, number][] = [];
+      for (let i = 0; i <= points; i++) {
+        const angle = (i / points) * Math.PI * 2;
+        ring.push([
+          hub.longitude + Math.cos(angle) * dLng,
+          hub.latitude + Math.sin(angle) * dLat,
+        ]);
+      }
+
+      features.push({
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: ring },
+        properties: { hubId: hub.id, miles, label: `${miles} mi` },
+      });
+    }
+  }
+
+  return fc(features);
+}
+
 export function discoveredToFC(pins: readonly DiscoveredPin[]): GeoJSON.FeatureCollection {
   return fc(
     pins.map((p) => ({

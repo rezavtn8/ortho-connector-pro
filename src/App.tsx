@@ -7,7 +7,14 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ProductionErrorBoundary } from "@/components/ProductionErrorBoundary";
 import { ConnectionMonitor } from "@/components/ConnectionMonitor";
 import { AuthProvider } from "@/contexts/AuthProvider";
+import { lazy, Suspense } from "react";
 import Index from "./pages/Index";
+
+// Dev-only map preview. `import.meta.env.DEV` is statically false in a production
+// build, so Rollup drops both the route and the lazy import entirely.
+const FlowMapPreview = import.meta.env.DEV
+  ? lazy(() => import("@/components/map/__dev__/FlowMapPreview"))
+  : null;
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -51,6 +58,16 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
+              {FlowMapPreview && (
+                <Route
+                  path="/__map-preview"
+                  element={
+                    <Suspense fallback={null}>
+                      <FlowMapPreview />
+                    </Suspense>
+                  }
+                />
+              )}
               <Route path="/*" element={<Index />} />
             </Routes>
           </BrowserRouter>

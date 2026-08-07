@@ -77,11 +77,63 @@ const FALLBACK_TIER_COLORS: TierColors = {
 
 const FALLBACK_HUB_COLOR = 'hsl(185, 75%, 35%)';
 
+/**
+ * Convert a bare shadcn HSL token into a colour string Mapbox actually accepts.
+ *
+ * shadcn stores tokens space-separated (`265 70% 55%`) so CSS can compose them as
+ * `hsl(var(--x) / 0.5)`. Mapbox GL's colour parser predates CSS Color Level 4 and
+ * understands only the **comma** form: handed `hsl(265 70% 55%)` it reports
+ * "Could not parse color from value" and — the part that actually hurts — silently
+ * refuses to add the whole layer. That is what produced a map with a basemap and
+ * nothing drawn on it: every arc, particle, office and hub layer was rejected.
+ *
+ * Returns null when the token isn't parseable, so callers fall back to a literal.
+ */
+export function hslTokenToColor(raw: string): string | null {
+  const parts = raw.replace('/', ' ').split(/[\s,]+/).filter(Boolean);
+  if (parts.length < 3) return null;
+
+  const [h, s, l, a] = parts;
+  const hue = Number.parseFloat(h);
+  const sat = Number.parseFloat(s);
+  const light = Number.parseFloat(l);
+  if (!Number.isFinite(hue) || !Number.isFinite(sat) || !Number.isFinite(light)) return null;
+
+  const alpha = a === undefined ? NaN : Number.parseFloat(a);
+
+  return Number.isFinite(alpha)
+    ? `hsla(${hue}, ${sat}%, ${light}%, ${alpha})`
+    : `hsl(${hue}, ${sat}%, ${light}%)`;
+}
+
+/**
+ * Re-express an `hsl(h, s%, l%)` colour with an alpha channel.
+ *
+ * Needed for arc gradients, which have to fade to fully transparent at the office
+ * end. Mapbox gradient stops must be concrete colours — they cannot reference
+ * feature properties — so the alpha has to be baked in here.
+ */
+export function withAlpha(color: string, alpha: number): string {
+  const match = color.match(/^hsla?\(\s*([\d.]+)\s*,\s*([\d.]+)%\s*,\s*([\d.]+)%/);
+  if (!match) return color;
+  const [, h, s, l] = match;
+  return `hsla(${h}, ${s}%, ${l}%, ${alpha})`;
+}
+
+/** Same, but nudging lightness — used to make the near-hub end of an arc glow. */
+export function lighten(color: string, delta: number): string {
+  const match = color.match(/^hsla?\(\s*([\d.]+)\s*,\s*([\d.]+)%\s*,\s*([\d.]+)%/);
+  if (!match) return color;
+  const [, h, s, l] = match;
+  const light = Math.max(0, Math.min(100, Number.parseFloat(l) + delta));
+  return `hsl(${h}, ${s}%, ${light}%)`;
+}
+
 function cssVar(name: string, fallback: string): string {
   if (typeof window === 'undefined' || typeof getComputedStyle !== 'function') return fallback;
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  // Tokens are stored bare ("265 70% 60%"), the shadcn convention.
-  return raw ? `hsl(${raw})` : fallback;
+  if (!raw) return fallback;
+  return hslTokenToColor(raw) ?? fallback;
 }
 
 /**

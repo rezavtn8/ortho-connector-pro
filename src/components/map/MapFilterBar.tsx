@@ -104,10 +104,14 @@ export function MapFilterBar({
       <div className="flex items-center gap-2 ml-auto flex-wrap">
         {unmappedCount > 0 && (
           <Tooltip>
+            {/* Badge is a plain function component, so it cannot take the ref
+                TooltipTrigger forwards; the span receives it instead. */}
             <TooltipTrigger asChild>
-              <Badge variant="outline" className="cursor-help">
-                {unmappedCount} unmapped
-              </Badge>
+              <span>
+                <Badge variant="outline" className="cursor-help">
+                  {unmappedCount} unmapped
+                </Badge>
+              </span>
             </TooltipTrigger>
             <TooltipContent>
               <p className="max-w-[16rem]">

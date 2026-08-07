@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { SOURCES } from './flowLayers';
-import { ArcCache, buildArcs, discoveredToFC, hubsToFC, officesToFC, type DiscoveredPin } from './geojson';
+import {
+  ArcCache,
+  buildArcs,
+  discoveredToFC,
+  hubsToFC,
+  officesToFC,
+  ringsToFC,
+  type DiscoveredPin,
+} from './geojson';
 import { useFlowAnimation, type FlowAnimationState } from './useFlowAnimation';
 import { useFlowMap } from './useFlowMap';
 import { useMapTheme } from './useMapTheme';
@@ -25,6 +33,10 @@ interface FlowMapCanvasProps {
   resetViewToken: number;
   /** When set, the map flies here once. */
   flyToOffice: MapOffice | null;
+  /** Dev preview harness only: a self-contained basemap style. */
+  styleOverride?: import('mapbox-gl').StyleSpecification;
+  showRings: boolean;
+  ringRadii: number[];
 }
 
 export function FlowMapCanvas({
@@ -42,6 +54,9 @@ export function FlowMapCanvas({
   onAnimationState,
   resetViewToken,
   flyToOffice,
+  styleOverride,
+  showRings,
+  ringRadii,
 }: FlowMapCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
@@ -52,6 +67,7 @@ export function FlowMapCanvas({
     token,
     containerRef,
     theme,
+    styleOverride,
     handlers: {
       onOfficeHover: onHover,
       onOfficeClick: onSelect,
@@ -70,6 +86,10 @@ export function FlowMapCanvas({
   );
 
   const hubsFC = useMemo(() => hubsToFC(hubs), [hubs]);
+  const ringsFC = useMemo(
+    () => (showRings ? ringsToFC(hubs, ringRadii) : { type: 'FeatureCollection' as const, features: [] }),
+    [hubs, ringRadii, showRings],
+  );
   const officesFC = useMemo(() => officesToFC(offices), [offices]);
   const discoveredFC = useMemo(() => discoveredToFC(discovered), [discovered]);
 
@@ -82,6 +102,7 @@ export function FlowMapCanvas({
 
   // --- Data effects: one setData each, no map rebuild ------------------------
   useEffect(() => setSourceData(SOURCES.hubs, hubsFC), [hubsFC, setSourceData, ready]);
+  useEffect(() => setSourceData(SOURCES.rings, ringsFC), [ringsFC, setSourceData, ready]);
   useEffect(() => setSourceData(SOURCES.offices, officesFC), [officesFC, setSourceData, ready]);
   useEffect(() => setSourceData(SOURCES.arcs, arcsFC), [arcsFC, setSourceData, ready]);
   useEffect(

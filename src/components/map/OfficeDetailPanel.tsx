@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom';
 import { Area, AreaChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
-import { ArrowUpRight, ExternalLink, Phone, Star, X } from 'lucide-react';
+import { ArrowUpRight, ExternalLink, Navigation, Phone, Star, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatYearMonth } from '@/lib/database.types';
 import { sanitizeURL } from '@/lib/sanitize';
 import { calculateDistance } from '@/utils/distanceCalculation';
+import { directionsUrl } from './mapActions';
 import type { FlowTier, Hub, MapOffice } from './types';
 
 const TIER_BADGE: Record<FlowTier, string> = {
@@ -159,6 +160,18 @@ export function OfficeDetailPanel({
             <a href={`tel:${office.phone}`}>
               <Phone className="h-3 w-3 mr-1" />
               Call
+            </a>
+          </Button>
+        )}
+        {hubs[0] && (
+          <Button size="sm" variant="outline" className="h-8 text-xs" asChild>
+            <a
+              href={directionsUrl(hubs[0], office)}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Navigation className="h-3 w-3 mr-1" />
+              Directions
             </a>
           </Button>
         )}
