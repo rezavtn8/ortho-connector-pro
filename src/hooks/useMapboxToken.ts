@@ -1,29 +1,32 @@
-import { useState, useEffect } from 'react';
-import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
+/**
+ * The Mapbox public token, fetched from an authenticated edge function rather than
+ * shipped as a build-time env var.
+ *
+ * On React Query with a long `staleTime` so navigating away from the map and back
+ * doesn't re-invoke the edge function — the previous useState/useEffect version
+ * re-fetched on every mount.
+ */
 export function useMapboxToken() {
-  const [token, setToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const query = useQuery({
+    queryKey: ['mapbox-token'],
+    queryFn: async (): Promise<string> => {
+      const { data, error } = await supabase.functions.invoke('get-mapbox-token');
+      if (error) throw error;
+      if (!data?.token) throw new Error('No Mapbox token returned');
+      return data.token as string;
+    },
+    staleTime: 30 * 60_000,
+    gcTime: 60 * 60_000,
+    refetchOnWindowFocus: false,
+    retry: 1,
+  });
 
-  useEffect(() => {
-    const getToken = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        const { data, error } = await supabase.functions.invoke('get-mapbox-token');
-        if (error) throw error;
-        setToken(data.token);
-      } catch (error) {
-        console.error('Error getting Mapbox token:', error);
-        setError('Failed to load Mapbox token');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    getToken();
-  }, []);
-
-  return { token, isLoading, error };
+  return {
+    token: query.data ?? null,
+    isLoading: query.isLoading,
+    error: query.error ? 'Failed to load Mapbox token' : null,
+  };
 }

@@ -221,6 +221,7 @@ export function useAddDailyPatients() {
       queryClient.invalidateQueries({ queryKey: ['daily-patients-date'] });
       queryClient.invalidateQueries({ queryKey: ['patient-sources'] });
       queryClient.invalidateQueries({ queryKey: ['monthly-patients'] });
+      queryClient.invalidateQueries({ queryKey: ['patient-flow-map'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-data'] });
       queryClient.invalidateQueries({ queryKey: ['unified-patient-data'] });
       
@@ -265,6 +266,7 @@ export function useDeleteDailyPatient() {
       queryClient.invalidateQueries({ queryKey: ['daily-patients-date'] });
       queryClient.invalidateQueries({ queryKey: ['patient-sources'] });
       queryClient.invalidateQueries({ queryKey: ['monthly-patients'] });
+      queryClient.invalidateQueries({ queryKey: ['patient-flow-map'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-data'] });
       queryClient.invalidateQueries({ queryKey: ['unified-patient-data'] });
       
@@ -310,6 +312,7 @@ export function useUpdateMonthlyPatients() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['monthly-patients'] });
+      queryClient.invalidateQueries({ queryKey: ['patient-flow-map'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-data'] });
       queryClient.invalidateQueries({ queryKey: ['patient-sources'] });
       queryClient.invalidateQueries({ queryKey: ['unified-patient-data'] });
