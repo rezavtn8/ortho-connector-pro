@@ -22,6 +22,7 @@ const MarketingVisits = lazy(() =>
 );
 const Settings = lazy(() => import('@/pages/Settings').then((m) => ({ default: m.Settings })));
 const Analytics = lazy(() => import('@/pages/Analytics').then((m) => ({ default: m.Analytics })));
+const Insights = lazy(() => import('@/pages/Insights').then((m) => ({ default: m.Insights })));
 const MapView = lazy(() => import('@/pages/MapView').then((m) => ({ default: m.MapView })));
 const Reviews = lazy(() => import('@/pages/Reviews').then((m) => ({ default: m.Reviews })));
 const Discover = lazy(() => import('@/pages/Discover').then((m) => ({ default: m.Discover })));
@@ -56,6 +57,7 @@ const ROUTES: ReadonlyArray<[path: string, Component: React.ComponentType]> = [
   ['/review-magic/*', ReviewMagic],
   ['/map-view/*', MapView],
   ['/analytics/*', Analytics],
+  ['/insights/*', Insights],
   ['/competitor-watch/*', CompetitorWatch],
   ['/ai-assistant/*', AIAssistant],
   ['/mailing-labels/*', MailingLabels],

@@ -16,6 +16,12 @@ const FlowMapPreview = import.meta.env.DEV
   ? lazy(() => import("@/components/map/__dev__/FlowMapPreview"))
   : null;
 
+// Same deal for the Insights diagrams: renders the real board against synthetic
+// fixtures, including the degenerate cases, with no login and no Supabase.
+const InsightsPreview = import.meta.env.DEV
+  ? lazy(() => import("@/components/insights/__dev__/InsightsPreview"))
+  : null;
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -64,6 +70,16 @@ const App = () => (
                   element={
                     <Suspense fallback={null}>
                       <FlowMapPreview />
+                    </Suspense>
+                  }
+                />
+              )}
+              {InsightsPreview && (
+                <Route
+                  path="/__insights-preview"
+                  element={
+                    <Suspense fallback={null}>
+                      <InsightsPreview />
                     </Suspense>
                   }
                 />

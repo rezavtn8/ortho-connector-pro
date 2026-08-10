@@ -59,7 +59,22 @@ All colors MUST be HSL.
     --tier-vip: 265 70% 55%;
     --tier-warm: 35 90% 50%;
     --tier-cold: 200 65% 50%;
-    --tier-dormant: 210 12% 62%;
+    /* Re-stepped from `210 12% 62%`. Against Cold that scored a normal-vision OKLab
+       ΔE of 11.1 — below the 15 floor, i.e. hard to tell apart even with full colour
+       vision, let alone with a colour deficiency. At `220 8% 45%` the pair scores
+       15.4 normal / 13.5 deutan, both passing. Still near-zero chroma on purpose:
+       Dormant is a *status* ("inactive"), and grey is the honest reading of it. */
+    --tier-dormant: 220 8% 45%;
+
+    /* Outreach channels - Insights network chart. Validated as a set: worst all-pairs
+       CVD ΔE 9.2, worst normal-vision ΔE 24.0 on the card surface. Never rendered as
+       comparable marks alongside the tier hues, which they collide with (this orange
+       sits on --tier-warm, this blue on --tier-cold); the network chart shows one
+       palette per mode. */
+    --outreach-visit: 213 68% 50%;
+    --outreach-campaign: 17 82% 56%;
+    --outreach-email: 159 73% 40%;
+    --outreach-none: 220 8% 45%;
 
     /* Gradients */
     --gradient-connection: linear-gradient(135deg, hsl(185 15% 99%), hsl(185 15% 95%));
@@ -148,7 +163,16 @@ All colors MUST be HSL.
     --tier-vip: 265 80% 70%;
     --tier-warm: 35 95% 60%;
     --tier-cold: 200 75% 60%;
-    --tier-dormant: 210 12% 55%;
+    --tier-dormant: 218 10% 58%;
+
+    /* Outreach channels - dark mode. Stepped for a dark surface rather than flipped.
+       Note no theme provider mounts `.dark` today, so these are forward-looking; the
+       tier steps above are tuned for the Mapbox basemap and want their own pass when
+       a theme toggle ships. */
+    --outreach-visit: 213 77% 56%;
+    --outreach-campaign: 17 70% 50%;
+    --outreach-email: 159 73% 36%;
+    --outreach-none: 218 10% 58%;
 
     /* Gradients - dark mode */
     --gradient-connection: linear-gradient(135deg, hsl(185 20% 12%), hsl(185 20% 8%));
@@ -468,6 +492,15 @@ All colors MUST be HSL.
   .animate-pulse-dot,
   .animate-flow,
   .animate-bob {
+    animation: none !important;
+  }
+
+  /* Insights diagrams. Their hover highlight and enter fades are CSS transitions on
+     one parent <g>, not per-mark React state, so nulling this one class stops every
+     path in all three charts. */
+  .insights-fade,
+  .insights-fade * {
+    transition: none !important;
     animation: none !important;
   }
 
