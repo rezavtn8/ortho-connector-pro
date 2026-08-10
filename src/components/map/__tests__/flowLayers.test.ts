@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { hslTokenToColor, readHubColor, readTierColors } from '../flowScales';
-import { installLayers, LAYERS, SOURCES } from '../flowLayers';
+import { installLayers, INTERACTIVE_LAYERS, LAYER_TARGET_KIND, LAYERS, SOURCES } from '../flowLayers';
 
 /**
  * Regression tests for the bug that shipped a blank map.
@@ -161,6 +161,30 @@ describe('installLayers', () => {
     }
     // Guard against the assertion silently checking nothing.
     expect(checked).toBeGreaterThan(5);
+  });
+
+  it('lists click targets in reverse paint order, topmost first', () => {
+    // The click dispatcher resolves overlapping pins by position in
+    // INTERACTIVE_LAYERS. If that list stops matching what is actually drawn on
+    // top, clicks start selecting the pin *underneath* the one the user aimed at —
+    // a bug nobody would think to look for in a constant. So it is checked against
+    // the real install order rather than maintained by hand and hoped for.
+    const map = makeFakeMap('https://example.com/{fontstack}/{range}.pbf');
+    installLayers(map as never, readTierColors(), readHubColor());
+
+    const paintOrder = [...map.layers.keys()]; // Map preserves insertion order
+    const interactiveInPaintOrder = paintOrder.filter((id) => INTERACTIVE_LAYERS.includes(id));
+
+    expect(INTERACTIVE_LAYERS).toEqual([...interactiveInPaintOrder].reverse());
+  });
+
+  it('maps every click target to a kind', () => {
+    // A layer listed as interactive but missing a kind would be silently skipped by
+    // the dispatcher, making that pin unclickable — precisely the defect that made
+    // prospects a click sink in the first place.
+    for (const id of INTERACTIVE_LAYERS) {
+      expect(LAYER_TARGET_KIND[id], `kind for ${id}`).toBeDefined();
+    }
   });
 
   it('is idempotent, as style.load re-runs it after every setStyle', () => {

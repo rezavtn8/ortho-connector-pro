@@ -59,6 +59,29 @@ export interface Flow {
   count: number;
 }
 
+/**
+ * What the pointer is over, or what the detail panel is showing.
+ *
+ * Tagged rather than a bare id string. The three kinds live in different collections
+ * — `officesById`, the discovered list, `hubs` — and a bare id looked up in the wrong
+ * one returns `undefined` rather than throwing, which renders an empty panel with no
+ * error anywhere. Carrying the kind makes that mistake a compile error instead.
+ */
+export type MapTargetKind = 'office' | 'prospect' | 'hub';
+
+export interface MapTarget {
+  kind: MapTargetKind;
+  id: string;
+}
+
+/** Independent focus per kind: hovering a prospect must not dim the referral arcs. */
+export interface MapFocus {
+  officeId: string | null;
+  prospectId: string | null;
+}
+
+export const NO_FOCUS: MapFocus = { officeId: null, prospectId: null };
+
 export const TIER_ORDER: readonly FlowTier[] = ['VIP', 'Warm', 'Cold', 'Dormant'] as const;
 
 export function isFlowTier(value: unknown): value is FlowTier {

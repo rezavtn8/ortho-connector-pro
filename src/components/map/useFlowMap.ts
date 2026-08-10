@@ -6,11 +6,12 @@ import {
   EMPTY_FC,
   installLayers,
   INTERACTIVE_LAYERS,
-  LAYERS,
+  LAYER_TARGET_KIND,
   SOURCES,
   type SourceId,
 } from './flowLayers';
 import { readHubColor, readTierColors } from './flowScales';
+import { NO_FOCUS, type MapFocus, type MapTarget } from './types';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 /**
@@ -25,10 +26,10 @@ const STYLES = {
 } as const;
 
 export interface FlowMapHandlers {
-  onOfficeHover?: (id: string | null) => void;
-  onOfficeClick?: (id: string) => void;
-  onHubClick?: (id: string) => void;
-  onBackgroundClick?: () => void;
+  /** Null when the pointer leaves every interactive pin. */
+  onHover?: (target: MapTarget | null) => void;
+  /** Null when the click landed on empty map, which dismisses the panel. */
+  onSelect?: (target: MapTarget | null) => void;
 }
 
 export interface UseFlowMapOptions {
@@ -101,7 +102,7 @@ export function useFlowMap({
   const handlersRef = useRef(handlers);
   handlersRef.current = handlers;
 
-  const focusRef = useRef<string | null>(null);
+  const focusRef = useRef<MapFocus>(NO_FOCUS);
 
   // --- Effect A: construct once ---------------------------------------------
   useEffect(() => {
@@ -138,39 +139,58 @@ export function useFlowMap({
 
     const canvas = () => map.getCanvas();
 
-    map.on('mousemove', LAYERS.officeDot, (e) => {
-      const id = e.features?.[0]?.properties?.id;
-      canvas().style.cursor = 'pointer';
-      if (typeof id === 'string') handlersRef.current.onOfficeHover?.(id);
+    /**
+     * Resolve the single thing a pointer event refers to.
+     *
+     * One query over every interactive layer, then an explicit priority choice —
+     * rather than a `map.on(event, layer, ...)` per layer. Per-layer handlers fire
+     * once *each* for overlapping pins, in registration order, and the previous
+     * version leaned on `preventDefault` to suppress a separate background handler.
+     * That arrangement is how prospects ended up as a click sink: they were listed
+     * as interactive, which blocked the background dismiss, but had no handler of
+     * their own, so a click on one did nothing whatsoever. With a single dispatcher
+     * there is exactly one outcome per click and nothing to keep in sync.
+     */
+    const pick = (point: mapboxgl.Point): MapTarget | null => {
+      const layers = INTERACTIVE_LAYERS.filter((id) => map.getLayer(id));
+      if (layers.length === 0) return null;
+
+      let best: MapTarget | null = null;
+      let bestRank = Number.POSITIVE_INFINITY;
+
+      for (const hit of map.queryRenderedFeatures(point, { layers })) {
+        const layerId = hit.layer?.id;
+        const id = hit.properties?.id;
+        if (typeof layerId !== 'string' || typeof id !== 'string') continue;
+
+        // INTERACTIVE_LAYERS is ordered topmost-first, so the lowest rank wins.
+        const rank = INTERACTIVE_LAYERS.indexOf(layerId);
+        const kind = LAYER_TARGET_KIND[layerId];
+        // An interactive layer with no kind mapping is skipped rather than
+        // dispatched as `undefined`, so a half-added layer cannot open a blank panel.
+        if (rank < 0 || rank >= bestRank || !kind) continue;
+
+        bestRank = rank;
+        best = { kind, id };
+      }
+
+      return best;
+    };
+
+    map.on('mousemove', (e) => {
+      const target = pick(e.point);
+      canvas().style.cursor = target ? 'pointer' : '';
+      handlersRef.current.onHover?.(target);
     });
 
-    map.on('mouseleave', LAYERS.officeDot, () => {
+    // Leaving the canvas entirely never produces a mousemove, so clear explicitly.
+    map.on('mouseout', () => {
       canvas().style.cursor = '';
-      handlersRef.current.onOfficeHover?.(null);
-    });
-
-    map.on('click', LAYERS.officeDot, (e) => {
-      const id = e.features?.[0]?.properties?.id;
-      if (typeof id === 'string') {
-        e.preventDefault();
-        handlersRef.current.onOfficeClick?.(id);
-      }
-    });
-
-    map.on('click', LAYERS.hubDot, (e) => {
-      const id = e.features?.[0]?.properties?.id;
-      if (typeof id === 'string') {
-        e.preventDefault();
-        handlersRef.current.onHubClick?.(id);
-      }
+      handlersRef.current.onHover?.(null);
     });
 
     map.on('click', (e) => {
-      if (e.defaultPrevented) return;
-      const hits = map.queryRenderedFeatures(e.point, {
-        layers: INTERACTIVE_LAYERS.filter((l) => map.getLayer(l)),
-      });
-      if (hits.length === 0) handlersRef.current.onBackgroundClick?.();
+      handlersRef.current.onSelect?.(pick(e.point));
     });
 
     mapRef.current = map;
@@ -223,10 +243,10 @@ export function useFlowMap({
     source?.setData(data);
   }, []);
 
-  const setFocus = useCallback((id: string | null) => {
-    focusRef.current = id;
+  const setFocus = useCallback((focus: MapFocus) => {
+    focusRef.current = focus;
     const map = mapRef.current;
-    if (map) applyFocus(map, id);
+    if (map) applyFocus(map, focus);
   }, []);
 
   const fitToData = useCallback((points: Array<[number, number]>, force = false) => {

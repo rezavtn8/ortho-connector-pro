@@ -1,8 +1,9 @@
 import { Building2, Compass, Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { MOMENTUM_WINDOW } from '@/lib/officeMetrics';
 import { cn } from '@/lib/utils';
-import { normalize, widthFor } from './flowScales';
+import { DIRECTION_COLORS, normalize, widthFor } from './flowScales';
 import { TIER_ORDER, type FlowTier } from './types';
 
 const TIER_DESCRIPTIONS: Record<FlowTier, string> = {
@@ -37,6 +38,8 @@ interface MapLegendProps {
   animatedFlows: number;
   totalFlows: number;
   reducedMotion: boolean;
+  /** Set when the map is showing month-on-month change rather than a month's flows. */
+  compare: { monthLabel: string; gained: number; lost: number } | null;
 }
 
 export function MapLegend({
@@ -50,6 +53,7 @@ export function MapLegend({
   animatedFlows,
   totalFlows,
   reducedMotion,
+  compare,
 }: MapLegendProps) {
   // Three sample widths labelled with real patient counts. Without this the
   // thickness encoding is undecodable.
@@ -98,41 +102,98 @@ export function MapLegend({
             </button>
           ))}
         </div>
-      </Card>
 
-      <Card className="p-3 sm:p-4">
-        <h3 className="font-semibold mb-3 flex items-center gap-2 text-sm">
-          <Sparkles className="h-4 w-4" />
-          Flow weight
-        </h3>
-
-        <div className="space-y-2.5">
-          {widthSamples.map(({ count, width }) => (
-            <div key={count} className="flex items-center gap-3">
+        {/* The ring is a second, independent encoding on the same dot: the fill says
+            what an office is worth, the ring says where it is heading. */}
+        <div className="mt-3 pt-2.5 border-t space-y-1.5">
+          <p className="text-[11px] font-medium">Rings show direction</p>
+          {[
+            { color: DIRECTION_COLORS.gaining, width: 2, label: 'Referring more than usual' },
+            { color: DIRECTION_COLORS.losing, width: 2, label: 'Slipping against its own norm' },
+            { color: DIRECTION_COLORS.losing, width: 3, label: 'Stopped referring' },
+          ].map((item) => (
+            <div key={item.label} className="flex items-center gap-2.5">
               <span
-                className="rounded-full bg-foreground/70 shrink-0"
-                style={{ width: 40, height: Math.max(2, width) }}
+                className="h-3.5 w-3.5 rounded-full shrink-0"
+                style={{ border: `${item.width}px solid ${item.color}` }}
               />
-              <span className="text-xs text-muted-foreground tabular-nums">
-                {count} patient{count === 1 ? '' : 's'}/mo
-              </span>
+              <span className="text-[11px] text-muted-foreground leading-tight">{item.label}</span>
             </div>
           ))}
-        </div>
-
-        <p className="text-[11px] text-muted-foreground mt-3 pt-2.5 border-t leading-relaxed">
-          {reducedMotion
-            ? 'Motion is off (reduced-motion preference). Dot density still shows volume.'
-            : 'Dots travel from each office toward your practice. Faster, denser flow means more patients.'}
-        </p>
-
-        {animatedFlows < totalFlows && (
-          <p className="text-[11px] text-muted-foreground mt-2">
-            Showing motion for the {animatedFlows} busiest of {totalFlows} flows; the rest still
-            show their arc.
+          <p className="text-[11px] text-muted-foreground pt-1">
+            Measured against each office's own last {MOMENTUM_WINDOW} months, so a big
+            referrer easing off registers even while it stays near the top.
           </p>
-        )}
+        </div>
       </Card>
+
+      {compare ? (
+        <Card className="p-3 sm:p-4">
+          <h3 className="font-semibold mb-3 flex items-center gap-2 text-sm">
+            <Sparkles className="h-4 w-4" />
+            Change vs {compare.monthLabel}
+          </h3>
+
+          <div className="space-y-2.5">
+            {[
+              { color: DIRECTION_COLORS.gaining, label: 'More than before', value: compare.gained },
+              { color: DIRECTION_COLORS.losing, label: 'Fewer than before', value: compare.lost },
+            ].map((item) => (
+              <div key={item.label} className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span
+                    className="rounded-full shrink-0"
+                    style={{ width: 40, height: 4, backgroundColor: item.color }}
+                  />
+                  <span className="text-xs text-muted-foreground truncate">{item.label}</span>
+                </div>
+                <span className="text-xs font-semibold tabular-nums" style={{ color: item.color }}>
+                  {item.value} pt
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-[11px] text-muted-foreground mt-3 pt-2.5 border-t leading-relaxed">
+            Thickness is the size of the change. Motion is off here — the dots stand for
+            patients arriving, and a difference between two months has none.
+          </p>
+        </Card>
+      ) : (
+        <Card className="p-3 sm:p-4">
+          <h3 className="font-semibold mb-3 flex items-center gap-2 text-sm">
+            <Sparkles className="h-4 w-4" />
+            Flow weight
+          </h3>
+
+          <div className="space-y-2.5">
+            {widthSamples.map(({ count, width }) => (
+              <div key={count} className="flex items-center gap-3">
+                <span
+                  className="rounded-full bg-foreground/70 shrink-0"
+                  style={{ width: 40, height: Math.max(2, width) }}
+                />
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {count} patient{count === 1 ? '' : 's'}/mo
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-[11px] text-muted-foreground mt-3 pt-2.5 border-t leading-relaxed">
+            {reducedMotion
+              ? 'Motion is off (reduced-motion preference). Dot density still shows volume.'
+              : 'Dots travel from each office toward your practice. Faster, denser flow means more patients.'}
+          </p>
+
+          {animatedFlows < totalFlows && (
+            <p className="text-[11px] text-muted-foreground mt-2">
+              Showing motion for the {animatedFlows} busiest of {totalFlows} flows; the rest still
+              show their arc.
+            </p>
+          )}
+        </Card>
+      )}
 
       {showDiscovered && (
         <Card className="p-3 sm:p-4 border-teal-200 dark:border-teal-800">

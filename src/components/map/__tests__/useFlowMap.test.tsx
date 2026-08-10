@@ -34,8 +34,18 @@ const setPaintCalls: Array<{ layer: string; prop: string }> = [];
 const removeCalls = { count: 0 };
 const addLayerCalls: string[] = [];
 const setStyleCalls: string[] = [];
+
+/** Features the fake map reports under the pointer, newest staging wins. */
+let renderedHits: Array<{ layer: { id: string }; properties: { id: string } }> = [];
+const stageHits = (...hits: Array<[layer: string, id: string]>) => {
+  renderedHits = hits.map(([layer, id]) => ({ layer: { id: layer }, properties: { id } }));
+};
+
 /** The live fake, so a test can drive the map the way Mapbox itself would. */
 let lastMap: FakeMap | null = null;
+const rememberMap = (map: FakeMap) => {
+  lastMap = map;
+};
 
 class FakeGeoJSONSource {
   constructor(public id: string) {}
@@ -52,7 +62,7 @@ class FakeMap {
 
   constructor(public options: Record<string, unknown>) {
     constructorCalls.count++;
-    lastMap = this;
+    rememberMap(this);
     // Style loads asynchronously in the real thing; mirror that.
     queueMicrotask(() => this.fire('style.load'));
   }
@@ -110,8 +120,10 @@ class FakeMap {
   getCanvas() {
     return { style: {} };
   }
-  queryRenderedFeatures() {
-    return [];
+  /** Tests stage overlapping pins here; the dispatcher must pick exactly one. */
+  queryRenderedFeatures(_point?: unknown, options?: { layers?: string[] }) {
+    const allowed = new Set(options?.layers ?? []);
+    return renderedHits.filter((h) => allowed.has(h.layer.id));
   }
   fitBounds() {}
   flyTo() {}
@@ -152,13 +164,21 @@ function makeFC(count: number): GeoJSON.FeatureCollection {
 }
 
 /** Mirrors how FlowMapCanvas drives the hook: new FC identity each render. */
-function Harness({ arcCount, theme }: { arcCount: number; theme: 'light' | 'dark' }) {
+function Harness({
+  arcCount,
+  theme,
+  handlers = {},
+}: {
+  arcCount: number;
+  theme: 'light' | 'dark';
+  handlers?: Parameters<typeof useFlowMap>[0]['handlers'];
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { setSourceData, ready } = useFlowMap({
     token: 'pk.test',
     containerRef: containerRef as never,
     theme,
-    handlers: {},
+    handlers,
   });
 
   useEffect(() => {
@@ -181,6 +201,7 @@ beforeEach(() => {
   addLayerCalls.length = 0;
   setStyleCalls.length = 0;
   lastMap = null;
+  renderedHits = [];
 
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -296,5 +317,102 @@ describe('useFlowMap lifecycle', () => {
     act(() => root.unmount());
     unmounted = true;
     expect(removeCalls.count).toBe(1);
+  });
+});
+
+/**
+ * The regression suite for prospects being a click sink.
+ *
+ * They were listed as interactive — which blocked the background dismiss — but had
+ * no handler of their own, so clicking one did nothing at all: no panel, and not
+ * even a dismissal of whatever was already open.
+ */
+describe('click dispatch', () => {
+  const selections: Array<{ kind: string; id: string } | null> = [];
+
+  const clickWith = async (...hits: Array<[string, string]>) => {
+    selections.length = 0;
+    await render(
+      createElement(Harness, {
+        arcCount: 1,
+        theme: 'light',
+        handlers: { onSelect: (t) => selections.push(t) },
+      }),
+    );
+    stageHits(...hits);
+    act(() => lastMap!.fire('click', { point: { x: 10, y: 10 } }));
+  };
+
+  it('opens a prospect when one is clicked', async () => {
+    await clickWith(['discovered-offices-icon', 'prospect-1']);
+    expect(selections).toEqual([{ kind: 'prospect', id: 'prospect-1' }]);
+  });
+
+  it('selects the referring office, not the prospect beneath it', async () => {
+    // Two pins at the same address: an office you already track and the prospect it
+    // was discovered as. The one drawn on top is the one the user aimed at.
+    await clickWith(
+      ['discovered-offices-icon', 'prospect-1'],
+      ['network-offices-dot', 'office-1'],
+    );
+    expect(selections).toEqual([{ kind: 'office', id: 'office-1' }]);
+  });
+
+  it('selects your practice over anything sharing its coordinates', async () => {
+    await clickWith(['network-offices-dot', 'office-1'], ['hub-dot', 'hub-1']);
+    expect(selections).toEqual([{ kind: 'hub', id: 'hub-1' }]);
+  });
+
+  it('fires exactly once per click, never once per overlapping layer', async () => {
+    await clickWith(
+      ['hub-dot', 'hub-1'],
+      ['network-offices-dot', 'office-1'],
+      ['discovered-offices-icon', 'prospect-1'],
+    );
+    expect(selections).toHaveLength(1);
+  });
+
+  it('dismisses on a click that hits nothing', async () => {
+    await clickWith();
+    expect(selections).toEqual([null]);
+  });
+
+  it('ignores a hit with no id rather than selecting undefined', async () => {
+    selections.length = 0;
+    await render(
+      createElement(Harness, {
+        arcCount: 1,
+        theme: 'light',
+        handlers: { onSelect: (t) => selections.push(t) },
+      }),
+    );
+    renderedHits = [{ layer: { id: 'network-offices-dot' }, properties: {} as never }];
+    act(() => lastMap!.fire('click', { point: { x: 1, y: 1 } }));
+    expect(selections).toEqual([null]);
+  });
+
+  it('reports hover targets and clears them when the pointer leaves', async () => {
+    const hovers: Array<{ kind: string; id: string } | null> = [];
+    await render(
+      createElement(Harness, {
+        arcCount: 1,
+        theme: 'light',
+        handlers: { onHover: (t) => hovers.push(t) },
+      }),
+    );
+
+    stageHits(['discovered-offices-icon', 'prospect-1']);
+    act(() => lastMap!.fire('mousemove', { point: { x: 5, y: 5 } }));
+    expect(hovers.at(-1)).toEqual({ kind: 'prospect', id: 'prospect-1' });
+
+    act(() => lastMap!.fire('mouseout', {}));
+    expect(hovers.at(-1)).toBeNull();
+  });
+
+  it('resolves every interaction on the one map instance', async () => {
+    await clickWith(['network-offices-dot', 'office-1']);
+    act(() => lastMap!.fire('mousemove', { point: { x: 2, y: 2 } }));
+    expect(constructorCalls.count).toBe(1);
+    expect(removeCalls.count).toBe(0);
   });
 });

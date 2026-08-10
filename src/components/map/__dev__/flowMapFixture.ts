@@ -1,3 +1,4 @@
+import type { DiscoveredOffice } from '@/hooks/useDiscoveredOffices';
 import type { PatientFlowData } from '@/hooks/usePatientFlowData';
 import type { Flow, FlowTier, Hub, MapOffice } from '../types';
 
@@ -169,6 +170,51 @@ export function buildFixture(now = new Date(2026, 7, 7)): PatientFlowData {
     latestMonthWithData,
     maxFlowCount: Math.max(1, maxFlowCount),
   };
+}
+
+const PROSPECT_NAMES = [
+  'Willow Bend Dental',
+  'Crescent Bay Orthodontics',
+  'Marigold Family Dental',
+  'Stonebridge Dental Care',
+  'Harbor Point Smiles',
+  'Juniper Hill Dentistry',
+  'Terrace View Dental',
+  'Oakmont Dental Studio',
+];
+
+/**
+ * Prospect pins for the harness, including two already imported.
+ *
+ * The imported pair matter: they are how the preview shows that an office already
+ * in the network stops being drawn as a prospect, rather than sitting under a
+ * dashed ring forever on top of its own tier dot.
+ */
+export function buildDiscoveredFixture(): DiscoveredOffice[] {
+  const rand = lcg(775501);
+
+  return PROSPECT_NAMES.map((name, index) => {
+    const angle = rand() * Math.PI * 2;
+    const radius = 0.05 + Math.pow(rand(), 1.4) * 0.3;
+    const rating = Math.round((3.2 + rand() * 1.8) * 10) / 10;
+
+    return {
+      id: `prospect-${index + 1}`,
+      name,
+      address: `${100 + Math.floor(rand() * 900)} Prospect Way, Irvine, CA`,
+      phone: '(949) 555-01' + String(10 + index),
+      website: `https://example.com/${index + 1}`,
+      latitude: HUB[1] + Math.sin(angle) * radius,
+      longitude: HUB[0] + Math.cos(angle) * radius * 1.2,
+      google_rating: rating,
+      office_type: index % 2 === 0 ? 'General dentist' : 'Pediatric dentist',
+      distance_miles: Math.round(radius * 69 * 10) / 10,
+      ratingCategory:
+        rating >= 4.5 ? 'Excellent' : rating >= 4.0 ? 'Good' : rating >= 3.5 ? 'Average' : 'Low',
+      google_place_id: `place-${index + 1}`,
+      imported: index >= PROSPECT_NAMES.length - 2,
+    };
+  });
 }
 
 /**

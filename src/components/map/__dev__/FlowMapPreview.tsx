@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { PATIENT_FLOW_QUERY_KEY } from '@/hooks/usePatientFlowData';
 import { PatientFlowMap } from '../PatientFlowMap';
-import { buildFixture, previewStyle } from './flowMapFixture';
+import { buildDiscoveredFixture, buildFixture, previewStyle } from './flowMapFixture';
 
 /**
  * Mapbox GL v3 validates the access token against Mapbox's API and refuses to draw
@@ -31,13 +31,14 @@ export default function FlowMapPreview() {
   const [dark, setDark] = useState(true);
 
   const fixture = useMemo(() => buildFixture(), []);
+  const prospects = useMemo(() => buildDiscoveredFixture(), []);
 
   // Seed synchronously during render so the hooks never fire a real request.
   useMemo(() => {
     queryClient.setQueryData(PATIENT_FLOW_QUERY_KEY, fixture);
     queryClient.setQueryData(['mapbox-token'], PREVIEW_TOKEN);
-    queryClient.setQueryData(['discovered-offices', 'all'], []);
-  }, [queryClient, fixture]);
+    queryClient.setQueryData(['discovered-offices', 'all'], prospects);
+  }, [queryClient, fixture, prospects]);
 
   // With a real token the harness uses the genuine Mapbox basemap, so what is on
   // screen here is what ships. The offline style is only a fallback.
@@ -72,7 +73,7 @@ export default function FlowMapPreview() {
         </p>
       )}
 
-      <PatientFlowMap height="620px" styleOverride={style} />
+      <PatientFlowMap height="620px" styleOverride={style} initialShowDiscovered />
     </div>
   );
 }

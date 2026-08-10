@@ -8,16 +8,29 @@ import { useDiscoveredGroups } from '@/hooks/useDiscoveredGroups';
 import { useDiscoveredOffices } from '@/hooks/useDiscoveredOffices';
 import { useMapboxToken } from '@/hooks/useMapboxToken';
 import { usePatientFlowData } from '@/hooks/usePatientFlowData';
+import { formatYearMonth } from '@/lib/database.types';
+import { AttentionCard } from './AttentionCard';
+import { computeAttention } from './attention';
+import { computeDeltaFlows } from './deltaFlows';
 import { FlowMapCanvas } from './FlowMapCanvas';
+import { HubDetailPanel } from './HubDetailPanel';
 import { MapActionsBar } from './MapActionsBar';
 import { MapFilterBar } from './MapFilterBar';
 import { MapLegend } from './MapLegend';
 import { MapStatsRow } from './MapStatsRow';
-import { MonthScrubber, type Speed } from './MonthScrubber';
+import { MonthScrubber, type CompareOffset, type Speed } from './MonthScrubber';
 import { OfficeDetailPanel } from './OfficeDetailPanel';
+import { ProspectDetailPanel } from './ProspectDetailPanel';
 import { ReachCard } from './ReachCard';
 import { computeReachStats } from './reachStats';
-import type { FlowTier, MapOffice } from './types';
+import {
+  aggregateFlows,
+  baselineWindow,
+  resolveWindow,
+  totalPatients,
+  type WindowSize,
+} from './timeWindow';
+import type { FlowTier, MapOffice, MapTarget } from './types';
 import type { FlowAnimationState } from './useFlowAnimation';
 
 export interface PatientFlowMapProps {
@@ -72,8 +85,10 @@ export function PatientFlowMap({
   const [monthIndex, setMonthIndex] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState<Speed>('1');
-  const [hoverId, setHoverId] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(initialOfficeId);
+  const [hover, setHover] = useState<MapTarget | null>(null);
+  const [selected, setSelected] = useState<MapTarget | null>(
+    initialOfficeId ? { kind: 'office', id: initialOfficeId } : null,
+  );
   const [legendTier, setLegendTier] = useState<FlowTier | null>(null);
   const [resetViewToken, setResetViewToken] = useState(0);
   const [animation, setAnimation] = useState<FlowAnimationState>({
@@ -83,6 +98,10 @@ export function PatientFlowMap({
   });
   const [hasFlownToInitial, setHasFlownToInitial] = useState(false);
   const [showRings, setShowRings] = useState(true);
+  const [compareOffset, setCompareOffset] = useState<CompareOffset>(0);
+  // Opens on the whole history: the aggregate is the resting state of this map, and
+  // a single month is the drill-down you scrub to.
+  const [windowSize, setWindowSize] = useState<WindowSize>('all');
 
   const { data: discovered = [] } = useDiscoveredOffices(groupId, showDiscovered);
 
@@ -135,10 +154,19 @@ export function PatientFlowMap({
 
   const visibleIds = useMemo(() => new Set(visibleOffices.map((o) => o.id)), [visibleOffices]);
 
+  /**
+   * The period on screen. Single source of truth — arcs, headline numbers, reach and
+   * compare all derive from this one call, so they cannot describe different spans.
+   */
+  const activeWindow = useMemo(
+    () => resolveWindow(months, windowSize, months.indexOf(deferredMonth ?? '')),
+    [months, windowSize, deferredMonth],
+  );
+
   const visibleFlows = useMemo(() => {
-    if (!data || !deferredMonth) return [];
-    return (data.flowsByMonth[deferredMonth] ?? []).filter((f) => visibleIds.has(f.sourceId));
-  }, [data, deferredMonth, visibleIds]);
+    if (!data) return [];
+    return aggregateFlows(data.flowsByMonth, activeWindow.months, (id) => visibleIds.has(id));
+  }, [data, activeWindow, visibleIds]);
 
   // --- Derived counts -------------------------------------------------------
   const tierCounts = useMemo(() => {
@@ -169,24 +197,64 @@ export function PatientFlowMap({
     [visibleFlows, officesById, data?.hubs],
   );
 
-  const patientsThisMonth = useMemo(
-    () => visibleFlows.reduce((sum, f) => sum + f.count, 0),
-    [visibleFlows],
+  // Momentum is read at the month the scrubber is on, so scrubbing back shows what
+  // was going wrong then rather than re-reporting today. Parked where the map opens
+  // — the newest month with data — it is the current state of the business.
+  const attention = useMemo(
+    () => computeAttention(visibleOffices, deferredMonth),
+    [visibleOffices, deferredMonth],
   );
 
-  const deltaVsPrevious = useMemo(() => {
-    if (!data || safeIndex <= 0) return null;
-    const previous = months[safeIndex - 1];
-    if (!previous) return null;
-    const previousTotal = (data.flowsByMonth[previous] ?? [])
-      .filter((f) => visibleIds.has(f.sourceId))
-      .reduce((sum, f) => sum + f.count, 0);
-    return patientsThisMonth - previousTotal;
-  }, [data, months, safeIndex, visibleIds, patientsThisMonth]);
+  /**
+   * The baseline period for compare mode: the same span, `compareOffset` months back.
+   *
+   * Null whenever the history cannot cover it in full, which turns compare mode off
+   * rather than diffing a full period against a truncated one and reporting the
+   * shortfall as a collapse.
+   */
+  const comparison = useMemo(
+    () => baselineWindow(months, activeWindow, compareOffset),
+    [months, activeWindow, compareOffset],
+  );
 
-  const selectedOffice: MapOffice | null = selectedId
-    ? (officesById.get(selectedId) ?? null)
-    : null;
+  const delta = useMemo(() => {
+    if (!data || !comparison) return null;
+    return computeDeltaFlows(
+      visibleFlows,
+      aggregateFlows(data.flowsByMonth, comparison.months, (id) => visibleIds.has(id)),
+      (id) => visibleIds.has(id),
+    );
+  }, [data, comparison, visibleFlows, visibleIds]);
+
+  const patientsThisMonth = useMemo(() => totalPatients(visibleFlows), [visibleFlows]);
+
+  /** Change against the equally sized period immediately before this one. */
+  const deltaVsPrevious = useMemo(() => {
+    if (!data) return null;
+    const previous = baselineWindow(months, activeWindow, activeWindow.monthCount);
+    if (!previous) return null;
+    const previousTotal = totalPatients(
+      aggregateFlows(data.flowsByMonth, previous.months, (id) => visibleIds.has(id)),
+    );
+    return patientsThisMonth - previousTotal;
+  }, [data, months, activeWindow, visibleIds, patientsThisMonth]);
+
+  // Prospects already pulled into the network are not prospects any more, and they
+  // already have a tier dot at the same address — drawing both means two pins for
+  // one building, with the dashed ring implying work still to do.
+  const visibleProspects = useMemo(() => discovered.filter((p) => !p.imported), [discovered]);
+  const importedCount = discovered.length - visibleProspects.length;
+
+  const selectedOffice: MapOffice | null =
+    selected?.kind === 'office' ? (officesById.get(selected.id) ?? null) : null;
+
+  const selectedProspect =
+    selected?.kind === 'prospect'
+      ? (visibleProspects.find((p) => p.id === selected.id) ?? null)
+      : null;
+
+  const selectedHub =
+    selected?.kind === 'hub' ? (data?.hubs.find((h) => h.id === selected.id) ?? null) : null;
 
   // Fly to a deep-linked office once its data has arrived.
   const flyToOffice = useMemo(() => {
@@ -198,16 +266,30 @@ export function PatientFlowMap({
     if (flyToOffice) setHasFlownToInitial(true);
   }, [flyToOffice]);
 
-  // Hovering a legend tier highlights that tier's busiest office as a proxy.
-  const focusId = useMemo(() => {
-    if (hoverId) return hoverId;
-    if (!legendTier) return null;
-    const inTier = visibleFlows
-      .map((f) => ({ flow: f, office: officesById.get(f.sourceId) }))
-      .filter((x) => x.office?.tier === legendTier)
-      .sort((a, b) => b.flow.count - a.flow.count);
-    return inTier[0]?.office?.id ?? null;
-  }, [hoverId, legendTier, visibleFlows, officesById]);
+  /**
+   * What the map should emphasise, per kind.
+   *
+   * Selection outranks hover, and the two kinds stay independent: pointing at a
+   * prospect must not dim the referral arcs, since a prospect has none and the map
+   * would appear to empty itself.
+   */
+  const focus = useMemo(() => {
+    const officeFromPointer =
+      selectedOffice?.id ??
+      (hover?.kind === 'office' ? hover.id : null) ??
+      // Hovering a legend tier highlights that tier's busiest office as a proxy.
+      (legendTier
+        ? (visibleFlows
+            .map((f) => ({ flow: f, office: officesById.get(f.sourceId) }))
+            .filter((x) => x.office?.tier === legendTier)
+            .sort((a, b) => b.flow.count - a.flow.count)[0]?.office?.id ?? null)
+        : null);
+
+    return {
+      officeId: officeFromPointer,
+      prospectId: selectedProspect?.id ?? (hover?.kind === 'prospect' ? hover.id : null),
+    };
+  }, [selectedOffice, selectedProspect, hover, legendTier, visibleFlows, officesById]);
 
   useEffect(() => {
     onStateChange?.({
@@ -215,9 +297,18 @@ export function PatientFlowMap({
       tier: tierFilter,
       showDiscovered,
       groupId,
-      officeId: selectedId,
+      // The URL only carries referring offices; a prospect is not a page of its own.
+      officeId: selected?.kind === 'office' ? selected.id : null,
     });
-  }, [activeMonth, tierFilter, showDiscovered, groupId, selectedId, onStateChange]);
+  }, [activeMonth, tierFilter, showDiscovered, groupId, selected, onStateChange]);
+
+  // The side panels deal in referring offices only, so they get id-shaped callbacks
+  // and the tagging happens here rather than in four different components.
+  const focusOffice = useCallback(
+    (id: string | null) => setHover(id ? { kind: 'office', id } : null),
+    [],
+  );
+  const selectOffice = useCallback((id: string) => setSelected({ kind: 'office', id }), []);
 
   const handleAnimationState = useCallback((state: FlowAnimationState) => {
     setAnimation((previous) =>
@@ -288,7 +379,25 @@ export function PatientFlowMap({
       hubs={data.hubs}
       months={months}
       activeMonth={activeMonth}
-      onClose={() => setSelectedId(null)}
+      onClose={() => setSelected(null)}
+    />
+  ) : selectedProspect ? (
+    <ProspectDetailPanel
+      prospect={selectedProspect}
+      hubs={data.hubs}
+      onClose={() => setSelected(null)}
+    />
+  ) : selectedHub ? (
+    <HubDetailPanel
+      hub={selectedHub}
+      patients={patientsThisMonth}
+      referringOffices={visibleFlows.length}
+      periodLabel={
+        activeWindow.monthCount > 1
+          ? `Over ${activeWindow.monthCount} months to ${activeMonth ? formatYearMonth(activeMonth) : '—'}`
+          : `In ${activeMonth ? formatYearMonth(activeMonth) : '—'}`
+      }
+      onClose={() => setSelected(null)}
     />
   ) : null;
 
@@ -296,6 +405,7 @@ export function PatientFlowMap({
     <div className="space-y-4 sm:space-y-6 animate-fade-in">
       <MapStatsRow
         month={activeMonth}
+        monthCount={activeWindow.monthCount}
         patientsThisMonth={patientsThisMonth}
         activeOffices={visibleFlows.length}
         totalOffices={visibleOffices.length}
@@ -314,7 +424,8 @@ export function PatientFlowMap({
         groups={groups}
         selectedGroupId={groupId}
         onSelectedGroupIdChange={setGroupId}
-        discoveredCount={discovered.length}
+        discoveredCount={visibleProspects.length}
+        importedCount={importedCount}
         unmappedCount={data.unmappedCount}
         onResetView={() => setResetViewToken((n) => n + 1)}
       />
@@ -337,19 +448,21 @@ export function PatientFlowMap({
               hubs={data.hubs}
               offices={visibleOffices}
               flows={visibleFlows}
-              discovered={showDiscovered ? discovered : []}
+              monthCount={activeWindow.monthCount}
+              discovered={showDiscovered ? visibleProspects : []}
               maxFlowCount={data.maxFlowCount}
-              focusId={focusId}
-              selectedId={selectedId}
+              focus={focus}
               height={height}
-              onHover={setHoverId}
-              onSelect={setSelectedId}
+              onHover={setHover}
+              onSelect={setSelected}
               onAnimationState={handleAnimationState}
               resetViewToken={resetViewToken}
               flyToOffice={flyToOffice}
               styleOverride={styleOverride}
               showRings={showRings}
               ringRadii={reach.ringRadii}
+              momentumById={attention.byId}
+              delta={delta}
             />
 
             {/* Desktop: float the detail over the map. Mobile uses a sheet below. */}
@@ -366,12 +479,18 @@ export function PatientFlowMap({
               months={months}
               monthIndex={safeIndex}
               onMonthIndexChange={setMonthIndex}
+              window={activeWindow}
+              windowSize={windowSize}
+              onWindowSizeChange={setWindowSize}
               playing={playing}
               onPlayingChange={setPlaying}
               speed={speed}
               onSpeedChange={setSpeed}
               totalsByMonth={data.totalsByMonth}
               patientsThisMonth={patientsThisMonth}
+              compareOffset={compareOffset}
+              onCompareOffsetChange={setCompareOffset}
+              compareMonth={comparison ? comparison.months[comparison.months.length - 1] : null}
             />
           </Card>
 
@@ -383,12 +502,18 @@ export function PatientFlowMap({
         </div>
 
         <div className="order-0 lg:order-2 space-y-4">
+          <AttentionCard
+            summary={attention}
+            monthLabel={activeMonth ? formatYearMonth(activeMonth) : 'this month'}
+            onFocusOffice={focusOffice}
+            onSelectOffice={selectOffice}
+          />
           <ReachCard
             stats={reach}
             showRings={showRings}
             onShowRingsChange={setShowRings}
-            onFocusOffice={setHoverId}
-            onSelectOffice={setSelectedId}
+            onFocusOffice={focusOffice}
+            onSelectOffice={selectOffice}
           />
           <MapLegend
             tierCounts={tierCounts}
@@ -401,12 +526,26 @@ export function PatientFlowMap({
             animatedFlows={animation.animatedFlows}
             totalFlows={animation.totalFlows}
             reducedMotion={animation.reducedMotion}
+            compare={
+              delta && comparison
+                ? {
+                    monthLabel:
+                      comparison.monthCount > 1
+                        ? `${formatYearMonth(comparison.months[0])} – ${formatYearMonth(
+                            comparison.months[comparison.monthCount - 1],
+                          )}`
+                        : formatYearMonth(comparison.months[0]),
+                    gained: delta.gained,
+                    lost: delta.lost,
+                  }
+                : null
+            }
           />
         </div>
       </div>
 
       {isMobile && (
-        <Sheet open={Boolean(detail)} onOpenChange={(open) => !open && setSelectedId(null)}>
+        <Sheet open={Boolean(detail)} onOpenChange={(open) => !open && setSelected(null)}>
           <SheetContent side="bottom" className="max-h-[75vh] overflow-y-auto">
             {detail}
           </SheetContent>

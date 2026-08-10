@@ -36,6 +36,8 @@ interface MapFilterBarProps {
   selectedGroupId: string | null;
   onSelectedGroupIdChange: (id: string | null) => void;
   discoveredCount: number;
+  /** Prospects hidden because they are already referring offices. */
+  importedCount: number;
   unmappedCount: number;
   onResetView: () => void;
 }
@@ -52,6 +54,7 @@ export function MapFilterBar({
   selectedGroupId,
   onSelectedGroupIdChange,
   discoveredCount,
+  importedCount,
   unmappedCount,
   onResetView,
 }: MapFilterBarProps) {
@@ -102,6 +105,27 @@ export function MapFilterBar({
       </div>
 
       <div className="flex items-center gap-2 ml-auto flex-wrap">
+        {/* Prospects vanish once added, so say where they went rather than letting
+            the count quietly drop. */}
+        {showDiscovered && importedCount > 0 && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <Badge variant="outline" className="cursor-help">
+                  {importedCount} added
+                </Badge>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="max-w-[16rem]">
+                {importedCount} discovered office{importedCount === 1 ? ' is' : 's are'} already in
+                your network, so {importedCount === 1 ? 'it is' : 'they are'} drawn as referring
+                offices rather than prospects.
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        )}
+
         {unmappedCount > 0 && (
           <Tooltip>
             {/* Badge is a plain function component, so it cannot take the ref

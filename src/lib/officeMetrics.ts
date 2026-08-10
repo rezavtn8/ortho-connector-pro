@@ -61,10 +61,124 @@ function recentMonthKeys(nowDate: Date, count: number): string[] {
   return out;
 }
 
+/** `'YYYY-MM'` keys are the app's month vocabulary everywhere. */
+export const MONTH_KEY_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+/**
+ * Move a `'YYYY-MM'` key by `delta` months, in either direction.
+ *
+ * Goes through `Date` rather than doing the arithmetic by hand so year rollover in
+ * both directions is the platform's problem, not ours.
+ */
+export function shiftMonth(key: string, delta: number): string {
+  const [y, m] = key.split('-').map(Number);
+  return monthKey(new Date(y, m - 1 + delta, 1));
+}
+
 /** Add one month to a `'YYYY-MM'` key. */
 function nextMonth(key: string): string {
-  const [y, m] = key.split('-').map(Number);
-  return monthKey(new Date(y, m, 1));
+  return shiftMonth(key, 1);
+}
+
+/**
+ * Which way a referral relationship is moving, judged against its own past.
+ *
+ * Deliberately relative, not absolute. An office that has always sent one patient a
+ * month and still does is `steady`, and a VIP dropping from twelve a month to seven
+ * is `slipping` — even though the VIP still out-refers the small office four to one.
+ * A fixed threshold would report the exact opposite, which is the whole reason the
+ * decline this product exists to catch goes unnoticed: the big relationships stay
+ * near the top of the list the entire time they are dying.
+ */
+export type Momentum = 'new' | 'rising' | 'steady' | 'slipping' | 'quiet';
+
+export interface MomentumReading {
+  momentum: Momentum;
+  /** Patients over the `window` months ending at, and including, the reference month. */
+  recent: number;
+  /** Patients over the `window` months immediately before those. */
+  baseline: number;
+  /** Patients per month lost against baseline. Negative means gaining. */
+  perMonthDelta: number;
+  /** Share of the baseline given up, 0..1. Zero while flat or gaining. */
+  dropShare: number;
+}
+
+/**
+ * Three months a side.
+ *
+ * One month is mostly noise — referrals arrive in clumps, and a dentist on holiday
+ * looks identical to a dentist who has switched specialists. Three is long enough to
+ * absorb that and still short enough to notice a decline inside a quarter, which is
+ * the window the product promises to beat.
+ */
+export const MOMENTUM_WINDOW = 3;
+
+/** Below this many patients in the baseline, there is no trend to read — only noise. */
+const MIN_BASELINE = 2;
+
+/** How much of the baseline must move before it counts as a direction rather than jitter. */
+const SIGNIFICANT_SHARE = 0.25;
+
+const NEUTRAL: MomentumReading = {
+  momentum: 'steady',
+  recent: 0,
+  baseline: 0,
+  perMonthDelta: 0,
+  dropShare: 0,
+};
+
+function sumWindow(
+  monthly: Readonly<Record<string, number>>,
+  endMonth: string,
+  window: number,
+): number {
+  let total = 0;
+  for (let i = 0; i < window; i++) {
+    total += monthly[shiftMonth(endMonth, -i)] ?? 0;
+  }
+  return total;
+}
+
+/**
+ * Read an office's momentum as of `month`.
+ *
+ * Evaluated at the given month rather than at "now" on purpose: every other reading
+ * on the map is relative to the scrubber, so this one is too. Parked at the newest
+ * month with data — where the map opens — it is the current state of the business;
+ * dragged backwards it answers "what was going wrong then", which is what makes
+ * playback worth watching.
+ */
+export function computeMomentum(
+  monthly: Readonly<Record<string, number>>,
+  month: string,
+  window: number = MOMENTUM_WINDOW,
+): MomentumReading {
+  if (!month || !MONTH_KEY_PATTERN.test(month) || window < 1) return NEUTRAL;
+
+  const recent = sumWindow(monthly, month, window);
+  const baseline = sumWindow(monthly, shiftMonth(month, -window), window);
+
+  const perMonthDelta = (baseline - recent) / window;
+  const dropShare = baseline > 0 ? Math.max(0, (baseline - recent) / baseline) : 0;
+  const reading = { recent, baseline, perMonthDelta, dropShare };
+
+  if (baseline === 0) {
+    return { ...reading, momentum: recent > 0 ? 'new' : 'steady' };
+  }
+  // Gone silent outright. Ranked ahead of a partial drop of the same size, because
+  // a relationship at zero has usually gone somewhere else rather than gone slow.
+  if (recent === 0 && baseline >= MIN_BASELINE) {
+    return { ...reading, momentum: 'quiet' };
+  }
+  if (baseline < MIN_BASELINE) {
+    return { ...reading, momentum: 'steady' };
+  }
+
+  const share = (baseline - recent) / baseline;
+  if (share >= SIGNIFICANT_SHARE) return { ...reading, momentum: 'slipping' };
+  if (share <= -SIGNIFICANT_SHARE) return { ...reading, momentum: 'rising' };
+  return { ...reading, momentum: 'steady' };
 }
 
 /**

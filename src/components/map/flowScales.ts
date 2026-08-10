@@ -78,6 +78,23 @@ const FALLBACK_TIER_COLORS: TierColors = {
 const FALLBACK_HUB_COLOR = 'hsl(185, 75%, 35%)';
 
 /**
+ * Direction colours: green for gaining ground, red for losing it.
+ *
+ * Deliberately literals rather than theme tokens. These are the one part of the map
+ * whose meaning is fixed rather than decorative — red has to mean "you are losing
+ * this relationship" identically in every theme, and a token that someone rebrands
+ * later would quietly break that. They are also written in the comma form Mapbox
+ * needs, for the same reason everything else here is.
+ *
+ * The hues are held well clear of the Warm tier's orange, so a ring around a dot is
+ * never mistaken for the dot's own tier.
+ */
+export const DIRECTION_COLORS = {
+  gaining: 'hsl(152, 62%, 46%)',
+  losing: 'hsl(2, 78%, 58%)',
+} as const;
+
+/**
  * Convert a bare shadcn HSL token into a colour string Mapbox actually accepts.
  *
  * shadcn stores tokens space-separated (`265 70% 55%`) so CSS can compose them as

@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef } from 'react';
+import type { Momentum } from '@/lib/officeMetrics';
 import { useIsMobile } from '@/hooks/use-mobile';
+import type { DeltaSummary } from './deltaFlows';
 import { SOURCES } from './flowLayers';
 import {
   ArcCache,
   buildArcs,
+  buildDeltaArcs,
   discoveredToFC,
   hubsToFC,
   officesToFC,
@@ -13,21 +16,24 @@ import {
 import { useFlowAnimation, type FlowAnimationState } from './useFlowAnimation';
 import { useFlowMap } from './useFlowMap';
 import { useMapTheme } from './useMapTheme';
-import type { Flow, Hub, MapOffice } from './types';
+import type { Flow, Hub, MapFocus, MapOffice, MapTarget } from './types';
 
 interface FlowMapCanvasProps {
   token: string;
   hubs: Hub[];
   /** Already filtered by search/tier — only these get dots and arcs. */
   offices: MapOffice[];
+  /** Already aggregated over the active time window. */
   flows: Flow[];
+  /** Months the flows cover, so widths can be expressed per month. */
+  monthCount: number;
   discovered: DiscoveredPin[];
   maxFlowCount: number;
-  focusId: string | null;
-  selectedId: string | null;
+  /** What to emphasise, tracked independently per kind. */
+  focus: MapFocus;
   height: string;
-  onHover: (id: string | null) => void;
-  onSelect: (id: string | null) => void;
+  onHover: (target: MapTarget | null) => void;
+  onSelect: (target: MapTarget | null) => void;
   onAnimationState: (state: FlowAnimationState) => void;
   /** Bumping this re-fits the viewport to the data. */
   resetViewToken: number;
@@ -37,6 +43,13 @@ interface FlowMapCanvasProps {
   styleOverride?: import('mapbox-gl').StyleSpecification;
   showRings: boolean;
   ringRadii: number[];
+  /** Direction per office, drawn as a ring around the dot. */
+  momentumById: ReadonlyMap<string, Momentum>;
+  /**
+   * When set, the map draws month-on-month change instead of a month's flows.
+   * The arcs become gains and losses, and the particles stop — see `buildDeltaArcs`.
+   */
+  delta: DeltaSummary | null;
 }
 
 export function FlowMapCanvas({
@@ -44,10 +57,10 @@ export function FlowMapCanvas({
   hubs,
   offices,
   flows,
+  monthCount,
   discovered,
   maxFlowCount,
-  focusId,
-  selectedId,
+  focus,
   height,
   onHover,
   onSelect,
@@ -57,6 +70,8 @@ export function FlowMapCanvas({
   styleOverride,
   showRings,
   ringRadii,
+  momentumById,
+  delta,
 }: FlowMapCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
@@ -68,21 +83,21 @@ export function FlowMapCanvas({
     containerRef,
     theme,
     styleOverride,
-    handlers: {
-      onOfficeHover: onHover,
-      onOfficeClick: onSelect,
-      onBackgroundClick: () => onSelect(null),
-    },
+    handlers: { onHover, onSelect },
   });
 
   const officesById = useMemo(() => new Map(offices.map((o) => [o.id, o])), [offices]);
   const hubsById = useMemo(() => new Map(hubs.map((h) => [h.id, h])), [hubs]);
 
   // Arc geometry is cached by office+hub, so scrubbing months only recomputes
-  // widths — never the curves themselves.
+  // widths — never the curves themselves. Compare mode reuses the very same cached
+  // curves; only the properties hung off them change.
   const { featureCollection: arcsFC, arcs } = useMemo(
-    () => buildArcs(flows, officesById, hubsById, maxFlowCount, arcCacheRef.current),
-    [flows, officesById, hubsById, maxFlowCount],
+    () =>
+      delta
+        ? buildDeltaArcs(delta.flows, officesById, hubsById, delta.maxDelta, arcCacheRef.current)
+        : buildArcs(flows, officesById, hubsById, maxFlowCount, arcCacheRef.current, monthCount),
+    [delta, flows, monthCount, officesById, hubsById, maxFlowCount],
   );
 
   const hubsFC = useMemo(() => hubsToFC(hubs), [hubs]);
@@ -90,7 +105,7 @@ export function FlowMapCanvas({
     () => (showRings ? ringsToFC(hubs, ringRadii) : { type: 'FeatureCollection' as const, features: [] }),
     [hubs, ringRadii, showRings],
   );
-  const officesFC = useMemo(() => officesToFC(offices), [offices]);
+  const officesFC = useMemo(() => officesToFC(offices, momentumById), [offices, momentumById]);
   const discoveredFC = useMemo(() => discoveredToFC(discovered), [discovered]);
 
   // Keep the arc cache bounded to the offices that still exist.
@@ -112,8 +127,8 @@ export function FlowMapCanvas({
 
   // --- Focus: paint only ----------------------------------------------------
   useEffect(() => {
-    setFocus(selectedId ?? focusId);
-  }, [focusId, selectedId, setFocus]);
+    setFocus(focus);
+  }, [focus, setFocus]);
 
   // --- Fit bounds -----------------------------------------------------------
   useEffect(() => {

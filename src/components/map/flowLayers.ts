@@ -1,6 +1,7 @@
 import type mapboxgl from 'mapbox-gl';
 import type { ExpressionSpecification } from 'mapbox-gl';
-import { lighten, withAlpha, type TierColors } from './flowScales';
+import { DIRECTION_COLORS, lighten, withAlpha, type TierColors } from './flowScales';
+import type { MapFocus, MapTargetKind } from './types';
 
 /**
  * Source and layer definitions for the patient-flow map.
@@ -26,14 +27,33 @@ export const LAYERS = {
   rings: 'catchment-rings',
   ringLabels: 'catchment-ring-labels',
   arcGlow: 'flow-arcs-glow',
+  arcDeltaGlow: 'flow-arcs-delta-glow',
+  arcGain: 'flow-arc-gain',
+  arcLoss: 'flow-arc-loss',
   particles: 'flow-particles-dot',
   discovered: 'discovered-offices-icon',
+  officeMomentum: 'network-offices-momentum',
   officeHalo: 'network-offices-halo',
   officeDot: 'network-offices-dot',
   officeLabel: 'network-offices-label',
   hubPulse: 'hub-pulse',
   hubDot: 'hub-dot',
 } as const;
+
+/**
+ * The change arcs, used when the map is comparing two months.
+ *
+ * They share the arc source with the per-tier layers and never collide, because a
+ * feature carries either `tier` (a month's flows) or `dir` (a month-on-month
+ * change), never both. Each set of layers filters on the property the other lacks,
+ * so switching modes is a `setData` and nothing else — no layer visibility to
+ * toggle, and no state that can get out of step with what is on screen.
+ */
+export const DELTA_LAYER_IDS = [LAYERS.arcGain, LAYERS.arcLoss];
+
+/** The two directions a change arc can carry, and the order they are declared in. */
+export const DIRECTIONS = ['gain', 'loss'] as const;
+export type Direction = (typeof DIRECTIONS)[number];
 
 export const TIERS = ['VIP', 'Warm', 'Cold', 'Dormant'] as const;
 
@@ -48,8 +68,32 @@ export const TIERS = ['VIP', 'Warm', 'Cold', 'Dormant'] as const;
 export const arcLayerId = (tier: string) => `flow-arc-${tier}`;
 export const ARC_LAYER_IDS = TIERS.map(arcLayerId);
 
-/** Layers that respond to clicks and hover. Order matters: topmost first. */
-export const INTERACTIVE_LAYERS = [LAYERS.officeDot, LAYERS.discovered, LAYERS.hubDot];
+/** Every layer that draws an arc body, whichever mode the map is in. */
+export const ALL_ARC_LAYER_IDS = [...ARC_LAYER_IDS, ...DELTA_LAYER_IDS];
+
+/**
+ * Click and hover targets, **topmost first**.
+ *
+ * This is a priority list, not a set: when pins overlap — a prospect sitting on the
+ * building next door, an office at the same address as your practice — exactly one
+ * of them must win, and it has to be the one drawn on top, because that is the one
+ * the user believes they clicked.
+ *
+ * So this must stay the reverse of paint order. `flowLayers.test.ts` asserts that
+ * against the real install order, so the two cannot quietly drift apart.
+ */
+export const INTERACTIVE_LAYERS: readonly string[] = [
+  LAYERS.hubDot,
+  LAYERS.officeDot,
+  LAYERS.discovered,
+];
+
+/** Which collection a hit on each layer should be looked up in. */
+export const LAYER_TARGET_KIND: Readonly<Record<string, MapTargetKind>> = {
+  [LAYERS.hubDot]: 'hub',
+  [LAYERS.officeDot]: 'office',
+  [LAYERS.discovered]: 'prospect',
+};
 
 export const EMPTY_FC: GeoJSON.FeatureCollection = {
   type: 'FeatureCollection',
@@ -108,6 +152,67 @@ export function arcOpacityExpr(focusId: string | null): number | ExpressionSpeci
 export function officeOpacityExpr(focusId: string | null): number | ExpressionSpecification {
   if (!focusId) return 0.9;
   return ['case', ['==', ['get', 'id'], focusId], 1, 0.25] as ExpressionSpecification;
+}
+
+/**
+ * The momentum ring: green if the office is growing, red if it is going.
+ *
+ * Only two colours for five momentum values, because the map is triage. "Which way
+ * is this heading" is the question a ring can answer at a glance; the precise
+ * distinction between slipping and gone-quiet is a job for the panel, which has room
+ * for words. Here it is carried by stroke width instead — a silent office gets the
+ * heavier ring.
+ */
+function momentumStrokeColor(): ExpressionSpecification {
+  return [
+    'match',
+    ['get', 'momentum'],
+    'rising',
+    DIRECTION_COLORS.gaining,
+    'new',
+    DIRECTION_COLORS.gaining,
+    'slipping',
+    DIRECTION_COLORS.losing,
+    'quiet',
+    DIRECTION_COLORS.losing,
+    'rgba(0, 0, 0, 0)',
+  ] as ExpressionSpecification;
+}
+
+/**
+ * Width doubles as the on/off switch: `steady` gets zero, so a healthy network draws
+ * no rings at all and the ones that appear are worth looking at.
+ */
+function momentumStrokeWidth(): ExpressionSpecification {
+  return [
+    'match',
+    ['get', 'momentum'],
+    'quiet',
+    3,
+    'slipping',
+    2,
+    'rising',
+    2,
+    'new',
+    2,
+    0,
+  ] as ExpressionSpecification;
+}
+
+/** Ring opacity, dimmed with everything else when one office has focus. */
+export function momentumOpacityExpr(focusId: string | null): number | ExpressionSpecification {
+  if (!focusId) return 0.85;
+  return ['case', ['==', ['get', 'id'], focusId], 1, 0.15] as ExpressionSpecification;
+}
+
+/**
+ * Prospect pins lift toward full opacity as you point at them, and recede when a
+ * sibling is picked — the affordance that was missing entirely when these pins had
+ * no handlers at all and simply swallowed the click.
+ */
+export function prospectOpacityExpr(focusId: string | null): number | ExpressionSpecification {
+  if (!focusId) return 0.9;
+  return ['case', ['==', ['get', 'id'], focusId], 1, 0.35] as ExpressionSpecification;
 }
 
 export function particleOpacityExpr(focusId: string | null): ExpressionSpecification {
@@ -235,10 +340,14 @@ export function installLayers(map: mapboxgl.Map, colors: TierColors, hubColor: s
     });
 
   // --- Arc glow -------------------------------------------------------------
+  // Filtered to flow arcs. Without this it would also glow the change arcs, where
+  // `['get', 'tier']` is null and `tierMatch` falls through to its Dormant default —
+  // a grey wash under every red and green arc in compare mode.
   add({
     id: LAYERS.arcGlow,
     type: 'line',
     source: SOURCES.arcs,
+    filter: ['!', ['has', 'dir']],
     layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: {
       'line-color': tierMatch(colors),
@@ -299,6 +408,75 @@ export function installLayers(map: mapboxgl.Map, colors: TierColors, hubColor: s
     });
   }
 
+  // --- Change arcs, drawn only while comparing two months --------------------
+  // Same source, same widths, same geometry as the flow arcs; only the meaning and
+  // the colour differ. A gain fades in green toward the practice, a loss in red.
+  add({
+    id: LAYERS.arcDeltaGlow,
+    type: 'line',
+    source: SOURCES.arcs,
+    filter: ['has', 'dir'],
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color': [
+        'match',
+        ['get', 'dir'],
+        'gain',
+        DIRECTION_COLORS.gaining,
+        DIRECTION_COLORS.losing,
+      ],
+      'line-blur': 6,
+      'line-opacity': 0.3,
+      'line-width': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        8,
+        ['*', ['get', 'w'], 2.4],
+        11,
+        ['*', ['get', 'w'], 4],
+        16,
+        ['*', ['get', 'w'], 6.5],
+      ],
+    },
+  });
+
+  for (const direction of DIRECTIONS) {
+    const color = direction === 'gain' ? DIRECTION_COLORS.gaining : DIRECTION_COLORS.losing;
+    add({
+      id: direction === 'gain' ? LAYERS.arcGain : LAYERS.arcLoss,
+      type: 'line',
+      source: SOURCES.arcs,
+      filter: ['==', ['get', 'dir'], direction],
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: {
+        'line-gradient': [
+          'interpolate',
+          ['linear'],
+          ['line-progress'],
+          0,
+          withAlpha(color, 0),
+          0.18,
+          withAlpha(color, 0.6),
+          1,
+          color,
+        ],
+        'line-opacity': arcOpacityExpr(null),
+        'line-width': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          8,
+          ['*', ['get', 'w'], 0.55],
+          11,
+          ['get', 'w'],
+          16,
+          ['*', ['get', 'w'], 1.8],
+        ],
+      },
+    });
+  }
+
   // --- Particles -------------------------------------------------------------
   add({
     id: LAYERS.particles,
@@ -333,9 +511,30 @@ export function installLayers(map: mapboxgl.Map, colors: TierColors, hubColor: s
       'icon-allow-overlap': true,
       'icon-size': ['interpolate', ['linear'], ['zoom'], 8, 0.4, 12, 0.55, 16, 0.8],
     },
+    paint: {
+      'icon-opacity': prospectOpacityExpr(null),
+    },
   });
 
   // --- Referring offices -----------------------------------------------------
+  // The momentum ring sits below the dot and is drawn wider than it, so it reads as
+  // a separate annulus rather than a recolouring of the dot's own rim. Tier is what
+  // the office is worth; momentum is where it is heading. Both have to be legible at
+  // once, which means they cannot share the fill.
+  add({
+    id: LAYERS.officeMomentum,
+    type: 'circle',
+    source: SOURCES.offices,
+    paint: {
+      'circle-color': 'rgba(0, 0, 0, 0)', // stroke only; the dot supplies the fill
+      'circle-opacity': 0,
+      'circle-stroke-color': momentumStrokeColor(),
+      'circle-stroke-opacity': momentumOpacityExpr(null),
+      'circle-stroke-width': momentumStrokeWidth(),
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 7, 12, 10.5, 16, 16],
+    },
+  });
+
   add({
     id: LAYERS.officeHalo,
     type: 'circle',
@@ -443,18 +642,36 @@ export function applyColors(map: mapboxgl.Map, colors: TierColors, hubColor: str
   set(LAYERS.ringLabels, 'text-color', hubColor);
 }
 
-/** Dim everything except the focused office. Paint-only — never re-tessellates. */
-export function applyFocus(map: mapboxgl.Map, focusId: string | null): void {
-  for (const tier of TIERS) {
-    const id = arcLayerId(tier);
+/**
+ * Dim everything except what has focus. Paint-only — never re-tessellates.
+ *
+ * Office and prospect focus are tracked separately and applied independently:
+ * pointing at a prospect must not dim the referral arcs, because a prospect has no
+ * arcs and the map would appear to go blank.
+ */
+export function applyFocus(map: mapboxgl.Map, focus: MapFocus): void {
+  const { officeId, prospectId } = focus;
+
+  // Both arc families, so focus behaves identically in flow and compare mode.
+  for (const id of ALL_ARC_LAYER_IDS) {
     if (map.getLayer(id)) {
-      map.setPaintProperty(id, 'line-opacity', arcOpacityExpr(focusId) as never);
+      map.setPaintProperty(id, 'line-opacity', arcOpacityExpr(officeId) as never);
     }
   }
   if (map.getLayer(LAYERS.officeDot)) {
-    map.setPaintProperty(LAYERS.officeDot, 'circle-opacity', officeOpacityExpr(focusId) as never);
+    map.setPaintProperty(LAYERS.officeDot, 'circle-opacity', officeOpacityExpr(officeId) as never);
+  }
+  if (map.getLayer(LAYERS.officeMomentum)) {
+    map.setPaintProperty(
+      LAYERS.officeMomentum,
+      'circle-stroke-opacity',
+      momentumOpacityExpr(officeId) as never,
+    );
   }
   if (map.getLayer(LAYERS.particles)) {
-    map.setPaintProperty(LAYERS.particles, 'circle-opacity', particleOpacityExpr(focusId) as never);
+    map.setPaintProperty(LAYERS.particles, 'circle-opacity', particleOpacityExpr(officeId) as never);
+  }
+  if (map.getLayer(LAYERS.discovered)) {
+    map.setPaintProperty(LAYERS.discovered, 'icon-opacity', prospectOpacityExpr(prospectId) as never);
   }
 }

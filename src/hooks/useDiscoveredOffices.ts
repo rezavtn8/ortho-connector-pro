@@ -15,6 +15,17 @@ export interface DiscoveredOffice {
   office_type: string | null;
   distance_miles: number | null;
   ratingCategory: RatingCategory;
+  /** Google's stable id for the place — the only reliable key for de-duplication. */
+  google_place_id: string | null;
+  /**
+   * Already pulled into the referral network.
+   *
+   * Read so the map can stop drawing these as prospects. The column was always
+   * written by the bulk import but never read back, so an office you added months
+   * ago kept its dashed prospect ring forever — sitting on top of the tier dot for
+   * the very same building.
+   */
+  imported: boolean;
 }
 
 function categorize(rating: number | null | undefined): RatingCategory {
@@ -59,7 +70,7 @@ export function useDiscoveredOffices(groupId: string | null, enabled: boolean) {
       let query = supabase
         .from('discovered_offices')
         .select(
-          'id, name, address, phone, website, latitude, longitude, google_rating, office_type, distance_miles',
+          'id, name, address, phone, website, latitude, longitude, google_rating, office_type, distance_miles, google_place_id, imported',
         )
         .not('latitude', 'is', null)
         .not('longitude', 'is', null);
@@ -81,6 +92,9 @@ export function useDiscoveredOffices(groupId: string | null, enabled: boolean) {
         office_type: office.office_type ?? null,
         distance_miles: office.distance_miles ?? null,
         ratingCategory: categorize(office.google_rating),
+        google_place_id: office.google_place_id ?? null,
+        // Null means "never imported"; only an explicit true counts as imported.
+        imported: office.imported === true,
       }));
     },
     staleTime: 5 * 60_000,

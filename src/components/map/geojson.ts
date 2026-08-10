@@ -1,4 +1,6 @@
+import type { Momentum } from '@/lib/officeMetrics';
 import { buildArc, type Arc } from './arcGeometry';
+import type { DeltaFlow } from './deltaFlows';
 import { normalize, widthFor } from './flowScales';
 import type { Flow, Hub, MapOffice } from './types';
 
@@ -32,12 +34,25 @@ export function hubsToFC(hubs: readonly Hub[]): GeoJSON.FeatureCollection {
   );
 }
 
-export function officesToFC(offices: readonly MapOffice[]): GeoJSON.FeatureCollection {
+/**
+ * `momentum` rides along on the same features as `tier` so the map can show volume
+ * and direction at once — tier as the dot's fill, momentum as a ring around it.
+ * Offices missing from the lookup fall back to `steady`, which draws no ring.
+ */
+export function officesToFC(
+  offices: readonly MapOffice[],
+  momentumById?: ReadonlyMap<string, Momentum>,
+): GeoJSON.FeatureCollection {
   return fc(
     offices.map((o) => ({
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [o.longitude, o.latitude] },
-      properties: { id: o.id, name: o.name, tier: o.tier },
+      properties: {
+        id: o.id,
+        name: o.name,
+        tier: o.tier,
+        momentum: momentumById?.get(o.id) ?? 'steady',
+      },
     })),
   );
 }
@@ -133,10 +148,17 @@ export interface ArcBuildResult {
 }
 
 /**
- * Build the arc layer for one month.
+ * Build the arc layer for the active time window.
  *
- * `maxFlowCount` is the global maximum across every month, not this month's — see
+ * `maxFlowCount` is the global maximum across every month, not the window's — see
  * `normalize` for why.
+ *
+ * Width comes from patients **per month**, never the window total. That is what lets
+ * a trailing-24-month view and a single month sit behind the same control without
+ * every arc exploding or collapsing when you switch: thickness means one thing
+ * everywhere, and the legend's "N patients/mo" stays literally true in every mode.
+ * The feature still carries the true `count` for the window, because that is the
+ * number a tooltip should say.
  */
 export function buildArcs(
   flows: readonly Flow[],
@@ -144,7 +166,9 @@ export function buildArcs(
   hubsById: ReadonlyMap<string, Hub>,
   maxFlowCount: number,
   cache: ArcCache,
+  monthCount = 1,
 ): ArcBuildResult {
+  const months = monthCount > 0 ? monthCount : 1;
   const features: GeoJSON.Feature[] = [];
   const arcs: ArcBuildResult['arcs'] = [];
 
@@ -160,7 +184,8 @@ export function buildArcs(
       [hub.longitude, hub.latitude],
     );
 
-    const u = normalize(flow.count, maxFlowCount);
+    const perMonth = flow.count / months;
+    const u = normalize(perMonth, maxFlowCount);
 
     features.push({
       type: 'Feature',
@@ -170,6 +195,7 @@ export function buildArcs(
         hubId: flow.hubId,
         tier: office.tier,
         count: flow.count,
+        perMonth,
         w: widthFor(u),
       },
     });
@@ -184,4 +210,50 @@ export function buildArcs(
   }
 
   return { featureCollection: fc(features), arcs };
+}
+
+/**
+ * Build the change arcs for compare mode.
+ *
+ * Features carry `dir` and no `tier`, which is what keeps them off the per-tier
+ * layers — see `DELTA_LAYER_IDS`. `arcs` comes back empty on purpose: particles
+ * represent patients travelling to the practice *this month*, and there is no such
+ * traffic in a difference between two months. Returning none stops the animation
+ * rather than leaving dots flowing along arcs that no longer mean flow.
+ */
+export function buildDeltaArcs(
+  deltas: readonly DeltaFlow[],
+  officesById: ReadonlyMap<string, MapOffice>,
+  hubsById: ReadonlyMap<string, Hub>,
+  maxDelta: number,
+  cache: ArcCache,
+): ArcBuildResult {
+  const features: GeoJSON.Feature[] = [];
+
+  for (const entry of deltas) {
+    const office = officesById.get(entry.sourceId);
+    const hub = hubsById.get(entry.hubId);
+    if (!office || !hub) continue;
+
+    const arc = cache.get(
+      entry.sourceId,
+      entry.hubId,
+      [office.longitude, office.latitude],
+      [hub.longitude, hub.latitude],
+    );
+
+    features.push({
+      type: 'Feature',
+      geometry: { type: 'LineString', coordinates: arc.line },
+      properties: {
+        sourceId: entry.sourceId,
+        hubId: entry.hubId,
+        dir: entry.delta > 0 ? 'gain' : 'loss',
+        delta: entry.delta,
+        w: widthFor(normalize(Math.abs(entry.delta), maxDelta)),
+      },
+    });
+  }
+
+  return { featureCollection: fc(features), arcs: [] };
 }

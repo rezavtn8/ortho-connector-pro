@@ -4,20 +4,26 @@ import { formatYearMonth } from '@/lib/database.types';
 
 interface MapStatsRowProps {
   month: string | null;
+  /** Months the headline figures cover; 1 means a single month. */
+  monthCount: number;
   patientsThisMonth: number;
   activeOffices: number;
   totalOffices: number;
-  /** Change vs the previous month, or null at the start of the window. */
+  /** Change vs the equivalent preceding period, or null when it does not fit. */
   deltaVsPrevious: number | null;
   hubCount: number;
 }
 
 /**
- * Month-aware headline numbers. These follow the scrubber rather than always
- * showing "today", so the stats and the map never tell different stories.
+ * Window-aware headline numbers.
+ *
+ * These follow the scrubber *and* the window control, so the stats and the map never
+ * tell different stories — a row reading "Patients in Jul 2026" above a map drawing
+ * twelve months of arcs is worse than no row at all.
  */
 export function MapStatsRow({
   month,
+  monthCount,
   patientsThisMonth,
   activeOffices,
   totalOffices,
@@ -25,20 +31,23 @@ export function MapStatsRow({
   hubCount,
 }: MapStatsRowProps) {
   const monthLabel = month ? formatYearMonth(month) : '—';
+  const periodLabel =
+    monthCount > 1 ? `over ${monthCount} months to ${monthLabel}` : `in ${monthLabel}`;
+  const priorLabel = monthCount > 1 ? 'prior period' : 'prior month';
 
   const deltaText =
     deltaVsPrevious === null
-      ? 'No prior month'
+      ? `No prior ${monthCount > 1 ? 'period' : 'month'}`
       : deltaVsPrevious === 0
-        ? 'Flat vs prior month'
-        : `${deltaVsPrevious > 0 ? '+' : ''}${deltaVsPrevious} vs prior month`;
+        ? `Flat vs ${priorLabel}`
+        : `${deltaVsPrevious > 0 ? '+' : ''}${deltaVsPrevious} vs ${priorLabel}`;
 
   const stats = [
     {
       icon: Users,
       iconClass: 'text-primary',
       value: patientsThisMonth,
-      label: `Patients in ${monthLabel}`,
+      label: `Patients ${periodLabel}`,
     },
     {
       icon: TrendingUp,
