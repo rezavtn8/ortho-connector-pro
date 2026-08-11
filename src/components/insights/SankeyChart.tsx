@@ -34,7 +34,7 @@ const MIDDLE_ORDER: Record<string, number> = {
   [DIRECT]: 4,
 };
 
-export type SankeyEndColumn = 'clinic' | 'momentum';
+export type SankeyEndColumn = 'clinic' | 'momentum' | 'outreach';
 
 const MOMENTUM_ORDER: Momentum[] = ['rising', 'new', 'steady', 'slipping', 'quiet'];
 const MOMENTUM_LABELS: Record<Momentum, string> = {
@@ -58,6 +58,8 @@ interface SankeyChartProps {
   /** The months on screen, ascending. */
   windowMonths: string[];
   endColumn: SankeyEndColumn;
+  /** officeId -> the outreach channels that reached it this window. */
+  reached: Map<string, Set<string>>;
 }
 
 export function SankeyChart({
@@ -66,6 +68,7 @@ export function SankeyChart({
   clinics,
   windowMonths,
   endColumn,
+  reached,
 }: SankeyChartProps) {
   const uid = useId().replace(/:/g, '');
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -92,10 +95,29 @@ export function SankeyChart({
       row.set(to, (row.get(to) ?? 0) + v);
     };
 
-    const endFor = (monthly: Record<string, number>): { id: string; label: string } => {
+    const endFor = (
+      monthly: Record<string, number>,
+      officeId: string | null,
+    ): { id: string; label: string } => {
       if (endColumn === 'momentum') {
         const m = computeMomentum(monthly, lastMonth).momentum;
         return { id: `end:${m}`, label: MOMENTUM_LABELS[m] };
+      }
+      if (endColumn === 'outreach') {
+        // Non-office sources cannot be visited or mailed, so they land in their own
+        // bucket rather than being counted as outreach failures.
+        if (!officeId) return { id: 'end:na', label: 'Not an office' };
+        const count = reached.get(officeId)?.size ?? 0;
+        const key = count === 0 ? 'none' : count === 1 ? 'one' : 'many';
+        return {
+          id: `end:${key}`,
+          label:
+            count === 0
+              ? 'Never contacted'
+              : count === 1
+                ? 'Reached one way'
+                : 'Reached several ways',
+        };
       }
       const clinic = clinics[0];
       return { id: `end:${clinic?.id ?? 'clinic'}`, label: clinic?.name ?? 'My practice' };
@@ -106,7 +128,7 @@ export function SankeyChart({
     for (const o of offices) {
       const patients = sumWindow(o.monthly, windowMonths);
       if (patients <= 0) continue; // no patients this window means no band to draw
-      const end = endFor(o.monthly);
+      const end = endFor(o.monthly, o.id);
       endLabels.set(end.id, end.label);
 
       add(stage1, 'src:Office', `mid:${o.tier}`, patients);
@@ -119,7 +141,7 @@ export function SankeyChart({
     for (const s of otherSources) {
       const patients = sumWindow(s.monthly, windowMonths);
       if (patients <= 0) continue;
-      const end = endFor(s.monthly);
+      const end = endFor(s.monthly, null);
       endLabels.set(end.id, end.label);
 
       const srcId = `src:${s.sourceType}`;
@@ -145,10 +167,16 @@ export function SankeyChart({
       if ((middleTotals.get(key) ?? 0) <= 0) continue;
       nodes.push({ id: `mid:${key}`, label: key, column: 1, order: MIDDLE_ORDER[key] });
     }
-    const endIds =
-      endColumn === 'momentum'
-        ? MOMENTUM_ORDER.map((m) => `end:${m}`).filter((id) => (endTotals.get(id) ?? 0) > 0)
-        : [...endTotals.keys()];
+    // Fixed order where the column has an inherent one, so the bands do not reshuffle
+    // as the scrubber moves.
+    const ORDERED_ENDS: Record<string, string[]> = {
+      momentum: MOMENTUM_ORDER.map((m) => `end:${m}`),
+      outreach: ['end:many', 'end:one', 'end:none', 'end:na'],
+    };
+    const preferred = ORDERED_ENDS[endColumn];
+    const endIds = preferred
+      ? preferred.filter((id) => (endTotals.get(id) ?? 0) > 0)
+      : [...endTotals.keys()];
     endIds.forEach((id, i) => {
       nodes.push({ id, label: endLabels.get(id) ?? 'Practice', column: 2, order: i });
     });
@@ -169,7 +197,7 @@ export function SankeyChart({
 
     const total = [...sourceTypeTotals.values()].reduce((a, b) => a + b, 0);
     return { layout, total };
-  }, [offices, otherSources, clinics, windowMonths, endColumn]);
+  }, [offices, otherSources, clinics, windowMonths, endColumn, reached]);
 
   const { layout, total } = graph;
 
@@ -213,7 +241,11 @@ export function SankeyChart({
         className="insights-fade h-auto w-full"
         role="img"
         aria-label={`Sankey diagram of ${total} patients flowing from source type through relationship tier to ${
-          endColumn === 'momentum' ? 'current momentum' : 'your practice'
+          endColumn === 'momentum'
+            ? 'current momentum'
+            : endColumn === 'outreach'
+              ? 'how many ways the office was reached'
+              : 'your practice'
         }`}
       >
         <defs>

@@ -17,6 +17,7 @@ import {
   type OutreachEvent,
   type VisitRow,
 } from '@/components/insights/outreach';
+import { bearingDegrees, distanceMiles } from '@/components/insights/geo';
 import type { SourceType } from '@/lib/database.types';
 
 export const INSIGHTS_QUERY_KEY = ['insights'] as const;
@@ -37,6 +38,29 @@ export interface InsightsOffice {
   lastActiveMonth: string | null;
   /** year_month -> count, restricted to the visible month axis. */
   monthly: Record<string, number>;
+
+  /** Miles from the primary clinic. Null when either end is ungeocoded. */
+  distanceMiles: number | null;
+  /** Degrees clockwise from true north, as seen from the clinic. */
+  bearingDeg: number | null;
+  googleRating: number | null;
+  /** Ids into `InsightsData.tags`. */
+  tagIds: string[];
+  /** Ids into `InsightsData.campaigns` — campaigns delivered to this office. */
+  campaignIds: string[];
+}
+
+export interface InsightsTag {
+  id: string;
+  name: string;
+  color: string | null;
+}
+
+export interface InsightsCampaign {
+  id: string;
+  name: string;
+  campaignType: string | null;
+  status: string | null;
 }
 
 export interface InsightsSource {
@@ -70,6 +94,11 @@ export interface InsightsData {
 
   outreach: OutreachEvent[];
   clinics: Array<{ id: string; name: string }>;
+  /** The primary clinic's coordinates, or null when it has never been geocoded. */
+  origin: { latitude: number; longitude: number } | null;
+
+  tags: InsightsTag[];
+  campaigns: InsightsCampaign[];
 
   counts: {
     offices: number;
@@ -79,6 +108,8 @@ export interface InsightsData {
     emails: number;
     /** Offices on the books that have never sent a patient. */
     officesWithNoReferrals: number;
+    /** Offices with referral history but no coordinates, so the gap is not silent. */
+    officesWithoutLocation: number;
   };
   /**
    * True when campaign data was read at all. `campaign_deliveries` is row-level
@@ -99,6 +130,9 @@ const EMPTY: InsightsData = {
   officeCohort: [],
   outreach: [],
   clinics: [],
+  origin: null,
+  tags: [],
+  campaigns: [],
   counts: {
     offices: 0,
     otherSources: 0,
@@ -106,6 +140,7 @@ const EMPTY: InsightsData = {
     deliveries: 0,
     emails: 0,
     officesWithNoReferrals: 0,
+    officesWithoutLocation: 0,
   },
   campaignScopeIsOwnerOnly: true,
 };
@@ -114,6 +149,9 @@ interface SourceRow {
   id: string;
   name: string;
   source_type: SourceType;
+  latitude: number | null;
+  longitude: number | null;
+  google_rating: number | null;
 }
 
 /**
@@ -149,25 +187,33 @@ export function useInsightsData() {
 
       const [clinicsResult, sources] = await Promise.all([
         clinicIds.length
-          ? supabase.from('clinics').select('id, name').in('id', clinicIds)
+          ? supabase.from('clinics').select('id, name, latitude, longitude').in('id', clinicIds)
           : Promise.resolve({ data: [], error: null } as const),
         // No `source_type` filter. This is the whole reason the hook exists: the
         // Sankey's first column is every source type, not just offices. Paged because
         // a practice that has imported prospects can pass 1000 sources.
         fetchAllRows<SourceRow>(() =>
-          supabase.from('patient_sources').select('id, name, source_type').eq('is_active', true),
+          supabase
+            .from('patient_sources')
+            .select('id, name, source_type, latitude, longitude, google_rating')
+            .eq('is_active', true),
         ),
       ]);
 
       if (clinicsResult.error) throw clinicsResult.error;
 
-      const clinics = (clinicsResult.data ?? []).map((c) => ({
-        id: c.id,
-        name: c.name || 'My Clinic',
-      }));
+      const clinicRows = clinicsResult.data ?? [];
+      const clinics = clinicRows.map((c) => ({ id: c.id, name: c.name || 'My Clinic' }));
+
+      // MULTI-LOCATION SEAM: the catchment plot measures from one point. When a second
+      // location ships, this becomes per-office nearest-hub rather than `[0]`.
+      const primary = clinicRows.find((c) => c.latitude != null && c.longitude != null);
+      const origin = primary
+        ? { latitude: primary.latitude as number, longitude: primary.longitude as number }
+        : null;
 
       if (sources.length === 0) {
-        return { ...EMPTY, clinics, months: [monthKey(now())] };
+        return { ...EMPTY, clinics, origin, months: [monthKey(now())] };
       }
 
       // No `.in('source_id', ids)` on any of these. RLS on `monthly_patients`,
@@ -176,24 +222,37 @@ export function useInsightsData() {
       // select returns exactly this user's rows. Sending the id list instead would
       // build a ~36 KB query string at 900 sources, and nginx returns 414 long before
       // the row cap bites. Filter client-side against a Set.
-      const [monthlyRows, visitRows, deliveryRows, emailRows] = await Promise.all([
-        fetchAllRows<MonthlyRow>(() =>
-          supabase.from('monthly_patients').select('source_id, year_month, patient_count'),
-        ),
-        fetchAllRows<VisitRow>(() =>
-          supabase.from('marketing_visits').select('office_id, visit_date, visited'),
-        ),
-        fetchAllRows<DeliveryRow>(() =>
-          supabase
-            .from('campaign_deliveries')
-            .select(
-              'office_id, delivered_at, delivery_status, email_status, email_sent_at, created_at',
-            ),
-        ),
-        fetchAllRows<OfficeEmailRow>(() =>
-          supabase.from('office_emails').select('office_id, sent_at, created_at, status'),
-        ),
-      ]);
+      const [monthlyRows, visitRows, deliveryRows, emailRows, tagRows, tagLinks, campaignRows] =
+        await Promise.all([
+          fetchAllRows<MonthlyRow>(() =>
+            supabase.from('monthly_patients').select('source_id, year_month, patient_count'),
+          ),
+          fetchAllRows<VisitRow>(() =>
+            supabase.from('marketing_visits').select('office_id, visit_date, visited'),
+          ),
+          fetchAllRows<DeliveryRow & { campaign_id: string | null }>(() =>
+            supabase
+              .from('campaign_deliveries')
+              .select(
+                'office_id, campaign_id, delivered_at, delivery_status, email_status, email_sent_at, created_at',
+              ),
+          ),
+          fetchAllRows<OfficeEmailRow>(() =>
+            supabase.from('office_emails').select('office_id, sent_at, created_at, status'),
+          ),
+          fetchAllRows<{ id: string; name: string; color: string | null }>(() =>
+            supabase.from('office_tags').select('id, name, color'),
+          ),
+          fetchAllRows<{ office_id: string; tag_id: string }>(() =>
+            supabase.from('office_tag_assignments').select('office_id, tag_id'),
+          ),
+          fetchAllRows<{
+            id: string;
+            name: string;
+            campaign_type: string | null;
+            status: string | null;
+          }>(() => supabase.from('campaigns').select('id, name, campaign_type, status')),
+        ]);
 
       const knownIds = new Set(sources.map((s) => s.id));
       const scopedMonthly = monthlyRows.filter((r) => knownIds.has(r.source_id));
@@ -236,9 +295,49 @@ export function useInsightsData() {
       // `useOffices` makes, so /insights and /offices agree by construction.
       const withMetrics = tierSnapshot(officeCohort, officeSeries, monthKey(nowDate), nowDate);
 
+      // Only tags and campaigns that actually touch a known office. An orphaned row
+      // would otherwise render as an empty category the user cannot account for.
+      const tagsById = new Map(tagRows.map((t) => [t.id, t]));
+      const tagsByOffice = new Map<string, string[]>();
+      const usedTagIds = new Set<string>();
+      for (const link of tagLinks) {
+        if (!link?.office_id || !officeIds.has(link.office_id) || !tagsById.has(link.tag_id)) continue;
+        const list = tagsByOffice.get(link.office_id) ?? [];
+        list.push(link.tag_id);
+        tagsByOffice.set(link.office_id, list);
+        usedTagIds.add(link.tag_id);
+      }
+
+      const campaignsById = new Map(campaignRows.map((c) => [c.id, c]));
+      const campaignsByOffice = new Map<string, string[]>();
+      const usedCampaignIds = new Set<string>();
+      for (const d of deliveryRows) {
+        const officeId = d?.office_id;
+        const campaignId = d?.campaign_id;
+        if (!officeId || !campaignId || !officeIds.has(officeId) || !campaignsById.has(campaignId)) {
+          continue;
+        }
+        const list = campaignsByOffice.get(officeId) ?? [];
+        if (!list.includes(campaignId)) list.push(campaignId);
+        campaignsByOffice.set(officeId, list);
+        usedCampaignIds.add(campaignId);
+      }
+
+      const geoById = new Map(sources.map((s) => [s.id, s]));
+
       let officesWithNoReferrals = 0;
+      let officesWithoutLocation = 0;
+
       const offices: InsightsOffice[] = withMetrics.map((o) => {
         if (o.totalReferrals === 0) officesWithNoReferrals++;
+
+        const geo = geoById.get(o.id);
+        const point =
+          geo?.latitude != null && geo?.longitude != null
+            ? { latitude: geo.latitude, longitude: geo.longitude }
+            : null;
+        if (!point && o.totalReferrals > 0) officesWithoutLocation++;
+
         return {
           id: o.id,
           name: o.name,
@@ -250,6 +349,11 @@ export function useInsightsData() {
           mslr: o.mslr,
           lastActiveMonth: o.lastActiveMonth,
           monthly: visibleMonthly(officeSeries, o.id),
+          distanceMiles: origin && point ? distanceMiles(origin, point) : null,
+          bearingDeg: origin && point ? bearingDegrees(origin, point) : null,
+          googleRating: geo?.google_rating ?? null,
+          tagIds: tagsByOffice.get(o.id) ?? [],
+          campaignIds: campaignsByOffice.get(o.id) ?? [],
         };
       });
 
@@ -289,6 +393,18 @@ export function useInsightsData() {
         officeCohort,
         outreach,
         clinics,
+        origin,
+        tags: tagRows
+          .filter((t) => usedTagIds.has(t.id))
+          .map((t) => ({ id: t.id, name: t.name, color: t.color })),
+        campaigns: campaignRows
+          .filter((c) => usedCampaignIds.has(c.id))
+          .map((c) => ({
+            id: c.id,
+            name: c.name,
+            campaignType: c.campaign_type,
+            status: c.status,
+          })),
         counts: {
           offices: offices.length,
           otherSources: otherSources.length,
@@ -296,6 +412,7 @@ export function useInsightsData() {
           deliveries: deliveryRows.length,
           emails: emailRows.length,
           officesWithNoReferrals,
+          officesWithoutLocation,
         },
         campaignScopeIsOwnerOnly: true,
       };

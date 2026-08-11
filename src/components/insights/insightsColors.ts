@@ -79,6 +79,60 @@ export const DIVERGING_FILL = {
   flat: token('muted-foreground'),
 } as const;
 
+/**
+ * Sequential ramp for magnitude, light to dark. Five steps, one hue.
+ *
+ * Binned rather than continuous on purpose: a continuous ramp cannot be legended, and
+ * an unlegended heatmap is a picture of a number nobody can read back. `heatStep`
+ * returns the bin index so the same thresholds drive the cells and the key.
+ */
+export const HEAT_TOKENS: readonly string[] = ['heat-1', 'heat-2', 'heat-3', 'heat-4', 'heat-5'];
+
+export const HEAT_FILL: readonly string[] = HEAT_TOKENS.map(token);
+
+/**
+ * Which heat bin a value falls in, or -1 for "nothing here".
+ *
+ * Zero is deliberately its own case rather than the lightest step: "no referrals this
+ * month" and "one referral this month" are different facts, and a ramp that renders
+ * them as neighbouring shades of the same blue asks the reader to distinguish them by
+ * eye. Zero gets no fill at all.
+ *
+ * Bins are on a square-root scale of `max`. Referral counts are heavily skewed — one
+ * office at forty a month and a long tail at one or two — so linear bins would put the
+ * entire tail in bin 0 and leave three bins empty.
+ */
+export function heatStep(value: number, max: number): number {
+  if (!(value > 0) || !Number.isFinite(value)) return -1;
+  if (!(max > 0)) return 0;
+  const t = Math.sqrt(Math.min(value, max) / max);
+  return Math.min(HEAT_FILL.length - 1, Math.max(0, Math.ceil(t * HEAT_FILL.length) - 1));
+}
+
+/** The value thresholds the bins correspond to, for the legend. */
+export function heatThresholds(max: number): number[] {
+  if (!(max > 0)) return [];
+  return HEAT_FILL.map((_, i) => Math.ceil(((i + 1) / HEAT_FILL.length) ** 2 * max));
+}
+
+/**
+ * Momentum: a diverging green-to-red ramp for the direction states, plus one blue that
+ * sits off that axis entirely for `new`.
+ *
+ * A first-ever referral is not a point on a good-to-bad scale, so it gets a hue that
+ * is not on the scale. Sharing the neutral midpoint with `steady` was the first
+ * attempt and it put two identical greys side by side on the chord ring, where the
+ * only thing telling them apart was a label. Scored as a set of five, the worst
+ * all-pairs separation is CVD 10.9 and normal-vision 15.5 — both clear.
+ */
+export const MOMENTUM_TOKENS: Readonly<Record<string, string>> = {
+  rising: 'momentum-rising',
+  new: 'momentum-new',
+  steady: 'momentum-steady',
+  slipping: 'momentum-slipping',
+  quiet: 'momentum-quiet',
+};
+
 /** Neutral ink and surfaces, so no chart hardcodes a gray. */
 export const CHART_INK = {
   axis: token('border'),

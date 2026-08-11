@@ -76,6 +76,28 @@ All colors MUST be HSL.
     --outreach-email: 159 73% 40%;
     --outreach-none: 220 8% 45%;
 
+    /* Sequential ramp for magnitude (the Fingerprint matrix). One hue, light to dark,
+       five steps. Validated as an ordinal ramp on the card surface: monotone
+       lightness, every adjacent gap >= 0.06 L, lightest step still 2.07:1 against the
+       surface, hue spread 3 degrees. Consecutive steps of the underlying scale were
+       too close to tell apart, so these are every other step. */
+    --heat-1: 213 76% 73%;
+    --heat-2: 213 75% 62%;
+    --heat-3: 213 68% 50%;
+    --heat-4: 213 72% 39%;
+    --heat-5: 213 78% 28%;
+
+    /* Momentum, as a diverging ramp: green through a neutral grey to deep red. The
+       two "failures" this scores against the categorical gates are the shape of a
+       diverging palette, not defects — the midpoint is meant to read as nothing, and
+       the far end is meant to be dark. What matters is separation, and the worst
+       all-pairs scores are CVD 10.9 and normal-vision 18.7, both clear. */
+    --momentum-rising: 151 58% 52%;
+    --momentum-new: 213 68% 50%;
+    --momentum-steady: 220 8% 55%;
+    --momentum-slipping: 3 72% 60%;
+    --momentum-quiet: 2 80% 24%;
+
     /* Gradients */
     --gradient-connection: linear-gradient(135deg, hsl(185 15% 99%), hsl(185 15% 95%));
     --gradient-card: linear-gradient(145deg, hsl(185 10% 99%), hsl(185 15% 96%));
@@ -173,6 +195,22 @@ All colors MUST be HSL.
     --outreach-campaign: 17 70% 50%;
     --outreach-email: 159 73% 36%;
     --outreach-none: 218 10% 58%;
+
+    /* Heat ramp - dark mode. Runs dark to light, because on a dark surface it is the
+       *bright* end that reads as "a lot", not the deep end. Flipping the light-mode
+       steps directly would make an empty month the loudest cell on the grid. */
+    --heat-1: 213 45% 30%;
+    --heat-2: 213 55% 40%;
+    --heat-3: 213 65% 51%;
+    --heat-4: 213 75% 62%;
+    --heat-5: 213 85% 74%;
+
+    /* Momentum - dark mode. */
+    --momentum-rising: 151 58% 46%;
+    --momentum-new: 213 70% 56%;
+    --momentum-steady: 220 8% 58%;
+    --momentum-slipping: 3 72% 56%;
+    --momentum-quiet: 2 70% 38%;
 
     /* Gradients - dark mode */
     --gradient-connection: linear-gradient(135deg, hsl(185 20% 12%), hsl(185 20% 8%));

@@ -1,8 +1,8 @@
 import { useMemo, useRef, useState } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
-import type { FlowTier, MonthlySeries } from '@/lib/officeMetrics';
+import { computeMomentum, type FlowTier, type Momentum, type MonthlySeries } from '@/lib/officeMetrics';
 import { classifyTierChange, hadHistoryBy, tierSnapshot } from '@/lib/tierSnapshot';
-import type { InsightsOffice } from '@/hooks/useInsightsData';
+import type { InsightsCampaign, InsightsOffice, InsightsTag } from '@/hooks/useInsightsData';
 import { packCircles } from './circlePack';
 import {
   bundlePath,
@@ -11,7 +11,7 @@ import {
   ringLabelPlacement,
   type RingLeafInput,
 } from './ringLayout';
-import { arcPath, polar, truncateLabel } from './svgPolar';
+import { annulusSectorPath, arcPath, polar, truncateLabel } from './svgPolar';
 import {
   CHANNEL_LABELS,
   channelsInWindow,
@@ -19,38 +19,62 @@ import {
   type OutreachChannel,
   type OutreachEvent,
 } from './outreach';
-import { CHART_INK, OUTREACH_FILL, TIER_FILL, alpha } from './insightsColors';
+import {
+  CHART_INK,
+  HEAT_TOKENS,
+  OUTREACH_TOKENS,
+  TIER_TOKENS,
+  alpha,
+  token,
+} from './insightsColors';
 import { InsightsTooltip, type TooltipState } from './InsightsTooltip';
 
 /**
  * Hierarchical edge bundling: offices on a ring, hub circles packed in the middle,
  * bundled curves between them.
  *
- * Two views, and the important thing about them is that **they never share a palette**.
- * The outreach hues and the tier hues were each validated on their own and collide when
- * scored against each other — outreach orange lands on `--tier-warm`, outreach blue on
- * `--tier-cold`. So the outreach view paints leaves neutral and carries tier only in the
- * labelled group arcs, while the movement view uses tier colour and no outreach colour
- * at all. One palette per picture.
+ * Four views of the same ring, and the important thing about them is that **no two
+ * palettes are ever on screen together**. The outreach hues and the tier hues were each
+ * validated on their own and collide when scored against each other — outreach orange
+ * lands on `--tier-warm`, outreach blue on `--tier-cold`. So every view except
+ * "movement" paints leaves neutral and carries tier only in the labelled group arcs;
+ * movement uses tier colour and nothing else. One palette per picture.
+ *
+ * Beyond the links, each leaf carries two extra marks that cost nothing to read and
+ * would otherwise need their own chart: a rim bar for volume, and a chevron for
+ * direction. The chevron encodes momentum by *shape* rather than colour precisely
+ * because a third palette would not survive the same collision test.
  */
 
 const VIEW = 1000;
 const CX = VIEW / 2;
 const CY = VIEW / 2;
 const HUB_DISC = 168;
-const LEAF_R = 300;
-const GROUP_ARC_R = 313;
-const LABEL_R = 326;
+const LEAF_R = 286;
+const RIM_BASE = LEAF_R + 8;
+const RIM_MAX = 34;
+const GROUP_ARC_R = RIM_BASE + RIM_MAX + 8;
+const LABEL_R = GROUP_ARC_R + 12;
 
 const TIER_ORDER: FlowTier[] = ['VIP', 'Warm', 'Cold', 'Dormant'];
 
-export type NetworkMode = 'outreach' | 'movement';
+export type NetworkMode = 'outreach' | 'movement' | 'tags' | 'campaigns';
 
-type HubKey = OutreachChannel | 'none' | FlowTier;
+/** How many named hubs a categorical view shows before folding the rest into Other. */
+const MAX_NAMED_HUBS = 4;
+const OTHER = '__other';
+const NONE = '__none';
+
+interface HubSpec {
+  key: string;
+  label: string;
+  /** CSS custom-property name, without the leading `--`. */
+  token: string;
+}
 
 interface NetworkLink {
   officeId: string;
-  hubKey: HubKey;
+  hubKey: string;
   /** True for an office with no referral history before the baseline window. */
   isNew: boolean;
 }
@@ -61,6 +85,8 @@ interface CircularNetworkChartProps {
   officeCohort: Array<{ id: string; name: string }>;
   officeSeries: MonthlySeries;
   outreach: OutreachEvent[];
+  tags: InsightsTag[];
+  campaigns: InsightsCampaign[];
   windowMonths: string[];
   /** Null when history cannot cover an equal-length baseline. */
   baselineMonths: string[] | null;
@@ -79,6 +105,8 @@ export function CircularNetworkChart({
   officeCohort,
   officeSeries,
   outreach,
+  tags,
+  campaigns,
   windowMonths,
   baselineMonths,
   mode,
@@ -88,83 +116,137 @@ export function CircularNetworkChart({
   const wrapRef = useRef<HTMLDivElement>(null);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [hoverLeaf, setHoverLeaf] = useState<string | null>(null);
-  const [hoverHub, setHoverHub] = useState<HubKey | null>(null);
+  const [hoverHub, setHoverHub] = useState<string | null>(null);
 
   const model = useMemo(() => {
-    const patientsById = new Map(
-      offices.map((o) => [o.id, sumWindow(o.monthly, windowMonths)]),
+    const patientsById = new Map(offices.map((o) => [o.id, sumWindow(o.monthly, windowMonths)]));
+    const maxPatients = Math.max(1, ...patientsById.values());
+    const lastMonth = windowMonths[windowMonths.length - 1] ?? '';
+
+    const momentumById = new Map<string, Momentum>(
+      offices.map((o) => [o.id, computeMomentum(o.monthly, lastMonth).momentum]),
     );
 
-    const leafInputs: RingLeafInput[] = offices.map((o) => ({
-      id: o.id,
-      label: o.name,
-      group: o.tier,
-      value: patientsById.get(o.id) ?? 0,
-    }));
-
-    const ring = layoutRing(leafInputs, {
-      cx: CX,
-      cy: CY,
-      radius: LEAF_R,
-      groupOrder: TIER_ORDER,
-      groupGap: 0.06,
-    });
+    const ring = layoutRing(
+      offices.map((o) => ({
+        id: o.id,
+        label: o.name,
+        group: o.tier,
+        value: patientsById.get(o.id) ?? 0,
+      })) as RingLeafInput[],
+      { cx: CX, cy: CY, radius: LEAF_R, groupOrder: TIER_ORDER, groupGap: 0.06 },
+    );
 
     const links: NetworkLink[] = [];
-    const hubKeys: HubKey[] = [];
-    const hubValues = new Map<HubKey, number>();
-    const hubMembers = new Map<HubKey, number>();
+    const hubs: HubSpec[] = [];
+    const hubValues = new Map<string, number>();
+    const hubMembers = new Map<string, number>();
     let movementCounts = { promoted: 0, demoted: 0, unchanged: 0, new: 0 };
+    let foldedCount = 0;
+
+    const register = (spec: HubSpec) => {
+      hubs.push(spec);
+      hubValues.set(spec.key, 0);
+      hubMembers.set(spec.key, 0);
+    };
+    const attach = (officeId: string, hubKey: string, patients: number, isNew = false) => {
+      links.push({ officeId, hubKey, isNew });
+      hubValues.set(hubKey, (hubValues.get(hubKey) ?? 0) + patients);
+      hubMembers.set(hubKey, (hubMembers.get(hubKey) ?? 0) + 1);
+    };
+
+    /**
+     * Shared shape for the two categorical views. Membership is many-to-many, hubs are
+     * capped at the top few by volume, and everything else folds into `Other` — never
+     * a generated hue for a ninth series, and never a silent truncation either: the
+     * fold is counted and reported.
+     */
+    const buildCategorical = (
+      entities: Array<{ id: string; name: string }>,
+      membership: (o: InsightsOffice) => string[],
+      noneLabel: string,
+    ) => {
+      const volume = new Map<string, number>();
+      for (const o of offices) {
+        const p = patientsById.get(o.id) ?? 0;
+        for (const id of membership(o)) volume.set(id, (volume.get(id) ?? 0) + p);
+      }
+
+      const ranked = entities
+        .filter((e) => volume.has(e.id))
+        .sort((a, b) => (volume.get(b.id) ?? 0) - (volume.get(a.id) ?? 0) || a.id.localeCompare(b.id));
+
+      const named = ranked.slice(0, MAX_NAMED_HUBS);
+      const folded = new Set(ranked.slice(MAX_NAMED_HUBS).map((e) => e.id));
+      foldedCount = folded.size;
+
+      // Ordered by volume and coloured with the sequential ramp darkest-first, so hue
+      // and circle area encode the same thing rather than competing. An unordered
+      // categorical palette would need eight validated hues this page does not have.
+      named.forEach((e, i) =>
+        register({
+          key: e.id,
+          label: e.name,
+          token: HEAT_TOKENS[Math.max(0, HEAT_TOKENS.length - 1 - i)],
+        }),
+      );
+      if (folded.size > 0) {
+        register({ key: OTHER, label: `Other (${folded.size})`, token: 'muted-foreground' });
+      }
+      register({ key: NONE, label: noneLabel, token: OUTREACH_TOKENS.none });
+
+      for (const o of offices) {
+        const p = patientsById.get(o.id) ?? 0;
+        const mine = membership(o);
+        if (mine.length === 0) {
+          attach(o.id, NONE, p);
+          continue;
+        }
+        const keys = new Set(mine.map((id) => (folded.has(id) ? OTHER : id)));
+        for (const k of keys) if (hubValues.has(k)) attach(o.id, k, p);
+      }
+    };
 
     if (mode === 'outreach') {
-      hubKeys.push(...OUTREACH_CHANNELS, 'none');
-      for (const k of hubKeys) {
-        hubValues.set(k, 0);
-        hubMembers.set(k, 0);
+      for (const c of OUTREACH_CHANNELS) {
+        register({ key: c, label: CHANNEL_LABELS[c], token: OUTREACH_TOKENS[c] });
       }
+      register({ key: NONE, label: CHANNEL_LABELS.none, token: OUTREACH_TOKENS.none });
 
       const touched = channelsInWindow(outreach, windowMonths);
       for (const o of offices) {
-        const patients = patientsById.get(o.id) ?? 0;
+        const p = patientsById.get(o.id) ?? 0;
         const channels = touched.get(o.id);
-        const keys: HubKey[] = channels && channels.size > 0 ? [...channels] : ['none'];
-        for (const k of keys) {
-          links.push({ officeId: o.id, hubKey: k, isNew: false });
-          // An office reached three ways counts toward all three hubs. That double
-          // counting is inherent to the question ("how did we reach these patients")
-          // and the totals are labelled per hub, never summed into a grand total.
-          hubValues.set(k, (hubValues.get(k) ?? 0) + patients);
-          hubMembers.set(k, (hubMembers.get(k) ?? 0) + 1);
-        }
+        const keys: string[] =
+          channels && channels.size > 0 ? [...(channels as Set<OutreachChannel>)] : [NONE];
+        // An office reached three ways counts toward all three hubs. That double
+        // counting is inherent to "how did we reach these patients", and the totals
+        // are labelled per hub, never summed into a grand total.
+        for (const k of keys) attach(o.id, k, p);
       }
+    } else if (mode === 'tags') {
+      buildCategorical(tags, (o) => o.tagIds, 'Untagged');
+    } else if (mode === 'campaigns') {
+      buildCategorical(campaigns, (o) => o.campaignIds, 'No campaign');
     } else {
-      hubKeys.push(...TIER_ORDER);
-      for (const k of hubKeys) {
-        hubValues.set(k, 0);
-        hubMembers.set(k, 0);
-      }
+      for (const t of TIER_ORDER) register({ key: t, label: t, token: TIER_TOKENS[t] });
 
-      // Baseline tiers must come from the identical cohort array, or the quartile
-      // boundaries shift and offices that never moved appear to have moved.
       const baselineEnd = baselineMonths?.[baselineMonths.length - 1] ?? null;
       const baseTier = new Map<string, FlowTier>();
       if (baselineEnd) {
+        // Baseline tiers must come from the identical cohort array, or the quartile
+        // boundaries shift and offices that never moved appear to have moved.
         for (const row of tierSnapshot(officeCohort, officeSeries, baselineEnd, nowDate)) {
           baseTier.set(row.id, row.tier);
         }
       }
 
       for (const o of offices) {
-        const patients = patientsById.get(o.id) ?? 0;
-        hubValues.set(o.tier, (hubValues.get(o.tier) ?? 0) + patients);
-        hubMembers.set(o.tier, (hubMembers.get(o.tier) ?? 0) + 1);
-
+        const p = patientsById.get(o.id) ?? 0;
         // Three cases, and collapsing the last two is the easy mistake:
         //   - had history by the baseline  -> compare the two tiers
         //   - no history then, some since  -> genuinely `new`
         //   - never referred at all        -> Dormant then, Dormant now, unchanged.
-        // Reporting a never-active office as "new" is how the movement count ends up
-        // claiming six new relationships on a practice that gained none.
         const hadHistory = baselineEnd ? hadHistoryBy(officeSeries, o.id, baselineEnd) : true;
         const from = hadHistory
           ? (baseTier.get(o.id) ?? null)
@@ -174,23 +256,27 @@ export function CircularNetworkChart({
         const change = classifyTierChange(from, o.tier);
         movementCounts = { ...movementCounts, [change]: movementCounts[change] + 1 };
 
-        links.push({ officeId: o.id, hubKey: o.tier, isNew: change === 'new' });
+        attach(o.id, o.tier, p, change === 'new');
         // An office that moved links to both ends, which is what makes the movement
         // legible as a crossing rope rather than as four separate fans.
-        if (from && from !== o.tier) {
-          links.push({ officeId: o.id, hubKey: from, isNew: false });
-        }
+        if (from && from !== o.tier) attach(o.id, from, p);
       }
     }
 
     const packed = packCircles(
-      hubKeys.map((k) => ({ id: String(k), value: hubValues.get(k) ?? 0 })),
+      hubs.map((h) => ({ id: h.key, value: hubValues.get(h.key) ?? 0 })),
       { radius: HUB_DISC, padding: 8, minRadiusRatio: 0.2 },
     );
-    const hubs = new Map(
+    const hubGeom = new Map(
       packed.map((c) => [
-        c.id as HubKey,
-        { x: CX + c.x, y: CY + c.y, r: c.r, value: c.value, members: hubMembers.get(c.id as HubKey) ?? 0 },
+        c.id,
+        {
+          x: CX + c.x,
+          y: CY + c.y,
+          r: c.r,
+          value: c.value,
+          members: hubMembers.get(c.id) ?? 0,
+        },
       ]),
     );
 
@@ -198,7 +284,7 @@ export function CircularNetworkChart({
     const paths = links
       .map((l) => {
         const leaf = leafById.get(l.officeId);
-        const hub = hubs.get(l.hubKey);
+        const hub = hubGeom.get(l.hubKey);
         if (!leaf || !hub) return null;
         return {
           ...l,
@@ -211,59 +297,60 @@ export function CircularNetworkChart({
     // Link opacity has to scale with how many links there are, or the chart is wrong
     // at both ends of the range: a fixed value that keeps 500 curves readable makes 40
     // of them almost invisible, and one that suits 40 turns 500 into a solid disc.
-    // Inverse-sqrt tracks how the ink actually accumulates as curves overlap.
     const restOpacity = Math.min(0.42, Math.max(0.07, 3.4 / Math.sqrt(Math.max(1, paths.length))));
 
     return {
       ring,
       hubs,
-      hubKeys,
+      hubGeom,
       paths,
       patientsById,
+      momentumById,
+      maxPatients,
       restOpacity,
       policy: labelPolicy(ring.leaves.length, LEAF_R),
       movementCounts,
+      foldedCount,
       hasBaseline: baselineMonths !== null,
     };
-  }, [offices, officeCohort, officeSeries, outreach, windowMonths, baselineMonths, mode, nowDate]);
+  }, [
+    offices,
+    officeCohort,
+    officeSeries,
+    outreach,
+    tags,
+    campaigns,
+    windowMonths,
+    baselineMonths,
+    mode,
+    nowDate,
+  ]);
 
   const {
     ring,
     hubs,
-    hubKeys,
+    hubGeom,
     paths,
     patientsById,
+    momentumById,
+    maxPatients,
     restOpacity,
     policy,
     movementCounts,
+    foldedCount,
     hasBaseline,
   } = model;
 
-  const hubLabel = (k: HubKey): string =>
-    mode === 'outreach' ? CHANNEL_LABELS[k as OutreachChannel | 'none'] : (k as string);
+  const hubByKey = useMemo(() => new Map(hubs.map((h) => [h.key, h])), [hubs]);
 
-  /** What fits inside the circle. The legend below carries the full name. */
-  const SHORT_LABEL: Record<string, string> = {
-    visit: 'Visits',
-    campaign: 'Campaigns',
-    email: 'Email',
-    none: 'No contact',
-  };
-  const hubShortLabel = (k: HubKey): string => SHORT_LABEL[String(k)] ?? (k as string);
-
-  const hubColor = (k: HubKey): string =>
-    mode === 'outreach'
-      ? OUTREACH_FILL[k as OutreachChannel | 'none']
-      : TIER_FILL[k as FlowTier];
-
-  /** The colour of a link. In outreach mode identity lives on the hub, not the leaf. */
-  const linkColor = (hubKey: HubKey, active: boolean): string => {
-    const t =
-      mode === 'outreach'
-        ? `outreach-${hubKey === 'none' ? 'none' : hubKey}`
-        : `tier-${String(hubKey).toLowerCase()}`;
-    return alpha(t, active ? 0.85 : restOpacity);
-  };
+  /**
+   * Hubs carry a token name rather than a finished colour so alpha can be composed
+   * here. Overlapping ribbons then accumulate the way ink does, which is what makes a
+   * bundle of forty read as heavier than a bundle of four.
+   */
+  const hubFill = (hubKey: string): string => token(hubByKey.get(hubKey)?.token ?? 'muted-foreground');
+  const linkColor = (hubKey: string, active: boolean): string =>
+    alpha(hubByKey.get(hubKey)?.token ?? 'muted-foreground', active ? 0.85 : restOpacity);
 
   const showTip = (e: React.MouseEvent, state: Omit<TooltipState, 'x' | 'y'>) => {
     const rect = wrapRef.current?.getBoundingClientRect();
@@ -272,11 +359,10 @@ export function CircularNetworkChart({
 
   const wrapRect = wrapRef.current?.getBoundingClientRect();
   const focusedLeaf = hoverLeaf ? ring.leaves.find((l) => l.id === hoverLeaf) : null;
+  const dimmed = hoverLeaf !== null || hoverHub !== null;
 
-  const isActive = (officeId: string, hubKey: HubKey) =>
-    (hoverLeaf === null && hoverHub === null) ||
-    hoverLeaf === officeId ||
-    hoverHub === hubKey;
+  const isActive = (officeId: string, hubKey: string) =>
+    !dimmed || hoverLeaf === officeId || hoverHub === hubKey;
 
   if (ring.leaves.length === 0) {
     return (
@@ -289,28 +375,32 @@ export function CircularNetworkChart({
   if (mode === 'movement' && !hasBaseline) {
     return (
       <p className="py-16 text-center text-sm text-muted-foreground">
-        Not enough history for an equal-length baseline, so there is nothing to compare
-        tiers against yet. Widen the window or pick a nearer baseline.
+        Not enough history for an equal-length baseline, so there is nothing to compare tiers
+        against yet. Widen the window or pick a nearer baseline.
       </p>
     );
   }
 
-  const dimmed = hoverLeaf !== null || hoverHub !== null;
+  if (hubs.length <= 1) {
+    return (
+      <p className="py-16 text-center text-sm text-muted-foreground">
+        {mode === 'tags'
+          ? 'No offices are tagged yet, so there is nothing to group them by.'
+          : 'No campaigns have been delivered yet, so there is nothing to group offices by.'}
+      </p>
+    );
+  }
 
   return (
     <div ref={wrapRef} className="relative" onMouseLeave={() => setTooltip(null)}>
       <svg
         viewBox={`0 0 ${VIEW} ${VIEW}`}
-        className="insights-fade mx-auto h-auto w-full max-w-[48rem]"
+        className="insights-fade mx-auto h-auto w-full max-w-[50rem]"
         role="img"
-        aria-label={
-          mode === 'outreach'
-            ? `Network diagram of ${ring.leaves.length} referring offices linked to the outreach channels that reached them`
-            : `Network diagram of ${ring.leaves.length} referring offices linked to their previous and current referral tier`
-        }
+        aria-label={`Network diagram of ${ring.leaves.length} referring offices grouped by ${mode}, with a rim bar per office showing its volume`}
       >
-        {/* Links. Drawn first so nothing else is buried under 500 curves. */}
-        <g style={{ transition: 'opacity 160ms ease' }}>
+        {/* Links first, so nothing else is buried under hundreds of curves. */}
+        <g>
           {paths.map((p) => {
             const active = isActive(p.officeId, p.hubKey);
             return (
@@ -331,7 +421,71 @@ export function CircularNetworkChart({
           })}
         </g>
 
-        {/* Group arcs. In outreach mode these are the *only* place tier appears. */}
+        {/* Rim bars: one per office, length by patients. This is the volume ranking the
+            radial tab shows in full, folded into the ring so the network view is not
+            blind to how much each connection is worth. */}
+        <g>
+          {ring.leaves.map((l) => {
+            const patients = patientsById.get(l.id) ?? 0;
+            if (patients <= 0) return null;
+            const active = hoverLeaf === null || hoverLeaf === l.id;
+            // Square-root, so a forty-patient office is not fourteen times the length
+            // of a two-patient one and the small offices stay visible.
+            const len = RIM_MAX * Math.sqrt(patients / maxPatients);
+            // A fifth of the slot, so these read as bars against the ring rather than as
+            // a segmented band. Much wider and the rim becomes a second solid arc
+            // competing with the tier arcs above it.
+            const half = ((Math.PI * 2) / Math.max(1, ring.leaves.length)) * 0.2;
+            return (
+              <path
+                key={`rim-${l.id}`}
+                d={annulusSectorPath(CX, CY, RIM_BASE, RIM_BASE + len, l.angle - half, l.angle + half)}
+                style={{
+                  fill:
+                    mode === 'movement'
+                      ? token(TIER_TOKENS[l.group as FlowTier])
+                      : CHART_INK.neutralMark,
+                  opacity: dimmed && !active ? 0.2 : 0.9,
+                  transition: 'opacity 140ms ease',
+                }}
+              />
+            );
+          })}
+        </g>
+
+        {/* Momentum chevrons — direction by *shape*, never by a third palette. Outward
+            for rising, inward for slipping; steady and quiet get nothing, because a
+            mark on every leaf is a mark that carries no information. */}
+        <g pointerEvents="none">
+          {ring.leaves.map((l) => {
+            const m = momentumById.get(l.id);
+            if (m !== 'rising' && m !== 'slipping') return null;
+            const active = hoverLeaf === null || hoverLeaf === l.id;
+            const patients = patientsById.get(l.id) ?? 0;
+            const len = patients > 0 ? RIM_MAX * Math.sqrt(patients / maxPatients) : 0;
+            const base = RIM_BASE + len + 5;
+            const tipR = m === 'rising' ? base + 5 : base;
+            const backR = m === 'rising' ? base : base + 5;
+            const w = 0.008;
+            const tip = polar(CX, CY, tipR, l.angle);
+            const a = polar(CX, CY, backR, l.angle - w * 3);
+            const b = polar(CX, CY, backR, l.angle + w * 3);
+            return (
+              <path
+                key={`mom-${l.id}`}
+                d={`M ${tip.x} ${tip.y} L ${a.x} ${a.y} L ${b.x} ${b.y} Z`}
+                style={{
+                  fill: CHART_INK.strongLabel,
+                  opacity: dimmed && !active ? 0.15 : 0.6,
+                  transition: 'opacity 140ms ease',
+                }}
+              />
+            );
+          })}
+        </g>
+
+        {/* Tier group arcs. In every view but movement these are the only place a tier
+            colour appears. */}
         <g>
           {ring.groups.map((g) => (
             <path
@@ -339,8 +493,8 @@ export function CircularNetworkChart({
               d={arcPath(CX, CY, GROUP_ARC_R, g.startAngle, g.endAngle)}
               fill="none"
               style={{
-                stroke: TIER_FILL[g.group as FlowTier] ?? CHART_INK.neutralMark,
-                strokeWidth: 6,
+                stroke: token(TIER_TOKENS[g.group as FlowTier]) ?? CHART_INK.neutralMark,
+                strokeWidth: 5,
                 strokeLinecap: 'butt',
                 opacity: 0.9,
               }}
@@ -353,19 +507,20 @@ export function CircularNetworkChart({
           {ring.leaves.map((l) => {
             const active = hoverLeaf === null || hoverLeaf === l.id;
             const patients = patientsById.get(l.id) ?? 0;
+            const momentum = momentumById.get(l.id);
             return (
               <circle
                 key={l.id}
                 cx={l.x}
                 cy={l.y}
-                r={policy.tickOnly ? 2 : 3.2}
+                r={policy.tickOnly ? 2 : 3}
                 style={{
-                  // Outreach mode keeps leaves neutral so the channel hues are the
+                  // Non-movement views keep leaves neutral so the hub palette is the
                   // only categorical encoding on screen.
                   fill:
-                    mode === 'outreach'
-                      ? CHART_INK.neutralMark
-                      : TIER_FILL[l.group as FlowTier],
+                    mode === 'movement'
+                      ? token(TIER_TOKENS[l.group as FlowTier])
+                      : CHART_INK.neutralMark,
                   opacity: dimmed && !active ? 0.25 : 1,
                   cursor: 'pointer',
                   transition: 'opacity 140ms ease',
@@ -378,8 +533,17 @@ export function CircularNetworkChart({
                 onMouseMove={(e) =>
                   showTip(e, {
                     title: l.label,
-                    subtitle: l.group,
-                    rows: [{ label: 'Patients', value: String(patients) }],
+                    subtitle: `${l.group}${momentum ? ` · ${momentum}` : ''}`,
+                    rows: [
+                      { label: 'Patients', value: String(patients) },
+                      ...paths
+                        .filter((p) => p.officeId === l.id)
+                        .map((p) => ({
+                          label: hubByKey.get(p.hubKey)?.label ?? p.hubKey,
+                          value: '●',
+                          swatch: hubFill(p.hubKey),
+                        })),
+                    ],
                   })
                 }
               />
@@ -415,66 +579,66 @@ export function CircularNetworkChart({
 
         {/* Hub circles. */}
         <g>
-          {hubKeys.map((k) => {
-            const hub = hubs.get(k);
-            if (!hub) return null;
-            const active = hoverHub === null || hoverHub === k;
+          {hubs.map((h) => {
+            const geom = hubGeom.get(h.key);
+            if (!geom) return null;
+            const active = hoverHub === null || hoverHub === h.key;
             return (
-              <g key={String(k)}>
-                <circle
-                  cx={hub.x}
-                  cy={hub.y}
-                  r={hub.r}
-                  style={{
-                    fill: hubColor(k),
-                    opacity: dimmed && !active ? 0.3 : 0.9,
-                    cursor: 'pointer',
-                    transition: 'opacity 160ms ease',
-                  }}
-                  onMouseEnter={() => setHoverHub(k)}
-                  onMouseLeave={() => {
-                    setHoverHub(null);
-                    setTooltip(null);
-                  }}
-                  onMouseMove={(e) =>
-                    showTip(e, {
-                      title: hubLabel(k),
-                      rows: [
-                        { label: 'Offices', value: String(hub.members) },
-                        { label: 'Patients', value: String(Math.round(hub.value)) },
-                      ],
-                    })
-                  }
-                />
-              </g>
+              <circle
+                key={h.key}
+                cx={geom.x}
+                cy={geom.y}
+                r={geom.r}
+                style={{
+                  fill: hubFill(h.key),
+                  opacity: dimmed && !active ? 0.3 : 0.92,
+                  cursor: 'pointer',
+                  transition: 'opacity 160ms ease',
+                }}
+                onMouseEnter={() => setHoverHub(h.key)}
+                onMouseLeave={() => {
+                  setHoverHub(null);
+                  setTooltip(null);
+                }}
+                onMouseMove={(e) =>
+                  showTip(e, {
+                    title: h.label,
+                    rows: [
+                      { label: 'Offices', value: String(geom.members) },
+                      { label: 'Patients', value: String(Math.round(geom.value)) },
+                    ],
+                  })
+                }
+              />
             );
           })}
         </g>
 
-        {/* Hub labels, above the circles. The value is printed because a hub with no
-            members is floored to a visible radius — without the number its area would
-            be read as a quantity it does not have. */}
+        {/* Hub labels. The value is printed because a hub with no members is floored to
+            a visible radius — without the number its area reads as a quantity it does
+            not have. */}
         <g pointerEvents="none">
-          {hubKeys.map((k) => {
-            const hub = hubs.get(k);
-            if (!hub) return null;
-
-            const short = hubShortLabel(k);
-            // Size the label to the circle rather than clamping to a fixed range. A
-            // fixed size overflows the smaller hubs, and SVG text does not clip or
-            // ellipsize — it just runs out over the neighbouring circles, which is
-            // how "Never contacted" ends up rendering as "ever contacte".
-            const fitted = (hub.r * 1.7) / (short.length * 0.56);
-            const nameSize = Math.min(15, fitted);
-            const showName = nameSize >= 7.5;
-            const valueSize = Math.min(12, hub.r * 0.28);
-
+          {hubs.map((h) => {
+            const geom = hubGeom.get(h.key);
+            if (!geom) return null;
+            const full = h.label.replace(/ (deliveries|outreach)$/, '');
+            // Fit the label to the circle by *shortening* it, not by shrinking it past
+            // legibility and not by dropping it. SVG text neither clips nor
+            // ellipsizes, so an unfitted label simply runs out over its neighbours;
+            // and a circle showing only a number is a category the reader cannot name.
+            // Below four characters there is nothing worth printing, and the legend
+            // underneath carries every hub with its count regardless.
+            const nameSize = Math.max(8, Math.min(15, geom.r * 0.34));
+            const maxChars = Math.floor((geom.r * 1.7) / (nameSize * 0.56));
+            const showName = maxChars >= 4;
+            const short = truncateLabel(full, Math.min(18, maxChars));
+            const valueSize = Math.min(12, geom.r * 0.28);
             return (
-              <g key={`hl-${String(k)}`}>
+              <g key={`hl-${h.key}`}>
                 {showName && (
                   <text
-                    x={hub.x}
-                    y={hub.y - valueSize * 0.55}
+                    x={geom.x}
+                    y={geom.y - valueSize * 0.55}
                     textAnchor="middle"
                     style={{ fill: CHART_INK.surface, fontSize: nameSize, fontWeight: 700 }}
                   >
@@ -482,13 +646,13 @@ export function CircularNetworkChart({
                   </text>
                 )}
                 <text
-                  x={hub.x}
-                  y={hub.y + (showName ? nameSize * 0.85 : 0)}
+                  x={geom.x}
+                  y={geom.y + (showName ? nameSize * 0.85 : 0)}
                   textAnchor="middle"
                   dominantBaseline={showName ? undefined : 'middle'}
                   style={{ fill: CHART_INK.surface, fontSize: valueSize, opacity: 0.92 }}
                 >
-                  {Math.round(hub.value)}
+                  {Math.round(geom.value)}
                 </text>
               </g>
             );
@@ -500,7 +664,7 @@ export function CircularNetworkChart({
         {focusedLeaf && (
           <g pointerEvents="none">
             {(() => {
-              const p = polar(CX, CY, LEAF_R + 16, focusedLeaf.angle);
+              const p = polar(CX, CY, LEAF_R - 14, focusedLeaf.angle);
               const text = truncateLabel(focusedLeaf.label, 26);
               const w = text.length * 7.2 + 16;
               const flip = focusedLeaf.angle > Math.PI;
@@ -533,34 +697,41 @@ export function CircularNetworkChart({
       <InsightsTooltip state={tooltip} width={wrapRect?.width ?? 0} height={wrapRect?.height ?? 0} />
 
       <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-xs">
-        {hubKeys.map((k) => (
-          <span key={`lg-${String(k)}`} className="flex items-center gap-1.5">
+        {hubs.map((h) => (
+          <span key={`lg-${h.key}`} className="flex items-center gap-1.5">
             <span
               aria-hidden="true"
               className="h-2.5 w-2.5 rounded-full"
-              style={{ background: hubColor(k) }}
+              style={{ background: hubFill(h.key) }}
             />
             <span className="text-muted-foreground">
-              {hubLabel(k)} · {hubs.get(k)?.members ?? 0}
+              {h.label} · {hubGeom.get(h.key)?.members ?? 0}
             </span>
           </span>
         ))}
       </div>
 
       <div className="mt-2 space-y-1 text-center text-xs text-muted-foreground">
+        <p>
+          Ring arcs are referral tiers. Each office has a rim bar for its volume, and a chevron
+          pointing out if it is rising or in if it is slipping.
+        </p>
         {policy.tickOnly && (
-          <p>
-            {ring.leaves.length} offices — too many to name around the ring, so names appear on
-            hover.
-          </p>
+          <p>{ring.leaves.length} offices — too many to name around the ring, so names appear on hover.</p>
         )}
         {ring.emptyGroups.length > 0 && (
           <p>No offices in {ring.emptyGroups.join(', ')} — those arcs are absent, not hidden.</p>
         )}
+        {foldedCount > 0 && (
+          <p>
+            The {foldedCount} smallest {mode === 'tags' ? 'tags' : 'campaigns'} are folded into
+            “Other” rather than given colours that could not be told apart.
+          </p>
+        )}
         {mode === 'outreach' && (
           <p>
-            Ring arcs are referral tiers; the hub colours are outreach channels. An office
-            reached more than one way links to each. Only campaigns you created are counted.
+            An office reached more than one way links to each hub. Only campaigns you created are
+            counted.
           </p>
         )}
         {mode === 'movement' && (

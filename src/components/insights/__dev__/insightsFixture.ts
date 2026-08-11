@@ -1,4 +1,11 @@
-import type { InsightsData, InsightsOffice, InsightsSource } from '@/hooks/useInsightsData';
+import type {
+  InsightsCampaign,
+  InsightsData,
+  InsightsOffice,
+  InsightsSource,
+  InsightsTag,
+} from '@/hooks/useInsightsData';
+import { bearingDegrees, distanceMiles } from '../geo';
 import { buildMonthlySeries, monthKey, type MonthlyRow } from '@/lib/officeMetrics';
 import { tierSnapshot } from '@/lib/tierSnapshot';
 import { toOutreachEvents } from '../outreach';
@@ -48,6 +55,12 @@ function axis(nowDate: Date, count: number): string[] {
   return out;
 }
 
+/** Irvine, CA — the fixtures' stand-in practice. */
+const ORIGIN = { latitude: 33.6846, longitude: -117.8265 };
+
+const TAG_NAMES = ['Key partner', 'Pediatric', 'Perio referral', 'Lunch club', 'New 2026'];
+const CAMPAIGN_NAMES = ['Spring gift drop', 'Summer lunch tour', 'Holiday cards', 'Re-engage cold'];
+
 export interface FixtureOptions {
   officeCount: number;
   otherCount?: number;
@@ -60,6 +73,12 @@ export interface FixtureOptions {
   singleTier?: boolean;
   /** One office carries most of the volume. */
   outlier?: boolean;
+  /** Strip every coordinate, to exercise the Orbit empty state. */
+  noGeo?: boolean;
+  /** Strip tags and campaigns, to exercise those network modes' empty states. */
+  noGroups?: boolean;
+  /** Cluster every office along one bearing, to exercise beeswarm relaxation. */
+  oneDirection?: boolean;
   seed?: number;
 }
 
@@ -72,6 +91,9 @@ export function makeInsightsFixture(opts: FixtureOptions, nowDate: Date): Insigh
     noOutreach = false,
     singleTier = false,
     outlier = false,
+    noGeo = false,
+    noGroups = false,
+    oneDirection = false,
     seed = 7,
   } = opts;
 
@@ -131,9 +153,43 @@ export function makeInsightsFixture(opts: FixtureOptions, nowDate: Date): Insigh
 
   const withMetrics = tierSnapshot(officeCohort, officeSeries, monthKey(nowDate), nowDate);
 
+  const tags: InsightsTag[] = noGroups
+    ? []
+    : TAG_NAMES.map((name, i) => ({ id: `tag-${i}`, name, color: null }));
+  const campaigns: InsightsCampaign[] = noGroups
+    ? []
+    : CAMPAIGN_NAMES.map((name, i) => ({
+        id: `camp-${i}`,
+        name,
+        campaignType: 'gift',
+        status: 'completed',
+      }));
+
   let officesWithNoReferrals = 0;
+  let officesWithoutLocation = 0;
+
   const offices: InsightsOffice[] = withMetrics.map((o) => {
     if (o.totalReferrals === 0) officesWithNoReferrals++;
+
+    const index = Number(o.id.split('-')[1] ?? 0);
+
+    // A plausible catchment: mostly clustered inside ten miles with a thinning tail,
+    // and (unless `oneDirection`) spread around the compass.
+    const spin = rand();
+    const bearing = oneDirection ? 115 + (spin - 0.5) * 26 : spin * 360;
+    const miles = 0.6 + Math.pow(rand(), 2.2) * 26;
+    const dLat = (miles / 69) * Math.cos((bearing * Math.PI) / 180);
+    const dLng = (miles / (69 * Math.cos((ORIGIN.latitude * Math.PI) / 180))) *
+      Math.sin((bearing * Math.PI) / 180);
+    const point = noGeo
+      ? null
+      : { latitude: ORIGIN.latitude + dLat, longitude: ORIGIN.longitude + dLng };
+    if (!point) officesWithoutLocation++;
+
+    // Many-to-many membership, so the categorical network views have real bundles.
+    const tagIds = tags.filter((_, t) => (index + t) % (3 + t) === 0).map((t) => t.id);
+    const campaignIds = campaigns.filter((_, c) => (index * 2 + c) % (4 + c) === 0).map((c) => c.id);
+
     return {
       id: o.id,
       name: o.name,
@@ -145,6 +201,11 @@ export function makeInsightsFixture(opts: FixtureOptions, nowDate: Date): Insigh
       mslr: o.mslr,
       lastActiveMonth: o.lastActiveMonth,
       monthly: visible(officeSeries, o.id),
+      distanceMiles: point ? distanceMiles(ORIGIN, point) : null,
+      bearingDeg: point ? bearingDegrees(ORIGIN, point) : null,
+      googleRating: point ? Math.round((3.4 + rand() * 1.6) * 10) / 10 : null,
+      tagIds,
+      campaignIds,
     };
   });
 
@@ -205,6 +266,9 @@ export function makeInsightsFixture(opts: FixtureOptions, nowDate: Date): Insigh
     officeCohort,
     outreach: toOutreachEvents({ visits, deliveries }),
     clinics: [{ id: 'clinic-1', name: 'Nexora Orthodontics' }],
+    origin: noGeo ? null : ORIGIN,
+    tags,
+    campaigns,
     counts: {
       offices: offices.length,
       otherSources: otherSources.length,
@@ -212,6 +276,7 @@ export function makeInsightsFixture(opts: FixtureOptions, nowDate: Date): Insigh
       deliveries: deliveries.length,
       emails: 0,
       officesWithNoReferrals,
+      officesWithoutLocation,
     },
     campaignScopeIsOwnerOnly: true,
   };
@@ -251,4 +316,20 @@ export const SCENARIOS: Scenario[] = [
   },
   { id: 'outlier', label: 'One dominant referrer', options: { officeCount: 24, outlier: true } },
   { id: 'short', label: 'Only 3 months of history', options: { officeCount: 20, months: 3 } },
+  { id: 'long', label: 'Two full years', options: { officeCount: 34, months: 24, seed: 23 } },
+  {
+    id: 'no-geo',
+    label: 'No addresses (Orbit empty)',
+    options: { officeCount: 24, noGeo: true },
+  },
+  {
+    id: 'no-groups',
+    label: 'No tags or campaigns',
+    options: { officeCount: 24, noGroups: true },
+  },
+  {
+    id: 'one-direction',
+    label: 'Catchment on one corridor',
+    options: { officeCount: 46, oneDirection: true, seed: 29 },
+  },
 ];
