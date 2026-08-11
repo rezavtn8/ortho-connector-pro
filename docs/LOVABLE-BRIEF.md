@@ -8,6 +8,8 @@ start:
 - **Paste Prompt 0 first, and re-paste it after any long session.** It stops Lovable from
   reverting the July 2026 cleanup. Several of those files are ones Lovable considers its
   own and will regenerate unless told not to.
+- **Prompt 8 is time-sensitive.** Office discovery is running on a fallback path until that
+  migration is applied. Do it before your next discovery search.
 
 ---
 
@@ -60,6 +62,41 @@ stop and tell me instead of doing it.
 
 10. Never put a secret in a VITE_-prefixed variable — those ship to the browser. Server
     secrets belong in Supabase Edge Function secrets.
+
+11. Office discovery was rebuilt in August 2026 and every point below is load-bearing. It is
+    split across supabase/functions/discover-nearby-offices/index.ts, places.ts, geo.ts and
+    classify.ts — do NOT collapse it back into a single index.ts.
+
+    a. The search TILES the area into overlapping circles and subdivides any tile that comes
+       back with a full page of results. Google caps a search at 20 results (Places API New)
+       or 60 (legacy), so a single un-tiled call silently loses most offices in a dense area.
+       Do not replace the tiling with one nearby-search call.
+    b. It uses Places API (New) — places.googleapis.com/v1/places:searchNearby and
+       :searchText — and reads address, phone, website and rating straight out of the search
+       response via the X-Goog-FieldMask. Do NOT add a per-result Place Details call back in;
+       that was ~100 extra billed requests per search. The legacy maps.googleapis.com path in
+       places.ts is an automatic fallback for projects without the New API enabled. Keep both.
+    c. Text search uses locationRestriction (a hard boundary). The legacy `radius` parameter
+       is only a ranking bias, which is why searches used to return offices 30 miles outside
+       the requested radius. Every result is then distance-checked with haversine, and
+       distance_miles is written to the database. Do not remove either check.
+    d. The edge function saves EVERY dental office inside the radius. Rating floors, "has a
+       website", office type and the specialty toggle are presentation filters applied
+       client-side in src/pages/Discover.tsx (matchesPreferences) and persisted to
+       localStorage. Do NOT move that filtering back into the edge function — it made the
+       cached result set depend on whichever filters were set on the first search.
+    e. The upsert conflict target is (discovered_by, google_place_id). Do NOT change it back
+       to google_place_id alone — see Prompt 8.
+    f. There is no `already_in_network` column and never was. `imported` is the flag for
+       "already a referral source".
+    g. The wizard has four steps and no "search strategy" dropdown. The old one offered four
+       strategies that all did exactly the same thing. Do not restore it.
+    h. discover-nearby-offices accepts force_refresh, which bypasses the 7-day cache. The
+       Refresh button depends on it.
+    i. src/utils/__tests__/discoverySearch.test.ts and
+       src/components/__tests__/DiscoveryWizard.test.tsx cover this. The tiling test asserts
+       there is no gap in coverage at any radius. If you make it fail, you have reintroduced
+       missing search results — fix the code, not the test.
 
 Confirm you have understood these before you make changes.
 ```
@@ -154,29 +191,11 @@ Do not move the auth subscription or timers out of AuthProvider.tsx while doing 
 
 ---
 
-## Prompt 4 — add a test suite
+## Prompt 4 — add a test suite ✅ done
 
-There are currently zero tests. Good fit for Lovable because it is purely additive.
-
-```
-This project has no tests and no test runner. Please add Vitest, configured for a
-Vite + React + TypeScript project, with an `npm test` script.
-
-Then write unit tests for the pure logic only — no component or integration tests yet:
-- src/utils/labelLayoutEngine.ts
-- src/utils/labelSizing.ts
-- src/utils/distanceCalculation.ts
-- src/lib/validationSchemas.ts (cover the phone and URL regexes, including rejections)
-
-Rules:
-- Test the real exported functions. Do not change the source files to make them easier to
-  test, and do not add mocks for things that are already pure.
-- If a test reveals an actual bug, STOP and tell me what you found rather than editing the
-  source to match the buggy behaviour.
-- `npm run lint` must still report 0 errors and `npm run build` must still pass.
-```
-
-**This is the prompt most likely to find real bugs.** Read what it reports carefully.
+Vitest is now configured and the suite is at 547 tests across 29 files. **Do not paste this
+prompt** — it would tell Lovable to install a test runner that already exists. Kept for the
+record only.
 
 ---
 
@@ -241,6 +260,82 @@ throughout. Right now those tables imply a permission model that nothing enforce
 If multiple staff per practice is on the roadmap, this is a real feature to finish
 deliberately. If not, say so and have the tables dropped. Either way, do it before you
 have paying customers whose data is shaped by the answer.
+
+---
+
+## Prompt 8 — finish the office discovery rebuild (do this before your next search)
+
+Office discovery was rebuilt in August 2026. Two things need database and Google Cloud
+access, which is why they are here rather than done already. **Until step 1 lands, discovery
+runs on a fallback path and two users cannot both keep the same discovered office.**
+
+### 8a — apply the constraint migration
+
+```
+supabase/migrations/20260811120000_discovered_offices_per_user_place_id.sql is committed but
+has not been applied to the live project. Please apply it and confirm the result.
+
+What it does and why it matters: discovered_offices.google_place_id had a GLOBAL unique
+constraint (discovered_offices_google_place_id_key). discovered_offices is a per-user
+discovery pool, so two clinics in the same city inevitably find the same office — and the
+upsert on that constraint rewrote discovered_by, silently transferring the row to whoever
+searched most recently. The first user's office disappeared from their list along with its
+imported flag and any group membership.
+
+The migration drops that constraint, de-duplicates any rows it was masking (keeping the most
+recent copy per user+place), and adds UNIQUE (discovered_by, google_place_id).
+
+Please:
+1. Before applying, report how many rows in discovered_offices share a google_place_id
+   across different discovered_by values. That number is how many offices were already
+   mis-assigned.
+2. Apply the migration.
+3. Confirm that discovered_offices_user_place_id_key exists and that
+   discovered_offices_google_place_id_key is gone.
+4. Confirm the idx_discovered_offices_owner_cache index was created.
+
+Do not change any application code in this task. In particular do not touch the
+onConflict: "discovered_by,google_place_id" in
+supabase/functions/discover-nearby-offices/index.ts — that is what the migration is for.
+```
+
+**Check before accepting:** the function logs a warning starting `[discover] discovered_offices
+has no UNIQUE` on every search while the old constraint is in place. Run one discovery search
+afterwards and confirm that warning is gone.
+
+### 8b — confirm Places API (New) is enabled
+
+```
+supabase/functions/discover-nearby-offices/places.ts prefers Places API (New)
+(places.googleapis.com/v1/places:searchNearby and :searchText) and falls back to the legacy
+maps.googleapis.com endpoints if the New API answers 403 PERMISSION_DENIED.
+
+The fallback is correct but costs roughly one extra billed Place Details request per office
+kept, because the legacy search response does not include phone or website.
+
+Please check the Google Cloud project behind the GOOGLE_MAPS_API_KEY Edge Function secret and
+tell me:
+1. Whether "Places API (New)" is enabled, and whether the key is restricted in a way that
+   blocks it.
+2. What the current API restrictions and quotas on that key are.
+
+Report what you find. Do not change the fallback logic in places.ts — it must keep working
+for the case where the New API is unavailable.
+```
+
+**How to verify either way:** run one discovery search and read the Edge Function logs. The
+line `[discover] N raw places via places-new in M requests` means the New API is live;
+`via places-legacy` means it fell back.
+
+### 8c — tuning knobs (no action needed, for reference)
+
+These are Edge Function secrets with sensible defaults. Set them only if you have a reason:
+
+| Secret | Default | What it does |
+| --- | --- | --- |
+| `DISCOVERY_WEEKLY_LIMIT` | 25 | Fresh (non-cached) searches per user per rolling 7 days. Shown in the wizard. |
+| `DISCOVERY_MAX_REQUESTS` | 160 | Ceiling on billed Google calls for one search. |
+| `DISCOVERY_DEADLINE_MS` | 90000 | Stop starting new Google calls after this long and return what was found. |
 
 ---
 

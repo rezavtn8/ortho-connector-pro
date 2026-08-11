@@ -35,7 +35,6 @@ interface DiscoveredOffice {
   search_distance: number;
   imported: boolean;
   distance?: number;
-  already_in_network?: boolean;
 }
 
 interface DiscoverySession {
@@ -94,9 +93,11 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
     return 'bg-muted text-muted-foreground border-border';
   };
 
-  // Separate offices into categories
-  const newOffices = offices.filter(office => !office.imported && !office.already_in_network);
-  const alreadyInNetwork = offices.filter(office => office.already_in_network || office.imported);
+  // Separate offices into categories. `imported` is the single source of truth
+  // for "already a referral source" — discovery now sets it on every office it
+  // matches against the network, on cached results too.
+  const newOffices = offices.filter(office => !office.imported);
+  const alreadyInNetwork = offices.filter(office => office.imported);
   const availableOffices = showAlreadyAdded ? offices : newOffices;
 
   // Sort offices
@@ -359,7 +360,7 @@ export const DiscoveryResults: React.FC<DiscoveryResultsProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
             {sortedOffices.map((office) => {
               const isSelected = selectedIds.includes(office.id);
-              const isInNetwork = office.already_in_network || office.imported;
+              const isInNetwork = office.imported;
               
               return (
                 <Card 

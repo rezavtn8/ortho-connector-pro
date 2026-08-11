@@ -1,27 +1,48 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MapPin, Search, Building2, ArrowRight, ArrowLeft, Navigation, Clock } from 'lucide-react';
+import {
+  MapPin, Search, Building2, ArrowRight, ArrowLeft, Navigation, Clock,
+  AlertCircle, Star, Globe, Stethoscope, Check,
+} from 'lucide-react';
 
-interface DiscoveryParams {
+/** What the search actually asks Google for. */
+export interface DiscoverySearch {
   distance: number;
-  zipCode?: string;
-  officeType?: string;
-  minRating?: number;
-  searchStrategy?: string;
-  includeSpecialties?: boolean;
-  requireWebsite?: boolean;
+  zipCode: string;
+}
+
+/**
+ * How results are presented.
+ *
+ * These never reach the edge function. Discovery saves every dental office
+ * inside the radius, and these preferences filter what you see — so changing
+ * one is instant and free instead of costing a fresh search, and the numbers
+ * on screen always match the filter that produced them.
+ */
+export interface DiscoveryPreferences {
+  officeType: string;
+  minRating: number;
+  includeSpecialties: boolean;
+  requireWebsite: boolean;
+}
+
+export interface DiscoveryUsage {
+  used: number;
+  limit: number;
+  resetsAt?: string | null;
 }
 
 interface DiscoveryWizardProps {
-  onDiscover: (params: DiscoveryParams) => Promise<void>;
+  onDiscover: (search: DiscoverySearch, preferences: DiscoveryPreferences) => Promise<void>;
   isLoading: boolean;
-  weeklyUsage: { used: number; limit: number };
-  canDiscover: boolean;
-  nextRefreshDate?: Date | null;
+  usage: DiscoveryUsage;
+  preferences: DiscoveryPreferences;
+  clinicName?: string | null;
+  hasClinicLocation: boolean;
   compact?: boolean;
 }
 
@@ -46,13 +67,6 @@ const OFFICE_TYPES = [
   { value: 'Multi-specialty', label: 'Multi-specialty' },
 ];
 
-const SEARCH_STRATEGIES = [
-  { value: 'comprehensive', label: 'Comprehensive Search', description: 'Finds all dental practices using multiple search methods' },
-  { value: 'nearby', label: 'Nearby Search', description: 'Quick search for offices in immediate vicinity' },
-  { value: 'specialty', label: 'Specialty Focus', description: 'Targets specialized dental practices' },
-  { value: 'high_rated', label: 'High-Rated Only', description: 'Focuses on highly-rated practices' },
-];
-
 const RATING_OPTIONS = [
   { value: 0, label: 'Any Rating' },
   { value: 3.5, label: '3.5+ Stars' },
@@ -60,59 +74,104 @@ const RATING_OPTIONS = [
   { value: 4.5, label: '4.5+ Stars' },
 ];
 
+const TOTAL_STEPS = 4;
+
+/**
+ * Status text while a search runs.
+ *
+ * A wide search legitimately takes 15-30 seconds because it sweeps the area in
+ * tiles. A spinner with no explanation reads as a hang, so the stages say what
+ * is happening and roughly track how long each part takes.
+ */
+const PROGRESS_STAGES = [
+  { after: 0, label: 'Locating your search area…' },
+  { after: 3, label: 'Sweeping the area for dental practices…' },
+  { after: 9, label: 'Covering dense neighbourhoods in finer detail…' },
+  { after: 16, label: 'Searching for specialists…' },
+  { after: 24, label: 'Checking each office against your network…' },
+  { after: 34, label: 'Still working — large areas take a little longer…' },
+];
+
+function useProgressLabel(isLoading: boolean): string {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!isLoading) {
+      setElapsed(0);
+      return;
+    }
+    const started = Date.now();
+    const timer = setInterval(() => setElapsed((Date.now() - started) / 1000), 1000);
+    return () => clearInterval(timer);
+  }, [isLoading]);
+
+  const stage = [...PROGRESS_STAGES].reverse().find((s) => elapsed >= s.after);
+  return stage?.label ?? PROGRESS_STAGES[0].label;
+}
+
 export const DiscoveryWizard: React.FC<DiscoveryWizardProps> = ({
   onDiscover,
   isLoading,
-  weeklyUsage,
-  canDiscover,
-  nextRefreshDate,
-  compact = false
+  usage,
+  preferences,
+  clinicName,
+  hasClinicLocation,
+  compact = false,
 }) => {
   const [currentStep, setCurrentStep] = useState(1);
-  const [params, setParams] = useState<DiscoveryParams>({
-    distance: 5,
-    zipCode: '',
-    officeType: 'all',
-    minRating: 0,
-    searchStrategy: 'comprehensive',
-    includeSpecialties: true,
-    requireWebsite: false
-  });
+  const [search, setSearch] = useState<DiscoverySearch>({ distance: 5, zipCode: '' });
+  const [draft, setDraft] = useState<DiscoveryPreferences>(preferences);
 
-  const handleNext = () => {
-    if (currentStep < 4) {
-      setCurrentStep(currentStep + 1);
-    }
-  };
+  const progressLabel = useProgressLabel(isLoading);
 
-  const handleBack = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
+  const zip = search.zipCode.trim();
+  const zipError = zip.length > 0 && !/^\d{5}$/.test(zip)
+    ? 'Enter a 5-digit ZIP code, or leave this empty to search from your clinic.'
+    : null;
+
+  // Without a clinic address and without a ZIP there is nothing to search
+  // around, so the wizard says so up front instead of failing at the last step.
+  const missingLocation = !hasClinicLocation && zip.length === 0;
+
+  const remaining = Math.max(0, usage.limit - usage.used);
+  const outOfSearches = remaining === 0;
+  const canSubmit = !isLoading && !zipError && !missingLocation && !outOfSearches;
 
   const handleDiscover = async () => {
-    await onDiscover(params);
+    if (!canSubmit) return;
+    await onDiscover({ ...search, zipCode: zip }, draft);
   };
 
-  const formatNextRefreshDate = () => {
-    if (!nextRefreshDate) return '';
-    return nextRefreshDate.toLocaleDateString('en-US', {
+  const formatResetDate = () => {
+    if (!usage.resetsAt) return null;
+    return new Date(usage.resetsAt).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
-      year: 'numeric'
     });
   };
 
+  const searchOrigin = zip
+    ? `ZIP ${zip}`
+    : clinicName
+      ? `${clinicName} (your clinic)`
+      : 'your clinic';
+
+  const activePreferences = [
+    draft.officeType !== 'all' ? OFFICE_TYPES.find((t) => t.value === draft.officeType)?.label : null,
+    draft.minRating > 0 ? `${draft.minRating}+ stars` : null,
+    draft.requireWebsite ? 'has a website' : null,
+    !draft.includeSpecialties ? 'general dentists only' : null,
+  ].filter(Boolean) as string[];
+
   return (
-    <Card className="max-w-2xl mx-auto">
-      <CardHeader>
+    <Card className={compact ? 'border-0 shadow-none' : 'max-w-2xl mx-auto'}>
+      <CardHeader className={compact ? 'px-0 pt-0' : undefined}>
         <div className="flex items-center justify-between">
           <CardTitle className="text-2xl bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
             🔍 Discovery Assistant
           </CardTitle>
           <Badge variant="outline" className="text-sm">
-            Step {currentStep} of 4
+            Step {currentStep} of {TOTAL_STEPS}
           </Badge>
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -121,22 +180,25 @@ export const DiscoveryWizard: React.FC<DiscoveryWizardProps> = ({
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-6">
+      <CardContent className={`space-y-6 ${compact ? 'px-0 pb-0' : ''}`}>
         {/* Progress Bar */}
         <div className="flex items-center gap-2">
           {[1, 2, 3, 4].map((step) => (
             <div key={step} className="flex items-center">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                step <= currentStep 
-                  ? 'bg-primary text-primary-foreground' 
-                  : 'bg-muted text-muted-foreground'
-              }`}>
+              <button
+                type="button"
+                onClick={() => setCurrentStep(step)}
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
+                  step <= currentStep
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:bg-muted-foreground/20'
+                }`}
+                aria-label={`Go to step ${step}`}
+              >
                 {step}
-              </div>
-              {step < 4 && (
-                <div className={`h-0.5 w-6 ${
-                  step < currentStep ? 'bg-primary' : 'bg-muted'
-                }`} />
+              </button>
+              {step < TOTAL_STEPS && (
+                <div className={`h-0.5 w-6 ${step < currentStep ? 'bg-primary' : 'bg-muted'}`} />
               )}
             </div>
           ))}
@@ -151,7 +213,7 @@ export const DiscoveryWizard: React.FC<DiscoveryWizardProps> = ({
                 Select Search Distance
               </h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Choose how far from your clinic to search for dental offices
+                Every dental office inside this radius is found and saved. Nothing outside it is.
               </p>
             </div>
 
@@ -159,9 +221,9 @@ export const DiscoveryWizard: React.FC<DiscoveryWizardProps> = ({
               {DISTANCE_OPTIONS.map((option) => (
                 <button
                   key={option.value}
-                  onClick={() => setParams(prev => ({ ...prev, distance: option.value }))}
+                  onClick={() => setSearch((prev) => ({ ...prev, distance: option.value }))}
                   className={`p-4 rounded-lg border-2 transition-all text-left hover:shadow-md ${
-                    params.distance === option.value
+                    search.distance === option.value
                       ? 'border-primary bg-primary/5 shadow-md'
                       : 'border-muted hover:border-primary/50'
                   }`}
@@ -171,6 +233,13 @@ export const DiscoveryWizard: React.FC<DiscoveryWizardProps> = ({
                 </button>
               ))}
             </div>
+
+            {search.distance >= 25 && (
+              <p className="text-xs text-muted-foreground flex items-start gap-2">
+                <Clock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                A {search.distance}-mile search covers a lot of ground and can take 20–40 seconds.
+              </p>
+            )}
           </div>
         )}
 
@@ -188,68 +257,73 @@ export const DiscoveryWizard: React.FC<DiscoveryWizardProps> = ({
             </div>
 
             <div className="space-y-3">
-              <div className="p-4 bg-muted/50 rounded-lg">
+              <div className={`p-4 rounded-lg ${hasClinicLocation ? 'bg-muted/50' : 'bg-destructive/5 border border-destructive/20'}`}>
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <Building2 className="w-4 h-4 text-primary" />
-                  Default: Your Clinic Location
+                  {hasClinicLocation
+                    ? `Default: ${clinicName ?? 'Your Clinic'}`
+                    : 'No clinic location on file'}
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Search will be centered around your clinic's address
+                  {hasClinicLocation
+                    ? "Search will be centered around your clinic's address"
+                    : 'Add your clinic address in Settings, or search by ZIP code below.'}
                 </p>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Override with ZIP Code (Optional)</label>
+                <label className="text-sm font-medium" htmlFor="discovery-zip">
+                  Override with ZIP Code (Optional)
+                </label>
                 <Input
+                  id="discovery-zip"
+                  inputMode="numeric"
+                  maxLength={5}
                   placeholder="Enter ZIP code to search elsewhere..."
-                  value={params.zipCode}
-                  onChange={(e) => setParams(prev => ({ ...prev, zipCode: e.target.value }))}
-                  className="max-w-xs"
+                  value={search.zipCode}
+                  onChange={(e) =>
+                    setSearch((prev) => ({ ...prev, zipCode: e.target.value.replace(/\D/g, '') }))
+                  }
+                  className={`max-w-xs ${zipError ? 'border-destructive' : ''}`}
+                  aria-invalid={zipError != null}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Leave empty to use your clinic's location
-                </p>
+                {zipError ? (
+                  <p className="text-xs text-destructive flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    {zipError}
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Leave empty to use your clinic's location
+                  </p>
+                )}
               </div>
             </div>
           </div>
         )}
 
-        {/* Step 3: Search Strategy */}
+        {/* Step 3: Result preferences */}
         {currentStep === 3 && (
           <div className="space-y-4">
             <div>
               <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                <Search className="w-5 h-5 text-primary" />
-                Search Strategy
+                <Star className="w-5 h-5 text-primary" />
+                Result Preferences
               </h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Choose how comprehensive you want the search to be
+                Narrow down what appears in your results. The search itself always looks for
+                everything, so you can change these at any time without running a new search.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {SEARCH_STRATEGIES.map((strategy) => (
-                <button
-                  key={strategy.value}
-                  onClick={() => setParams(prev => ({ ...prev, searchStrategy: strategy.value }))}
-                  className={`p-4 rounded-lg border-2 transition-all text-left hover:shadow-md ${
-                    params.searchStrategy === strategy.value
-                      ? 'border-primary bg-primary/5 shadow-md'
-                      : 'border-muted hover:border-primary/50'
-                  }`}
-                >
-                  <div className="font-medium">{strategy.label}</div>
-                  <div className="text-sm text-muted-foreground">{strategy.description}</div>
-                </button>
-              ))}
-            </div>
-
-            <div className="space-y-4 mt-6">
-              <div className="space-y-3">
+            <div className="space-y-4">
+              <div className="space-y-2">
                 <label className="text-sm font-medium">Minimum Rating</label>
                 <Select
-                  value={params.minRating?.toString()}
-                  onValueChange={(value) => setParams(prev => ({ ...prev, minRating: parseFloat(value) }))}
+                  value={draft.minRating.toString()}
+                  onValueChange={(value) =>
+                    setDraft((prev) => ({ ...prev, minRating: parseFloat(value) }))
+                  }
                 >
                   <SelectTrigger className="w-full max-w-xs">
                     <SelectValue placeholder="Select minimum rating..." />
@@ -262,40 +336,65 @@ export const DiscoveryWizard: React.FC<DiscoveryWizardProps> = ({
                     ))}
                   </SelectContent>
                 </Select>
+                {draft.minRating > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Offices Google has no rating for are hidden by this.
+                  </p>
+                )}
               </div>
 
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="includeSpecialties"
-                    checked={params.includeSpecialties}
-                    onChange={(e) => setParams(prev => ({ ...prev, includeSpecialties: e.target.checked }))}
-                    className="rounded border-muted"
-                  />
-                  <label htmlFor="includeSpecialties" className="text-sm font-medium">
-                    Include specialty practices (orthodontics, oral surgery, etc.)
-                  </label>
-                </div>
+              <label
+                htmlFor="includeSpecialties"
+                className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/40 transition-colors"
+              >
+                <input
+                  type="checkbox"
+                  id="includeSpecialties"
+                  checked={draft.includeSpecialties}
+                  onChange={(e) =>
+                    setDraft((prev) => ({ ...prev, includeSpecialties: e.target.checked }))
+                  }
+                  className="rounded border-muted mt-0.5"
+                />
+                <span>
+                  <span className="text-sm font-medium flex items-center gap-2">
+                    <Stethoscope className="w-4 h-4 text-primary" />
+                    Include specialty practices
+                  </span>
+                  <span className="block text-xs text-muted-foreground mt-0.5">
+                    Orthodontics, oral surgery, endodontics, periodontics and multi-specialty groups.
+                  </span>
+                </span>
+              </label>
 
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="requireWebsite"
-                    checked={params.requireWebsite}
-                    onChange={(e) => setParams(prev => ({ ...prev, requireWebsite: e.target.checked }))}
-                    className="rounded border-muted"
-                  />
-                  <label htmlFor="requireWebsite" className="text-sm font-medium">
+              <label
+                htmlFor="requireWebsite"
+                className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:bg-muted/40 transition-colors"
+              >
+                <input
+                  type="checkbox"
+                  id="requireWebsite"
+                  checked={draft.requireWebsite}
+                  onChange={(e) =>
+                    setDraft((prev) => ({ ...prev, requireWebsite: e.target.checked }))
+                  }
+                  className="rounded border-muted mt-0.5"
+                />
+                <span>
+                  <span className="text-sm font-medium flex items-center gap-2">
+                    <Globe className="w-4 h-4 text-primary" />
                     Only practices with websites
-                  </label>
-                </div>
-              </div>
+                  </span>
+                  <span className="block text-xs text-muted-foreground mt-0.5">
+                    Useful when you plan to research each office before reaching out.
+                  </span>
+                </span>
+              </label>
             </div>
           </div>
         )}
 
-        {/* Step 4: Office Type Filter */}
+        {/* Step 4: Office type + review */}
         {currentStep === 4 && (
           <div className="space-y-4">
             <div>
@@ -310,8 +409,8 @@ export const DiscoveryWizard: React.FC<DiscoveryWizardProps> = ({
 
             <div className="space-y-3">
               <Select
-                value={params.officeType}
-                onValueChange={(value) => setParams(prev => ({ ...prev, officeType: value }))}
+                value={draft.officeType}
+                onValueChange={(value) => setDraft((prev) => ({ ...prev, officeType: value }))}
               >
                 <SelectTrigger className="w-full max-w-xs">
                   <SelectValue placeholder="Select office type..." />
@@ -330,23 +429,57 @@ export const DiscoveryWizard: React.FC<DiscoveryWizardProps> = ({
               </div>
             </div>
 
+            {/* Review */}
+            <div className="mt-6 p-4 rounded-lg border bg-muted/30 space-y-2">
+              <div className="text-sm font-medium flex items-center gap-2">
+                <Check className="w-4 h-4 text-primary" />
+                Ready to search
+              </div>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>
+                  <span className="text-foreground font-medium">{search.distance} miles</span> around{' '}
+                  <span className="text-foreground font-medium">{searchOrigin}</span>
+                </li>
+                <li>
+                  Showing:{' '}
+                  <span className="text-foreground font-medium">
+                    {activePreferences.length > 0 ? activePreferences.join(', ') : 'every office found'}
+                  </span>
+                </li>
+              </ul>
+            </div>
+
             {/* Weekly Usage Display */}
-            <div className="mt-6 p-4 bg-muted/50 rounded-lg">
+            <div className="p-4 bg-muted/50 rounded-lg">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-medium">Weekly API Usage</span>
+                  <span className="text-sm font-medium">Fresh searches this week</span>
                 </div>
-                <Badge variant={weeklyUsage.used >= weeklyUsage.limit ? "destructive" : "secondary"}>
-                  {weeklyUsage.used} of {weeklyUsage.limit} used
+                <Badge variant={outOfSearches ? 'destructive' : 'secondary'}>
+                  {usage.used} of {usage.limit} used
                 </Badge>
               </div>
-              {!canDiscover && nextRefreshDate && (
-                <p className="text-xs text-muted-foreground mt-2">
-                  Next discovery available: {formatNextRefreshDate()}
-                </p>
-              )}
+              <p className="text-xs text-muted-foreground mt-2">
+                {outOfSearches
+                  ? `Limit reached${formatResetDate() ? ` — one frees up on ${formatResetDate()}` : ''}. Results you've already found are still available.`
+                  : 'Re-running a search you already ran this week is free — results are reused for 7 days.'}
+              </p>
             </div>
+
+            {missingLocation && (
+              <p className="text-sm text-destructive flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                Add your clinic address in Settings, or go back and enter a ZIP code to search.
+              </p>
+            )}
+          </div>
+        )}
+
+        {isLoading && (
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
+            <div className="w-4 h-4 animate-spin rounded-full border-2 border-primary border-t-transparent shrink-0" />
+            <span className="text-sm text-muted-foreground">{progressLabel}</span>
           </div>
         )}
 
@@ -354,17 +487,18 @@ export const DiscoveryWizard: React.FC<DiscoveryWizardProps> = ({
         <div className="flex items-center justify-between pt-4">
           <Button
             variant="outline"
-            onClick={handleBack}
-            disabled={currentStep === 1}
+            onClick={() => setCurrentStep((s) => Math.max(1, s - 1))}
+            disabled={currentStep === 1 || isLoading}
             className="flex items-center gap-2"
           >
             <ArrowLeft className="w-4 h-4" />
             Back
           </Button>
 
-          {currentStep < 4 ? (
+          {currentStep < TOTAL_STEPS ? (
             <Button
-              onClick={handleNext}
+              onClick={() => setCurrentStep((s) => Math.min(TOTAL_STEPS, s + 1))}
+              disabled={currentStep === 2 && zipError != null}
               className="flex items-center gap-2 bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-600/90"
             >
               Next
@@ -373,7 +507,7 @@ export const DiscoveryWizard: React.FC<DiscoveryWizardProps> = ({
           ) : (
             <Button
               onClick={handleDiscover}
-              disabled={isLoading || !canDiscover}
+              disabled={!canSubmit}
               className="flex items-center gap-2 bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-600/90"
               size="lg"
             >
@@ -383,9 +517,7 @@ export const DiscoveryWizard: React.FC<DiscoveryWizardProps> = ({
                   Discovering...
                 </>
               ) : (
-                <>
-                  🔍 Discover Offices
-                </>
+                <>🔍 Discover Offices</>
               )}
             </Button>
           )}

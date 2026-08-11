@@ -1,19 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { RefreshCw, Search, Building2, Loader2, Star, Globe, MapPin, Download } from 'lucide-react';
+import { RefreshCw, Search, Building2, Star, Globe, MapPin, Download, SlidersHorizontal, X } from 'lucide-react';
 // xlsx is ~94 kB gzipped and only needed when the user actually exports, so it is
 // imported on demand inside the handler rather than at module scope.
 import { DiscoveryWizard } from '@/components/DiscoveryWizard';
+import type {
+  DiscoveryPreferences,
+  DiscoverySearch,
+  DiscoveryUsage,
+} from '@/components/DiscoveryWizard';
 import { DiscoveryResults } from '@/components/DiscoveryResults';
 import { SelectionActionBar } from '@/components/SelectionActionBar';
 import { BulkAddToNetworkDialog } from '@/components/BulkAddToNetworkDialog';
 import { SaveToGroupDialog } from '@/components/SaveToGroupDialog';
 import { DiscoveredOfficeGroups } from '@/components/DiscoveredOfficeGroups';
-import { calculateDistance } from '@/utils/distanceCalculation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDiscoveredGroups } from '@/hooks/useDiscoveredGroups';
@@ -51,28 +56,103 @@ interface DiscoverySession {
   created_at: string;
 }
 
-interface DiscoveryParams {
-  distance: number;
-  zipCode?: string;
-  officeType?: string;
-  minRating?: number;
-  searchStrategy?: string;
-  includeSpecialties?: boolean;
-  requireWebsite?: boolean;
+const PREFERENCES_KEY = 'nexora.discovery.preferences';
+
+const DEFAULT_PREFERENCES: DiscoveryPreferences = {
+  officeType: 'all',
+  minRating: 0,
+  includeSpecialties: true,
+  requireWebsite: false,
+};
+
+const SPECIALTY_TYPES = new Set([
+  'Orthodontics',
+  'Oral Surgery',
+  'Endodontics',
+  'Periodontics',
+  'Multi-specialty',
+]);
+
+/**
+ * Result preferences survive a reload.
+ *
+ * They used to live only inside the wizard, so a filter you chose was applied
+ * once to the search response and then silently dropped the next time the page
+ * loaded every discovered office straight from the database.
+ */
+function loadPreferences(): DiscoveryPreferences {
+  try {
+    const stored = localStorage.getItem(PREFERENCES_KEY);
+    return stored ? { ...DEFAULT_PREFERENCES, ...JSON.parse(stored) } : DEFAULT_PREFERENCES;
+  } catch {
+    return DEFAULT_PREFERENCES;
+  }
+}
+
+/**
+ * Distance shown in the results.
+ *
+ * `distance_miles` is measured from the point the search actually ran at, which
+ * is the clinic for a normal search and the ZIP code for an override. The page
+ * used to recompute it from the clinic every time, so a ZIP-code search
+ * reported how far each office was from a clinic it had nothing to do with.
+ */
+function withDistance(office: any) {
+  return {
+    ...office,
+    distance: office.distance_miles ?? undefined,
+  };
+}
+
+/** "3 days", "20 minutes" — how old a cached result set is. */
+function formatAge(seconds: number): string {
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${Math.max(1, minutes)} minute${minutes === 1 ? '' : 's'}`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 36) return `${hours} hour${hours === 1 ? '' : 's'}`;
+  return `${Math.round(hours / 24)} days`;
+}
+
+/** Does this office match the user's result preferences? */
+function matchesPreferences(office: any, prefs: DiscoveryPreferences): boolean {
+  if (prefs.officeType !== 'all' && office.office_type !== prefs.officeType) return false;
+  if (prefs.minRating > 0 && (office.google_rating ?? 0) < prefs.minRating) return false;
+  if (prefs.requireWebsite && !office.website) return false;
+  if (!prefs.includeSpecialties && SPECIALTY_TYPES.has(office.office_type)) return false;
+  return true;
+}
+
+/**
+ * The JSON body of a failed edge function call.
+ *
+ * supabase-js turns any non-2xx response into a FunctionsHttpError whose
+ * message is just the status line; the server's explanation — an invalid ZIP,
+ * the weekly limit, a missing clinic — is only in the attached response.
+ */
+async function readErrorBody(error: unknown): Promise<any | null> {
+  const response = (error as any)?.context;
+  if (!response || typeof response.json !== 'function') return null;
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
 }
 
 export const Discover = () => {
   const [currentSession, setCurrentSession] = useState<DiscoverySession | null>(null);
   const [discoveredOffices, setDiscoveredOffices] = useState<DiscoveredOffice[]>([]);
   const [cacheMetadata, setCacheMetadata] = useState<{ cacheAge?: number; expiresIn?: number } | null>(null);
-  
+
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingFromDB, setIsLoadingFromDB] = useState(true);
-  const [weeklyUsage, setWeeklyUsage] = useState({ used: 0, limit: 999 });
-  const [canDiscover, setCanDiscover] = useState(true);
-  const [nextRefreshDate, setNextRefreshDate] = useState<Date | null>(null);
+  const [usage, setUsage] = useState<DiscoveryUsage>({ used: 0, limit: 25, resetsAt: null });
+  const [preferences, setPreferences] = useState<DiscoveryPreferences>(loadPreferences);
   const [clinicLocation, setClinicLocation] = useState<{ lat: number; lng: number } | null>(null);
-  
+  const [clinicName, setClinicName] = useState<string | null>(null);
+  const [clinicId, setClinicId] = useState<string | null>(null);
+  const [lastSearch, setLastSearch] = useState<DiscoverySearch | null>(null);
+
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showBulkAddDialog, setShowBulkAddDialog] = useState(false);
   const [showNewSearchDialog, setShowNewSearchDialog] = useState(false);
@@ -87,7 +167,7 @@ export const Discover = () => {
   useEffect(() => {
     if (user) {
       loadUserProfile();
-      loadWeeklyUsage();
+      loadUsage();
       loadDiscoveredOfficesFromDB();
     }
   }, [user]);
@@ -115,37 +195,7 @@ export const Discover = () => {
       if (error) throw error;
 
       if (offices && offices.length > 0) {
-        const { data: profile } = await supabase
-          .from('user_profiles')
-          .select('clinic_id')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        let clinicLat: number | null = null;
-        let clinicLng: number | null = null;
-
-        if (profile?.clinic_id) {
-          const { data: clinic } = await supabase
-            .from('clinics')
-            .select('latitude, longitude')
-            .eq('id', profile.clinic_id)
-            .maybeSingle();
-
-          if (clinic) {
-            clinicLat = clinic.latitude;
-            clinicLng = clinic.longitude;
-            setClinicLocation({ lat: clinic.latitude!, lng: clinic.longitude! });
-          }
-        }
-
-        const officesWithDistance = offices.map((office: any) => {
-          const distance = office.latitude && office.longitude && clinicLat && clinicLng
-            ? calculateDistance(clinicLat, clinicLng, office.latitude, office.longitude)
-            : undefined;
-          return { ...office, distance };
-        });
-
-        setDiscoveredOffices(officesWithDistance);
+        setDiscoveredOffices(offices.map(withDistance));
 
         const { data: latestSession } = await supabase
           .from('discovery_sessions')
@@ -190,16 +240,20 @@ export const Discover = () => {
         return;
       }
 
+      setClinicId(profile.clinic_id);
+
       const { data: clinic } = await supabase
         .from('clinics')
-        .select('latitude, longitude')
+        .select('name, latitude, longitude')
         .eq('id', profile.clinic_id)
         .maybeSingle();
 
+      if (clinic?.name) setClinicName(clinic.name);
+
       if (clinic?.latitude && clinic?.longitude) {
-        setClinicLocation({ 
-          lat: clinic.latitude, 
-          lng: clinic.longitude 
+        setClinicLocation({
+          lat: clinic.latitude,
+          lng: clinic.longitude
         });
       }
     } catch (error) {
@@ -207,174 +261,180 @@ export const Discover = () => {
     }
   };
 
-  const loadWeeklyUsage = async () => {
+  /**
+   * Fresh searches run in the last 7 days.
+   *
+   * The counter used to be hard-coded to "0 of 999", so the wizard displayed a
+   * usage figure that was never once true.
+   */
+  const loadUsage = async () => {
     if (!user) return;
-    setWeeklyUsage({ used: 0, limit: 999 });
-    setCanDiscover(true);
-    setNextRefreshDate(null);
+
+    const windowStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase
+      .from('discovery_sessions')
+      .select('created_at')
+      .eq('user_id', user.id)
+      .eq('api_call_made', true)
+      .gte('created_at', windowStart)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Error loading discovery usage:', error);
+      return;
+    }
+
+    const oldest = data?.[0]?.created_at;
+    setUsage((prev) => ({
+      used: data?.length ?? 0,
+      limit: prev.limit,
+      resetsAt: oldest
+        ? new Date(new Date(oldest).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString()
+        : null,
+    }));
   };
 
-  const callGooglePlacesAPI = async (params: DiscoveryParams): Promise<void> => {
-    if (!user || !clinicLocation) return;
+  const runDiscovery = async (search: DiscoverySearch, forceRefresh: boolean): Promise<void> => {
+    if (!user) return;
+
+    if (!clinicId) {
+      toast({
+        title: 'Clinic not set up',
+        description: 'Please set up your clinic information in Settings first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!clinicLocation && !search.zipCode) {
+      toast({
+        title: 'No search location',
+        description: 'Add your clinic address in Settings, or search by ZIP code.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     try {
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('clinic_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile?.clinic_id) {
-        toast({
-          title: "Error",
-          description: "Please set up your clinic information in Settings first.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      const requestBody = {
-        clinic_id: profile.clinic_id,
-        distance: params.distance,
-        search_lat: clinicLocation.lat,
-        search_lng: clinicLocation.lng,
-        office_type_filter: params.officeType === 'all' ? null : params.officeType,
-        zip_code_override: params.zipCode || null,
-        min_rating: params.minRating || 0,
-        search_strategy: params.searchStrategy || 'comprehensive',
-        include_specialties: params.includeSpecialties ?? true,
-        require_website: params.requireWebsite ?? false
-      };
-
       const { data, error } = await supabase.functions.invoke('discover-nearby-offices', {
-        body: requestBody
+        body: {
+          clinic_id: clinicId,
+          distance: search.distance,
+          search_lat: clinicLocation?.lat,
+          search_lng: clinicLocation?.lng,
+          zip_code_override: search.zipCode || null,
+          force_refresh: forceRefresh,
+        },
       });
 
-      if (error) {
-        const errMsg = String((error as any)?.message || '');
-        if (errMsg.includes('429') || /rate\s*limit/i.test(errMsg)) {
-          toast({
-            title: "Rate Limited",
-            description: "You've reached the weekly discovery limit. Try again later.",
-            variant: "destructive"
-          });
-          await loadWeeklyUsage();
-          return;
-        }
-        
+      // A non-2xx edge function response arrives as an error with the body
+      // attached, so the server's actual explanation is read out of it rather
+      // than replaced with a generic "please try again".
+      const payload = data ?? (await readErrorBody(error));
+
+      if (payload?.usage) setUsage((prev) => ({ ...prev, ...payload.usage }));
+
+      if (!payload?.success) {
         toast({
-          title: "Error", 
-          description: "Failed to discover offices. Please try again.",
-          variant: "destructive"
+          title: payload?.usage && payload.usage.used >= payload.usage.limit
+            ? 'Weekly search limit reached'
+            : 'Discovery failed',
+          description: payload?.error || 'Could not reach the discovery service. Please try again.',
+          variant: 'destructive',
         });
         return;
       }
 
-      if (!data?.success) {
-        if (data?.error?.includes('Weekly discovery limit')) {
-          toast({
-            title: "Rate Limited",
-            description: data.error,
-            variant: "destructive"
-          });
-          await loadWeeklyUsage();
-        } else {
-          toast({
-            title: "Error",
-            description: data?.error || "Failed to discover offices",
-            variant: "destructive"
-          });
-        }
-        return;
-      }
+      setCacheMetadata(
+        payload.cached ? { cacheAge: payload.cacheAge, expiresIn: payload.expiresIn } : null,
+      );
 
-      const officesCount = data.offices?.length || 0;
-      
-      if (data.cached && data.cacheAge !== undefined && data.expiresIn !== undefined) {
-        setCacheMetadata({
-          cacheAge: data.cacheAge,
-          expiresIn: data.expiresIn
-        });
-      } else {
-        setCacheMetadata(null);
-      }
-      
-      const newCount = data.newOfficesCount || 0;
-      toast({
-        title: "Offices Found",
-        description: newCount > 0 
-          ? `Found ${newCount} new offices nearby`
-          : `Found ${officesCount} offices matching your criteria`,
+      const offices: DiscoveredOffice[] = (payload.offices || []).map(withDistance);
+      setDiscoveredOffices(offices);
+
+      setCurrentSession({
+        id: payload.sessionId || 'temp-' + Date.now(),
+        search_distance: search.distance,
+        search_lat: payload.searchCenter?.lat ?? clinicLocation?.lat ?? 0,
+        search_lng: payload.searchCenter?.lng ?? clinicLocation?.lng ?? 0,
+        office_type_filter: undefined,
+        zip_code_override: search.zipCode || undefined,
+        results_count: offices.length,
+        api_call_made: !payload.cached,
+        created_at: new Date().toISOString(),
       });
 
-      const officesWithDistance = (data.offices || []).map((office: any) => {
-        const distance = office.latitude && office.longitude ? calculateDistance(
-          clinicLocation.lat, clinicLocation.lng, office.latitude, office.longitude
-        ) : undefined;
-        return { ...office, distance };
-      });
-
-      setDiscoveredOffices(officesWithDistance);
-
-      const session: DiscoverySession = {
-        id: data.sessionId || 'temp-' + Date.now(),
-        search_distance: params.distance,
-        search_lat: clinicLocation.lat,
-        search_lng: clinicLocation.lng,
-        office_type_filter: params.officeType === 'all' ? undefined : params.officeType,
-        zip_code_override: params.zipCode || undefined,
-        results_count: officesCount,
-        api_call_made: !data.cached,
-        created_at: new Date().toISOString()
-      };
-
-      setCurrentSession(session);
       setShowNewSearchDialog(false);
-      
-      if (!data.cached) {
-        await loadWeeklyUsage();
+
+      toast({
+        title: offices.length > 0 ? 'Search complete' : 'No offices found',
+        description: payload.message,
+        variant: offices.length > 0 ? 'default' : 'destructive',
+      });
+
+      // Coverage gaps and Google-side failures are reported rather than passed
+      // off as a complete result set.
+      const diagnostics = payload.diagnostics;
+      if (diagnostics?.failedRequests > 0 || diagnostics?.coverageIncomplete) {
+        console.warn('[discover] partial coverage', diagnostics);
+        toast({
+          title: 'Partial results',
+          description:
+            'Some searches did not complete, so a few offices may be missing. Refresh to try again.',
+          variant: 'destructive',
+        });
       }
 
+      if (!payload.cached) await loadUsage();
     } catch (error) {
-      console.error('Error in callGooglePlacesAPI:', error);
+      console.error('Error running discovery:', error);
       toast({
-        title: "Error",
-        description: "Failed to discover offices. Please try again.",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to discover offices. Please try again.',
+        variant: 'destructive',
       });
     }
   };
 
-  const handleDiscover = async (params: DiscoveryParams, forceRefresh = false) => {
+  const handleDiscover = async (search: DiscoverySearch, prefs: DiscoveryPreferences) => {
+    setLastSearch(search);
+    savePreferences(prefs);
     setIsLoading(true);
     try {
-      await callGooglePlacesAPI(params);
-    } catch (error) {
-      console.error('Error in handleDiscover:', error);
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred during discovery",
-        variant: "destructive"
-      });
+      await runDiscovery(search, false);
     } finally {
       setIsLoading(false);
     }
   };
 
+  /**
+   * Re-run the last search against Google, bypassing the cache.
+   *
+   * "Refresh" previously called the same endpoint with the same arguments,
+   * which hit the 7-day cache and returned the identical rows — the button
+   * spun and changed nothing.
+   */
   const handleForceRefresh = async () => {
-    if (!currentSession) return;
-    
-    const params: DiscoveryParams = {
-      distance: currentSession.search_distance,
-      zipCode: currentSession.zip_code_override || undefined,
-      officeType: currentSession.office_type_filter || 'all',
-      minRating: 0,
-      searchStrategy: 'comprehensive',
-      includeSpecialties: true,
-      requireWebsite: false
+    const search: DiscoverySearch = lastSearch ?? {
+      distance: currentSession?.search_distance ?? 5,
+      zipCode: currentSession?.zip_code_override ?? '',
     };
-    
-    await handleDiscover(params, true);
+
+    setIsLoading(true);
+    try {
+      await runDiscovery(search, true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const savePreferences = (prefs: DiscoveryPreferences) => {
+    setPreferences(prefs);
+    try {
+      localStorage.setItem(PREFERENCES_KEY, JSON.stringify(prefs));
+    } catch {
+      // A full or disabled localStorage is not a reason to fail the search.
+    }
   };
 
   const handleOfficeAdded = async () => {
@@ -481,9 +541,24 @@ export const Discover = () => {
   const selectedNames = selectedOffices.map(o => o.name);
 
   // Filter offices by active group
-  const displayedOffices = activeGroupId
+  const groupOffices = activeGroupId
     ? discoveredOffices.filter(o => activeGroupMemberIds.includes(o.id))
     : discoveredOffices;
+
+  // …then by the result preferences, which is the only place they are applied.
+  const displayedOffices = useMemo(
+    () => groupOffices.filter(o => matchesPreferences(o, preferences)),
+    [groupOffices, preferences],
+  );
+
+  const hiddenByPreferences = groupOffices.length - displayedOffices.length;
+
+  const activePreferenceLabels = [
+    preferences.officeType !== 'all' ? preferences.officeType : null,
+    preferences.minRating > 0 ? `${preferences.minRating}+ stars` : null,
+    preferences.requireWebsite ? 'Has website' : null,
+    !preferences.includeSpecialties ? 'General dentists only' : null,
+  ].filter(Boolean) as string[];
 
   const handleExportExcel = async () => {
     const XLSX = await import('xlsx');
@@ -629,11 +704,16 @@ export const Discover = () => {
                 <Download className="w-4 h-4" />
                 Export Excel
               </Button>
-              <Button 
+              <Button
                 onClick={handleForceRefresh}
                 variant="outline"
                 disabled={isLoading}
                 className="flex items-center gap-2"
+                title={
+                  cacheMetadata?.cacheAge != null
+                    ? `These results were found ${formatAge(cacheMetadata.cacheAge)} ago. Refresh asks Google again.`
+                    : 'Search Google again, ignoring saved results'
+                }
               >
                 <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                 Refresh
@@ -652,15 +732,43 @@ export const Discover = () => {
                   <DiscoveryWizard
                     onDiscover={handleDiscover}
                     isLoading={isLoading}
-                    weeklyUsage={weeklyUsage}
-                    canDiscover={canDiscover}
-                    nextRefreshDate={nextRefreshDate}
+                    usage={usage}
+                    preferences={preferences}
+                    clinicName={clinicName}
+                    hasClinicLocation={clinicLocation != null}
                     compact
                   />
                 </DialogContent>
               </Dialog>
             </div>
           </div>
+
+          {/* Active result preferences — visible, so nothing is hidden silently */}
+          {activePreferenceLabels.length > 0 && (
+            <Card className="border-primary/30 bg-primary/5">
+              <CardContent className="p-3 flex items-center gap-3 flex-wrap">
+                <SlidersHorizontal className="w-4 h-4 text-primary shrink-0" />
+                <span className="text-sm text-muted-foreground">Showing only:</span>
+                {activePreferenceLabels.map((label) => (
+                  <Badge key={label} variant="secondary">{label}</Badge>
+                ))}
+                {hiddenByPreferences > 0 && (
+                  <span className="text-sm text-muted-foreground">
+                    {hiddenByPreferences} office{hiddenByPreferences === 1 ? '' : 's'} hidden
+                  </span>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="ml-auto"
+                  onClick={() => savePreferences(DEFAULT_PREFERENCES)}
+                >
+                  <X className="w-4 h-4 mr-1" />
+                  Show all
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Group Selector */}
           {groups.length > 0 && (
@@ -681,9 +789,10 @@ export const Discover = () => {
         <DiscoveryWizard
           onDiscover={handleDiscover}
           isLoading={isLoading}
-          weeklyUsage={weeklyUsage}
-          canDiscover={canDiscover}
-          nextRefreshDate={nextRefreshDate}
+          usage={usage}
+          preferences={preferences}
+          clinicName={clinicName}
+          hasClinicLocation={clinicLocation != null}
         />
       ) : (
         <DiscoveryResults
