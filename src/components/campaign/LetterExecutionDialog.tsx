@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { nowISO } from '@/lib/dateSync';
 import jsPDF from 'jspdf';
 
 interface Campaign {
@@ -49,6 +50,15 @@ interface LetterDelivery {
   primary_contact?: string;
 }
 
+interface SenderContext {
+  sender_name: string;
+  sender_degrees: string;
+  sender_title: string;
+  clinic_name: string;
+  clinic_address: string;
+  logo_url: string | null;
+}
+
 interface LetterStyle {
   fontFamily: string;
   fontSize: number;
@@ -73,6 +83,9 @@ const FONT_OPTIONS = [
   { value: '"Segoe UI", Roboto, sans-serif', label: 'Segoe UI' },
 ];
 
+/** Letters saved per round of parallel writes. */
+const WRITE_BATCH = 8;
+
 const MARGIN_OPTIONS = {
   compact: { x: 40, y: 40, label: 'Compact' },
   standard: { x: 60, y: 60, label: 'Standard' },
@@ -94,8 +107,8 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
   const [exportingPdf, setExportingPdf] = useState(false);
   const [cachedTemplates, setCachedTemplates] = useState<CachedLetterTemplates | null>(null);
 
-  const [senderContext, setSenderContext] = useState({
-    sender_name: '', sender_degrees: '', sender_title: '', clinic_name: '', clinic_address: '', logo_url: '' as string | null,
+  const [senderContext, setSenderContext] = useState<SenderContext>({
+    sender_name: '', sender_degrees: '', sender_title: '', clinic_name: '', clinic_address: '', logo_url: null,
   });
 
   const [style, setStyle] = useState<LetterStyle>({
@@ -178,28 +191,53 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
       .eq('id', campaign.id);
   };
 
+  /**
+   * Fill one tier template per office and save them.
+   *
+   * Writes go out in parallel batches; this used to be a strictly sequential loop, so
+   * a 40-office campaign spent 40 round trips in a row before showing anything.
+   */
+  const personalizeAndSave = async (
+    templates: { tier: string; body: string }[],
+    context: SenderContext,
+  ) => {
+    const tierTemplates = new Map<string, string>();
+    templates.forEach(t => tierTemplates.set(t.tier, t.body));
+
+    const updates = deliveries.map(delivery => {
+      const tier = delivery.referral_tier || 'Cold';
+      const template = tierTemplates.get(tier) || tierTemplates.values().next().value || '';
+      const info = extractDoctorInfo(delivery);
+      const body = template
+        .replace(/\{\{doctor_name\}\}/g, info.displayName)
+        .replace(/\{\{office_name\}\}/g, delivery.office.name)
+        .replace(/\{\{clinic_name\}\}/g, context.clinic_name)
+        .replace(/\{\{sender_name\}\}/g, context.sender_name);
+
+      return { id: delivery.id, body };
+    });
+
+    for (let i = 0; i < updates.length; i += WRITE_BATCH) {
+      const results = await Promise.all(
+        updates.slice(i, i + WRITE_BATCH).map(update =>
+          supabase
+            .from('campaign_deliveries')
+            .update({ email_body: update.body, email_status: 'ready' })
+            .eq('id', update.id),
+        ),
+      );
+      const failure = results.find(r => r.error);
+      if (failure?.error) throw new Error(failure.error.message);
+    }
+  };
+
   const applyTemplates = async (templates: { tier: string; body: string }[]) => {
     if (!deliveries.length || !templates.length) return;
     setGenerating(true);
     try {
-      const tierTemplates = new Map<string, string>();
-      templates.forEach(t => tierTemplates.set(t.tier, t.body));
-
-      for (const delivery of deliveries) {
-        const tier = delivery.referral_tier || 'Cold';
-        const template = tierTemplates.get(tier) || tierTemplates.values().next().value || '';
-        const info = extractDoctorInfo(delivery);
-        const body = template
-          .replace(/\{\{doctor_name\}\}/g, info.displayName)
-          .replace(/\{\{office_name\}\}/g, delivery.office.name)
-          .replace(/\{\{clinic_name\}\}/g, senderContext.clinic_name)
-          .replace(/\{\{sender_name\}\}/g, senderContext.sender_name);
-
-        await supabase.from('campaign_deliveries')
-          .update({ email_body: body, email_status: 'ready' })
-          .eq('id', delivery.id);
-      }
+      await personalizeAndSave(templates, senderContext);
       await fetchDeliveries();
+      onCampaignUpdated();
       toast({ title: "Templates Applied", description: `${deliveries.length} letters personalized from cached templates` });
     } catch (err: any) {
       toast({ title: "Apply Failed", description: err.message, variant: "destructive" });
@@ -254,8 +292,16 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
         }
       });
 
+      // An office deleted after the campaign was built comes back as a null join;
+      // every downstream reader assumes `office.name` exists.
       setDeliveries((data || []).map((d: any) => ({
         ...d,
+        office: {
+          name: d.office?.name ?? 'Office removed',
+          address: d.office?.address ?? undefined,
+          source_type: d.office?.source_type ?? 'Office',
+          email: d.office?.email ?? undefined,
+        },
         primary_contact: contactMap.get(d.office_id) || undefined,
       })));
     } catch {
@@ -276,39 +322,28 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
       if (error) throw error;
       if (!data.success) throw new Error(data.error || 'Generation failed');
 
-      const tierTemplates = new Map<string, string>();
-      data.letters.forEach((l: any) => tierTemplates.set(l.tier, l.body));
-
       // Cache the raw tier templates in the campaign
       await saveCachedTemplates(data.letters);
 
-      if (data.context) {
-        setSenderContext(prev => ({
-          ...prev,
-          sender_name: data.context.sender_name || prev.sender_name,
-          sender_degrees: data.context.sender_degrees || prev.sender_degrees,
-          sender_title: data.context.sender_title || prev.sender_title,
-          clinic_name: data.context.clinic_name || prev.clinic_name,
-        }));
-      }
+      // Merge the returned context *before* substituting. Reading `senderContext`
+      // straight after `setSenderContext` used the pre-update state, so the clinic and
+      // sender placeholders were filled from the stale values.
+      const effective: SenderContext = data.context
+        ? {
+            ...senderContext,
+            sender_name: data.context.sender_name || senderContext.sender_name,
+            sender_degrees: data.context.sender_degrees || senderContext.sender_degrees,
+            sender_title: data.context.sender_title || senderContext.sender_title,
+            clinic_name: data.context.clinic_name || senderContext.clinic_name,
+          }
+        : senderContext;
 
-      for (const delivery of deliveries) {
-        const tier = delivery.referral_tier || 'Cold';
-        const template = tierTemplates.get(tier) || tierTemplates.values().next().value || '';
+      if (data.context) setSenderContext(effective);
 
-        const info = extractDoctorInfo(delivery);
-        const body = template
-          .replace(/\{\{doctor_name\}\}/g, info.displayName)
-          .replace(/\{\{office_name\}\}/g, delivery.office.name)
-          .replace(/\{\{clinic_name\}\}/g, senderContext.clinic_name)
-          .replace(/\{\{sender_name\}\}/g, senderContext.sender_name);
-
-        await supabase.from('campaign_deliveries')
-          .update({ email_body: body, email_status: 'ready' })
-          .eq('id', delivery.id);
-      }
+      await personalizeAndSave(data.letters, effective);
 
       await fetchDeliveries();
+      onCampaignUpdated();
       toast({ title: "Letters Generated", description: `${deliveries.length} personalized letters ready` });
     } catch (err: any) {
       toast({ title: "Generation Failed", description: err.message, variant: "destructive" });
@@ -338,12 +373,40 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
 
   const current = deliveries[currentIndex];
   const lettersGenerated = deliveries.some(d => d.email_body);
+  const unmailed = deliveries.filter(d => d.email_body && d.email_status !== 'sent');
+
+  /**
+   * Close the loop on a letter campaign. Printing and posting happen off-platform, so
+   * without this the campaign has no way to record that the letters actually went out.
+   */
+  const markAllMailed = async () => {
+    if (!unmailed.length) return;
+    const { error } = await supabase
+      .from('campaign_deliveries')
+      .update({ email_status: 'sent', email_sent_at: nowISO() })
+      .in('id', unmailed.map(d => d.id));
+
+    if (error) {
+      toast({ title: "Could not update", description: error.message, variant: "destructive" });
+      return;
+    }
+    await fetchDeliveries();
+    onCampaignUpdated();
+    toast({ title: "Marked as mailed", description: `${unmailed.length} letters logged as sent` });
+  };
 
   const saveEdit = async () => {
     if (!current) return;
     setSaving(true);
     try {
-      await supabase.from('campaign_deliveries').update({ email_body: editedBody }).eq('id', current.id);
+      const { error } = await supabase
+        .from('campaign_deliveries')
+        .update({ email_body: editedBody })
+        .eq('id', current.id);
+      if (error) {
+        toast({ title: "Could not save", description: error.message, variant: "destructive" });
+        return;
+      }
       setEditing(false);
       await fetchDeliveries();
       toast({ title: "Letter Updated" });
@@ -573,6 +636,11 @@ export function LetterExecutionDialog({ campaign, open, onOpenChange, onCampaign
                 <Button variant="outline" size="sm" onClick={exportPdf} disabled={exportingPdf} className="gap-1.5">
                   <Download className="w-3.5 h-3.5" /> {exportingPdf ? 'Exporting...' : 'Export PDF'}
                 </Button>
+                {unmailed.length > 0 && (
+                  <Button variant="outline" size="sm" onClick={markAllMailed} className="gap-1.5">
+                    <Check className="w-3.5 h-3.5" /> Mark {unmailed.length} as mailed
+                  </Button>
+                )}
               </>
             )}
             <div className="flex-1" />
