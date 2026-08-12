@@ -114,16 +114,24 @@ export default function ReviewMagic() {
         body: { clinic_id: clinicData.id },
       });
 
-      if (error) throw error;
+      // supabase-js drops the response body on a non-2xx, so dig it back out
+      // of the raw response — that's where Google's actual reason lives.
+      let payload: any = data;
+      if (error) {
+        payload = await (error as any)?.context?.json?.().catch(() => null);
+        if (!payload) throw error;
+      }
 
-      const result = (data as any)?.results?.[0];
+      if (payload?.error) throw new Error(payload.error);
+
+      const result = payload?.results?.[0];
       if (!result?.success) {
         throw new Error(result?.error || 'Failed to sync reviews');
       }
 
       toast({
         title: "Success",
-        description: `Reviews synced successfully (${result.reviews_fetched ?? 0} fetched)`,
+        description: `Reviews synced successfully (${result.reviews_fetched ?? 0} fetched from ${result.locations ?? 0} location${result.locations === 1 ? '' : 's'})`,
       });
 
       await loadReviews(clinicData.id);
@@ -133,6 +141,7 @@ export default function ReviewMagic() {
         title: "Sync Failed",
         description: error.message || "Failed to sync reviews",
         variant: "destructive",
+        duration: 15000,
       });
     } finally {
       setSyncing(false);

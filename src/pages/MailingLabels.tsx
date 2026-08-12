@@ -1,19 +1,49 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { EditableCell } from '@/components/EditableCell';
+import { InlineEditCell } from '@/components/InlineEditCell';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Download, Search, FileSpreadsheet, MapPin, CheckCircle2, Loader2, FileText, FileDown, RotateCcw, Pencil, X, Check, ArrowLeft, FolderOpen } from 'lucide-react';
-import { downloadLabelsPDF } from '@/utils/pdfLabelGenerator';
+import { Separator } from '@/components/ui/separator';
+import {
+  Download,
+  Search,
+  MapPin,
+  CheckCircle2,
+  Loader2,
+  Printer,
+  FileDown,
+  RotateCcw,
+  ArrowLeft,
+  FolderOpen,
+  AlertTriangle,
+  Copy,
+  Settings2,
+  X,
+} from 'lucide-react';
+import {
+  buildPrintQueue,
+  downloadLabelsPDF,
+  AVERY_TEMPLATES,
+  type LabelData,
+} from '@/utils/pdfLabelGenerator';
 import { useOffices } from '@/hooks/useOffices';
 import { useDiscoveredGroups } from '@/hooks/useDiscoveredGroups';
-import { useQuery } from '@tanstack/react-query';
+import { useLabelPrintSettings, type LabelNameFormat } from '@/hooks/useLabelPrintSettings';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import {
+  parseAddress,
+  extractContactName,
+  isIncomplete,
+  missingFields,
+  markDuplicates,
+  type LabelRow,
+} from '@/lib/mailingLabels';
 // xlsx is ~94 kB gzipped and only needed when the user actually exports, so it is
 // imported on demand inside the handler rather than at module scope.
 import {
@@ -24,6 +54,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   Table,
   TableBody,
   TableCell,
@@ -32,991 +68,1127 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from '@/components/ui/alert';
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { AddressCorrectionDialog } from '@/components/AddressCorrectionDialog';
 import { MailingLabelPreview } from '@/components/MailingLabelPreview';
+import { LabelCustomizationDialog } from '@/components/LabelCustomizationDialog';
 
-interface ParsedAddress {
-  address1: string;
-  address2: string;
-  city: string;
-  state: string;
-  zip: string;
-}
+type SourceFilter = 'all' | 'partner' | 'discovered' | 'group';
+type SortKey = 'name' | 'city' | 'zip';
+type IssueView = 'all' | 'incomplete' | 'duplicates';
 
-interface MailingLabelData {
-  officeName: string;
-  contactName: string;
-  address1: string;
-  address2: string;
-  city: string;
-  state: string;
-  zip: string;
-}
+type DecoratedRow = LabelRow & { isDuplicate: boolean; incomplete: boolean };
 
-// PHASE 1: Enhanced address parsing with proper handling of "United States" suffix
-const parseAddress = (address: string | null): ParsedAddress => {
-  if (!address) {
-    return { address1: '', address2: '', city: '', state: '', zip: '' };
-  }
+const TIERS = ['VIP', 'Warm', 'Cold', 'Dormant'] as const;
 
-  // Clean up address - remove "United States" or "USA" from the end
-  let cleanAddress = address.trim();
-  cleanAddress = cleanAddress.replace(/,?\s*(United States|USA)\s*$/i, '');
-  
-  // Split by comma
-  const parts = cleanAddress.split(',').map(p => p.trim());
-  
-  let address1 = '';
-  let address2 = '';
-  let city = '';
-  let state = '';
-  let zip = '';
-
-  if (parts.length >= 2) {
-    // Get the last part which should contain state and zip
-    const lastPart = parts[parts.length - 1];
-    
-    // Match patterns like "CA 92618" or "CA 92618-1234"
-    const stateZipMatch = lastPart.match(/^([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
-    
-    if (stateZipMatch) {
-      state = stateZipMatch[1];
-      zip = stateZipMatch[2];
-      
-      // City is the second-to-last part
-      if (parts.length >= 2) {
-        city = parts[parts.length - 2].trim();
-      }
-      
-      // Everything before city is address
-      const addressParts = parts.slice(0, parts.length - 2);
-      
-      if (addressParts.length > 0) {
-        const fullAddress = addressParts.join(', ').trim();
-        
-        // Try to split street address from suite/unit/apt
-        // Match patterns: "#170-B", "Suite 100", "STE 300", "Unit A", etc.
-        const suiteMatch = fullAddress.match(/^(.*?)\s+(Suite|Unit|Apt|Ste|STE|Building|Bldg|#)\s*(.+)$/i);
-        
-        if (suiteMatch) {
-          address1 = suiteMatch[1].trim();
-          const suiteType = suiteMatch[2].trim();
-          const suiteNum = suiteMatch[3].trim();
-          // Normalize the suite format
-          if (suiteType === '#') {
-            address2 = `#${suiteNum}`;
-          } else {
-            address2 = `${suiteType.charAt(0).toUpperCase() + suiteType.slice(1).toLowerCase()} ${suiteNum}`;
-          }
-        } else {
-          address1 = fullAddress;
-        }
-      }
-    } else {
-      // Fallback: couldn't parse state/zip from last part
-      // Try to find state and zip anywhere in the address
-      const stateZipAnywhere = cleanAddress.match(/([A-Z]{2})\s+(\d{5}(?:-\d{4})?)/);
-      if (stateZipAnywhere) {
-        state = stateZipAnywhere[1];
-        zip = stateZipAnywhere[2];
-        
-        // Try to extract city (word before state)
-        const cityMatch = cleanAddress.match(/,?\s*([^,]+?)\s*,?\s*[A-Z]{2}\s+\d{5}/);
-        if (cityMatch) {
-          city = cityMatch[1].trim();
-        }
-        
-        // Extract address before city/state/zip
-        const addressBeforeCityState = cleanAddress.split(city)[0];
-        if (addressBeforeCityState) {
-          const addrMatch = addressBeforeCityState.match(/^(.*?)\s+(Suite|Unit|Apt|Ste|STE|#)\s*(.+?)$/i);
-          if (addrMatch) {
-            address1 = addrMatch[1].trim().replace(/,$/, '');
-            const suiteType = addrMatch[2].trim();
-            const suiteNum = addrMatch[3].trim().replace(/,$/, '');
-            address2 = suiteType === '#' ? `#${suiteNum}` : `${suiteType.charAt(0).toUpperCase() + suiteType.slice(1).toLowerCase()} ${suiteNum}`;
-          } else {
-            address1 = addressBeforeCityState.trim().replace(/,$/, '');
-          }
-        }
-      } else {
-        // Ultimate fallback: just use everything as address1
-        address1 = cleanAddress;
-      }
-    }
-  } else {
-    // Single part address - just use as-is
-    address1 = cleanAddress;
-  }
-
-  return { address1, address2, city, state, zip };
+const SORT_LABELS: Record<SortKey, string> = {
+  name: 'Name (A–Z)',
+  city: 'City',
+  zip: 'ZIP code',
 };
 
-// PHASE 2: Extract doctor name from office name for contact
-const extractContactName = (officeName: string): string => {
-  if (!officeName) return '';
-  
-  // Pattern 1: "Practice Name: Dr. FirstName LastName" or "Practice Name - Dr. FirstName LastName"
-  const colonPattern = officeName.match(/[:–-]\s*Dr\.?\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i);
-  if (colonPattern) {
-    return `Dr. ${colonPattern[1].trim()}`;
-  }
-  
-  // Pattern 2: "Dr. FirstName LastName" at the start
-  const startPattern = officeName.match(/^Dr\.?\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i);
-  if (startPattern) {
-    return `Dr. ${startPattern[1].trim()}`;
-  }
-  
-  // Pattern 3: "FirstName LastName DDS/DMD/DDS" etc at the end or anywhere
-  const degreePattern = officeName.match(/([A-Z][a-z]+\s+[A-Z][a-z]+)\s*,?\s*(DDS|DMD|MD|PhD|D\.D\.S\.|D\.M\.D\.)/i);
-  if (degreePattern) {
-    return `Dr. ${degreePattern[1].trim()}`;
-  }
-  
-  // Pattern 4: Just "FirstName LastName" if office name is a person's name (2-3 words, each capitalized)
-  const personNamePattern = officeName.match(/^([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)$/);
-  if (personNamePattern) {
-    return `Dr. ${personNamePattern[1].trim()}`;
-  }
-  
-  // Fallback: return the office name as-is
-  return officeName;
-};
-
-export type LabelNameFormat = 'office' | 'contact';
+/** Small labelled figure used in the summary strip. */
+function Stat({
+  value,
+  label,
+  tone = 'default',
+  icon,
+}: {
+  value: React.ReactNode;
+  label: string;
+  tone?: 'default' | 'warning';
+  icon?: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5 px-4 py-2">
+      <div
+        className={`text-2xl font-semibold tabular-nums flex items-center gap-1.5 ${
+          tone === 'warning' ? 'text-amber-600 dark:text-amber-500' : ''
+        }`}
+      >
+        {icon}
+        {value}
+      </div>
+      <div className="text-xs text-muted-foreground">{label}</div>
+    </div>
+  );
+}
 
 export function MailingLabels() {
   const [searchParams] = useSearchParams();
-  const selectedIds = searchParams.get('ids')?.split(',').filter(Boolean) || [];
+  const queryClient = useQueryClient();
+
+  const selectedIds = useMemo(
+    () => searchParams.get('ids')?.split(',').filter(Boolean) ?? [],
+    [searchParams],
+  );
   const isDiscoveredSource = searchParams.get('discovered') === 'true';
   const groupIdParam = searchParams.get('group') || null;
   const hasSelectedIds = selectedIds.length > 0;
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedTiers, setSelectedTiers] = useState<string[]>(['VIP', 'Warm', 'Cold', 'Dormant']);
+  const [selectedTiers, setSelectedTiers] = useState<string[]>([...TIERS]);
   const [includeDiscovered, setIncludeDiscovered] = useState(isDiscoveredSource || !!groupIdParam);
-  const [sourceFilter, setSourceFilter] = useState<'all' | 'partner' | 'discovered' | 'group'>(
-    groupIdParam ? 'group' : isDiscoveredSource && hasSelectedIds ? 'discovered' : 'all'
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>(
+    groupIdParam ? 'group' : isDiscoveredSource && hasSelectedIds ? 'discovered' : 'all',
   );
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(groupIdParam);
   const [groupMemberIds, setGroupMemberIds] = useState<string[]>([]);
-  const [showParseErrors, setShowParseErrors] = useState(false);
-  const [labelNameFormat, setLabelNameFormat] = useState<LabelNameFormat>('office');
-  
-  // PHASE 1: Address Correction State
+  const [sortKey, setSortKey] = useState<SortKey>('name');
+  const [issueView, setIssueView] = useState<IssueView>('all');
+  const [hideDuplicates, setHideDuplicates] = useState(true);
+
+  // Rows the user has explicitly unchecked. Keyed by stable row id so a row keeps
+  // its state when filters bring it in and out of view.
+  const [excludedIds, setExcludedIds] = useState<Set<string>>(() => new Set());
+  // Cell-level overrides layered on top of the parsed data, also keyed by row id,
+  // so editing a row never freezes the filters the way a snapshot copy would.
+  const [edits, setEdits] = useState<Record<string, Partial<LabelRow>>>({});
+
   const [isCorrecting, setIsCorrecting] = useState(false);
   const [correctionProgress, setCorrectionProgress] = useState(0);
   const [showCorrectionDialog, setShowCorrectionDialog] = useState(false);
   const [correctionResults, setCorrectionResults] = useState<any[]>([]);
-  const [hasBeenCorrected, setHasBeenCorrected] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [showCustomization, setShowCustomization] = useState(false);
+
+  const { settings, update: updateSettings } = useLabelPrintSettings();
+  const { templateKey, copies, startOffset, nameFormat, customization } = settings;
+  const template = AVERY_TEMPLATES[templateKey] ?? AVERY_TEMPLATES['5160'];
+  const labelsPerSheet = template.cols * template.rows;
 
   const { data: offices = [], isLoading: officesLoading } = useOffices();
   const { groups, getGroupMemberIds: fetchGroupMemberIds } = useDiscoveredGroups();
 
-  // Load group member IDs when group is selected
   useEffect(() => {
     if (sourceFilter === 'group' && selectedGroupId) {
       fetchGroupMemberIds(selectedGroupId).then(ids => setGroupMemberIds(ids));
     }
+    // fetchGroupMemberIds is re-created every render by useDiscoveredGroups; including
+    // it here would re-fetch in a loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourceFilter, selectedGroupId]);
-  
-  // Enable discovered offices query when:
-  // 1. User wants to include discovered offices
-  // 2. Source filter is 'discovered'
-  // 3. URL params indicate discovered offices (discovered=true)
+
   const { data: discoveredOffices = [], isLoading: discoveredLoading } = useQuery({
     queryKey: ['discovered-offices-for-labels'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('discovered_offices')
-        .select('*')
-        .order('name');
-      
+      const { data, error } = await supabase.from('discovered_offices').select('*').order('name');
       if (error) throw error;
       return data || [];
     },
-    enabled: includeDiscovered || sourceFilter === 'discovered' || sourceFilter === 'group' || isDiscoveredSource,
+    enabled:
+      includeDiscovered ||
+      sourceFilter === 'discovered' ||
+      sourceFilter === 'group' ||
+      isDiscoveredSource,
   });
 
-  // Phase 2: Filtering Logic + Error Detection
-  const filteredData = useMemo(() => {
-    let results: MailingLabelData[] = [];
-    const errors: string[] = [];
+  const isLoading = officesLoading || (includeDiscovered && discoveredLoading);
 
-    // Filter partner offices
+  /** Rows matching the source/tier/search filters, with edits and flags applied. */
+  const rows = useMemo<DecoratedRow[]>(() => {
+    const matchesSearch = (name: string, address: string | null | undefined) => {
+      if (!searchTerm) return true;
+      const needle = searchTerm.toLowerCase();
+      return (
+        name.toLowerCase().includes(needle) || (address?.toLowerCase().includes(needle) ?? false)
+      );
+    };
+
+    const base: LabelRow[] = [];
+
     if (sourceFilter === 'all' || sourceFilter === 'partner') {
-      const partnerOffices = offices
-        .filter(office => {
-          // If we have specific IDs from URL, filter by those
-          if (hasSelectedIds) {
-            return selectedIds.includes(office.id);
-          }
-          
-          // Otherwise use tier and search filters
-          const matchesTier = selectedTiers.includes(office.tier);
-          const matchesSearch = searchTerm === '' || 
-            office.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (office.address?.toLowerCase().includes(searchTerm.toLowerCase()));
-          
-          return matchesTier && matchesSearch;
-        })
-        .map(office => {
-          const parsed = parseAddress(office.address);
-          
-          // Detect potential parsing errors
-          if (!parsed.city || !parsed.state || !parsed.zip) {
-            errors.push(`${office.name}: Missing city/state/zip - "${office.address}"`);
-          }
-          
-          return {
-            officeName: office.name,
-            contactName: extractContactName(office.name),
-            ...parsed,
-          };
+      for (const office of offices) {
+        if (hasSelectedIds) {
+          if (!selectedIds.includes(office.id)) continue;
+        } else {
+          if (!selectedTiers.includes(office.tier ?? '')) continue;
+          if (!matchesSearch(office.name, office.address)) continue;
+        }
+        base.push({
+          id: `partner:${office.id}`,
+          source: 'partner',
+          officeName: office.name,
+          contactName: extractContactName(office.name),
+          ...parseAddress(office.address),
         });
-      
-      results = [...results, ...partnerOffices];
+      }
     }
 
-    // Filter discovered offices
-    // Include when: URL has discovered=true with IDs, OR user enabled discovered filter
-    const shouldIncludeDiscovered = (isDiscoveredSource && hasSelectedIds) || 
+    const shouldIncludeDiscovered =
+      (isDiscoveredSource && hasSelectedIds) ||
       sourceFilter === 'group' ||
-      (!hasSelectedIds && (sourceFilter === 'all' || sourceFilter === 'discovered') && (includeDiscovered || sourceFilter === 'discovered'));
-    
+      (!hasSelectedIds &&
+        (sourceFilter === 'all' || sourceFilter === 'discovered') &&
+        (includeDiscovered || sourceFilter === 'discovered'));
+
     if (shouldIncludeDiscovered) {
-      const discovered = discoveredOffices
-        .filter(office => {
-          const matchesSearch = searchTerm === '' || 
-            office.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (office.address?.toLowerCase().includes(searchTerm.toLowerCase()));
+      for (const office of discoveredOffices) {
+        if (sourceFilter === 'group' && selectedGroupId) {
+          if (!groupMemberIds.includes(office.id)) continue;
+          if (!matchesSearch(office.name, office.address)) continue;
+        } else if (isDiscoveredSource && hasSelectedIds) {
+          if (!selectedIds.includes(office.id)) continue;
+        } else if (!matchesSearch(office.name, office.address)) {
+          continue;
+        }
 
-          // If group filter, only show group members
-          if (sourceFilter === 'group' && selectedGroupId) {
-            return groupMemberIds.includes(office.id) && matchesSearch;
-          }
-          
-          // If we have specific IDs from URL with discovered=true, filter by those
-          if (isDiscoveredSource && hasSelectedIds) {
-            return selectedIds.includes(office.id);
-          }
-          
-          return matchesSearch;
-        })
-        .map(office => {
-          const parsed = parseAddress(office.address);
-          
-          // Detect potential parsing errors
-          if (!parsed.city || !parsed.state || !parsed.zip) {
-            errors.push(`${office.name}: Missing city/state/zip - "${office.address}"`);
-          }
-          
-          return {
-            officeName: office.name,
-            contactName: extractContactName(office.name),
-            ...parsed,
-          };
+        base.push({
+          id: `discovered:${office.id}`,
+          source: 'discovered',
+          officeName: office.name,
+          contactName: extractContactName(office.name),
+          ...parseAddress(office.address),
         });
-      
-      results = [...results, ...discovered];
+      }
     }
 
-    // Log errors if any
-    if (errors.length > 0 && showParseErrors) {
-      console.warn('Address parsing errors:', errors);
-    }
+    const withEdits = base.map(row => ({ ...row, ...edits[row.id] }));
+    const flagged = markDuplicates(withEdits).map(row => ({
+      ...row,
+      incomplete: isIncomplete(row),
+    }));
 
-    return results;
-  }, [offices, discoveredOffices, selectedTiers, includeDiscovered, searchTerm, sourceFilter, showParseErrors, hasSelectedIds, selectedIds, isDiscoveredSource, groupMemberIds, selectedGroupId]);
+    const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
+    return [...flagged].sort((a, b) => {
+      if (sortKey === 'zip') return collator.compare(a.zip, b.zip) || collator.compare(a.officeName, b.officeName);
+      if (sortKey === 'city') return collator.compare(a.city, b.city) || collator.compare(a.officeName, b.officeName);
+      return collator.compare(a.officeName, b.officeName);
+    });
+  }, [
+    offices,
+    discoveredOffices,
+    selectedTiers,
+    includeDiscovered,
+    searchTerm,
+    sourceFilter,
+    hasSelectedIds,
+    selectedIds,
+    isDiscoveredSource,
+    groupMemberIds,
+    selectedGroupId,
+    edits,
+    sortKey,
+  ]);
 
-  // Editable data state - syncs with filtered data but allows edits
-  const [editableData, setEditableData] = useState<MailingLabelData[]>([]);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [hasCustomEdits, setHasCustomEdits] = useState(false);
-  
-  // Track the last filteredData stringified to detect real changes
-  const [lastFilteredDataHash, setLastFilteredDataHash] = useState<string>('');
+  const duplicateCount = useMemo(() => rows.filter(r => r.isDuplicate).length, [rows]);
+  const incompleteCount = useMemo(() => rows.filter(r => r.incomplete).length, [rows]);
 
-  // Only sync editable data when filteredData ACTUALLY changes AND no custom edits
-  useEffect(() => {
-    const currentHash = JSON.stringify(filteredData);
-    
-    // Only update if: not in edit mode, no custom edits, and data actually changed
-    if (!isEditMode && !hasCustomEdits && currentHash !== lastFilteredDataHash) {
-      setEditableData(filteredData);
-      setLastFilteredDataHash(currentHash);
-    }
-  }, [filteredData, isEditMode, hasCustomEdits, lastFilteredDataHash]);
+  /**
+   * Rows that will actually print. The issue chips below only change what the table
+   * shows — narrowing the view must never silently shrink the export.
+   */
+  const exportRows = useMemo(
+    () => rows.filter(r => !excludedIds.has(r.id) && !(hideDuplicates && r.isDuplicate)),
+    [rows, excludedIds, hideDuplicates],
+  );
 
-  // Handle cell edit - memoized for performance
-  const handleCellEdit = useCallback((index: number, field: keyof MailingLabelData, value: string) => {
-    setEditableData(prev => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], [field]: value };
-      return updated;
+  const visibleRows = useMemo(() => {
+    if (issueView === 'incomplete') return rows.filter(r => r.incomplete);
+    if (issueView === 'duplicates') return rows.filter(r => r.isDuplicate);
+    return rows;
+  }, [rows, issueView]);
+
+  const excludedCount = rows.length - exportRows.length;
+  const incompleteSelected = useMemo(
+    () => exportRows.filter(r => r.incomplete).length,
+    [exportRows],
+  );
+
+  const labelData = useMemo<LabelData[]>(
+    () =>
+      exportRows.map(row => ({
+        contact: nameFormat === 'office' ? row.officeName : row.contactName,
+        address1: row.address1,
+        address2: row.address2,
+        city: row.city,
+        state: row.state,
+        zip: row.zip,
+      })),
+    [exportRows, nameFormat],
+  );
+
+  const printQueue = useMemo(
+    () => buildPrintQueue(labelData, { copies, startOffset }),
+    [labelData, copies, startOffset],
+  );
+
+  const totalSlots = printQueue.length;
+  const sheetsNeeded = totalSlots === 0 ? 0 : Math.ceil(totalSlots / labelsPerSheet);
+  const blanksOnLastSheet = sheetsNeeded === 0 ? 0 : sheetsNeeded * labelsPerSheet - totalSlots;
+
+  const hasEdits = Object.keys(edits).length > 0;
+
+  /** Switching to a smaller sheet can leave a stored offset past the last slot. */
+  const handleTemplateChange = useCallback(
+    (nextKey: string) => {
+      const next = AVERY_TEMPLATES[nextKey] ?? AVERY_TEMPLATES['5160'];
+      const maxOffset = next.cols * next.rows - 1;
+      updateSettings({
+        templateKey: nextKey,
+        startOffset: Math.min(settings.startOffset, maxOffset),
+      });
+    },
+    [updateSettings, settings.startOffset],
+  );
+
+  const handleCellEdit = useCallback((id: string, field: keyof LabelRow, value: string) => {
+    setEdits(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
+  }, []);
+
+  const toggleRow = useCallback((id: string) => {
+    setExcludedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
     });
   }, []);
 
-  // Enter edit mode - preserve existing edits if any
-  const handleStartEdit = () => {
-    if (!hasCustomEdits) {
-      setEditableData([...filteredData]);
-    }
-    setIsEditMode(true);
-  };
+  const visibleSelectedCount = visibleRows.filter(r => !excludedIds.has(r.id)).length;
+  const allVisibleSelected = visibleRows.length > 0 && visibleSelectedCount === visibleRows.length;
 
-  // Save edits
-  const handleSaveEdits = () => {
-    setHasCustomEdits(true);
-    setIsEditMode(false);
-    toast({
-      title: "Changes saved",
-      description: "Your edits have been applied to the export data.",
+  const toggleAllVisible = () => {
+    setExcludedIds(prev => {
+      const next = new Set(prev);
+      if (allVisibleSelected) visibleRows.forEach(r => next.add(r.id));
+      else visibleRows.forEach(r => next.delete(r.id));
+      return next;
     });
   };
 
-  // Cancel edits
-  const handleCancelEdit = () => {
-    if (hasCustomEdits) {
-      // Revert to last saved state - do nothing, editableData already has saved edits
-    } else {
-      setEditableData(filteredData);
-    }
-    setIsEditMode(false);
-    toast({
-      title: "Edits cancelled",
-      description: "Changes have been reverted.",
-    });
+  const resetEdits = () => {
+    setEdits({});
+    toast({ title: 'Edits cleared', description: 'All cells restored to their source values.' });
   };
 
-  // Reset to original data
-  const handleResetToOriginal = () => {
-    setEditableData(filteredData);
-    setHasCustomEdits(false);
-    toast({
-      title: "Reset complete",
-      description: "Data restored to original values.",
-    });
+  const clearFilters = () => {
+    setSearchTerm('');
+    setSelectedTiers([...TIERS]);
+    setSourceFilter('all');
+    setSelectedGroupId(null);
+    setIssueView('all');
   };
 
-  // Get export data (uses editable data)
+  const toggleTier = (tier: string) => {
+    setSelectedTiers(prev =>
+      prev.includes(tier) ? prev.filter(t => t !== tier) : [...prev, tier],
+    );
+  };
 
-  // Phase 4: Excel Export
-  const handleExportToExcel = async () => {
-    const XLSX = await import('xlsx');
-    if (editableData.length === 0) {
+  const warnIfIncomplete = () => {
+    if (incompleteSelected > 0) {
       toast({
-        title: "No data to export",
-        description: "Please adjust your filters to include offices.",
-        variant: "destructive",
+        title: `${incompleteSelected} label${incompleteSelected === 1 ? '' : ' has'} missing address parts`,
+        description: 'They were included anyway — check the highlighted rows before mailing.',
       });
-      return;
     }
+  };
 
-    const exportData = editableData.map(item => ({
-      'Name': labelNameFormat === 'office' ? item.officeName : item.contactName,
-      'Address 1': item.address1,
-      'Address 2': item.address2,
-      'City': item.city,
-      'State': item.state,
-      'ZIP': item.zip,
+  const exportRowsAsRecords = (): Record<string, string>[] =>
+    exportRows.map(row => ({
+      Name: nameFormat === 'office' ? row.officeName : row.contactName,
+      'Address 1': row.address1,
+      'Address 2': row.address2,
+      City: row.city,
+      State: row.state,
+      ZIP: row.zip,
     }));
 
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Mailing Labels');
+  const handleExportToExcel = async () => {
+    if (exportRows.length === 0) return;
+    const XLSX = await import('xlsx');
 
-    // Set column widths
+    const worksheet = XLSX.utils.json_to_sheet(exportRowsAsRecords());
     worksheet['!cols'] = [
       { wch: 30 }, // Name
       { wch: 30 }, // Address 1
       { wch: 20 }, // Address 2
       { wch: 20 }, // City
-      { wch: 8 },  // State
+      { wch: 8 }, // State
       { wch: 12 }, // ZIP
     ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Mailing Labels');
 
     const fileName = `mailing-labels-${new Date().toISOString().split('T')[0]}.xlsx`;
     XLSX.writeFile(workbook, fileName);
 
+    warnIfIncomplete();
     toast({
-      title: "Export successful",
-      description: `Exported ${editableData.length} mailing labels to ${fileName}`,
+      title: 'Excel exported',
+      description: `${exportRows.length} rows written to ${fileName}.`,
     });
   };
 
-  const isLoading = officesLoading || (includeDiscovered && discoveredLoading);
+  const handleExportToCsv = () => {
+    if (exportRows.length === 0) return;
 
-  const toggleTier = (tier: string) => {
-    setSelectedTiers(prev => 
-      prev.includes(tier) 
-        ? prev.filter(t => t !== tier)
-        : [...prev, tier]
-    );
+    const records = exportRowsAsRecords();
+    const headers = Object.keys(records[0]);
+    const escape = (value: string) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const csv = [
+      headers.join(','),
+      ...records.map(record => headers.map(h => escape(record[h])).join(',')),
+    ].join('\r\n');
+
+    const fileName = `mailing-labels-${new Date().toISOString().split('T')[0]}.csv`;
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    warnIfIncomplete();
+    toast({
+      title: 'CSV exported',
+      description: `${exportRows.length} rows written to ${fileName}.`,
+    });
   };
 
-  // PHASE 2: Address Correction Handler - Now shows review dialog
-  const handleCorrectAddresses = async () => {
-    if (hasBeenCorrected) {
+  const handleCopyAddresses = async () => {
+    if (exportRows.length === 0) return;
+    const text = exportRows
+      .map(row =>
+        [
+          nameFormat === 'office' ? row.officeName : row.contactName,
+          row.address1,
+          row.address2,
+          `${row.city}${row.city && row.state ? ', ' : ''}${row.state} ${row.zip}`.trim(),
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      )
+      .join('\n\n');
+
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: 'Copied', description: `${exportRows.length} addresses on the clipboard.` });
+    } catch {
       toast({
-        title: "Already corrected",
-        description: "Addresses have already been corrected once. Refresh the page to run again.",
-        variant: "destructive",
+        title: 'Copy failed',
+        description: 'Your browser blocked clipboard access.',
+        variant: 'destructive',
       });
-      return;
     }
+  };
 
-    // Get all partner office IDs that are currently filtered
-    const officesWithIds = offices
-      .filter(office => {
-        const matchesTier = selectedTiers.includes(office.tier);
-        const matchesSearch = searchTerm === '' || 
-          office.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (office.address?.toLowerCase().includes(searchTerm.toLowerCase()));
-        
-        return matchesTier && matchesSearch && office.address;
-      });
-
-    const partnerOfficeIds = officesWithIds.map(office => office.id);
-
-    if (partnerOfficeIds.length === 0) {
-      const hasAnyOffices = offices.length > 0;
-      const hasAddresses = offices.some(o => o.address);
-      
-      let description = "No partner offices with addresses found in current filter.";
-      if (!hasAnyOffices) {
-        description = "You don't have any partner offices yet. Add offices from the Offices page first.";
-      } else if (!hasAddresses) {
-        description = "Your offices don't have addresses. Add addresses to your offices first.";
-      } else {
-        description = "No offices match the current tier/search filters. Try adjusting your filters.";
-      }
-      
+  const handleQuickPdf = async () => {
+    if (printQueue.length === 0) return;
+    try {
+      const filename = `mailing-labels-${templateKey}-${new Date().toISOString().split('T')[0]}.pdf`;
+      await downloadLabelsPDF(
+        printQueue,
+        templateKey,
+        {
+          showLogo: customization.showLogo,
+          logoUrl: customization.logoUrl,
+          logoSizeMultiplier: customization.logoSizeMultiplier,
+          showReturnAddress: customization.showReturnAddress,
+          returnAddress: customization.returnAddress,
+          showFromLabel: customization.showFromLabel,
+          showToLabel: customization.showToLabel,
+          showBranding: customization.showBranding,
+          brandingText: customization.brandingText,
+          fontSizeMultiplier: customization.fontSizeMultiplier,
+          fromFontSizeMultiplier: customization.fromFontSizeMultiplier,
+          lineSpacing: customization.lineSpacing,
+          toAlignment: customization.toAlignment,
+          fromPosition: customization.fromPosition,
+          layoutMode: customization.layoutMode,
+        },
+        filename,
+      );
+      warnIfIncomplete();
       toast({
-        title: "No addresses to correct",
-        description,
-        variant: "destructive",
+        title: 'PDF downloaded',
+        description: `${labelData.length} labels × ${copies} on ${sheetsNeeded} sheet${sheetsNeeded === 1 ? '' : 's'} (${template.name}).`,
+      });
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      toast({
+        title: 'PDF generation failed',
+        description: 'There was an error generating the PDF. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleCorrectAddresses = async () => {
+    const partnerIdsInView = exportRows
+      .filter(row => row.source === 'partner')
+      .map(row => row.id.replace('partner:', ''));
+
+    if (partnerIdsInView.length === 0) {
+      toast({
+        title: 'Nothing to fix',
+        description:
+          offices.length === 0
+            ? "You don't have any partner offices yet. Add them from the Offices page first."
+            : 'No partner offices are selected. Address lookup only covers partner offices.',
+        variant: 'destructive',
       });
       return;
     }
 
     setIsCorrecting(true);
-    setCorrectionProgress(0);
+    setCorrectionProgress(15);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        throw new Error('Not authenticated');
-      }
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
 
-      console.log('Session token available:', !!session.access_token);
+      const { data: result, error: fnError } = await supabase.functions.invoke(
+        'correct-office-addresses',
+        {
+          body: { officeIds: partnerIdsInView },
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        },
+      );
 
-      toast({
-        title: "Starting address correction",
-        description: `Processing ${partnerOfficeIds.length} offices with Google Maps API...`,
-      });
+      if (fnError) throw new Error(fnError.message || 'Address correction failed');
 
-      // Call edge function via supabase client to get corrections (no auto-update)
-      const { data: result, error: fnError } = await supabase.functions.invoke('correct-office-addresses', {
-        body: { officeIds: partnerOfficeIds },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        }
-      });
-
-      console.log('Function invoke result:', { hasData: !!result, hasError: !!fnError });
-
-      if (fnError) {
-        throw new Error(fnError.message || 'Address correction failed');
-      }
-      
-      // Map results with office names
-      const resultsWithNames = result.results.map((r: any) => {
-        const office = officesWithIds.find(o => o.id === r.id);
-        return {
-          ...r,
-          officeName: office?.name || 'Unknown Office',
-        };
-      });
+      const resultsWithNames = (result.results ?? []).map((r: any) => ({
+        ...r,
+        officeName: offices.find(o => o.id === r.id)?.name || 'Unknown Office',
+      }));
 
       setCorrectionResults(resultsWithNames);
       setCorrectionProgress(100);
       setShowCorrectionDialog(true);
 
       toast({
-        title: "Analysis complete",
-        description: `Found ${result.needsUpdate} addresses that can be improved.`,
+        title: 'Lookup complete',
+        description: `${result.needsUpdate} address${result.needsUpdate === 1 ? '' : 'es'} can be improved.`,
       });
-
     } catch (error) {
       console.error('Address correction error:', error);
       toast({
-        title: "Correction failed",
+        title: 'Correction failed',
         description: error instanceof Error ? error.message : 'Unknown error occurred',
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setIsCorrecting(false);
     }
   };
 
-  // PHASE 3: Apply selected corrections
-  const handleApplyCorrections = async (selectedIds: string[]) => {
+  const handleApplyCorrections = async (idsToApply: string[]) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        throw new Error('Not authenticated');
-      }
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
 
       const updates = correctionResults
-        .filter(r => selectedIds.includes(r.id))
+        .filter(r => idsToApply.includes(r.id))
         .map(r => ({ id: r.id, address: r.corrected }));
 
-      // Invoke edge function to apply selected corrections
-      const { data: result, error: fnError } = await supabase.functions.invoke('apply-address-corrections', {
-        body: { updates },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        }
-      });
+      const { data: result, error: fnError } = await supabase.functions.invoke(
+        'apply-address-corrections',
+        {
+          body: { updates },
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        },
+      );
 
-      if (fnError) {
-        throw new Error(fnError.message || 'Failed to apply corrections');
-      }
-      
+      if (fnError) throw new Error(fnError.message || 'Failed to apply corrections');
+
       toast({
-        title: "Addresses updated",
-        description: `Successfully updated ${result.updated} of ${result.total} addresses.`,
+        title: 'Addresses updated',
+        description: `Updated ${result.updated} of ${result.total} addresses.`,
       });
 
-      setHasBeenCorrected(true);
-      
-      // Refresh page to show updated addresses
-      setTimeout(() => window.location.reload(), 1500);
-
+      // Refetch in place — a full page reload would throw away selection and edits.
+      await queryClient.invalidateQueries({ queryKey: ['offices'] });
     } catch (error) {
       console.error('Apply corrections error:', error);
       toast({
-        title: "Update failed",
+        title: 'Update failed',
         description: error instanceof Error ? error.message : 'Unknown error occurred',
-        variant: "destructive",
+        variant: 'destructive',
       });
       throw error;
     }
   };
 
+  const nothingSelected = exportRows.length === 0;
+
   return (
-    <div className="space-y-6">
-      {/* Context Banner for selected offices */}
-      {hasSelectedIds && (
-        <Alert className="bg-primary/10 border-primary/20">
-          <MapPin className="h-4 w-4" />
-          <AlertTitle>Viewing {selectedIds.length} Selected Offices</AlertTitle>
-          <AlertDescription className="flex items-center justify-between">
-            <span>Creating labels for offices selected from Partner Offices page.</span>
-            <Link to="/offices">
-              <Button variant="outline" size="sm" className="gap-2">
-                <ArrowLeft className="h-4 w-4" />
-                Back to Offices
-              </Button>
-            </Link>
-          </AlertDescription>
-        </Alert>
-      )}
+    <TooltipProvider delayDuration={200}>
+      <div className="space-y-4">
+        {hasSelectedIds && (
+          <Alert className="bg-primary/10 border-primary/20">
+            <MapPin className="h-4 w-4" />
+            <AlertTitle>Viewing {selectedIds.length} selected offices</AlertTitle>
+            <AlertDescription className="flex items-center justify-between">
+              <span>Creating labels for the offices you picked on the Offices page.</span>
+              <Link to="/offices">
+                <Button variant="outline" size="sm" className="gap-2">
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to Offices
+                </Button>
+              </Link>
+            </AlertDescription>
+          </Alert>
+        )}
 
+        {/* Summary strip — the numbers that decide how much label stock to load. */}
+        <Card>
+          <CardContent className="p-0">
+            <div className="flex flex-wrap items-center divide-x divide-border">
+              <Stat value={isLoading ? '—' : exportRows.length} label="Labels selected" />
+              {copies > 1 && <Stat value={totalSlots - startOffset} label={`Prints (${copies}× each)`} />}
+              <Stat value={sheetsNeeded} label={`Sheet${sheetsNeeded === 1 ? '' : 's'} of ${template.name.split(' (')[0]}`} />
+              <Stat value={blanksOnLastSheet} label="Unused on last sheet" />
+              {incompleteSelected > 0 && (
+                <Stat
+                  value={incompleteSelected}
+                  label="Incomplete addresses"
+                  tone="warning"
+                  icon={<AlertTriangle className="h-5 w-5" />}
+                />
+              )}
+              <div className="flex-1 min-w-[240px] flex flex-wrap justify-end gap-2 p-3">
+                <Button
+                  onClick={() => setShowPreview(true)}
+                  disabled={isLoading || nothingSelected}
+                  className="gap-2"
+                >
+                  <Printer className="h-4 w-4" />
+                  Preview &amp; print
+                </Button>
+                <Button
+                  onClick={handleQuickPdf}
+                  disabled={isLoading || nothingSelected}
+                  variant="secondary"
+                  className="gap-2"
+                >
+                  <FileDown className="h-4 w-4" />
+                  Download PDF
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" disabled={isLoading || nothingSelected} className="gap-2">
+                      <Download className="h-4 w-4" />
+                      Export
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleExportToExcel}>Excel (.xlsx)</DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportToCsv}>CSV (.csv)</DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleCopyAddresses}>
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copy to clipboard
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Compact Filters Bar */}
-      {!hasSelectedIds && (
-        <div className="flex flex-wrap items-center gap-3 p-3 bg-muted/30 rounded-lg border">
-          <div className="relative flex-1 min-w-[200px] max-w-xs">
-            <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search offices..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-8 h-9"
-            />
-          </div>
+        {/* Who gets a label */}
+        {!hasSelectedIds && (
+          <div className="flex flex-wrap items-center gap-3 p-3 bg-muted/30 rounded-lg border">
+            <div className="relative flex-1 min-w-[200px] max-w-xs">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search offices…"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="pl-8 h-9"
+              />
+            </div>
 
-          <Select value={sourceFilter} onValueChange={(value: any) => { setSourceFilter(value); if (value !== 'group') setSelectedGroupId(null); }}>
-            <SelectTrigger className="w-[180px] h-9">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Offices</SelectItem>
-              <SelectItem value="partner">Partner Only</SelectItem>
-              <SelectItem value="discovered">Discovered Only</SelectItem>
-              <SelectItem value="group">
-                <span className="flex items-center gap-1.5"><FolderOpen className="h-3 w-3" /> By Group</span>
-              </SelectItem>
-            </SelectContent>
-          </Select>
-
-          {sourceFilter === 'group' && (
-            <Select value={selectedGroupId || ''} onValueChange={(val) => setSelectedGroupId(val || null)}>
-              <SelectTrigger className="w-[180px] h-9">
-                <SelectValue placeholder="Select group..." />
+            <Select
+              value={sourceFilter}
+              onValueChange={(value: SourceFilter) => {
+                setSourceFilter(value);
+                if (value !== 'group') setSelectedGroupId(null);
+              }}
+            >
+              <SelectTrigger className="w-[170px] h-9">
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {groups.map(g => (
-                  <SelectItem key={g.id} value={g.id}>{g.name} ({g.member_count || 0})</SelectItem>
+                <SelectItem value="all">All offices</SelectItem>
+                <SelectItem value="partner">Partner only</SelectItem>
+                <SelectItem value="discovered">Discovered only</SelectItem>
+                <SelectItem value="group">
+                  <span className="flex items-center gap-1.5">
+                    <FolderOpen className="h-3 w-3" /> By group
+                  </span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+
+            {sourceFilter === 'group' && (
+              <Select value={selectedGroupId || ''} onValueChange={val => setSelectedGroupId(val || null)}>
+                <SelectTrigger className="w-[180px] h-9">
+                  <SelectValue placeholder="Select group…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {groups.map(g => (
+                    <SelectItem key={g.id} value={g.id}>
+                      {g.name} ({g.member_count || 0})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            {(sourceFilter === 'all' || sourceFilter === 'partner') && (
+              <div className="flex items-center gap-2">
+                {TIERS.map(tier => (
+                  <div key={tier} className="flex items-center gap-1.5">
+                    <Checkbox
+                      id={`tier-${tier}`}
+                      checked={selectedTiers.includes(tier)}
+                      onCheckedChange={() => toggleTier(tier)}
+                      className="h-4 w-4"
+                    />
+                    <label htmlFor={`tier-${tier}`} className="text-xs cursor-pointer">
+                      {tier}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {sourceFilter === 'all' && (
+              <div className="flex items-center gap-1.5">
+                <Checkbox
+                  id="include-discovered"
+                  checked={includeDiscovered}
+                  onCheckedChange={checked => setIncludeDiscovered(checked as boolean)}
+                  className="h-4 w-4"
+                />
+                <label htmlFor="include-discovered" className="text-xs cursor-pointer">
+                  Include discovered
+                </label>
+              </div>
+            )}
+
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1.5 text-muted-foreground">
+              <X className="h-3.5 w-3.5" />
+              Clear
+            </Button>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="ml-auto">
+                  <Button
+                    onClick={handleCorrectAddresses}
+                    disabled={isCorrecting || officesLoading}
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                  >
+                    {isCorrecting ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        Looking up…
+                      </>
+                    ) : (
+                      <>
+                        <MapPin className="w-3.5 h-3.5" />
+                        Fix addresses
+                      </>
+                    )}
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                Re-checks selected partner-office addresses against Google Maps and lets you review each change.
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        )}
+
+        {isCorrecting && (
+          <div className="flex items-center gap-3 px-3">
+            <span className="text-sm text-muted-foreground">Checking addresses…</span>
+            <Progress value={correctionProgress} className="flex-1 h-2" />
+          </div>
+        )}
+
+        {/* Print setup */}
+        <div className="flex flex-wrap items-end gap-4 p-3 bg-muted/30 rounded-lg border">
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Label sheet</Label>
+            <Select value={templateKey} onValueChange={handleTemplateChange}>
+              <SelectTrigger className="w-[260px] h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(AVERY_TEMPLATES).map(([key, tmpl]) => (
+                  <SelectItem key={key} value={key}>
+                    {tmpl.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          )}
+          </div>
 
-          {(sourceFilter === 'all' || sourceFilter === 'partner') && (
-            <div className="flex items-center gap-2">
-              {['VIP', 'Warm', 'Cold', 'Dormant'].map(tier => (
-                <div key={tier} className="flex items-center gap-1.5">
-                  <Checkbox
-                    id={`tier-${tier}`}
-                    checked={selectedTiers.includes(tier)}
-                    onCheckedChange={() => toggleTier(tier)}
-                    className="h-4 w-4"
-                  />
-                  <label htmlFor={`tier-${tier}`} className="text-xs cursor-pointer">
-                    {tier}
-                  </label>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Name on label</Label>
+            <Select
+              value={nameFormat}
+              onValueChange={(value: LabelNameFormat) => updateSettings({ nameFormat: value })}
+            >
+              <SelectTrigger className="w-[170px] h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="office">Office name</SelectItem>
+                <SelectItem value="contact">Contact name (Dr.)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-          {sourceFilter === 'all' && (
-            <div className="flex items-center gap-1.5">
-              <Checkbox
-                id="include-discovered"
-                checked={includeDiscovered}
-                onCheckedChange={(checked) => setIncludeDiscovered(checked as boolean)}
-                className="h-4 w-4"
-              />
-              <label htmlFor="include-discovered" className="text-xs cursor-pointer">
-                Include discovered
-              </label>
-            </div>
-          )}
+          <div className="space-y-1.5">
+            <Label htmlFor="copies" className="text-xs text-muted-foreground">
+              Copies each
+            </Label>
+            <Input
+              id="copies"
+              type="number"
+              min={1}
+              max={20}
+              value={copies}
+              onChange={e =>
+                updateSettings({
+                  copies: Math.min(20, Math.max(1, Number(e.target.value) || 1)),
+                })
+              }
+              className="w-[90px] h-9"
+            />
+          </div>
 
-          {/* Address Correction Button */}
-          <Button
-            onClick={handleCorrectAddresses}
-            disabled={isCorrecting || hasBeenCorrected || officesLoading}
-            variant="outline"
-            size="sm"
-            className="gap-1.5 ml-auto"
-          >
-            {isCorrecting ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                Correcting...
-              </>
-            ) : hasBeenCorrected ? (
-              <>
-                <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
-                Corrected
-              </>
-            ) : (
-              <>
-                <MapPin className="w-3.5 h-3.5" />
-                Fix Addresses
-              </>
-            )}
+          <div className="space-y-1.5">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Label
+                  htmlFor="start-offset"
+                  className="text-xs text-muted-foreground underline decoration-dotted underline-offset-4 cursor-help"
+                >
+                  Skip first
+                </Label>
+              </TooltipTrigger>
+              <TooltipContent>
+                Leaves the first N slots blank so you can reuse a partly peeled sheet.
+              </TooltipContent>
+            </Tooltip>
+            <Input
+              id="start-offset"
+              type="number"
+              min={0}
+              max={labelsPerSheet - 1}
+              value={startOffset}
+              onChange={e =>
+                updateSettings({
+                  startOffset: Math.min(
+                    labelsPerSheet - 1,
+                    Math.max(0, Number(e.target.value) || 0),
+                  ),
+                })
+              }
+              className="w-[90px] h-9"
+            />
+          </div>
+
+          <Button variant="outline" onClick={() => setShowCustomization(true)} className="gap-2 h-9">
+            <Settings2 className="h-4 w-4" />
+            Logo &amp; return address
           </Button>
-        </div>
-      )}
 
-      {isCorrecting && (
-        <div className="flex items-center gap-3 px-3">
-          <span className="text-sm text-muted-foreground">Processing...</span>
-          <Progress value={correctionProgress} className="flex-1 h-2" />
-          <span className="text-sm text-muted-foreground">{Math.round(correctionProgress)}%</span>
+          {(customization.showLogo || customization.showReturnAddress || customization.showBranding) && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+              {[
+                customization.showLogo && customization.logoUrl && 'logo',
+                customization.showReturnAddress && customization.returnAddress && 'return address',
+                customization.showBranding && customization.brandingText && 'footer',
+              ]
+                .filter(Boolean)
+                .join(', ') || 'nothing added yet'}
+            </div>
+          )}
         </div>
-      )}
 
-      {/* Phase 3: Preview Table */}
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  Preview
-                  {isEditMode && (
-                    <Badge variant="outline" className="text-xs border-primary text-primary">
-                      <Pencil className="w-3 h-3 mr-1" />
-                      Editing
-                    </Badge>
-                  )}
-                  {!isEditMode && hasCustomEdits && (
-                    <Badge variant="secondary" className="text-xs">
-                      <Check className="w-3 h-3 mr-1" />
-                      Edited
-                    </Badge>
-                  )}
-                </CardTitle>
-                <CardDescription>
-                  {isLoading ? 'Loading...' : `${editableData.length} offices selected`}
-                  {isEditMode && ' • Edit cells below, then save'}
-                  {!isEditMode && hasCustomEdits && ' • Custom edits applied'}
-                </CardDescription>
+        {/* Row table */}
+        <Card>
+          <CardContent className="p-0">
+            <div className="flex flex-wrap items-center justify-between gap-3 p-3 border-b">
+              <div className="flex items-center gap-2 flex-wrap text-sm">
+                <span className="font-medium">
+                  {exportRows.length} of {rows.length} selected
+                </span>
+                {excludedCount > 0 && (
+                  <span className="text-muted-foreground">({excludedCount} left out)</span>
+                )}
+                <Separator orientation="vertical" className="h-4" />
+                <Button
+                  variant={issueView === 'all' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-7"
+                  onClick={() => setIssueView('all')}
+                >
+                  All
+                </Button>
+                {incompleteCount > 0 && (
+                  <Button
+                    variant={issueView === 'incomplete' ? 'secondary' : 'ghost'}
+                    size="sm"
+                    className="h-7 gap-1.5"
+                    onClick={() => setIssueView(issueView === 'incomplete' ? 'all' : 'incomplete')}
+                  >
+                    <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                    Incomplete ({incompleteCount})
+                  </Button>
+                )}
+                {duplicateCount > 0 && (
+                  <Button
+                    variant={issueView === 'duplicates' ? 'secondary' : 'ghost'}
+                    size="sm"
+                    className="h-7 gap-1.5"
+                    onClick={() => setIssueView(issueView === 'duplicates' ? 'all' : 'duplicates')}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    Duplicates ({duplicateCount})
+                  </Button>
+                )}
               </div>
-              {/* Label Name Format Selector */}
-              <div className="flex items-center gap-3">
-                <Label htmlFor="name-format" className="text-sm whitespace-nowrap">Export Name:</Label>
-                <Select value={labelNameFormat} onValueChange={(value: LabelNameFormat) => setLabelNameFormat(value)}>
-                  <SelectTrigger id="name-format" className="w-[200px]">
+
+              <div className="flex items-center gap-2 flex-wrap">
+                {duplicateCount > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <Checkbox
+                      id="hide-duplicates"
+                      checked={hideDuplicates}
+                      onCheckedChange={checked => setHideDuplicates(checked as boolean)}
+                      className="h-4 w-4"
+                    />
+                    <label htmlFor="hide-duplicates" className="text-xs cursor-pointer">
+                      Skip duplicates
+                    </label>
+                  </div>
+                )}
+                <Select value={sortKey} onValueChange={(value: SortKey) => setSortKey(value)}>
+                  <SelectTrigger className="w-[150px] h-8 text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="office">Office Name</SelectItem>
-                    <SelectItem value="contact">Contact Name (Dr.)</SelectItem>
+                    {Object.entries(SORT_LABELS).map(([key, label]) => (
+                      <SelectItem key={key} value={key}>
+                        Sort: {label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+                {hasEdits && (
+                  <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-muted-foreground" onClick={resetEdits}>
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Undo edits
+                  </Button>
+                )}
               </div>
             </div>
-            <div className="flex gap-2 flex-wrap">
-              {isEditMode ? (
-                <>
-                  <Button 
-                    onClick={handleCancelEdit}
-                    variant="ghost"
-                    className="gap-2"
-                  >
-                    <X className="w-4 h-4" />
-                    Cancel
-                  </Button>
-                  <Button 
-                    onClick={handleSaveEdits}
-                    variant="default"
-                    className="gap-2"
-                  >
-                    <Check className="w-4 h-4" />
-                    Save Changes
-                  </Button>
-                </>
-              ) : (
-                <>
-                  {hasCustomEdits && (
-                    <Button 
-                      onClick={handleResetToOriginal}
-                      variant="ghost"
-                      className="gap-2 text-muted-foreground"
-                    >
-                      <RotateCcw className="w-4 h-4" />
-                      Reset
-                    </Button>
-                  )}
-                  <Button 
-                    onClick={handleStartEdit}
-                    disabled={isLoading || editableData.length === 0}
-                    variant="outline"
-                    className="gap-2"
-                  >
-                    <Pencil className="w-4 h-4" />
-                    Edit
-                  </Button>
-                  <Button 
-                    onClick={() => setShowPreview(true)}
-                    disabled={isLoading || editableData.length === 0}
-                    variant="outline"
-                    className="gap-2"
-                  >
-                    <FileText className="w-4 h-4" />
-                    Preview Labels
-                  </Button>
-                  <Button 
-                    onClick={() => {
-                      const pdfData = editableData.map(item => ({
-                        contact: labelNameFormat === 'office' ? item.officeName : item.contactName,
-                        address1: item.address1,
-                        address2: item.address2,
-                        city: item.city,
-                        state: item.state,
-                        zip: item.zip,
-                      }));
-                      const filename = `mailing-labels-${new Date().toISOString().split('T')[0]}.pdf`;
-                      downloadLabelsPDF(pdfData, '5160', { showToLabel: true }, filename);
-                      toast({
-                        title: "PDF Downloaded",
-                        description: `Exported ${editableData.length} labels using Avery 5160 template.`,
-                      });
-                    }}
-                    disabled={isLoading || editableData.length === 0}
-                    variant="secondary"
-                    className="gap-2"
-                  >
-                    <FileDown className="w-4 h-4" />
-                    Quick PDF
-                  </Button>
-                  <Button 
-                    onClick={handleExportToExcel}
-                    disabled={isLoading || filteredData.length === 0}
-                    className="gap-2"
-                  >
-                    <Download className="w-4 h-4" />
-                    Export Excel
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">
-              Loading offices...
-            </div>
-          ) : editableData.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No offices match your filters. Try adjusting your selection.
-            </div>
-          ) : (
-            <div className="border rounded-lg overflow-hidden">
-              <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+
+            {issueView !== 'all' && (
+              <div className="px-3 py-2 text-xs text-muted-foreground bg-amber-500/10 border-b">
+                Filtered view — your export still includes all {exportRows.length} selected labels.
+              </div>
+            )}
+
+            {isLoading ? (
+              <div className="text-center py-12 text-muted-foreground">Loading offices…</div>
+            ) : visibleRows.length === 0 ? (
+              <div className="text-center py-12 space-y-3">
+                <p className="text-muted-foreground">
+                  {rows.length === 0
+                    ? 'No offices match your filters.'
+                    : 'No rows in this view.'}
+                </p>
+                <Button variant="outline" size="sm" onClick={clearFilters}>
+                  Reset filters
+                </Button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto max-h-[560px] overflow-y-auto">
                 <Table>
                   <TableHeader className="bg-muted/50 sticky top-0 z-10">
                     <TableRow>
-                      <TableHead className="min-w-[180px]">Office Name</TableHead>
-                      <TableHead className="min-w-[150px]">Contact Name</TableHead>
-                      <TableHead className="min-w-[180px]">Address 1</TableHead>
+                      <TableHead className="w-[44px]">
+                        <Checkbox
+                          checked={allVisibleSelected}
+                          onCheckedChange={toggleAllVisible}
+                          aria-label="Select all visible rows"
+                        />
+                      </TableHead>
+                      <TableHead className="w-[36px]" />
+                      <TableHead className="min-w-[200px]">
+                        Office name
+                        {nameFormat === 'office' && (
+                          <Badge variant="outline" className="ml-2 text-[10px]">
+                            on label
+                          </Badge>
+                        )}
+                      </TableHead>
+                      <TableHead className="min-w-[170px]">
+                        Contact name
+                        {nameFormat === 'contact' && (
+                          <Badge variant="outline" className="ml-2 text-[10px]">
+                            on label
+                          </Badge>
+                        )}
+                      </TableHead>
+                      <TableHead className="min-w-[190px]">Address 1</TableHead>
                       <TableHead className="min-w-[120px]">Address 2</TableHead>
-                      <TableHead className="min-w-[120px]">City</TableHead>
-                      <TableHead className="min-w-[60px]">State</TableHead>
-                      <TableHead className="min-w-[80px]">ZIP</TableHead>
+                      <TableHead className="min-w-[130px]">City</TableHead>
+                      <TableHead className="min-w-[70px]">State</TableHead>
+                      <TableHead className="min-w-[90px]">ZIP</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {editableData.map((item, index) => (
-                      <TableRow key={index}>
-                        <TableCell className={isEditMode ? "p-1" : "font-medium"}>
-                          {isEditMode ? (
-                            <EditableCell
-                              value={item.officeName}
-                              onChange={(val) => handleCellEdit(index, 'officeName', val)}
+                    {visibleRows.map(row => {
+                      const isExcluded =
+                        excludedIds.has(row.id) || (hideDuplicates && row.isDuplicate);
+                      const missing = missingFields(row);
+
+                      return (
+                        <TableRow
+                          key={row.id}
+                          className={isExcluded ? 'opacity-45' : undefined}
+                        >
+                          <TableCell>
+                            <Checkbox
+                              checked={!isExcluded}
+                              disabled={hideDuplicates && row.isDuplicate}
+                              onCheckedChange={() => toggleRow(row.id)}
+                              aria-label={`Include ${row.officeName}`}
+                            />
+                          </TableCell>
+                          <TableCell className="px-1">
+                            <div className="flex items-center gap-1">
+                              {row.incomplete && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                                  </TooltipTrigger>
+                                  <TooltipContent>Missing {missing.join(', ')}</TooltipContent>
+                                </Tooltip>
+                              )}
+                              {row.isDuplicate && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Copy className="h-4 w-4 text-muted-foreground shrink-0" />
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    Already listed above — {hideDuplicates ? 'skipped' : 'will print twice'}
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="p-1">
+                            <InlineEditCell
+                              value={row.officeName}
+                              onChange={val => handleCellEdit(row.id, 'officeName', val)}
                               className="font-medium"
                             />
-                          ) : (
-                            item.officeName || '-'
-                          )}
-                        </TableCell>
-                        <TableCell className={isEditMode ? "p-1" : ""}>
-                          {isEditMode ? (
-                            <EditableCell
-                              value={item.contactName}
-                              onChange={(val) => handleCellEdit(index, 'contactName', val)}
+                          </TableCell>
+                          <TableCell className="p-1">
+                            <InlineEditCell
+                              value={row.contactName}
+                              onChange={val => handleCellEdit(row.id, 'contactName', val)}
                             />
-                          ) : (
-                            item.contactName || '-'
-                          )}
-                        </TableCell>
-                        <TableCell className={isEditMode ? "p-1" : ""}>
-                          {isEditMode ? (
-                            <EditableCell
-                              value={item.address1}
-                              onChange={(val) => handleCellEdit(index, 'address1', val)}
+                          </TableCell>
+                          <TableCell className="p-1">
+                            <InlineEditCell
+                              value={row.address1}
+                              invalid={!row.address1}
+                              onChange={val => handleCellEdit(row.id, 'address1', val)}
                             />
-                          ) : (
-                            item.address1 || '-'
-                          )}
-                        </TableCell>
-                        <TableCell className={isEditMode ? "p-1" : ""}>
-                          {isEditMode ? (
-                            <EditableCell
-                              value={item.address2}
-                              onChange={(val) => handleCellEdit(index, 'address2', val)}
+                          </TableCell>
+                          <TableCell className="p-1">
+                            <InlineEditCell
+                              value={row.address2}
+                              onChange={val => handleCellEdit(row.id, 'address2', val)}
                             />
-                          ) : (
-                            item.address2 || '-'
-                          )}
-                        </TableCell>
-                        <TableCell className={isEditMode ? "p-1" : ""}>
-                          {isEditMode ? (
-                            <EditableCell
-                              value={item.city}
-                              onChange={(val) => handleCellEdit(index, 'city', val)}
+                          </TableCell>
+                          <TableCell className="p-1">
+                            <InlineEditCell
+                              value={row.city}
+                              invalid={!row.city}
+                              onChange={val => handleCellEdit(row.id, 'city', val)}
                             />
-                          ) : (
-                            item.city || '-'
-                          )}
-                        </TableCell>
-                        <TableCell className={isEditMode ? "p-1" : ""}>
-                          {isEditMode ? (
-                            <EditableCell
-                              value={item.state}
-                              onChange={(val) => handleCellEdit(index, 'state', val)}
-                              className="w-16"
+                          </TableCell>
+                          <TableCell className="p-1">
+                            <InlineEditCell
+                              value={row.state}
+                              invalid={!row.state}
+                              onChange={val => handleCellEdit(row.id, 'state', val)}
                             />
-                          ) : (
-                            item.state || '-'
-                          )}
-                        </TableCell>
-                        <TableCell className={isEditMode ? "p-1" : ""}>
-                          {isEditMode ? (
-                            <EditableCell
-                              value={item.zip}
-                              onChange={(val) => handleCellEdit(index, 'zip', val)}
-                              className="w-20"
+                          </TableCell>
+                          <TableCell className="p-1">
+                            <InlineEditCell
+                              value={row.zip}
+                              invalid={!row.zip}
+                              onChange={val => handleCellEdit(row.id, 'zip', val)}
                             />
-                          ) : (
-                            item.zip || '-'
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
+            )}
+
+            <div className="px-3 py-2 text-xs text-muted-foreground border-t">
+              Click any cell to edit it — changes apply to this export only and never touch the
+              office record.
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      {/* Info Card */}
-      <Card className="bg-muted/30">
-        <CardContent className="pt-6">
-          <div className="flex gap-3">
-            <FileSpreadsheet className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <p className="text-sm font-medium">Excel Format</p>
-              <p className="text-sm text-muted-foreground">
-                The exported file will be formatted for standard mailing label sheets with columns: 
-                Office Name, Contact Name, Address 1, Address 2, City, State, and ZIP.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        <AddressCorrectionDialog
+          open={showCorrectionDialog}
+          onOpenChange={setShowCorrectionDialog}
+          corrections={correctionResults}
+          onConfirm={handleApplyCorrections}
+        />
 
-      {/* Address Correction Dialog */}
-      <AddressCorrectionDialog
-        open={showCorrectionDialog}
-        onOpenChange={setShowCorrectionDialog}
-        corrections={correctionResults}
-        onConfirm={handleApplyCorrections}
-      />
+        <LabelCustomizationDialog
+          open={showCustomization}
+          onOpenChange={setShowCustomization}
+          customization={customization}
+          onSave={value => updateSettings({ customization: value })}
+          templateDimensions={{ width: template.width, height: template.height }}
+        />
 
-      {/* Mailing Label Preview */}
-      <MailingLabelPreview
-        open={showPreview}
-        onOpenChange={setShowPreview}
-        data={editableData.map(item => ({
-          contact: labelNameFormat === 'office' ? item.officeName : item.contactName,
-          address1: item.address1,
-          address2: item.address2,
-          city: item.city,
-          state: item.state,
-          zip: item.zip,
-        }))}
-      />
-    </div>
+        <MailingLabelPreview
+          open={showPreview}
+          onOpenChange={setShowPreview}
+          data={printQueue}
+          templateKey={templateKey}
+          onTemplateChange={handleTemplateChange}
+          customization={customization}
+          onCustomizationChange={value => updateSettings({ customization: value })}
+        />
+      </div>
+    </TooltipProvider>
   );
 }

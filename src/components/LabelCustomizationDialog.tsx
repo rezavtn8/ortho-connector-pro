@@ -68,7 +68,13 @@ export const LabelCustomizationDialog = ({
   const hasSavedAddress = !savedSettings.isLoading && !!savedSettings.clinicAddress;
   const hasSavedClinicName = !savedSettings.isLoading && !!savedSettings.clinicName;
   const isLargeLabel = templateDimensions.height >= 2.5;
-  
+
+  // The dialog is mounted from more than one place, so pick up whatever the caller
+  // has stored each time it opens instead of trusting the initial useState value.
+  useEffect(() => {
+    if (open) setLocalCustomization(customization);
+  }, [open, customization]);
+
   // Auto-load saved settings on first dialog open when settings are available
   useEffect(() => {
     if (savedSettings.isLoading || hasAutoLoadedSettings) return;

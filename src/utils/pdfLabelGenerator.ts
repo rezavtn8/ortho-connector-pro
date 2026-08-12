@@ -20,6 +20,37 @@ export interface LabelData {
   city: string;
   state: string;
   zip: string;
+  /** Placeholder for an already-peeled slot on a partially used sheet. Rendered as nothing. */
+  blank?: boolean;
+}
+
+const BLANK_LABEL: LabelData = {
+  contact: '',
+  address1: '',
+  address2: '',
+  city: '',
+  state: '',
+  zip: '',
+  blank: true,
+};
+
+/**
+ * Expand the selected rows into the exact sequence of slots that gets printed:
+ * `startOffset` already-peeled slots first, then `copies` of each label.
+ */
+export function buildPrintQueue(
+  labels: LabelData[],
+  { copies = 1, startOffset = 0 }: { copies?: number; startOffset?: number } = {},
+): LabelData[] {
+  // Nothing selected means nothing to print — an offset alone must not conjure a sheet.
+  if (labels.length === 0) return [];
+
+  const queue: LabelData[] = [];
+  for (let i = 0; i < startOffset; i++) queue.push(BLANK_LABEL);
+  for (const label of labels) {
+    for (let c = 0; c < copies; c++) queue.push(label);
+  }
+  return queue;
 }
 
 export interface LabelTemplate {
@@ -317,6 +348,9 @@ export async function generateLabelsPDF(
     const pageLabels = labels.slice(startIndex, startIndex + labelsPerPage);
     
     pageLabels.forEach((label, index) => {
+      // Skipped slots on a partially used sheet get no ink at all.
+      if (label.blank) return;
+
       const col = index % template.cols;
       const row = Math.floor(index / template.cols);
       
