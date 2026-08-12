@@ -349,7 +349,14 @@ These are Edge Function secrets with sensible defaults. Set them only if you hav
 Competitor Watch was rebuilt in August 2026. It works today on manual refresh. Two steps
 need database access.
 
-### 9a — apply the history migration
+### 9a — apply the history migration — DONE (part 1)
+
+Part 1, the three indexes, was applied 12 Aug 2026 in commit dece109 as
+`supabase/migrations/20260812012314_cecb5e8e-59d3-4f33-bdef-2c637543153c.sql`. Part 2, the
+schedule, has not run — it needs the secrets in 9b first. Re-running the file below is safe
+(`CREATE INDEX IF NOT EXISTS`) and is how part 2 gets scheduled once 9b is done.
+
+<details><summary>Original prompt, kept for the record</summary>
 
 ```
 Please apply supabase/migrations/20260811180000_competitor_watch_history.sql and confirm.
@@ -366,6 +373,8 @@ idx_competitor_watchlist_user_active exist, and report any NOTICE the DO block r
 
 Do not change application code in this task.
 ```
+
+</details>
 
 ### 9b — turn on scheduled snapshots
 
