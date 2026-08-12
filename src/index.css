@@ -507,6 +507,38 @@ All colors MUST be HSL.
     animation: bob 3s ease-in-out infinite;
   }
 
+  /* Landing page. The hero diagram is six referral paths feeding one practice.
+     Each path carries a short travelling dash; the paths are drawn with
+     pathLength="100" so the dash maths is in percentages and never has to
+     measure the geometry. */
+  @keyframes inflow {
+    from { stroke-dashoffset: 0; }
+    to { stroke-dashoffset: 100; }
+  }
+
+  /* The one source that has stopped sending. It breathes out and nearly
+     disappears, which is the whole product argument without a sentence. */
+  @keyframes quiet {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 0.08; }
+  }
+
+  @keyframes breathe {
+    0%, 100% { opacity: 0.22; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.3); }
+  }
+
+  @keyframes drift {
+    0% { opacity: 0; transform: translateY(-6px); }
+    35%, 65% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(14px); }
+  }
+
+  .animate-inflow { animation: inflow 4s linear infinite; }
+  .animate-quiet { animation: quiet 7s ease-in-out infinite; }
+  .animate-breathe { animation: breathe 5s ease-in-out infinite; transform-origin: 200px 200px; }
+  .animate-drift { animation: drift 2.8s ease-in-out infinite; }
+
   .hover-glow:hover {
     animation: glow 0.3s ease-in-out;
   }
@@ -558,7 +590,11 @@ All colors MUST be HSL.
   .animate-pulse-glow,
   .animate-pulse-dot,
   .animate-flow,
-  .animate-bob {
+  .animate-bob,
+  .animate-inflow,
+  .animate-quiet,
+  .animate-breathe,
+  .animate-drift {
     animation: none !important;
   }
 
