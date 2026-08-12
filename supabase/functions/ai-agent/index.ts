@@ -28,7 +28,7 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import { getCorsHeaders, handleCorsPreflight } from '../_shared/cors.ts';
-import { Network, READ_ONLY_TOOLS, TOOL_SCHEMAS, runTool, type Proposal } from './tools.ts';
+import { Network, TOOL_SCHEMAS, runTool, type Proposal } from './tools.ts';
 
 /**
  * Tool-calling over a dozen offices with twelve months of history each is past what
@@ -346,6 +346,11 @@ const handler = async (req: Request): Promise<Response> => {
               });
             }
           }
+
+          // Only reachable if the loop ever stops returning from inside. Leaving the
+          // stream open would hang the client on a spinner with no way out.
+          send({ type: 'done', tokens: totalTokens });
+          controller.close();
         } catch (err) {
           const message = err instanceof Error ? err.message : 'Something went wrong.';
           console.error('agent turn failed:', message);
@@ -369,5 +374,3 @@ const handler = async (req: Request): Promise<Response> => {
 };
 
 serve(handler);
-
-export { READ_ONLY_TOOLS };

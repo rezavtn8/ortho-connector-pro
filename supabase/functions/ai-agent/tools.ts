@@ -371,14 +371,6 @@ export const TOOL_SCHEMAS = [
   },
 ] as const;
 
-export const READ_ONLY_TOOLS = new Set([
-  'list_offices',
-  'get_office',
-  'referral_trend',
-  'list_visits',
-  'list_reviews',
-  'list_campaigns',
-]);
 
 function clamp(n: unknown, fallback: number, max: number): number {
   const v = typeof n === 'number' && Number.isFinite(n) ? Math.floor(n) : fallback;

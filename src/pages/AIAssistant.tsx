@@ -1,204 +1,208 @@
-import React, { useState, useEffect } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Brain, MessageSquare, Settings, Users, Activity, TrendingUp, TrendingDown, Target } from 'lucide-react';
-import { AIAnalysisTab } from '@/components/ai/AIAnalysisTab';
-import { AIChatTab } from '@/components/ai/AIChatTab';
-import { AISettingsTab } from '@/components/ai/AISettingsTab';
+/**
+ * The assistant.
+ *
+ * WHY THERE ARE NO LONGER FOUR TABS
+ *
+ * This page used to be Analysis / Chat / Forecast / Settings. Three of those were the
+ * same model answering questions about the same data in three fixed formats, and the
+ * user had to guess which tab held the answer before they could ask. Worse, the tab
+ * that could actually take a question was the one that had been given the least to
+ * work with.
+ *
+ * There is now one surface. The left rail is what changed, computed from the data and
+ * ranked by patients per month at stake. The right is a conversation with an assistant
+ * that can look anything up. They are wired together: every signal carries the
+ * question it raises, and clicking it asks that question. Analysis was folded into the
+ * rail. Forecast and Settings are still here, but as things you open — a forecast is a
+ * report and settings are configuration, and neither is a peer of the main task.
+ */
+
+import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { LineChart, RefreshCw, Settings2, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { BriefingRail } from '@/components/ai/BriefingRail';
+import { Conversation } from '@/components/ai/Conversation';
 import { AIForecastTab } from '@/components/ai/AIForecastTab';
-import { supabase } from '@/integrations/supabase/client';
-import { Skeleton } from '@/components/ui/skeleton';
+import { AISettingsTab } from '@/components/ai/AISettingsTab';
+import { useAgentChat } from '@/hooks/useAgentChat';
+import { useBriefing } from '@/hooks/useBriefing';
+import { executeProposal } from '@/lib/agentActions';
+import { toast } from '@/hooks/use-toast';
+import type { ProposalRecord } from '@/lib/agentProtocol';
+
+/**
+ * Fallbacks for a network with nothing worth flagging. Deliberately about the
+ * practice rather than about the product — "what can you do" teaches the user
+ * nothing they wanted to know.
+ */
+const GENERIC_STARTERS = [
+  'Which relationships should I worry about?',
+  'How is my patient volume trending?',
+  'Who should I visit this month?',
+];
 
 export function AIAssistant() {
-  const [activeTab, setActiveTab] = useState('analysis');
-  const [totalPatients, setTotalPatients] = useState(0);
-  const [averagePerSource, setAveragePerSource] = useState(0);
-  const [growingSources, setGrowingSources] = useState(0);
-  const [decliningSources, setDecliningSources] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const { briefing, summary, tierByOffice, loading, refresh } = useBriefing();
+  const { messages, streaming, send, stop, clear, resolveProposal } = useAgentChat();
+  const [forecastOpen, setForecastOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
-  useEffect(() => {
-    loadQuickStats();
-  }, []);
+  /**
+   * Openers drawn from the user's own signals, so the suggested questions are about
+   * their actual network. A generic starter list is the same failure as an empty box,
+   * one step later.
+   */
+  const starters = useMemo(() => {
+    const fromSignals = (briefing?.signals ?? [])
+      .slice(0, 3)
+      .map((s) =>
+        s.officeName ? `What should I do about ${s.officeName}?` : s.headline.replace(/\.$/, '?'),
+      );
+    return [...new Set([...fromSignals, ...GENERIC_STARTERS])].slice(0, 4);
+  }, [briefing]);
 
-  const loadQuickStats = async () => {
+  const handleAccept = async (messageId: string, record: ProposalRecord) => {
     try {
-      const { data: sourcesData } = await supabase
-        .from('patient_sources')
-        .select('*')
-        .eq('is_active', true);
-
-      const now = new Date();
-      const startDate = new Date(now.getFullYear(), now.getMonth() - 6, 1);
-      const startYearMonth = `${startDate.getFullYear()}-${(startDate.getMonth() + 1).toString().padStart(2, '0')}`;
-
-      const { data: monthlyDataResult } = await supabase
-        .from('monthly_patients')
-        .select('*')
-        .gte('year_month', startYearMonth);
-
-      const sources = sourcesData || [];
-      const monthlyData = monthlyDataResult || [];
-
-      const analyticsData = sources.map(source => {
-        const sourceMonthlyData = monthlyData.filter(m => m.source_id === source.id);
-        const total = sourceMonthlyData.reduce((sum, m) => sum + m.patient_count, 0);
-        
-        const sorted = [...sourceMonthlyData].sort((a, b) => (a.year_month || '').localeCompare(b.year_month || ''));
-        const recent = sorted.length >= 1 ? (sorted[sorted.length - 1].patient_count || 0) : 0;
-        const previous = sorted.length >= 2 ? (sorted[sorted.length - 2].patient_count || 0) : 0;
-
-        let trend: 'up' | 'down' | 'stable' = 'stable';
-        if (sorted.length >= 2) {
-          if (recent > previous) trend = 'up';
-          else if (recent < previous) trend = 'down';
-        }
-
-        return { total, trend };
+      const result = await executeProposal(record.proposal, tierByOffice);
+      resolveProposal(messageId, record.id, 'accepted', { resultHref: result.href });
+      toast({
+        title: 'Done',
+        description: result.message,
+        action: (
+          <Button size="sm" variant="outline" onClick={() => navigate(result.href)}>
+            Open
+          </Button>
+        ),
       });
-
-      const total = analyticsData.reduce((sum, a) => sum + a.total, 0);
-      const growing = analyticsData.filter(a => a.trend === 'up').length;
-      const declining = analyticsData.filter(a => a.trend === 'down').length;
-
-      setTotalPatients(total);
-      setAveragePerSource(sources.length > 0 ? Math.round(total / sources.length) : 0);
-      setGrowingSources(growing);
-      setDecliningSources(declining);
-    } catch (error) {
-      console.error('Error loading quick stats:', error);
-    } finally {
-      setLoading(false);
+      // A scheduled visit changes the overdue-visit signal; leaving the rail stale
+      // would have it recommend the visit that was just booked.
+      refresh();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'That could not be created.';
+      resolveProposal(messageId, record.id, 'failed', { error: message });
+      toast({ title: 'Could not do that', description: message, variant: 'destructive' });
     }
   };
 
-  const stats = [
-    { 
-      label: 'Total Patients', 
-      value: totalPatients.toLocaleString(), 
-      icon: Users, 
-      color: 'text-teal-600 dark:text-teal-400',
-      bgColor: 'bg-teal-50 dark:bg-teal-950/30'
-    },
-    { 
-      label: 'Avg/Source', 
-      value: averagePerSource, 
-      icon: Activity, 
-      color: 'text-blue-600 dark:text-blue-400',
-      bgColor: 'bg-blue-50 dark:bg-blue-950/30'
-    },
-    { 
-      label: 'Growing', 
-      value: growingSources, 
-      icon: TrendingUp, 
-      color: 'text-emerald-600 dark:text-emerald-400',
-      bgColor: 'bg-emerald-50 dark:bg-emerald-950/30'
-    },
-    { 
-      label: 'Declining', 
-      value: decliningSources, 
-      icon: TrendingDown, 
-      color: 'text-rose-600 dark:text-rose-400',
-      bgColor: 'bg-rose-50 dark:bg-rose-950/30'
-    },
-  ];
-
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {loading ? (
-          [...Array(4)].map((_, i) => (
-            <Card key={i} className="border-border/50">
-              <CardContent className="p-4">
-                <Skeleton className="h-4 w-24 mb-2" />
-                <Skeleton className="h-8 w-16" />
-              </CardContent>
-            </Card>
-          ))
-        ) : (
-          stats.map((stat, index) => (
-            <Card key={index} className="border-border/50 hover:border-primary/30 transition-colors group">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${stat.bgColor} group-hover:scale-105 transition-transform`}>
-                    <stat.icon className={`w-4 h-4 ${stat.color}`} />
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">{stat.label}</p>
-                    <p className="text-xl font-bold text-foreground">{stat.value}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
+    <TooltipProvider delayDuration={300}>
+      <div className="flex h-[calc(100vh-6.5rem)] min-h-[520px] flex-col gap-4 lg:flex-row">
+        {/* Rail. Above the conversation on mobile, beside it from lg — a phone should
+            show the findings first and the input on the way down, which is the order
+            the two are actually used in. */}
+        <aside className="w-full shrink-0 overflow-y-auto lg:w-80 lg:pr-1 xl:w-96">
+          <BriefingRail
+            briefing={briefing}
+            loading={loading}
+            onAsk={send}
+            disabled={streaming}
+          />
+        </aside>
+
+        <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border/60 bg-card">
+          <header className="flex h-12 shrink-0 items-center justify-between border-b border-border/60 px-3 sm:px-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-foreground">Assistant</span>
+              <span className="hidden text-xs text-muted-foreground sm:inline">
+                reads your referral data
+              </span>
+            </div>
+
+            <div className="flex items-center gap-0.5">
+              {messages.length > 0 && (
+                <IconAction label="Clear conversation" onClick={clear}>
+                  <Trash2 className="h-4 w-4" aria-hidden />
+                </IconAction>
+              )}
+              <IconAction label="Refresh the briefing" onClick={() => refresh()}>
+                <RefreshCw className={loading ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} aria-hidden />
+              </IconAction>
+
+              <Sheet open={forecastOpen} onOpenChange={setForecastOpen}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <SheetTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Forecast">
+                        <LineChart className="h-4 w-4" aria-hidden />
+                      </Button>
+                    </SheetTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>Forecast</TooltipContent>
+                </Tooltip>
+                <SheetContent className="w-full overflow-y-auto sm:max-w-2xl">
+                  <SheetHeader className="mb-4">
+                    <SheetTitle>Forecast</SheetTitle>
+                  </SheetHeader>
+                  {/* Mounted only while open: the forecast calls a model, and paying
+                      for one on every page load of a surface it is not part of is
+                      exactly the waste the tab layout was causing. */}
+                  {forecastOpen && <AIForecastTab />}
+                </SheetContent>
+              </Sheet>
+
+              <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <SheetTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Assistant settings">
+                        <Settings2 className="h-4 w-4" aria-hidden />
+                      </Button>
+                    </SheetTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>Assistant settings</TooltipContent>
+                </Tooltip>
+                <SheetContent className="w-full overflow-y-auto sm:max-w-2xl">
+                  <SheetHeader className="mb-4">
+                    <SheetTitle>Assistant settings</SheetTitle>
+                  </SheetHeader>
+                  {settingsOpen && <AISettingsTab />}
+                </SheetContent>
+              </Sheet>
+            </div>
+          </header>
+
+          <div className="min-h-0 flex-1">
+            <Conversation
+              messages={messages}
+              streaming={streaming}
+              summary={summary}
+              briefingLoading={loading}
+              starters={starters}
+              onSend={send}
+              onStop={stop}
+              onAcceptProposal={handleAccept}
+              onDismissProposal={(messageId, record) =>
+                resolveProposal(messageId, record.id, 'dismissed')
+              }
+            />
+          </div>
+        </section>
       </div>
+    </TooltipProvider>
+  );
+}
 
-      {/* Tabs Section */}
-      <Card className="border-border/50">
-        <CardContent className="p-0">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <div className="border-b border-border/50 bg-muted/30 rounded-t-lg">
-              <TabsList className="h-auto p-1 bg-transparent w-full justify-start gap-1">
-                <TabsTrigger 
-                  value="analysis" 
-                  className="flex items-center gap-2 px-4 py-2.5 data-[state=active]:bg-background data-[state=active]:text-teal-600 dark:data-[state=active]:text-teal-400 data-[state=active]:shadow-sm rounded-lg"
-                >
-                  <Brain className="h-4 w-4" />
-                  <span className="hidden sm:inline">Analysis</span>
-                  <Badge variant="secondary" className="ml-1 text-xs bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300">
-                    AI
-                  </Badge>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="chat" 
-                  className="flex items-center gap-2 px-4 py-2.5 data-[state=active]:bg-background data-[state=active]:text-teal-600 dark:data-[state=active]:text-teal-400 data-[state=active]:shadow-sm rounded-lg"
-                >
-                  <MessageSquare className="h-4 w-4" />
-                  <span className="hidden sm:inline">Chat</span>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="forecast" 
-                  className="flex items-center gap-2 px-4 py-2.5 data-[state=active]:bg-background data-[state=active]:text-teal-600 dark:data-[state=active]:text-teal-400 data-[state=active]:shadow-sm rounded-lg"
-                >
-                  <Target className="h-4 w-4" />
-                  <span className="hidden sm:inline">Forecast</span>
-                  <Badge variant="secondary" className="ml-1 text-xs bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300">
-                    AI
-                  </Badge>
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="settings" 
-                  className="flex items-center gap-2 px-4 py-2.5 data-[state=active]:bg-background data-[state=active]:text-teal-600 dark:data-[state=active]:text-teal-400 data-[state=active]:shadow-sm rounded-lg"
-                >
-                  <Settings className="h-4 w-4" />
-                  <span className="hidden sm:inline">Settings</span>
-                </TabsTrigger>
-              </TabsList>
-            </div>
-
-            <div className="p-6">
-              <TabsContent value="analysis" className="mt-0">
-                <AIAnalysisTab />
-              </TabsContent>
-
-              <TabsContent value="chat" className="mt-0">
-                <AIChatTab />
-              </TabsContent>
-
-              <TabsContent value="forecast" className="mt-0">
-                <AIForecastTab />
-              </TabsContent>
-
-              <TabsContent value="settings" className="mt-0">
-                <AISettingsTab />
-              </TabsContent>
-            </div>
-          </Tabs>
-        </CardContent>
-      </Card>
-    </div>
+function IconAction({
+  label,
+  onClick,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClick} aria-label={label}>
+          {children}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
   );
 }
