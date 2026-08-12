@@ -528,16 +528,16 @@ All colors MUST be HSL.
     50% { opacity: 0.5; transform: scale(1.3); }
   }
 
-  @keyframes drift {
-    0% { opacity: 0; transform: translateY(-6px); }
-    35%, 65% { opacity: 1; }
-    100% { opacity: 0; transform: translateY(14px); }
+  /* The mark settling into the middle of the diagram on load. */
+  @keyframes logo-in {
+    0% { opacity: 0; transform: scale(0.86); }
+    100% { opacity: 1; transform: scale(1); }
   }
 
+  .animate-logo-in { animation: logo-in 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; }
   .animate-inflow { animation: inflow 4s linear infinite; }
   .animate-quiet { animation: quiet 7s ease-in-out infinite; }
   .animate-breathe { animation: breathe 5s ease-in-out infinite; transform-origin: 200px 200px; }
-  .animate-drift { animation: drift 2.8s ease-in-out infinite; }
 
   .hover-glow:hover {
     animation: glow 0.3s ease-in-out;
@@ -594,7 +594,7 @@ All colors MUST be HSL.
   .animate-inflow,
   .animate-quiet,
   .animate-breathe,
-  .animate-drift {
+  .animate-logo-in {
     animation: none !important;
   }
 
