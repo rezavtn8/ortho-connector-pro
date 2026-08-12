@@ -98,6 +98,23 @@ All colors MUST be HSL.
     --momentum-slipping: 3 72% 60%;
     --momentum-quiet: 2 80% 24%;
 
+    /* Categorical series colours for charts.
+
+       Assigned in this fixed order and never cycled: --chart-1 is always the
+       practice's own line, so a competitor added or removed never repaints the
+       series that stayed. A chart needing more than five series folds the tail
+       into "Other" rather than inventing a sixth hue.
+
+       Validated against the light chart surface: all five inside the OKLCH
+       lightness band, above the chroma floor, above 3:1 contrast, and the worst
+       adjacent pair separates at CVD deltaE 15.5 (deutan) / 15.3 (tritan) with
+       25.3 for normal vision. --chart-1 leads with the brand teal. */
+    --chart-1: 187 95% 33%;
+    --chart-2: 265 70% 55%;
+    --chart-3: 35 95% 38%;
+    --chart-4: 213 68% 50%;
+    --chart-5: 345 70% 50%;
+
     /* Gradients */
     --gradient-connection: linear-gradient(135deg, hsl(185 15% 99%), hsl(185 15% 95%));
     --gradient-card: linear-gradient(145deg, hsl(185 10% 99%), hsl(185 15% 96%));
@@ -211,6 +228,18 @@ All colors MUST be HSL.
     --momentum-steady: 220 8% 58%;
     --momentum-slipping: 3 72% 56%;
     --momentum-quiet: 2 70% 38%;
+
+    /* Categorical series colours - dark mode.
+
+       Re-stepped against the dark surface rather than flipped: the light steps
+       sit above the dark lightness band and glare. Same hues, same order, so a
+       chart keeps its series identity across themes. Validated at OKLCH L 0.60
+       with the worst adjacent pair at CVD deltaE 12.1 / 12.9 and 22.3 normal. */
+    --chart-1: 187 80% 35%;
+    --chart-2: 265 72% 63%;
+    --chart-3: 35 88% 38%;
+    --chart-4: 213 75% 54%;
+    --chart-5: 345 78% 53%;
 
     /* Gradients - dark mode */
     --gradient-connection: linear-gradient(135deg, hsl(185 20% 12%), hsl(185 20% 8%));

@@ -1,248 +1,298 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
+/**
+ * Competitor watchlist and daily snapshots.
+ *
+ * Google access lives in places.ts; this module owns authentication, the
+ * actions the page calls, and persistence.
+ *
+ * Three rules shape the design:
+ *
+ *  1. **A snapshot is only written when Google actually answered.** The old
+ *     code stored whatever came back from a details call wrapped in a
+ *     try/catch, so a throttled request recorded a real practice as having
+ *     zero reviews and poisoned every trend drawn through that point.
+ *
+ *  2. **Refresh is idempotent and never billed twice in a day.** Entries
+ *     already snapshotted today are skipped unless the caller forces it, which
+ *     is what makes it safe for the page to offer a refresh button and for a
+ *     cron to call the same action.
+ *
+ *  3. **Nothing bills Google on page load.** `bootstrap` is database-only. The
+ *     page used to re-run the `add` action on every mount to keep the
+ *     practice's own row current, which cost a Place Details call each time
+ *     the tab was opened.
+ */
 
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 import { getCorsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
-serve(async (req: Request) => {
-  const corsHeaders = getCorsHeaders(req, { "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
+import { PlaceResult, PlacesClient } from "./places.ts";
 
-  if (req.method === 'OPTIONS') {
-    return handleCorsPreflight(req, corsHeaders);
-  }
+/** Ceiling on billed Google calls for one invocation. */
+const MAX_GOOGLE_REQUESTS = Number(Deno.env.get("COMPETITOR_MAX_REQUESTS") ?? 60);
+
+/** Watchlist entries refreshed concurrently. */
+const REFRESH_CONCURRENCY = 4;
+
+/** Hard cap on tracked competitors, so refresh cost stays predictable. */
+const MAX_WATCHLIST = 25;
+
+const DEFAULT_SEARCH_RADIUS_MILES = 10;
+const MAX_SEARCH_RADIUS_MILES = 30;
+
+/** Office types treated as competing for the same referrals. */
+const DENTAL_FAMILY = [
+  "dent",
+  "ortho",
+  "endo",
+  "perio",
+  "prosth",
+  "oral",
+  "maxillo",
+  "pedodont",
+  "implant",
+];
+
+interface WatchlistRow {
+  id: string;
+  google_place_id: string;
+  name: string;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+serve(async (req: Request) => {
+  const corsHeaders = getCorsHeaders(req, {
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  });
+
+  if (req.method === "OPTIONS") return handleCorsPreflight(req, corsHeaders);
+
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
 
   try {
-    const supabaseAuth = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
-    );
-
-    const token = (req.headers.get('Authorization') || '').replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getUser(token);
-    if (claimsError || !claimsData?.user?.id) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    const userId = claimsData.user.id;
-
     const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
-    const GOOGLE_MAPS_API_KEY = Deno.env.get('GOOGLE_MAPS_API_KEY');
-    if (!GOOGLE_MAPS_API_KEY) {
-      throw new Error('GOOGLE_MAPS_API_KEY not configured');
+    const body = await req.json().catch(() => ({}));
+    const action = body?.action;
+    const entry = body?.watchlist_entry ?? {};
+
+    // ---------------------------------------------------------- refresh-all
+    //
+    // The scheduled path. A watch that only updates when someone opens the tab
+    // has no history on the days that matter, so this exists to be called
+    // nightly for every account at once.
+    //
+    // It cannot use the user JWT the other actions use — there is no user on a
+    // cron — so it is authorised by a shared secret instead. Unset secret means
+    // the endpoint stays closed rather than open.
+    if (action === "refresh-all") {
+      const expected = Deno.env.get("COMPETITOR_CRON_SECRET");
+      const presented = req.headers.get("x-cron-secret");
+      if (!expected || presented !== expected) {
+        console.warn("[competitor] refresh-all rejected: bad or missing cron secret");
+        return json({ error: "Unauthorized" }, 401);
+      }
+      return json(await refreshAllUsers(supabase));
     }
 
-    const body = await req.json();
-    const { action, watchlist_entry, place_id } = body;
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const supabaseAuth = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } },
+    );
 
-    // Action: add competitor to watchlist
-    if (action === 'add') {
-      const { data, error } = await supabase
-        .from('competitor_watchlist')
-        .upsert({
+    const { data: claims, error: claimsError } = await supabaseAuth.auth.getUser(
+      authHeader.replace("Bearer ", ""),
+    );
+    if (claimsError || !claims?.user?.id) return json({ error: "Unauthorized" }, 401);
+    const userId = claims.user.id;
+
+    // ------------------------------------------------------------ bootstrap
+    //
+    // Make sure the practice's own Google listing is tracked, so ranks and the
+    // review race have a "you" line. Database only — no Google call.
+    if (action === "bootstrap") {
+      const clinic = await loadClinic(supabase, userId);
+      if (!clinic?.google_place_id) {
+        return json({ success: true, tracked: false, reason: "clinic-has-no-place-id" });
+      }
+
+      const { error } = await supabase.from("competitor_watchlist").upsert(
+        {
           user_id: userId,
-          google_place_id: watchlist_entry.google_place_id,
-          name: watchlist_entry.name,
-          address: watchlist_entry.address,
-          specialty: watchlist_entry.specialty,
-          latitude: watchlist_entry.latitude,
-          longitude: watchlist_entry.longitude,
-          clinic_id: watchlist_entry.clinic_id || null,
-        }, { onConflict: 'user_id,google_place_id' })
-        .select()
-        .single();
-
+          google_place_id: clinic.google_place_id,
+          name: clinic.name,
+          address: clinic.address,
+          specialty: clinic.specialty ?? "dentist",
+          latitude: clinic.latitude,
+          longitude: clinic.longitude,
+          clinic_id: clinic.id,
+          is_active: true,
+        },
+        { onConflict: "user_id,google_place_id" },
+      );
       if (error) throw error;
 
-      // Take an initial snapshot
-      const snapshot = await fetchGooglePlaceData(data.google_place_id, GOOGLE_MAPS_API_KEY);
-      if (snapshot) {
-        await supabase.from('competitor_snapshots').upsert({
-          watchlist_id: data.id,
-          user_id: userId,
-          google_rating: snapshot.rating,
-          review_count: snapshot.review_count,
-          review_velocity: 0,
-          snapshot_date: new Date().toISOString().split('T')[0],
-          raw_data: snapshot.raw,
-        }, { onConflict: 'watchlist_id,snapshot_date' });
-      }
-
-      return new Response(JSON.stringify({ success: true, data, snapshot }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return json({ success: true, tracked: true });
     }
 
-    // Action: remove competitor
-    if (action === 'remove') {
-      await supabase
-        .from('competitor_watchlist')
-        .delete()
-        .eq('id', watchlist_entry.id)
-        .eq('user_id', userId);
-
-      return new Response(JSON.stringify({ success: true }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Action: refresh all snapshots for user
-    if (action === 'refresh') {
-      const { data: watchlist } = await supabase
-        .from('competitor_watchlist')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('is_active', true);
-
-      if (!watchlist || watchlist.length === 0) {
-        return new Response(JSON.stringify({ success: true, refreshed: 0 }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+    // ------------------------------------------------------------------ add
+    if (action === "add") {
+      // `name` is NOT NULL on the table, so an entry missing it would surface
+      // as an opaque 500 rather than a usable message.
+      if (!entry.google_place_id || !entry.name) {
+        return json({ error: "google_place_id and name are required" }, 400);
       }
 
-      const today = new Date().toISOString().split('T')[0];
-      let refreshed = 0;
+      const { count } = await supabase
+        .from("competitor_watchlist")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("is_active", true);
 
-      for (const entry of watchlist) {
-        try {
-          const snapshot = await fetchGooglePlaceData(entry.google_place_id, GOOGLE_MAPS_API_KEY);
-          if (!snapshot) continue;
+      // Re-adding an existing entry is an update, not a new slot, so it is
+      // allowed even at the cap.
+      const { data: existing } = await supabase
+        .from("competitor_watchlist")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("google_place_id", entry.google_place_id)
+        .maybeSingle();
 
-          const { data: prevSnapshots } = await supabase
-            .from('competitor_snapshots')
-            .select('review_count, snapshot_date')
-            .eq('watchlist_id', entry.id)
-            .order('snapshot_date', { ascending: false })
-            .limit(1);
+      if (!existing && (count ?? 0) >= MAX_WATCHLIST) {
+        return json(
+          { error: `Watchlist is limited to ${MAX_WATCHLIST} practices. Remove one to add another.` },
+          400,
+        );
+      }
 
-          let velocity = 0;
-          if (prevSnapshots && prevSnapshots.length > 0) {
-            const prev = prevSnapshots[0];
-            const daysDiff = Math.max(1, Math.floor(
-              (new Date(today).getTime() - new Date(prev.snapshot_date).getTime()) / (1000 * 60 * 60 * 24)
-            ));
-            const reviewDiff = (snapshot.review_count || 0) - (prev.review_count || 0);
-            velocity = Math.round((reviewDiff / daysDiff) * 7 * 100) / 100;
-          }
-
-          await supabase.from('competitor_snapshots').upsert({
-            watchlist_id: entry.id,
+      const { data: row, error } = await supabase
+        .from("competitor_watchlist")
+        .upsert(
+          {
             user_id: userId,
-            google_rating: snapshot.rating,
-            review_count: snapshot.review_count,
-            review_velocity: velocity,
-            snapshot_date: today,
-            raw_data: snapshot.raw,
-          }, { onConflict: 'watchlist_id,snapshot_date' });
-
-          refreshed++;
-        } catch (e) {
-          console.error(`Failed to refresh ${entry.name}:`, e);
-        }
-      }
-
-      return new Response(JSON.stringify({ success: true, refreshed }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Action: search for competitors by specialty near a location
-    if (action === 'search') {
-      const lat = watchlist_entry?.latitude;
-      const lng = watchlist_entry?.longitude;
-      const spec = watchlist_entry?.specialty || 'dentist';
-      const radiusMeters = ((watchlist_entry?.radius_miles || 10) * 1609.34).toFixed(0);
-
-      // Use keyword for specialty, don't hardcode type=dentist
-      const searchUrl = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radiusMeters}&keyword=${encodeURIComponent(spec)}&key=${GOOGLE_MAPS_API_KEY}`;
-      
-      const searchRes = await fetch(searchUrl);
-      const searchData = await searchRes.json();
-
-      const results = (searchData.results || []).map((place: any) => ({
-        google_place_id: place.place_id,
-        name: place.name,
-        address: place.vicinity || place.formatted_address,
-        latitude: place.geometry?.location?.lat,
-        longitude: place.geometry?.location?.lng,
-        google_rating: place.rating,
-        review_count: place.user_ratings_total,
-        specialty: spec,
-      }));
-
-      return new Response(JSON.stringify({ success: true, results }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Action: suggest competitors from discovered offices
-    if (action === 'suggest') {
-      const specialty = watchlist_entry?.specialty || 'dentist';
-
-      // Get already-watched place IDs
-      const { data: watched } = await supabase
-        .from('competitor_watchlist')
-        .select('google_place_id')
-        .eq('user_id', userId)
-        .eq('is_active', true);
-      
-      const watchedPlaceIds = (watched || []).map(w => w.google_place_id);
-
-      // Get user's clinic google_place_id to exclude it
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('clinic_id')
-        .eq('user_id', userId)
+            google_place_id: entry.google_place_id,
+            name: entry.name,
+            address: entry.address ?? null,
+            specialty: entry.specialty ?? null,
+            latitude: entry.latitude ?? null,
+            longitude: entry.longitude ?? null,
+            clinic_id: entry.clinic_id ?? null,
+            is_active: true,
+          },
+          { onConflict: "user_id,google_place_id" },
+        )
+        .select()
         .single();
+      if (error) throw error;
 
-      let clinicPlaceId: string | null = null;
-      if (profile?.clinic_id) {
-        const { data: clinicData } = await supabase
-          .from('clinics')
-          .select('google_place_id')
-          .eq('id', profile.clinic_id)
-          .single();
-        clinicPlaceId = clinicData?.google_place_id || null;
+      const places = new PlacesClient(requireApiKey(), MAX_GOOGLE_REQUESTS);
+      const snapshot = await snapshotEntry(supabase, places, userId, row);
+
+      return json({
+        success: true,
+        data: row,
+        snapshot,
+        diagnostics: places.diagnostics,
+      });
+    }
+
+    // --------------------------------------------------------------- remove
+    if (action === "remove") {
+      if (!entry.id) return json({ error: "id is required" }, 400);
+
+      // Snapshots cascade on the foreign key, so the history goes with it.
+      const { error } = await supabase
+        .from("competitor_watchlist")
+        .delete()
+        .eq("id", entry.id)
+        .eq("user_id", userId);
+      if (error) throw error;
+
+      return json({ success: true });
+    }
+
+    // -------------------------------------------------------------- refresh
+    if (action === "refresh") {
+      const places = new PlacesClient(requireApiKey(), MAX_GOOGLE_REQUESTS);
+      const result = await refreshUser(supabase, places, userId, body?.force === true);
+      return json({ success: true, ...result, diagnostics: places.diagnostics });
+    }
+
+    // --------------------------------------------------------------- search
+    if (action === "search") {
+      const clinic = await loadClinic(supabase, userId);
+      const lat = numberOrNull(entry.latitude) ?? numberOrNull(clinic?.latitude);
+      const lng = numberOrNull(entry.longitude) ?? numberOrNull(clinic?.longitude);
+      if (lat == null || lng == null) {
+        return json({ error: "Set your clinic address before searching" }, 400);
       }
 
-      // Query discovered offices
+      const query = (entry.specialty || clinic?.specialty || "dentist").toString().slice(0, 120);
+      const radius = Math.min(
+        MAX_SEARCH_RADIUS_MILES,
+        Math.max(1, numberOrNull(entry.radius_miles) ?? DEFAULT_SEARCH_RADIUS_MILES),
+      );
+
+      const places = new PlacesClient(requireApiKey(), MAX_GOOGLE_REQUESTS);
+      const found = await places.search(query, lat, lng, radius);
+
+      const excluded = await excludedPlaceIds(supabase, userId, clinic?.google_place_id ?? null);
+      const results = found
+        .filter((p) => !excluded.has(p.google_place_id))
+        // A closed practice is not a competitor.
+        .filter((p) => p.business_status == null || p.business_status === "OPERATIONAL")
+        .map((p) => withDistance(p, lat, lng, query))
+        .sort((a, b) => (a.distance_miles ?? 999) - (b.distance_miles ?? 999));
+
+      return json({ success: true, results, diagnostics: places.diagnostics });
+    }
+
+    // -------------------------------------------------------------- suggest
+    //
+    // Reuses offices already discovered, so suggestions cost nothing.
+    if (action === "suggest") {
+      const clinic = await loadClinic(supabase, userId);
+      const specialty = (entry.specialty || clinic?.specialty || "dentist").toString().toLowerCase();
+      const excluded = await excludedPlaceIds(supabase, userId, clinic?.google_place_id ?? null);
+
       const { data: discovered } = await supabase
-        .from('discovered_offices')
-        .select('id, name, address, google_place_id, google_rating, user_ratings_total, latitude, longitude, office_type, distance_miles')
-        .eq('discovered_by', userId)
-        .eq('is_active', true)
-        .order('distance_miles', { ascending: true })
-        .limit(30);
+        .from("discovered_offices")
+        .select(
+          "name, address, google_place_id, google_rating, user_ratings_total, latitude, longitude, office_type, distance_miles",
+        )
+        .eq("discovered_by", userId)
+        .eq("is_active", true)
+        .order("distance_miles", { ascending: true })
+        .limit(120);
 
-      // Filter: exclude watched/own clinic, use broad dental-family matching
-      const excludeIds = new Set(watchedPlaceIds);
-      if (clinicPlaceId) excludeIds.add(clinicPlaceId);
+      const wantsDental = DENTAL_FAMILY.some((kw) => specialty.includes(kw));
 
-      // Dental-family keywords: if any of these appear in the office_type, it's a potential competitor
-      const dentalFamily = ['dent', 'ortho', 'endo', 'perio', 'prosth', 'oral', 'maxillo', 'pedodont', 'implant'];
-      const specLower = specialty.toLowerCase();
-      
-      const isDentalSpec = dentalFamily.some(kw => specLower.includes(kw));
-
-      const suggestions = (discovered || [])
-        .filter(d => {
-          if (excludeIds.has(d.google_place_id)) return false;
-          const officeType = (d.office_type || '').toLowerCase();
-          
-          // If user's specialty is dental-family, match all dental-family offices
-          if (isDentalSpec) {
-            return dentalFamily.some(kw => officeType.includes(kw)) || officeType === 'unknown';
-          }
-          
-          // Otherwise do flexible matching
-          return officeType.includes(specLower) || specLower.includes(officeType) || officeType === 'unknown';
+      const results = (discovered ?? [])
+        .filter((d) => d.google_place_id && !excluded.has(d.google_place_id))
+        .filter((d) => {
+          const type = (d.office_type ?? "").toLowerCase();
+          if (!type || type === "unknown") return true;
+          if (wantsDental) return DENTAL_FAMILY.some((kw) => type.includes(kw));
+          return type.includes(specialty) || specialty.includes(type);
         })
-        .slice(0, 10)
-        .map(d => ({
+        // Nearest 120 are fetched, then ranked by prominence rather than by
+        // distance: the practice two miles away with 400 reviews is a bigger
+        // competitor than the one next door with none, and sorting this way
+        // sinks the zero-review listings to the bottom on its own.
+        .sort((a, b) => (b.user_ratings_total ?? 0) - (a.user_ratings_total ?? 0))
+        .slice(0, 12)
+        .map((d) => ({
           google_place_id: d.google_place_id,
           name: d.name,
           address: d.address,
@@ -250,59 +300,290 @@ serve(async (req: Request) => {
           longitude: d.longitude,
           google_rating: d.google_rating,
           review_count: d.user_ratings_total,
-          specialty,
+          specialty: d.office_type ?? specialty,
           distance_miles: d.distance_miles,
         }));
 
-      return new Response(JSON.stringify({ success: true, results: suggestions }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return json({ success: true, results });
     }
 
-    return new Response(JSON.stringify({ error: 'Invalid action' }), {
-      status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-
+    return json({ error: `Unknown action: ${action}` }, 400);
   } catch (error: any) {
-    console.error('Error in competitor-snapshot:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.error("[competitor] unhandled error:", error);
+    return json({ error: error?.message ?? "Unexpected error" }, 500);
   }
 });
 
-async function fetchGooglePlaceData(placeId: string, apiKey: string) {
-  try {
-    const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=name,rating,user_ratings_total,reviews,types&key=${apiKey}`;
-    const res = await fetch(url);
-    const data = await res.json();
-    
-    if (data.status !== 'OK' || !data.result) return null;
+// ------------------------------------------------------------------ helpers
 
-    const result = data.result;
-    const recentReviews = (result.reviews || []).filter((r: any) => {
-      const reviewDate = new Date(r.time * 1000);
-      const monthAgo = new Date();
-      monthAgo.setMonth(monthAgo.getMonth() - 1);
-      return reviewDate > monthAgo;
-    });
+function requireApiKey(): string {
+  const key = Deno.env.get("GOOGLE_MAPS_API_KEY");
+  if (!key) throw new Error("GOOGLE_MAPS_API_KEY is not configured");
+  return key;
+}
 
-    return {
-      rating: result.rating || null,
-      review_count: result.user_ratings_total || 0,
-      recent_reviews: recentReviews.length,
-      raw: {
-        types: result.types,
-        reviews_sample: (result.reviews || []).slice(0, 3).map((r: any) => ({
-          rating: r.rating,
-          text: r.text?.substring(0, 200),
-          time: r.time,
-          author: r.author_name,
-        })),
-      },
-    };
-  } catch (e) {
-    console.error('Failed to fetch place data:', e);
+/** `YYYY-MM-DD` in UTC, matching the `snapshot_date` column's semantics. */
+function utcToday(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function numberOrNull(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+async function loadClinic(supabase: any, userId: string) {
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("clinic_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!profile?.clinic_id) return null;
+
+  const { data: clinic } = await supabase
+    .from("clinics")
+    .select("id, name, address, latitude, longitude, google_place_id, specialty")
+    .eq("id", profile.clinic_id)
+    .maybeSingle();
+  return clinic ?? null;
+}
+
+/** Place ids that must never appear as a suggestion: already watched, or us. */
+async function excludedPlaceIds(
+  supabase: any,
+  userId: string,
+  clinicPlaceId: string | null,
+): Promise<Set<string>> {
+  const { data: watched } = await supabase
+    .from("competitor_watchlist")
+    .select("google_place_id")
+    .eq("user_id", userId)
+    .eq("is_active", true);
+
+  const ids = new Set<string>((watched ?? []).map((w: any) => w.google_place_id));
+  if (clinicPlaceId) ids.add(clinicPlaceId);
+  return ids;
+}
+
+function withDistance(place: PlaceResult, lat: number, lng: number, specialty: string) {
+  const distance =
+    place.latitude != null && place.longitude != null
+      ? haversineMiles(lat, lng, place.latitude, place.longitude)
+      : null;
+  return {
+    ...place,
+    specialty,
+    distance_miles: distance == null ? null : Math.round(distance * 10) / 10,
+  };
+}
+
+function haversineMiles(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 3958.8;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+interface RefreshOutcome {
+  refreshed: number;
+  skipped: number;
+  failed: number;
+  upToDate?: boolean;
+}
+
+/**
+ * Snapshot every practice one user watches.
+ *
+ * Entries already captured today are skipped unless forced, which is what
+ * makes this safe to call from both a button and a nightly cron without
+ * paying Google twice for the same day.
+ */
+async function refreshUser(
+  supabase: any,
+  places: PlacesClient,
+  userId: string,
+  force: boolean,
+): Promise<RefreshOutcome> {
+  const today = utcToday();
+
+  const { data: watchlist, error } = await supabase
+    .from("competitor_watchlist")
+    .select("id, google_place_id, name, latitude, longitude")
+    .eq("user_id", userId)
+    .eq("is_active", true);
+  if (error) throw error;
+
+  if (!watchlist?.length) return { refreshed: 0, skipped: 0, failed: 0 };
+
+  // One query for today's snapshots beats one existence check per entry.
+  const { data: todays } = await supabase
+    .from("competitor_snapshots")
+    .select("watchlist_id")
+    .eq("user_id", userId)
+    .eq("snapshot_date", today);
+  const alreadyToday = new Set((todays ?? []).map((s: any) => s.watchlist_id));
+
+  const due = force ? watchlist : watchlist.filter((w: WatchlistRow) => !alreadyToday.has(w.id));
+  const skipped = watchlist.length - due.length;
+
+  if (due.length === 0) return { refreshed: 0, skipped, failed: 0, upToDate: true };
+
+  const results = await mapWithConcurrency(due, REFRESH_CONCURRENCY, (row: WatchlistRow) =>
+    snapshotEntry(supabase, places, userId, row).catch((e) => {
+      console.error(`[competitor] refresh failed for ${row.name}:`, e);
+      return null;
+    }),
+  );
+
+  const refreshed = results.filter(Boolean).length;
+  return { refreshed, skipped, failed: due.length - refreshed };
+}
+
+/**
+ * The nightly sweep: every account that watches anything.
+ *
+ * Users are processed one at a time with a fresh request budget each, so one
+ * account with a full watchlist cannot exhaust the budget and leave everyone
+ * after it without a snapshot for the day. A user whose refresh throws is
+ * logged and stepped over rather than aborting the run.
+ */
+async function refreshAllUsers(supabase: any) {
+  const { data: rows, error } = await supabase
+    .from("competitor_watchlist")
+    .select("user_id")
+    .eq("is_active", true);
+  if (error) throw error;
+
+  const userIds = [...new Set((rows ?? []).map((r: any) => r.user_id as string))];
+  const apiKey = requireApiKey();
+
+  let refreshed = 0;
+  let failed = 0;
+  const errors: string[] = [];
+
+  for (const userId of userIds) {
+    try {
+      const places = new PlacesClient(apiKey, MAX_GOOGLE_REQUESTS);
+      const result = await refreshUser(supabase, places, userId as string, false);
+      refreshed += result.refreshed;
+      failed += result.failed;
+    } catch (e) {
+      failed++;
+      const message = e instanceof Error ? e.message : String(e);
+      console.error(`[competitor] refresh-all failed for user ${userId}:`, message);
+      if (errors.length < 5) errors.push(message);
+    }
+  }
+
+  console.log(
+    `[competitor] refresh-all covered ${userIds.length} users, ${refreshed} snapshots, ${failed} failures`,
+  );
+  return { success: true, users: userIds.length, refreshed, failed, errors };
+}
+
+/**
+ * Fetch and store one competitor's current standing.
+ *
+ * Velocity is measured against the most recent snapshot *strictly before
+ * today*. The previous version took the latest snapshot of any date, so a
+ * second refresh on the same day compared today's row against itself, computed
+ * a zero-day delta and overwrote a real velocity with 0.
+ *
+ * Returns null without writing when Google did not answer, so a failed call
+ * cannot enter the history as a genuine collapse to zero reviews.
+ */
+async function snapshotEntry(
+  supabase: any,
+  places: PlacesClient,
+  userId: string,
+  row: WatchlistRow,
+) {
+  const details = await places.details(row.google_place_id);
+  if (!details) {
+    console.warn(`[competitor] no details for ${row.name} (${row.google_place_id})`);
     return null;
   }
+
+  const today = utcToday();
+
+  const { data: previous } = await supabase
+    .from("competitor_snapshots")
+    .select("review_count, snapshot_date")
+    .eq("watchlist_id", row.id)
+    .lt("snapshot_date", today)
+    .order("snapshot_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let velocity = 0;
+  if (previous) {
+    const days = Math.max(
+      1,
+      Math.round(
+        (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${previous.snapshot_date}T00:00:00Z`)) /
+          86_400_000,
+      ),
+    );
+    const gained = (details.reviewCount ?? 0) - (previous.review_count ?? 0);
+    velocity = Math.round((gained / days) * 7 * 100) / 100;
+  }
+
+  const { error } = await supabase.from("competitor_snapshots").upsert(
+    {
+      watchlist_id: row.id,
+      user_id: userId,
+      google_rating: details.rating,
+      review_count: details.reviewCount,
+      review_velocity: velocity,
+      snapshot_date: today,
+      raw_data: {
+        types: details.types,
+        business_status: details.businessStatus,
+        reviews: details.reviews,
+        captured_at: new Date().toISOString(),
+      },
+    },
+    { onConflict: "watchlist_id,snapshot_date" },
+  );
+  if (error) throw error;
+
+  // Google is the authority on a practice's name; keep the watchlist in step
+  // so a rebrand does not leave a stale label on the chart.
+  if (details.name && details.name !== row.name) {
+    await supabase.from("competitor_watchlist").update({ name: details.name }).eq("id", row.id);
+  }
+
+  return {
+    watchlist_id: row.id,
+    rating: details.rating,
+    review_count: details.reviewCount,
+    review_velocity: velocity,
+  };
+}
+
+/** Run `fn` over `items` with at most `limit` in flight at once. */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (true) {
+      const index = cursor++;
+      if (index >= items.length) return;
+      results[index] = await fn(items[index]);
+    }
+  });
+
+  await Promise.all(workers);
+  return results;
 }

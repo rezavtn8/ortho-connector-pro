@@ -269,7 +269,12 @@ Office discovery was rebuilt in August 2026. Two things need database and Google
 access, which is why they are here rather than done already. **Until step 1 lands, discovery
 runs on a fallback path and two users cannot both keep the same discovered office.**
 
-### 8a — apply the constraint migration
+### 8a — apply the constraint migration — DONE
+
+Applied 11 Aug 2026 in commit f2c3b98, as
+`supabase/migrations/20260811233954_4b66ff7e-ae24-477e-8ff8-40eb42139afa.sql` rather than
+the committed file below. Do not run it again: `ADD CONSTRAINT` is not idempotent and will
+error now that `discovered_offices_user_place_id_key` exists. Kept for the record.
 
 ```
 supabase/migrations/20260811120000_discovered_offices_per_user_place_id.sql is committed but
@@ -336,6 +341,65 @@ These are Edge Function secrets with sensible defaults. Set them only if you hav
 | `DISCOVERY_WEEKLY_LIMIT` | 25 | Fresh (non-cached) searches per user per rolling 7 days. Shown in the wizard. |
 | `DISCOVERY_MAX_REQUESTS` | 160 | Ceiling on billed Google calls for one search. |
 | `DISCOVERY_DEADLINE_MS` | 90000 | Stop starting new Google calls after this long and return what was found. |
+
+---
+
+## Prompt 9 — finish the Competitor Watch rebuild
+
+Competitor Watch was rebuilt in August 2026. It works today on manual refresh. Two steps
+need database access.
+
+### 9a — apply the history migration
+
+```
+Please apply supabase/migrations/20260811180000_competitor_watch_history.sql and confirm.
+
+Part 1 adds three indexes. competitor_snapshots had none beyond its primary key and its
+(watchlist_id, snapshot_date) unique constraint, and every read is scoped by user_id
+through RLS, so the whole table was scanned on each page load.
+
+Part 2 schedules a nightly job and skips itself with a NOTICE if pg_cron/pg_net or its two
+settings are missing, so applying the file is safe either way.
+
+Confirm: idx_competitor_snapshots_user_date, idx_competitor_snapshots_user_watchlist and
+idx_competitor_watchlist_user_active exist, and report any NOTICE the DO block raised.
+
+Do not change application code in this task.
+```
+
+### 9b — turn on nightly snapshots
+
+Every trend line, the review race chart and the movement feed read `competitor_snapshots`,
+and rows only exist for days a snapshot was taken. On manual refresh alone, the weeks
+nobody opens the page are the weeks a competitor's review campaign goes unrecorded.
+
+**Cost first:** one Google Place Details call per watched practice per day, per account.
+The watchlist is capped at 25, so at most 25 calls per account per day. Everything else on
+the page works without this, just with sparser history. Decide before running it.
+
+```
+Please enable the nightly competitor snapshot job.
+
+1. Generate a random secret. Set it as Edge Function secret COMPETITOR_CRON_SECRET, and:
+
+   ALTER DATABASE postgres SET app.settings.competitor_cron_secret = '<the secret>';
+   ALTER DATABASE postgres SET app.settings.project_url = 'https://<ref>.supabase.co';
+
+2. Confirm pg_cron and pg_net are enabled.
+3. Re-run supabase/migrations/20260811180000_competitor_watch_history.sql. The DO block is
+   idempotent — it unschedules any existing job of the same name first.
+4. Confirm a cron.job row named 'competitor-nightly-snapshot' exists at '10 7 * * *'.
+```
+
+The `refresh-all` action is authorised by that secret alone and returns 401 while it is
+unset, so the endpoint stays closed until step 1 is done.
+
+### 9c — tuning knobs (reference)
+
+| Secret | Default | What it does |
+| --- | --- | --- |
+| `COMPETITOR_MAX_REQUESTS` | 60 | Ceiling on billed Google calls for one invocation. |
+| `COMPETITOR_CRON_SECRET` | unset | Required for `refresh-all`. Unset means closed. |
 
 ---
 
