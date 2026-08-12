@@ -11,7 +11,13 @@ import {
   Trash2, Users, Zap,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { METHOD_META, type CampaignStatus } from '@/lib/campaigns';
+import {
+  EMPTY_STATS,
+  METHOD_META,
+  normalizeMethod,
+  progressFor,
+  type CampaignStatus,
+} from '@/lib/campaigns';
 import { ATTENTION_STYLE } from './AttentionNote';
 import type { Campaign } from '@/hooks/useCampaigns';
 
