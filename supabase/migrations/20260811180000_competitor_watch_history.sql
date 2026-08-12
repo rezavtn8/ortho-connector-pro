@@ -28,12 +28,17 @@ CREATE INDEX IF NOT EXISTS idx_competitor_watchlist_user_active
 
 
 -- ---------------------------------------------------------------------------
--- Part 2: nightly snapshots (optional)
+-- Part 2: scheduled snapshots, every third night (optional)
 --
 -- Without this, history only accumulates on days somebody opens the page and
 -- presses Refresh, which is exactly the wrong sampling: the weeks nobody looks
 -- are the weeks a competitor's review campaign goes unrecorded. Movement
 -- detection and every trend line on the page are drawn from these rows.
+--
+-- Sampling every third day rather than nightly cuts the Google bill to a third.
+-- Nothing on the page assumes daily rows: velocity is measured over real
+-- elapsed days and surge detection compares a competitor against their own
+-- baseline, so wider spacing changes when a change is noticed, not whether.
 --
 -- Before applying, set the two settings the job reads. The secret must match the
 -- COMPETITOR_CRON_SECRET edge function secret, and the endpoint is unauthorised
@@ -43,8 +48,10 @@ CREATE INDEX IF NOT EXISTS idx_competitor_watchlist_user_active
 --   ALTER DATABASE postgres SET app.settings.competitor_cron_secret = '<same value as the edge secret>';
 --
 -- Cost note: this bills one Google Place Details call per watched practice per
--- day, for every account that watches anything. At the 25-practice watchlist cap
--- that is at most 25 calls per account per day.
+-- three days, for every account that watches anything. At the 25-practice
+-- watchlist cap that is at most 25 calls per account every three days, roughly
+-- 250 a month. Set COMPETITOR_SNAPSHOT_INTERVAL_DAYS to change the spacing
+-- without touching this schedule.
 -- ---------------------------------------------------------------------------
 
 DO $$
@@ -69,11 +76,17 @@ BEGIN
   PERFORM cron.unschedule('competitor-nightly-snapshot')
   WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'competitor-nightly-snapshot');
 
-  -- 07:10 UTC: after midnight in every US timezone, so a run lands on one
-  -- calendar day per local day and snapshot_date stays one row per real day.
+  -- 07:10 UTC on every third day of the month: after midnight in every US
+  -- timezone, so a run lands on one calendar day per local day and
+  -- snapshot_date stays one row per real day.
+  --
+  -- '*/3' on day-of-month restarts at the 1st, so the 31st and the 1st can fall
+  -- on consecutive days. That does not cost anything: the function itself skips
+  -- any practice snapshotted within COMPETITOR_SNAPSHOT_INTERVAL_DAYS (3), so
+  -- the spacing is guaranteed there rather than by this expression.
   PERFORM cron.schedule(
     'competitor-nightly-snapshot',
-    '10 7 * * *',
+    '10 7 */3 * *',
     format(
       $job$
       SELECT net.http_post(

@@ -367,18 +367,18 @@ idx_competitor_watchlist_user_active exist, and report any NOTICE the DO block r
 Do not change application code in this task.
 ```
 
-### 9b — turn on nightly snapshots
+### 9b — turn on scheduled snapshots
 
 Every trend line, the review race chart and the movement feed read `competitor_snapshots`,
 and rows only exist for days a snapshot was taken. On manual refresh alone, the weeks
 nobody opens the page are the weeks a competitor's review campaign goes unrecorded.
 
-**Cost first:** one Google Place Details call per watched practice per day, per account.
-The watchlist is capped at 25, so at most 25 calls per account per day. Everything else on
-the page works without this, just with sparser history. Decide before running it.
+**Cost:** one Google Place Details call per watched practice every three days, per account.
+The watchlist is capped at 25, so at most 25 calls per account every three days — roughly
+250 a month. Everything else on the page works without this, just with sparser history.
 
 ```
-Please enable the nightly competitor snapshot job.
+Please enable the scheduled competitor snapshot job.
 
 1. Generate a random secret. Set it as Edge Function secret COMPETITOR_CRON_SECRET, and:
 
@@ -388,17 +388,23 @@ Please enable the nightly competitor snapshot job.
 2. Confirm pg_cron and pg_net are enabled.
 3. Re-run supabase/migrations/20260811180000_competitor_watch_history.sql. The DO block is
    idempotent — it unschedules any existing job of the same name first.
-4. Confirm a cron.job row named 'competitor-nightly-snapshot' exists at '10 7 * * *'.
+4. Confirm a cron.job row named 'competitor-nightly-snapshot' exists at '10 7 */3 * *'.
 ```
 
 The `refresh-all` action is authorised by that secret alone and returns 401 while it is
 unset, so the endpoint stays closed until step 1 is done.
+
+The three-day spacing is enforced in the function, not by the cron expression: it skips any
+practice snapshotted within `COMPETITOR_SNAPSHOT_INTERVAL_DAYS`. So an early, doubled or
+missed run cannot bill twice for the same window. The manual Refresh button is unaffected
+and still returns same-day numbers.
 
 ### 9c — tuning knobs (reference)
 
 | Secret | Default | What it does |
 | --- | --- | --- |
 | `COMPETITOR_MAX_REQUESTS` | 60 | Ceiling on billed Google calls for one invocation. |
+| `COMPETITOR_SNAPSHOT_INTERVAL_DAYS` | 3 | Days between scheduled snapshots of a practice. |
 | `COMPETITOR_CRON_SECRET` | unset | Required for `refresh-all`. Unset means closed. |
 
 ---

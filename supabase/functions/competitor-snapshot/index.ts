@@ -37,6 +37,28 @@ const REFRESH_CONCURRENCY = 4;
 /** Hard cap on tracked competitors, so refresh cost stays predictable. */
 const MAX_WATCHLIST = 25;
 
+/**
+ * Days between scheduled snapshots of the same practice.
+ *
+ * Every Google call is billed, so the sweep samples every third day rather
+ * than nightly. Trends and the review race are unaffected — velocity is
+ * measured over real elapsed days, not per snapshot — and surge detection
+ * compares a competitor against their own baseline, so a wider spacing shifts
+ * when a surge is noticed rather than whether it is.
+ *
+ * This gate, not the cron expression, is what guarantees the spacing: it holds
+ * even if the schedule fires early, twice, or after a missed run.
+ */
+const SNAPSHOT_INTERVAL_DAYS = Number(
+  Deno.env.get("COMPETITOR_SNAPSHOT_INTERVAL_DAYS") ?? 3,
+);
+
+/**
+ * The manual Refresh button stays same-day: someone who pressed it and waited
+ * expects today's numbers, not "come back on Thursday".
+ */
+const MANUAL_INTERVAL_DAYS = 1;
+
 const DEFAULT_SEARCH_RADIUS_MILES = 10;
 const MAX_SEARCH_RADIUS_MILES = 30;
 
@@ -225,7 +247,10 @@ serve(async (req: Request) => {
     // -------------------------------------------------------------- refresh
     if (action === "refresh") {
       const places = new PlacesClient(requireApiKey(), MAX_GOOGLE_REQUESTS);
-      const result = await refreshUser(supabase, places, userId, body?.force === true);
+      const result = await refreshUser(supabase, places, userId, {
+        force: body?.force === true,
+        intervalDays: MANUAL_INTERVAL_DAYS,
+      });
       return json({ success: true, ...result, diagnostics: places.diagnostics });
     }
 
@@ -327,6 +352,11 @@ function utcToday(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** `YYYY-MM-DD` for `n` days before today, UTC. `n = 0` is today. */
+function utcDaysAgo(n: number): string {
+  return new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
+}
+
 function numberOrNull(value: unknown): number | null {
   if (value == null || value === "") return null;
   const n = Number(value);
@@ -397,21 +427,26 @@ interface RefreshOutcome {
   upToDate?: boolean;
 }
 
+interface RefreshOptions {
+  /** Snapshot regardless of how recently the practice was last captured. */
+  force?: boolean;
+  /** Minimum age of the newest snapshot before a practice is due again. */
+  intervalDays?: number;
+}
+
 /**
  * Snapshot every practice one user watches.
  *
- * Entries already captured today are skipped unless forced, which is what
- * makes this safe to call from both a button and a nightly cron without
- * paying Google twice for the same day.
+ * A practice is due when its newest snapshot is at least `intervalDays` old,
+ * so this is safe to call from both a button and a schedule without paying
+ * Google twice for the same window. `force` overrides the gate entirely.
  */
 async function refreshUser(
   supabase: any,
   places: PlacesClient,
   userId: string,
-  force: boolean,
+  { force = false, intervalDays = MANUAL_INTERVAL_DAYS }: RefreshOptions = {},
 ): Promise<RefreshOutcome> {
-  const today = utcToday();
-
   const { data: watchlist, error } = await supabase
     .from("competitor_watchlist")
     .select("id, google_place_id, name, latitude, longitude")
@@ -421,15 +456,19 @@ async function refreshUser(
 
   if (!watchlist?.length) return { refreshed: 0, skipped: 0, failed: 0 };
 
-  // One query for today's snapshots beats one existence check per entry.
-  const { data: todays } = await supabase
+  // Anything captured on or after this date is still fresh. At intervalDays=1
+  // that is today alone; at 3 it is today and the two days before it.
+  const freshFrom = utcDaysAgo(Math.max(0, intervalDays - 1));
+
+  // One range query beats one existence check per entry.
+  const { data: recent } = await supabase
     .from("competitor_snapshots")
     .select("watchlist_id")
     .eq("user_id", userId)
-    .eq("snapshot_date", today);
-  const alreadyToday = new Set((todays ?? []).map((s: any) => s.watchlist_id));
+    .gte("snapshot_date", freshFrom);
+  const stillFresh = new Set((recent ?? []).map((s: any) => s.watchlist_id));
 
-  const due = force ? watchlist : watchlist.filter((w: WatchlistRow) => !alreadyToday.has(w.id));
+  const due = force ? watchlist : watchlist.filter((w: WatchlistRow) => !stillFresh.has(w.id));
   const skipped = watchlist.length - due.length;
 
   if (due.length === 0) return { refreshed: 0, skipped, failed: 0, upToDate: true };
@@ -470,7 +509,9 @@ async function refreshAllUsers(supabase: any) {
   for (const userId of userIds) {
     try {
       const places = new PlacesClient(apiKey, MAX_GOOGLE_REQUESTS);
-      const result = await refreshUser(supabase, places, userId as string, false);
+      const result = await refreshUser(supabase, places, userId as string, {
+        intervalDays: SNAPSHOT_INTERVAL_DAYS,
+      });
       refreshed += result.refreshed;
       failed += result.failed;
     } catch (e) {
