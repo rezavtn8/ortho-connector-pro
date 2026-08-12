@@ -31,19 +31,29 @@ function path(deg: number, bend: number) {
   return { x, y, d: `M ${CENTER} ${CENTER} Q ${cx} ${cy} ${x} ${y}` };
 }
 
+/**
+ * `sends` is how many patients are on the wire at once, so a busy source runs a queue
+ * and a slow one sends the occasional single. `secs` is one patient's journey, varied
+ * per source so the six never fall into step and start reading as a pinwheel.
+ */
 const SOURCES = [
-  { deg: -152, bend: 30, delay: 0 },
-  { deg: -104, bend: -26, delay: 1.3 },
-  { deg: -48, bend: 28, delay: 2.6 },
-  { deg: 14, bend: -30, delay: 0.65 },
-  { deg: 74, bend: 26, delay: null }, // gone quiet
-  { deg: 138, bend: -28, delay: 1.95 },
+  { deg: -152, bend: 30, sends: 2, secs: 5.2, delay: 0 },
+  { deg: -104, bend: -26, sends: 3, secs: 4.1, delay: 1.4 },
+  { deg: -48, bend: 28, sends: 1, secs: 6.4, delay: 2.6 },
+  { deg: 14, bend: -30, sends: 2, secs: 4.8, delay: 0.7 },
+  { deg: 74, bend: 26, sends: 1, secs: 13, delay: 0, quiet: true },
+  { deg: 138, bend: -28, sends: 1, secs: 5.7, delay: 2 },
 ];
 
 /**
- * The entire pitch, drawn rather than written: five sources still sending, one that
- * stopped. Built from type-free geometry so it stays sharp at any size and costs
- * nothing to ship. `hub` is off where the logo is laid over the centre instead.
+ * The entire pitch, drawn rather than written: five sources still sending, one down to
+ * a patient every so often. Each arrival is a round dot with a short tail, running the
+ * curve into the practice and disappearing behind the mark.
+ *
+ * The dots are dashes on the path rather than elements moved along it: a zero-length
+ * dash under a round cap renders as a circle, and `pathLength="100"` normalises the
+ * geometry so spacing is a percentage and never has to be measured. `hub` is off where
+ * the logo is laid over the centre instead.
  */
 function Inflow({ className = '', hub = true }: { className?: string; hub?: boolean }) {
   return (
@@ -51,32 +61,58 @@ function Inflow({ className = '', hub = true }: { className?: string; hub?: bool
       viewBox="0 0 400 400"
       className={className}
       role="img"
-      aria-label="Six referral sources feeding one practice. One has gone quiet."
+      aria-label="Six referral sources sending patients to one practice. One has nearly stopped."
     >
       <circle cx={CENTER} cy={CENTER} r={RADIUS} fill="none" strokeWidth={1} className="stroke-connection-primary/10" />
       <circle cx={CENTER} cy={CENTER} r={RADIUS * 0.62} fill="none" strokeWidth={1} className="stroke-connection-primary/[0.06]" />
 
       {SOURCES.map((s) => {
         const { x, y, d } = path(s.deg, s.bend);
-        const quiet = s.delay === null;
+        // One dash period per patient in flight, so they space themselves evenly and
+        // the loop closes on itself with no jump.
+        const gap = 100 / s.sends;
+        const timing = { animationDuration: `${s.secs}s`, animationDelay: `${s.delay}s` };
 
         return (
-          <g key={s.deg} className={quiet ? 'animate-quiet opacity-50' : undefined}>
+          <g key={s.deg} className={s.quiet ? 'animate-quiet opacity-60' : undefined}>
             <path d={d} fill="none" strokeWidth={1} className="stroke-connection-primary/25" />
 
-            {!quiet && (
-              <path
-                d={d}
-                pathLength={100}
-                fill="none"
-                strokeWidth={2.5}
-                strokeLinecap="round"
-                strokeDasharray="3 97"
-                className="stroke-connection-primary animate-inflow"
-                style={{ animationDelay: `${s.delay}s` }}
-              />
-            )}
+            {/* The tail, sitting behind the dot and travelling with it. */}
+            <path
+              d={d}
+              pathLength={100}
+              fill="none"
+              strokeWidth={2.5}
+              strokeLinecap="round"
+              strokeDasharray={`9 ${gap - 9}`}
+              className="stroke-connection-primary/35 animate-inflow"
+              style={timing}
+            />
 
+            {/* Halo, then the patient. Same phase, so it rides with the dot. */}
+            <path
+              d={d}
+              pathLength={100}
+              fill="none"
+              strokeWidth={14}
+              strokeLinecap="round"
+              strokeDasharray={`0.01 ${gap - 0.01}`}
+              className="stroke-connection-primary/15 animate-inflow"
+              style={timing}
+            />
+            <path
+              d={d}
+              pathLength={100}
+              fill="none"
+              strokeWidth={7}
+              strokeLinecap="round"
+              strokeDasharray={`0.01 ${gap - 0.01}`}
+              className="stroke-connection-primary animate-inflow drop-shadow-circuit"
+              style={timing}
+            />
+
+            {/* The source itself. */}
+            <circle cx={x} cy={y} r={7} fill="none" strokeWidth={1} className="stroke-connection-primary/25" />
             <circle cx={x} cy={y} r={3} className="fill-connection-primary/70" />
           </g>
         );
