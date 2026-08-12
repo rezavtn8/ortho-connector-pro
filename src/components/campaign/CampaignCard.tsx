@@ -46,11 +46,16 @@ export function CampaignCard({
   onStatus,
   compact = false,
 }: CampaignCardProps) {
-  const meta = METHOD_META[campaign.method];
-  const { progress, stats, attention } = campaign;
+  // A campaign can arrive from a stale cache or a partial write without its derived
+  // roll-up; fall back rather than take the whole page down.
+  const method = normalizeMethod(campaign.method ?? campaign.delivery_method);
+  const meta = METHOD_META[method] ?? METHOD_META.physical;
+  const stats = campaign.stats ?? EMPTY_STATS;
+  const progress = campaign.progress ?? progressFor(method, stats);
+  const attention = campaign.attention ?? null;
   const attentionStyle = attention ? ATTENTION_STYLE[attention.level] : null;
 
-  const tiers = Object.entries(stats.tiers).sort((a, b) => b[1] - a[1]);
+  const tiers = Object.entries(stats.tiers ?? {}).sort((a, b) => b[1] - a[1]);
 
   return (
     <Card
