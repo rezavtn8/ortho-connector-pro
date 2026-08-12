@@ -39,10 +39,10 @@ function path(deg: number, bend: number) {
 const SOURCES = [
   { deg: -152, bend: 30, sends: 2, secs: 5.2, delay: 0 },
   { deg: -104, bend: -26, sends: 3, secs: 4.1, delay: 1.4 },
-  { deg: -48, bend: 28, sends: 1, secs: 6.4, delay: 2.6 },
+  { deg: -48, bend: 28, sends: 2, secs: 5.8, delay: 2.6 },
   { deg: 14, bend: -30, sends: 2, secs: 4.8, delay: 0.7 },
-  { deg: 74, bend: 26, sends: 1, secs: 13, delay: 0, quiet: true },
-  { deg: 138, bend: -28, sends: 1, secs: 5.7, delay: 2 },
+  { deg: 74, bend: 26, sends: 1, secs: 7.5, delay: 0, quiet: true },
+  { deg: 138, bend: -28, sends: 2, secs: 5, delay: 2 },
 ];
 
 /**
@@ -74,7 +74,7 @@ function Inflow({ className = '', hub = true }: { className?: string; hub?: bool
         const timing = { animationDuration: `${s.secs}s`, animationDelay: `${s.delay}s` };
 
         return (
-          <g key={s.deg} className={s.quiet ? 'animate-quiet opacity-60' : undefined}>
+          <g key={s.deg} className={s.quiet ? 'animate-quiet opacity-75' : undefined}>
             <path d={d} fill="none" strokeWidth={1} className="stroke-connection-primary/25" />
 
             {/* The tail, sitting behind the dot and travelling with it. */}

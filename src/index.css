@@ -516,11 +516,11 @@ All colors MUST be HSL.
     to { stroke-dashoffset: 100; }
   }
 
-  /* The one source that has stopped sending. It breathes out and nearly
-     disappears, which is the whole product argument without a sentence. */
+  /* The source that has nearly stopped. It breathes out, but stays legible — faded to
+     the point of vanishing it just reads as a rendering fault. */
   @keyframes quiet {
-    0%, 100% { opacity: 0.5; }
-    50% { opacity: 0.08; }
+    0%, 100% { opacity: 0.9; }
+    50% { opacity: 0.5; }
   }
 
   @keyframes breathe {
